@@ -1,0 +1,35 @@
++-------------------+     +--------------------+     +-----------------------+
+|                   |     |                    |     |                       |
+|    Admin Portal   |     |   User Interface   |     |   AI Verification     |
+|                   |     |                    |     |                       |
++--------+----------+     +---------+----------+     +-----------+-----------+
+         |                            |                          |
+         | Upload genuine COS PDFs    |                          |
+         +---------->-----------------+                          |
+                                      |                          |
+                                      | Upload COS for           |
+                                      | verification             |
+                                      +--------->----------------+
+                                                                   |
+                                                                   |
+                                        Extract metadata from uploaded PDF
+                                                                   |
+                                                                   v
+                                       +-----------------------------+
+                                       |  Trusted Patterns Database  |
+                                       | (Stores metadata from admin  |
+                                       |  uploaded genuine COS docs) |
+                                       +--------------+--------------+
+                                                      |
+                                                      v
+                        Compare against trusted patterns using:
+                        - Rule-based matching
+                        - Vector similarity (SentenceTransformers)
+                        - ML model inference (ONNX Runtime)
+
+                           Result: Genuine / Edited / Fake (with confidence)
+                                      ^        ^         ^
+                                      |        |         |
+                                      +--------+---------+
+                                               |
+                                 Display result to user
