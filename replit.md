@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is a Certificate of Shipment (COS) verification system that uses AI to detect fake or edited COS documents. The application features a dual-portal design with a user interface for document verification and an admin portal for managing trusted patterns. The system leverages machine learning techniques including rule-based matching, vector similarity analysis, and ML model inference to provide accurate document authenticity assessments.
+This is a Certificate of Sponsorship (COS) verification system that uses AI to detect fake or edited COS documents. The application features a dual-portal design with a user interface for document verification and an admin portal for managing trusted patterns. The system leverages machine learning techniques including rule-based matching, vector similarity analysis, and ML model inference to provide accurate document authenticity assessments.
 
 ## System Architecture
 
@@ -11,14 +11,14 @@ This is a Certificate of Shipment (COS) verification system that uses AI to dete
 - **Styling**: Tailwind CSS with shadcn/ui component library
 - **Routing**: Wouter for client-side routing
 - **State Management**: TanStack Query for server state management
-- **Build Tool**: Vite for development and production builds
+- **Build Tool**: Vite with SWC compiler for enhanced performance
 
 ### Backend Architecture
-- **Runtime**: Node.js with Express.js
-- **Database**: PostgreSQL with Neon serverless
-- **ORM**: Drizzle ORM for type-safe database operations
-- **File Upload**: Multer for handling PDF uploads
-- **PDF Processing**: Custom PDF analyzer service for metadata extraction
+- **Runtime**: FastAPI with async support for high performance
+- **Database**: DuckDB for in-process storage
+- **PDF Processing**: PyMuPDF for comprehensive metadata extraction
+- **AI Engine**: ONNX Runtime for ML model inference
+- **Vectorization**: TF-IDF with scikit-learn (all-MiniLM-L6-v2 model planned)
 
 ### Database Design
 The system uses PostgreSQL with three main tables:

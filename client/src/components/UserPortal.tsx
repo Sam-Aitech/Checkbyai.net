@@ -48,7 +48,7 @@ export default function UserPortal() {
     <div>
       {/* Hero Section */}
       <div className="text-center mb-12">
-        <h2 className="text-3xl font-bold text-gray-900 mb-4">Verify Certificate of Shipment</h2>
+        <h2 className="text-3xl font-bold text-gray-900 mb-4">Verify Certificate of Sponsorship</h2>
         <p className="text-lg text-gray-600 max-w-3xl mx-auto">
           Upload your COS document for instant verification against our database of trusted patterns. 
           Our AI-powered system analyzes PDF metadata to detect genuine, edited, or fraudulent documents.

@@ -23,7 +23,7 @@ export default function Home() {
                 <h1 className="text-xl font-bold text-gray-900">COS Checker</h1>
               </div>
               <span className="text-sm text-gray-500 hidden sm:block">
-                Certificate of Shipment Verification
+                Certificate of Sponsorship Verification
               </span>
             </div>
             
