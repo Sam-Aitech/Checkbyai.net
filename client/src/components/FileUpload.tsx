@@ -129,7 +129,6 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
 
       const transformedResult = {
         type: typeMapping[data.result] || 'Fake',
-        confidence: data.confidence || 0,
         mismatchedFields: data.mismatchedFields || []
       };
 

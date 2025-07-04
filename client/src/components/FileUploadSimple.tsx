@@ -2,7 +2,6 @@ import { useState } from 'react';
 
 interface VerificationResult {
   type: 'Genuine' | 'Edited' | 'Fake';
-  confidence: number;
   mismatchedFields?: string[];
 }
 
@@ -91,7 +90,6 @@ export default function FileUploadSimple() {
 
       const transformedResult: VerificationResult = {
         type: typeMapping[data.result] || 'Fake',
-        confidence: data.confidence || 0,
         mismatchedFields: data.mismatchedFields || []
       };
 

@@ -7,7 +7,6 @@ import { useToast } from "@/hooks/use-toast";
 
 interface VerificationResult {
   type: 'Genuine' | 'Edited' | 'Fake';
-  confidence: number;
   mismatchedFields?: string[];
 }
 
@@ -25,7 +24,6 @@ export default function UserPortal() {
 
     return {
       type: typeMapping[backendResult.result] || 'Fake',
-      confidence: backendResult.confidence || 0,
       mismatchedFields: backendResult.mismatchedFields || []
     };
   };
@@ -41,7 +39,7 @@ export default function UserPortal() {
       setVerificationResult(transformedResult);
       toast({
         title: "Verification Complete",
-        description: `Document verified as ${transformedResult.type.toUpperCase()} with ${(transformedResult.confidence * 100).toFixed(1)}% confidence`,
+        description: `Document verified as ${transformedResult.type.toUpperCase()}`,
       });
     },
     onError: (error) => {
@@ -134,7 +132,7 @@ export default function UserPortal() {
               </div>
               <div>
                 <h4 className="font-medium text-gray-900">Result Generation</h4>
-                <p className="text-sm text-gray-600">Generate confidence score and detailed verification report</p>
+                <p className="text-sm text-gray-600">Generate verification result and detailed analysis</p>
               </div>
             </div>
           </div>
