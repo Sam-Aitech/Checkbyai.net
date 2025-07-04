@@ -1,66 +1,138 @@
-import { useState } from "react";
+import { useState, Suspense, lazy } from "react";
 import { Link } from "wouter";
-import UserPortal from "@/components/UserPortal";
-import AdminPortal from "@/components/AdminPortal";
+import { Shield, Database, LayoutDashboard, ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
-import { Shield, Database, LayoutDashboard } from "lucide-react";
+
+// Lazy load heavy components for better performance
+const UserPortal = lazy(() => import("@/components/UserPortal"));
+const AdminPortal = lazy(() => import("@/components/AdminPortal"));
+const HeroSection = lazy(() => import("@/components/HeroSection"));
+
+function LoadingSpinner() {
+  return (
+    <div className="flex items-center justify-center py-8">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+    </div>
+  );
+}
 
 export default function Home() {
+  const [showPortals, setShowPortals] = useState(false);
   const [activeMode, setActiveMode] = useState<'user' | 'admin'>('user');
 
   const { data: stats } = useQuery({
     queryKey: ['/api/stats'],
   });
 
+  // Show landing page first, then portals on user action
+  if (!showPortals) {
+    return (
+      <div className="min-h-screen">
+        {/* Modern Navigation Header */}
+        <nav className="fixed top-0 w-full z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-700">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center h-16">
+              <div className="flex items-center space-x-3">
+                <Shield className="text-blue-600 text-2xl" />
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900 dark:text-white">COS Verifier</h1>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">AI-Powered Document Authentication</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-4">
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setShowPortals(true)}
+                  className="text-gray-600 hover:text-blue-600"
+                >
+                  Launch App
+                  <ArrowRight className="ml-2 w-4 h-4" />
+                </Button>
+                
+                <Link href="/dashboard">
+                  <Button variant="outline" size="sm">
+                    <LayoutDashboard className="mr-2 w-4 h-4" />
+                    Dashboard
+                  </Button>
+                </Link>
+                
+                <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
+                  <Database className="w-4 h-4" />
+                  <span>{stats?.trustedPatterns || 0}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </nav>
+
+        {/* 3D Landing Page */}
+        <Suspense fallback={<LoadingSpinner />}>
+          <HeroSection />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // Show application portals
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Application Header */}
+      <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setShowPortals(false)}
+                className="text-gray-600 hover:text-blue-600"
+              >
+                ← Back to Home
+              </Button>
+              
               <div className="flex items-center space-x-2">
-                <Shield className="text-primary text-2xl" />
-                <h1 className="text-xl font-bold text-gray-900">COS Checker</h1>
+                <Shield className="text-blue-600 text-xl" />
+                <h1 className="text-lg font-bold text-gray-900 dark:text-white">COS Verifier</h1>
               </div>
-              <span className="text-sm text-gray-500 hidden sm:block">
-                Certificate of Sponsorship Verification
-              </span>
             </div>
             
             <div className="flex items-center space-x-4">
-              <Link href="/dashboard" className="flex items-center space-x-2 px-3 py-2 text-sm font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors">
-                <LayoutDashboard className="h-4 w-4" />
-                <span>Simple Dashboard</span>
+              <Link href="/dashboard">
+                <Button variant="outline" size="sm">
+                  <LayoutDashboard className="mr-2 w-4 h-4" />
+                  Dashboard
+                </Button>
               </Link>
               
-              <div className="flex bg-gray-100 rounded-lg p-1">
+              <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
                 <button
                   onClick={() => setActiveMode('user')}
                   className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
                     activeMode === 'user'
-                      ? 'bg-white text-primary shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
+                      ? 'bg-white dark:bg-gray-800 text-blue-600 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
                   }`}
                 >
-                  <span className="fas fa-user mr-2"></span>User Portal
+                  User Portal
                 </button>
                 <button
                   onClick={() => setActiveMode('admin')}
                   className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
                     activeMode === 'admin'
-                      ? 'bg-white text-primary shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
+                      ? 'bg-white dark:bg-gray-800 text-blue-600 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
                   }`}
                 >
-                  <span className="fas fa-cog mr-2"></span>Admin Portal
+                  Admin Portal
                 </button>
               </div>
               
-              <div className="flex items-center space-x-2 text-sm text-gray-600">
-                <Database className="h-4 w-4" />
+              <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
+                <Database className="w-4 h-4" />
                 <span>{stats?.trustedPatterns || 0}</span>
-                <span className="hidden sm:inline">trusted patterns</span>
               </div>
             </div>
           </div>
@@ -69,43 +141,10 @@ export default function Home() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeMode === 'user' ? <UserPortal /> : <AdminPortal />}
+        <Suspense fallback={<LoadingSpinner />}>
+          {activeMode === 'user' ? <UserPortal /> : <AdminPortal />}
+        </Suspense>
       </main>
-
-      {/* Footer */}
-      <footer className="bg-white border-t border-gray-200 mt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="grid md:grid-cols-3 gap-8">
-            <div>
-              <h4 className="font-semibold text-gray-900 mb-4">About COS Checker</h4>
-              <p className="text-sm text-gray-600">
-                Advanced PDF metadata analysis system for Certificate of Shipment verification. 
-                Powered by machine learning and trusted pattern recognition.
-              </p>
-            </div>
-            <div>
-              <h4 className="font-semibold text-gray-900 mb-4">Technical Details</h4>
-              <ul className="text-sm text-gray-600 space-y-2">
-                <li><span className="fas fa-check mr-2 text-green-500"></span>XMP Metadata Extraction</li>
-                <li><span className="fas fa-check mr-2 text-green-500"></span>Vector Similarity Analysis</li>
-                <li><span className="fas fa-check mr-2 text-green-500"></span>ONNX Runtime ML Models</li>
-                <li><span className="fas fa-check mr-2 text-green-500"></span>Rule-based Pattern Matching</li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold text-gray-900 mb-4">System Status</h4>
-              <div className="flex items-center space-x-2 text-sm text-gray-600 mb-2">
-                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                <span>All Systems Operational</span>
-              </div>
-              <div className="text-sm text-gray-500">
-                <p>Last Updated: {new Date().toLocaleString()}</p>
-                <p>Version: 2.1.3</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }
