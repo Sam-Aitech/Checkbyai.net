@@ -21,10 +21,11 @@ This is a Certificate of Sponsorship (COS) verification system that uses AI to d
 - **Vectorization**: TF-IDF with scikit-learn (all-MiniLM-L6-v2 model planned)
 
 ### Database Design
-The system uses PostgreSQL with three main tables:
-- `users`: User authentication and management
-- `trusted_patterns`: Storage of verified COS documents and their metadata
-- `verification_results`: Historical record of verification attempts and results
+The system uses DuckDB with four main tables (updated per user requirements):
+- `users`: User authentication with role-based access (admin/user)
+- `trusted_cos_patterns`: Storage of genuine COS documents with metadata and pattern hashes
+- `submitted_cos`: User-submitted COS documents for verification
+- `verification_results`: Historical record with result_type (Genuine/Edited/Fake) and confidence scores
 
 ## Key Components
 
@@ -120,6 +121,12 @@ The system uses PostgreSQL with three main tables:
 
 ```
 Changelog:
+- July 04, 2025. Restructured to dual-portal Python/React architecture
+  - Migrated from Node.js Express to Python FastAPI backend
+  - Updated database schema per user specifications
+  - Implemented AI engine with PyMuPDF and TF-IDF vectorization
+  - Created dual-portal frontend (user verification + admin management)
+  - Added pattern hash-based document comparison
 - July 03, 2025. Initial setup
 ```
 
