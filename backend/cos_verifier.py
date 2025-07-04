@@ -24,7 +24,8 @@ class COSVerifier:
         self.thresholds = {
             'exact_match': 0.98,  # For hash-based exact match
             'genuine': 0.85,      # For vector similarity threshold
-            'edited': 0.6         # Lower threshold for edited documents
+            'edited': 0.6,        # Medium threshold for edited documents
+            'fake': 0.45          # Lower threshold for fake documents
         }
         
         # Store trusted patterns
@@ -104,9 +105,51 @@ class COSVerifier:
             best_match_idx = np.argmax(similarities)
             best_similarity = similarities[best_match_idx]
             best_pattern = self.trusted_patterns[best_match_idx]
-            return best_similarity, best_pattern
+            
+            # Apply field-based penalty for completely different documents
+            field_similarity = self._calculate_field_similarity(extracted_metadata, best_pattern['metadata'])
+            
+            # Combine vector similarity with field similarity (weighted average)
+            # Field similarity gets more weight to properly identify fake documents
+            combined_similarity = (best_similarity * 0.3) + (field_similarity * 0.7)
+            
+            return combined_similarity, best_pattern
         
         return 0, None
+    
+    def _calculate_field_similarity(self, metadata1: dict, metadata2: dict) -> float:
+        """Calculate field-based similarity for better fake detection"""
+        matched_fields = 0
+        total_fields = len(self.key_fields)
+        
+        for field in self.key_fields:
+            if field in metadata1 and field in metadata2:
+                val1 = self._clean_value(metadata1[field])
+                val2 = self._clean_value(metadata2[field])
+                
+                if val1 == val2:
+                    matched_fields += 1
+                elif self._string_similarity(val1, val2) > 0.8:
+                    # Partial match for similar values
+                    matched_fields += 0.5
+        
+        return matched_fields / total_fields
+    
+    def _string_similarity(self, str1: str, str2: str) -> float:
+        """Calculate string similarity using simple edit distance"""
+        if str1 == str2:
+            return 1.0
+        
+        # Simple Levenshtein distance approximation
+        len1, len2 = len(str1), len(str2)
+        if len1 == 0 or len2 == 0:
+            return 0.0
+        
+        # Count common characters
+        common = sum(1 for a, b in zip(str1, str2) if a == b)
+        max_len = max(len1, len2)
+        
+        return common / max_len
     
     def _field_by_field_comparison(self, extracted_metadata: dict, pattern: dict) -> tuple:
         """Do detailed field-by-field comparison"""

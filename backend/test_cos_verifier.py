@@ -155,18 +155,17 @@ def test_fake_document():
     
     # Test with completely different metadata (fake document)
     extracted_metadata = {
-        "dc:date": "2024-01-01T00:00:00Z",
+        "dc:date": "2022-01-01T12:00:00Z",
         "dc:language": "fr-FR",
-        "pdf:Producer": "Microsoft Word 2019",
-        "xmp:CreateDate": "2024-01-01T00:00:00Z",
-        "xmp:CreatorTool": "Microsoft Word 2019",
-        "xmp:MetadataDate": "2024-01-01T00:00:00Z"
+        "pdf:Producer": "Adobe Acrobat Pro DC",
+        "xmp:CreateDate": "2022-01-01T12:00:00Z",
+        "xmp:CreatorTool": "Adobe Acrobat Pro DC",
+        "xmp:MetadataDate": "2022-01-01T12:00:00Z"
     }
     
     result = verifier.verify_cos(extracted_metadata)
-    # Accept either Fake or Edited for completely different metadata
-    assert result["type"] in ["Fake", "Edited"], f"Should identify as fake or edited document, got {result['type']}"
-    assert result["confidence"] < 0.85, f"Lower confidence expected for fake document, got {result['confidence']:.2f}"
+    assert result["type"] == "Fake", f"Should identify fake document, got {result['type']}"
+    assert result["confidence"] < 0.6, f"Low confidence expected for fake document, got {result['confidence']:.2f}"
     print(f"✓ Fake document test passed: {result['type']} with {result['confidence']:.2f} confidence")
 
 def test_multiple_trusted_patterns():
