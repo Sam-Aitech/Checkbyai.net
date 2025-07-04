@@ -37,7 +37,8 @@ export default function Dashboard() {
       });
       
       if (!response.ok) {
-        throw new Error('Verification failed');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`Verification Failed ${response.status}: ${errorData.error || 'Unknown error'}`);
       }
       
       const data = await response.json();
