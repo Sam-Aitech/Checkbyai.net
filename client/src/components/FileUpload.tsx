@@ -230,12 +230,12 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
           <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Verification Result</h3>
           
           <div className="flex items-center gap-3 mb-4">
-            <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+            <div className={`px-3 py-1 rounded-full text-sm font-medium transition-all duration-700 ease-in-out transform hover:scale-105 ${
               localResult.type === 'Genuine' 
-                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                ? 'bg-gradient-to-r from-green-400 to-emerald-500 text-white shadow-lg shadow-green-500/25 animate-pulse'
                 : localResult.type === 'Edited'
-                ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white shadow-lg shadow-yellow-500/25 animate-bounce'
+                : 'bg-gradient-to-r from-red-400 to-rose-500 text-white shadow-lg shadow-red-500/25 animate-pulse'
             }`}>
               {localResult.type}
             </div>
