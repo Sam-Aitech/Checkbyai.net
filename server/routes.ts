@@ -12,7 +12,8 @@ const upload = multer({
   limits: {
     fileSize: 50 * 1024 * 1024, // 50MB
   },
-  fileFilter: (req, file, cb) => {
+  fileFilter: (req: any, file: any, cb: any) => {
+    console.log('Multer fileFilter called:', file);
     if (file.mimetype === 'application/pdf') {
       cb(null, true);
     } else {
@@ -24,6 +25,25 @@ const upload = multer({
 const pdfAnalyzer = new PDFAnalyzer();
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Debug middleware for file uploads
+  app.use('/api/verify', (req, res, next) => {
+    console.log('=== VERIFY REQUEST DEBUG ===');
+    console.log('Method:', req.method);
+    console.log('Content-Type:', req.headers['content-type']);
+    console.log('Content-Length:', req.headers['content-length']);
+    console.log('Body keys:', Object.keys(req.body || {}));
+    console.log('Raw body available:', !!req.body);
+    next();
+  });
+
+  app.use('/api/admin/upload-pattern', (req, res, next) => {
+    console.log('=== ADMIN UPLOAD REQUEST DEBUG ===');
+    console.log('Method:', req.method);
+    console.log('Content-Type:', req.headers['content-type']);
+    console.log('Content-Length:', req.headers['content-length']);
+    next();
+  });
+
   // Get statistics
   app.get("/api/stats", async (req, res) => {
     try {
