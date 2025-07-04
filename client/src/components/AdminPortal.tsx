@@ -157,11 +157,7 @@ export default function AdminPortal() {
           <h3 className="text-xl font-semibold text-gray-900 mb-6">Upload Genuine COS Documents</h3>
           
           <FileUpload
-            onFileSelect={handleFileUpload}
-            isLoading={uploadPatternMutation.isPending}
-            accept=".pdf"
-            maxSize={50 * 1024 * 1024} // 50MB
-            multiple
+            onFileUpload={handleFileUpload}
           />
 
           <div className="space-y-4 mb-6 mt-6">

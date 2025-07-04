@@ -1,138 +1,126 @@
-import { useState, useCallback } from "react";
-import { useDropzone } from "react-dropzone";
-import { CloudUpload, FileText, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
+import { useState } from 'react';
 
 interface FileUploadProps {
-  onFileSelect: (file: File) => void;
-  isLoading?: boolean;
-  accept?: string;
-  maxSize?: number;
-  multiple?: boolean;
+  onFileUpload: (file: File) => void;
 }
 
-export default function FileUpload({
-  onFileSelect,
-  isLoading = false,
-  accept = ".pdf",
-  maxSize = 10 * 1024 * 1024, // 10MB default
-  multiple = false
-}: FileUploadProps) {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
+export default function FileUpload({ onFileUpload }: FileUploadProps) {
+  const [file, setFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [error, setError] = useState('');
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    if (acceptedFiles.length > 0) {
-      const file = acceptedFiles[0];
-      setSelectedFile(file);
-      if (!multiple) {
-        onFileSelect(file);
-      }
-    }
-  }, [onFileSelect, multiple]);
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
 
-  const { getRootProps, getInputProps, isDragActive, fileRejections } = useDropzone({
-    onDrop,
-    accept: {
-      'application/pdf': ['.pdf']
-    },
-    maxSize,
-    multiple,
-    disabled: isLoading
-  });
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
 
-  const handleSubmit = () => {
-    if (selectedFile) {
-      onFileSelect(selectedFile);
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const selectedFile = e.dataTransfer.files[0];
+      processFile(selectedFile);
     }
   };
 
-  const removeFile = () => {
-    setSelectedFile(null);
-    setUploadProgress(0);
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const selectedFile = e.target.files[0];
+      processFile(selectedFile);
+    }
   };
 
-  // Simulate upload progress when loading
-  useState(() => {
-    if (isLoading) {
-      const interval = setInterval(() => {
-        setUploadProgress((prev) => {
-          if (prev >= 100) {
-            clearInterval(interval);
-            return 100;
-          }
-          return prev + 10;
-        });
-      }, 200);
-      return () => clearInterval(interval);
-    } else {
-      setUploadProgress(0);
+  const processFile = (selectedFile: File) => {
+    if (selectedFile.type !== 'application/pdf') {
+      setError('Please upload a valid PDF file.');
+      return;
     }
-  });
+    
+    setFile(selectedFile);
+    setError('');
+    
+    // Trigger parent component callback
+    if (onFileUpload) {
+      onFileUpload(selectedFile);
+    }
+  };
 
   return (
-    <div className="space-y-4">
-      <div
-        {...getRootProps()}
-        className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors duration-200 ${
-          isDragActive
-            ? 'border-primary bg-primary/5'
-            : 'border-gray-300 hover:border-primary/40'
-        } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+    <div className="w-full">
+      <div 
+        className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
+          ${isDragging ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30' : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'}`}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
       >
-        <input {...getInputProps()} />
-        <CloudUpload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-        {isDragActive ? (
-          <p className="text-gray-600">Drop the PDF file here...</p>
-        ) : (
-          <div>
-            <p className="text-gray-600 mb-2">Choose PDF file or drag it here</p>
-            <p className="text-sm text-gray-400">
-              Maximum file size: {Math.round(maxSize / (1024 * 1024))}MB
-            </p>
-          </div>
-        )}
+        <svg 
+          className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500" 
+          stroke="currentColor" 
+          fill="none" 
+          viewBox="0 0 48 48"
+        >
+          <path 
+            d="M24 12c0-2.21-1.79-4-4-4S16 9.79 16 12s1.79 4 4 4 4-1.79 4-4zm0 12c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm0 12c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4z" 
+            strokeLinecap="round" 
+            strokeLinejoin="round" 
+            strokeWidth="2"
+          />
+        </svg>
+        
+        <h3 className="mt-2 text-lg font-medium text-gray-900 dark:text-gray-100">Upload COS Document</h3>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Drag and drop your PDF file here, or click to select</p>
+        
+        <input 
+          type="file" 
+          accept=".pdf" 
+          onChange={handleFileChange}
+          className="hidden"
+          id="file-upload"
+        />
+        
+        <label 
+          htmlFor="file-upload"
+          className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"
+        >
+          Select PDF File
+        </label>
       </div>
-
-      {fileRejections.length > 0 && (
-        <div className="text-red-600 text-sm">
-          {fileRejections[0].errors[0].message}
+      
+      {file && (
+        <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-md">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <svg className="h-5 w-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span className="ml-2 text-sm text-gray-900 dark:text-gray-100 truncate">{file.name}</span>
+            </div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">
+              {(file.size / 1024).toFixed(1)} KB
+            </div>
+          </div>
         </div>
       )}
-
-      {selectedFile && (
-        <div className="bg-gray-50 rounded-lg p-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center space-x-2">
-              <FileText className="h-5 w-5 text-red-500" />
-              <span className="text-sm font-medium text-gray-900">{selectedFile.name}</span>
-              <span className="text-xs text-gray-500">
-                ({(selectedFile.size / (1024 * 1024)).toFixed(1)} MB)
-              </span>
-            </div>
-            {!isLoading && (
-              <Button variant="ghost" size="sm" onClick={removeFile}>
-                <X className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-
-          {isLoading && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm text-gray-600">
-                <span>Processing...</span>
-                <span>{uploadProgress}%</span>
-              </div>
-              <Progress value={uploadProgress} className="h-2" />
-            </div>
-          )}
-
-          {multiple && !isLoading && (
-            <Button onClick={handleSubmit} className="w-full mt-2">
-              Upload File
-            </Button>
-          )}
+      
+      {error && (
+        <div className="mt-4 p-3 bg-red-100 dark:bg-red-900/30 border-l-4 border-red-500 text-red-700 dark:text-red-400">
+          <p className="text-sm">{error}</p>
         </div>
       )}
     </div>

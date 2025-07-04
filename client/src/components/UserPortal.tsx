@@ -66,10 +66,7 @@ export default function UserPortal() {
           </div>
 
           <FileUpload
-            onFileSelect={handleFileUpload}
-            isLoading={verifyMutation.isPending}
-            accept=".pdf"
-            maxSize={10 * 1024 * 1024} // 10MB
+            onFileUpload={handleFileUpload}
           />
         </div>
 
