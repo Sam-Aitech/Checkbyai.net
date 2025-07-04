@@ -12,6 +12,12 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState('');
 
+  console.log('FileUpload component props:');
+  console.log('  onFileUpload:', !!onFileUpload);
+  console.log('  onVerificationResult:', !!onVerificationResult);
+  console.log('  onLoading:', !!onLoading);
+  console.log('  onError:', !!onError);
+
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -63,14 +69,12 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
     setFile(selectedFile);
     setError('');
     
-    // Trigger parent component callback
+    // Always trigger verification directly
+    uploadAndVerify(selectedFile);
+    
+    // Also trigger parent component callback for compatibility
     if (onFileUpload) {
       onFileUpload(selectedFile);
-    }
-    
-    // Also handle verification directly if callbacks are provided
-    if (onVerificationResult) {
-      uploadAndVerify(selectedFile);
     }
   };
 
