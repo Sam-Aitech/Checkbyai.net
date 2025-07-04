@@ -7,8 +7,12 @@ from typing import List, Dict, Any
 import hashlib
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
+from cos_verifier import COSVerifier
 
 app = FastAPI(title="COS Checker API")
+
+# Initialize AI comparison engine
+cos_verifier = COSVerifier()
 
 # In-memory database for demo purposes
 trusted_patterns = []
@@ -102,8 +106,12 @@ async def upload_trusted(file: UploadFile = File(...)):
         
         # Create trusted pattern
         pattern_id = len(trusted_patterns) + 1
-        pattern = TrustedPattern(pattern_id, file.filename, metadata)
+        pattern = TrustedPattern(pattern_id, file.filename or "unknown", metadata)
         trusted_patterns.append(pattern)
+        
+        # Reload patterns in AI verifier
+        pattern_list = [{"id": p.id, "filename": p.filename, "metadata": p.metadata} for p in trusted_patterns]
+        cos_verifier.load_trusted_patterns(pattern_list)
         
         return {"message": "Trusted pattern added successfully", "pattern_id": pattern_id}
         
@@ -154,8 +162,15 @@ async def verify_cos(file: UploadFile = File(...)):
         # Remove temporary file
         os.remove(temp_path)
         
-        # Compare with trusted patterns
-        result = compare_with_trusted(metadata)
+        # Compare with trusted patterns using AI engine
+        if trusted_patterns:
+            try:
+                result = cos_verifier.verify_cos(metadata)
+            except ValueError:
+                # Fallback to basic comparison if AI engine fails
+                result = compare_with_trusted(metadata)
+        else:
+            result = compare_with_trusted(metadata)
         
         # Store submission
         submission_id = len(submitted_documents) + 1

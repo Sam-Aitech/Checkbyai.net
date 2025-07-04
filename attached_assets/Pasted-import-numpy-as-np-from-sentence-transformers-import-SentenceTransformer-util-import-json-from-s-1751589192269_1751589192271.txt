@@ -1,0 +1,188 @@
+import numpy as np
+from sentence_transformers import SentenceTransformer, util
+import json
+from sklearn.metrics.pairwise import cosine_similarity
+import re
+
+class COSVerifier:
+    def __init__(self):
+        # Load pre-trained model for text embeddings
+        self.model = SentenceTransformer('all-MiniLM-L6-v2')
+        
+        # Key metadata fields for comparison
+        self.key_fields = [
+            'dc:date', 
+            'dc:language', 
+            'pdf:Producer', 
+            'xmp:CreateDate', 
+            'xmp:CreatorTool', 
+            'xmp:MetadataDate'
+        ]
+        
+        # Thresholds for different result types
+        self.thresholds = {
+            'exact_match': 0.98,  # For hash-based exact match
+            'genuine': 0.85,      # For vector similarity threshold
+            'edited': 0.6         # Lower threshold for edited documents
+        }
+        
+        # Store trusted patterns
+        self.trusted_patterns = []
+        self.trusted_embeddings = []
+        
+    def load_trusted_patterns(self, patterns: list):
+        """Load trusted patterns and create embeddings"""
+        self.trusted_patterns = []
+        self.trusted_embeddings = []
+        
+        for pattern in patterns:
+            # Convert pattern to string representation
+            pattern_str = self._pattern_to_string(pattern['metadata'])
+            
+            # Create embedding
+            embedding = self.model.encode(pattern_str, convert_to_tensor=True)
+            
+            # Store pattern and embedding
+            self.trusted_patterns.append(pattern)
+            self.trusted_embeddings.append(embedding)
+            
+        return len(self.trusted_patterns)
+    
+    def _pattern_to_string(self, metadata: dict) -> str:
+        """Convert metadata dictionary to string for embedding"""
+        result = ""
+        for field in self.key_fields:
+            if field in metadata:
+                result += f"{field}: {metadata[field]}\n"
+        return result
+    
+    def _clean_value(self, value: str) -> str:
+        """Clean metadata values for comparison"""
+        # Convert to lowercase
+        value = str(value).lower()
+        
+        # Remove extra whitespace
+        value = re.sub(r'\s+', ' ', value).strip()
+        
+        return value
+    
+    def _compare_exact_match(self, extracted_metadata: dict) -> tuple:
+        """Check for exact match using hash comparison"""
+        # Generate hash string from key fields
+        hash_string = ""
+        for field in self.key_fields:
+            if field in extracted_metadata:
+                hash_string += f"{field}:{self._clean_value(extracted_metadata[field])}|"
+                
+        # Generate SHA-256 hash
+        pattern_hash = hashlib.sha256(hash_string.encode()).hexdigest()
+        
+        # Check against all trusted patterns
+        for pattern in self.trusted_patterns:
+            if pattern.get('pattern_hash') == pattern_hash:
+                return True, pattern
+        
+        return False, None
+    
+    def _compare_vector_similarity(self, extracted_metadata: dict) -> tuple:
+        """Compare using vector embeddings and cosine similarity"""
+        # Convert extracted metadata to string
+        extracted_str = self._pattern_to_string(extracted_metadata)
+        
+        # Create embedding
+        extracted_embedding = self.model.encode(extracted_str, convert_to_tensor=True)
+        
+        # Calculate cosine similarities
+        similarities = []
+        for embedding in self.trusted_embeddings:
+            similarity = util.cos_sim(extracted_embedding, embedding).item()
+            similarities.append(similarity)
+            
+        # Find best match
+        if similarities:
+            best_match_idx = np.argmax(similarities)
+            best_similarity = similarities[best_match_idx]
+            best_pattern = self.trusted_patterns[best_match_idx]
+            return best_similarity, best_pattern
+        
+        return 0, None
+    
+    def _field_by_field_comparison(self, extracted_metadata: dict, pattern: dict) -> tuple:
+        """Do detailed field-by-field comparison"""
+        matched_fields = []
+        mismatched_fields = []
+        
+        for field in self.key_fields:
+            if field in extracted_metadata and field in pattern['metadata']:
+                extracted_val = self._clean_value(extracted_metadata[field])
+                pattern_val = self._clean_value(pattern['metadata'][field])
+                
+                if extracted_val == pattern_val:
+                    matched_fields.append(field)
+                else:
+                    mismatched_fields.append(field)
+            else:
+                mismatched_fields.append(field)
+                
+        match_ratio = len(matched_fields) / len(self.key_fields)
+        return match_ratio, matched_fields, mismatched_fields
+    
+    def verify_cos(self, extracted_metadata: dict) -> dict:
+        """Main verification function"""
+        if not self.trusted_patterns:
+            raise ValueError("No trusted patterns loaded")
+        
+        # First check for exact match
+        exact_match, matched_pattern = self._compare_exact_match(extracted_metadata)
+        
+        if exact_match:
+            return {
+                "type": "Genuine",
+                "confidence": 0.98,
+                "matched_pattern_id": matched_pattern['id'],
+                "matched_fields": self.key_fields,
+                "mismatched_fields": [],
+                "method": "exact_match"
+            }
+        
+        # If no exact match, use vector similarity
+        similarity_score, best_pattern = self._compare_vector_similarity(extracted_metadata)
+        
+        if similarity_score >= self.thresholds['genuine']:
+            # Do field-by-field comparison for details
+            match_ratio, matched_fields, mismatched_fields = self._field_by_field_comparison(
+                extracted_metadata, best_pattern
+            )
+            
+            return {
+                "type": "Genuine",
+                "confidence": float(similarity_score),
+                "matched_pattern_id": best_pattern['id'],
+                "matched_fields": matched_fields,
+                "mismatched_fields": mismatched_fields,
+                "method": "vector_similarity"
+            }
+        elif similarity_score >= self.thresholds['edited']:
+            # Do field-by-field comparison for details
+            match_ratio, matched_fields, mismatched_fields = self._field_by_field_comparison(
+                extracted_metadata, best_pattern
+            )
+            
+            return {
+                "type": "Edited",
+                "confidence": float(similarity_score),
+                "matched_pattern_id": best_pattern['id'],
+                "matched_fields": matched_fields,
+                "mismatched_fields": mismatched_fields,
+                "method": "vector_similarity"
+            }
+        else:
+            # Check if it's completely fake
+            return {
+                "type": "Fake",
+                "confidence": float(similarity_score),
+                "matched_pattern_id": None,
+                "matched_fields": [],
+                "mismatched_fields": self.key_fields,
+                "method": "vector_similarity"
+            }
