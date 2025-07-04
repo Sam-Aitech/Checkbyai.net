@@ -43,21 +43,6 @@ export default function VerificationResults({ result }: VerificationResultsProps
       </div>
       
       <div className="mt-4 space-y-4">
-        <div>
-          <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Confidence Score</h4>
-          <div className="mt-1 relative pt-1">
-            <div className="flex mb-2 items-center justify-between">
-              <div>
-                <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-blue-600 bg-blue-200 dark:text-blue-400 dark:bg-blue-900">
-                  {Math.round(result.confidence * 100)}%
-                </span>
-              </div>
-            </div>
-            <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-blue-200 dark:bg-blue-900">
-              <div style={{ width: `${result.confidence * 100}%` }} className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-blue-500 dark:bg-blue-600"></div>
-            </div>
-          </div>
-        </div>
         
         {result.mismatchedFields && result.mismatchedFields.length > 0 && (
           <div>
