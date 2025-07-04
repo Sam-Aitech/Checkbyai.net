@@ -7,15 +7,29 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 interface VerificationResult {
-  id: number;
-  result: 'genuine' | 'suspicious' | 'fake';
+  type: 'Genuine' | 'Edited' | 'Fake';
   confidence: number;
-  details: any;
+  mismatchedFields?: string[];
 }
 
 export default function UserPortal() {
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
   const { toast } = useToast();
+
+  const transformResult = (backendResult: any): VerificationResult => {
+    // Transform backend response to match our interface
+    const typeMapping: Record<string, 'Genuine' | 'Edited' | 'Fake'> = {
+      'genuine': 'Genuine',
+      'suspicious': 'Edited',
+      'fake': 'Fake'
+    };
+
+    return {
+      type: typeMapping[backendResult.result] || 'Fake',
+      confidence: backendResult.confidence || 0,
+      mismatchedFields: backendResult.mismatchedFields || []
+    };
+  };
 
   const verifyMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -25,10 +39,11 @@ export default function UserPortal() {
       return response.json();
     },
     onSuccess: (result) => {
-      setVerificationResult(result);
+      const transformedResult = transformResult(result);
+      setVerificationResult(transformedResult);
       toast({
         title: "Verification Complete",
-        description: `Document verified as ${result.result.toUpperCase()} with ${result.confidence.toFixed(1)}% confidence`,
+        description: `Document verified as ${transformedResult.type.toUpperCase()} with ${(transformedResult.confidence * 100).toFixed(1)}% confidence`,
       });
     },
     onError: (error) => {
