@@ -45,6 +45,13 @@ export default function FileUpload({ onFileUpload }: FileUploadProps) {
   };
 
   const processFile = (selectedFile: File) => {
+    console.log('=== FILEUPLOAD COMPONENT DEBUG ===');
+    console.log('Processing file:', selectedFile);
+    console.log('File name:', selectedFile?.name);
+    console.log('File type:', selectedFile?.type);
+    console.log('File size:', selectedFile?.size);
+    console.log('onFileUpload callback:', !!onFileUpload);
+    
     if (selectedFile.type !== 'application/pdf') {
       setError('Please upload a valid PDF file.');
       return;
@@ -55,7 +62,10 @@ export default function FileUpload({ onFileUpload }: FileUploadProps) {
     
     // Trigger parent component callback
     if (onFileUpload) {
+      console.log('Calling onFileUpload callback with file:', selectedFile);
       onFileUpload(selectedFile);
+    } else {
+      console.error('No onFileUpload callback provided!');
     }
   };
 

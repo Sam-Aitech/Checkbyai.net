@@ -31,7 +31,12 @@ export default function Dashboard() {
         throw new Error('Invalid file selected');
       }
       
-      console.log('Uploading file:', documentFile.name, 'Size:', documentFile.size, 'Type:', documentFile.type);
+      console.log('=== DASHBOARD FILE UPLOAD DEBUG ===');
+      console.log('File object:', documentFile);
+      console.log('File name:', documentFile.name);
+      console.log('File size:', documentFile.size);
+      console.log('File type:', documentFile.type);
+      console.log('File instanceof File:', documentFile instanceof File);
       
       // Create form data
       const formData = new FormData();
