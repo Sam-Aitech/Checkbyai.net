@@ -265,8 +265,12 @@ async def verify_cos(file: UploadFile = File(...)):
         # Compare with trusted patterns using AI engine
         if trusted_patterns:
             try:
+                print(f"Using COSVerifier with {len(trusted_patterns)} trusted patterns")
                 result = cos_verifier.verify_cos(metadata)
-            except ValueError:
+                print(f"COSVerifier result: {result}")
+            except Exception as e:
+                print(f"COSVerifier failed with error: {e}")
+                print(f"Falling back to basic comparison")
                 # Fallback to basic comparison if AI engine fails
                 result = compare_with_trusted(metadata)
         else:
