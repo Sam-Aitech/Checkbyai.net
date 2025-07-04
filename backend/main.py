@@ -9,28 +9,28 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from .database import DatabaseManager
-from .pdf_analyzer import PDFAnalyzer
-from .models import VerificationResult, StatsResponse, TrustedPattern
+from database import DatabaseManager
+from ai_engine import AIEngine
+from models import VerificationResult, StatsResponse, TrustedPattern
 
 
 # Database and analyzer instances
 db_manager = None
-pdf_analyzer = None
+ai_engine = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    global db_manager, pdf_analyzer
+    global db_manager, ai_engine
     
     # Initialize database
     db_manager = DatabaseManager()
     await db_manager.initialize()
     
-    # Initialize PDF analyzer
-    pdf_analyzer = PDFAnalyzer()
-    await pdf_analyzer.initialize()
+    # Initialize AI engine
+    ai_engine = AIEngine()
+    await ai_engine.initialize()
     
     yield
     
@@ -96,8 +96,8 @@ async def upload_trusted_pattern(file: UploadFile = File(...)):
             buffer.write(content)
         
         # Extract metadata and patterns
-        metadata = await pdf_analyzer.extract_metadata(file_path)
-        patterns = await pdf_analyzer.extract_patterns(file_path)
+        metadata = await ai_engine.extract_metadata(file_path)
+        patterns = await ai_engine.extract_patterns(file_path)
         
         # Store in database
         pattern_id = await db_manager.create_trusted_pattern(
@@ -137,11 +137,11 @@ async def verify_document(file: UploadFile = File(...)):
             buffer.write(content)
         
         # Extract metadata and analyze
-        metadata = await pdf_analyzer.extract_metadata(file_path)
+        metadata = await ai_engine.extract_metadata(file_path)
         trusted_patterns = await db_manager.get_trusted_patterns()
         
         # Perform verification
-        analysis = await pdf_analyzer.analyze_against_patterns(metadata, trusted_patterns)
+        analysis = await ai_engine.analyze_against_patterns(metadata, trusted_patterns)
         
         # Store verification result
         result_id = await db_manager.create_verification_result(

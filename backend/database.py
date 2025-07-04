@@ -5,7 +5,7 @@ from typing import Dict, List, Any, Optional
 
 import duckdb
 
-from .models import StatsResponse, TrustedPattern, RecentActivity
+from models import StatsResponse, TrustedPattern, RecentActivity
 
 
 class DatabaseManager:
