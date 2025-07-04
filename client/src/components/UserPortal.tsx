@@ -1,6 +1,5 @@
 import { useState } from "react";
 import FileUpload from "./FileUpload";
-import VerificationResults from "./VerificationResults";
 import { CloudUpload, CheckCircle, AlertTriangle, XCircle } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -142,9 +141,34 @@ export default function UserPortal() {
         </div>
       </div>
 
-      {/* Results Section */}
+      {/* Results Section - Clean display without confidence percentages */}
       {verificationResult && (
-        <VerificationResults result={verificationResult} />
+        <div className="mt-6 p-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Verification Result</h3>
+          
+          <div className="flex items-center gap-3 mb-4">
+            <div className={`px-4 py-2 rounded-full text-base font-semibold ${
+              verificationResult.type === 'Genuine' 
+                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                : verificationResult.type === 'Edited'
+                ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+            }`}>
+              {verificationResult.type}
+            </div>
+          </div>
+
+          {verificationResult.mismatchedFields && verificationResult.mismatchedFields.length > 0 && (
+            <div className="mb-4">
+              <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Issues detected:</h4>
+              <ul className="list-disc list-inside text-gray-600 dark:text-gray-400">
+                {verificationResult.mismatchedFields.map((field: string, index: number) => (
+                  <li key={index}>{field}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
