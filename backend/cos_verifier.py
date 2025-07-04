@@ -69,7 +69,7 @@ class COSVerifier:
         return value
     
     def _compare_exact_match(self, extracted_metadata: dict) -> tuple:
-        """Check for exact match using hash comparison"""
+        """Check for exact match using hash comparison and field-by-field comparison"""
         # Generate hash string from key fields
         hash_string = ""
         for field in self.key_fields:
@@ -81,10 +81,31 @@ class COSVerifier:
         
         # Check against all trusted patterns
         for pattern in self.trusted_patterns:
+            # First try hash comparison if available
             if pattern.get('pattern_hash') == pattern_hash:
+                return True, pattern
+            
+            # Fallback to field-by-field exact comparison
+            if self._is_perfect_field_match(extracted_metadata, pattern):
                 return True, pattern
         
         return False, None
+    
+    def _is_perfect_field_match(self, extracted_metadata: dict, pattern: dict) -> bool:
+        """Check if all key fields match exactly"""
+        pattern_metadata = pattern.get('metadata', {})
+        
+        for field in self.key_fields:
+            if field not in extracted_metadata or field not in pattern_metadata:
+                return False
+                
+            extracted_val = self._clean_value(extracted_metadata[field])
+            pattern_val = self._clean_value(pattern_metadata[field])
+            
+            if extracted_val != pattern_val:
+                return False
+                
+        return True
     
     def _compare_vector_similarity(self, extracted_metadata: dict) -> tuple:
         """Compare using TF-IDF vectors and cosine similarity"""
@@ -182,7 +203,7 @@ class COSVerifier:
         if exact_match:
             return {
                 "type": "Genuine",
-                "confidence": 0.98,
+                "confidence": 1.0,  # 100% confidence for exact matches
                 "matched_pattern_id": matched_pattern['id'],
                 "matched_fields": self.key_fields,
                 "mismatched_fields": [],
