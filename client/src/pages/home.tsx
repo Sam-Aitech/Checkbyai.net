@@ -1,8 +1,9 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import UserPortal from "@/components/UserPortal";
 import AdminPortal from "@/components/AdminPortal";
 import { useQuery } from "@tanstack/react-query";
-import { Shield, Database } from "lucide-react";
+import { Shield, Database, LayoutDashboard } from "lucide-react";
 
 export default function Home() {
   const [activeMode, setActiveMode] = useState<'user' | 'admin'>('user');
@@ -28,6 +29,11 @@ export default function Home() {
             </div>
             
             <div className="flex items-center space-x-4">
+              <Link href="/dashboard" className="flex items-center space-x-2 px-3 py-2 text-sm font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors">
+                <LayoutDashboard className="h-4 w-4" />
+                <span>Simple Dashboard</span>
+              </Link>
+              
               <div className="flex bg-gray-100 rounded-lg p-1">
                 <button
                   onClick={() => setActiveMode('user')}
