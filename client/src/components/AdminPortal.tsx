@@ -85,6 +85,27 @@ export default function AdminPortal() {
     },
   });
 
+  const clearDataMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest('DELETE', '/api/admin/clear-verification-data');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/recent-activity'] });
+      toast({
+        title: "Data Cleared",
+        description: "All user verification data cleared. Trusted patterns preserved.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Clear Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const filteredPatterns = trustedPatterns.filter((pattern: any) =>
     pattern.filename.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -159,6 +180,27 @@ export default function AdminPortal() {
               <p className="text-2xl font-semibold text-gray-900">{stats?.successRate || '0'}%</p>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Data Management Section */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Data Management</h3>
+            <p className="text-sm text-gray-600 mt-1">
+              Clear user verification data while preserving trusted patterns database
+            </p>
+          </div>
+          <Button
+            onClick={() => clearDataMutation.mutate()}
+            variant="destructive"
+            disabled={clearDataMutation.isPending}
+            className="flex items-center"
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            {clearDataMutation.isPending ? 'Clearing...' : 'Reset User Data'}
+          </Button>
         </div>
       </div>
 

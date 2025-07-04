@@ -165,6 +165,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Clear all verification results (admin) - keeps trusted patterns
+  app.delete("/api/admin/clear-verification-data", async (req, res) => {
+    try {
+      await storage.clearVerificationResults();
+      res.json({ success: true, message: "All user verification data cleared. Trusted patterns preserved." });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to clear verification data" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

@@ -26,6 +26,7 @@ export interface IStorage {
   // Verification Results
   createVerificationResult(result: InsertVerificationResult): Promise<VerificationResult>;
   getRecentActivity(): Promise<VerificationResult[]>;
+  clearVerificationResults(): Promise<void>;
   
   // Statistics
   getStats(): Promise<{
@@ -85,6 +86,11 @@ export class DatabaseStorage implements IStorage {
       .from(verificationResults)
       .orderBy(desc(verificationResults.verifiedAt))
       .limit(10);
+  }
+
+  async clearVerificationResults(): Promise<void> {
+    // Delete all verification results but preserve trusted patterns
+    await db.delete(verificationResults);
   }
 
   async getStats(): Promise<{
