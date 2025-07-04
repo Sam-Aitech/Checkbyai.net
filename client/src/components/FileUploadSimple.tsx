@@ -174,7 +174,7 @@ export default function FileUploadSimple() {
           <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Verification Result</h3>
           
           <div className="flex items-center gap-3 mb-4">
-            <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+            <div className={`px-4 py-2 rounded-full text-base font-semibold ${
               result.type === 'Genuine' 
                 ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                 : result.type === 'Edited'
@@ -183,9 +183,6 @@ export default function FileUploadSimple() {
             }`}>
               {result.type}
             </div>
-            <span className="text-gray-600 dark:text-gray-400">
-              Confidence: {result.confidence?.toFixed(1)}%
-            </span>
           </div>
 
           {result.mismatchedFields && result.mismatchedFields.length > 0 && (
