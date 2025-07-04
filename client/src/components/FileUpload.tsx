@@ -239,9 +239,6 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
             }`}>
               {localResult.type}
             </div>
-            <span className="text-gray-600 dark:text-gray-400">
-              Confidence: {localResult.confidence?.toFixed(1)}%
-            </span>
           </div>
 
           {localResult.mismatchedFields && localResult.mismatchedFields.length > 0 && (
