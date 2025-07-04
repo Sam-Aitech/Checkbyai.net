@@ -33,10 +33,9 @@ export default function UserPortal() {
 
   const verifyMutation = useMutation({
     mutationFn: async (file: File) => {
-      const formData = new FormData();
-      formData.append('file', file);
-      const response = await apiRequest('POST', '/api/verify', formData);
-      return response.json();
+      console.log('UserPortal mutation disabled - using FileUpload component instead');
+      // This mutation is disabled as FileUpload component handles verification directly
+      throw new Error('This verification method is disabled');
     },
     onSuccess: (result) => {
       const transformedResult = transformResult(result);
@@ -56,7 +55,9 @@ export default function UserPortal() {
   });
 
   const handleFileUpload = (file: File) => {
-    verifyMutation.mutate(file);
+    console.log('UserPortal handleFileUpload - verification handled by FileUpload component');
+    // File verification is now handled directly by the FileUpload component
+    // No need to trigger mutation here
   };
 
   return (
