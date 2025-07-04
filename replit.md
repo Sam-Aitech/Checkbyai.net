@@ -6,19 +6,32 @@ This is a Certificate of Sponsorship (COS) verification system that uses AI to d
 
 ## System Architecture
 
+### Three-Portal System Design
+```
+Admin Portal → Uploads genuine COS → Trusted Patterns Database
+                     ↓
+User Portal → Upload COS for verification → AI Verification Engine
+                     ↓
+Results: Genuine/Edited/Fake with confidence score
+```
+
 ### Frontend Architecture
 - **Framework**: React with TypeScript
-- **Styling**: Tailwind CSS with shadcn/ui component library
+- **Styling**: Tailwind CSS with shadcn/ui component library  
 - **Routing**: Wouter for client-side routing
 - **State Management**: TanStack Query for server state management
 - **Build Tool**: Vite with SWC compiler for enhanced performance
+- **3D Graphics**: Three.js with @react-three/fiber for animated landing page
 
 ### Backend Architecture
 - **Runtime**: FastAPI with async support for high performance
 - **Database**: In-memory storage for trusted patterns and verification results
 - **PDF Processing**: PyMuPDF for comprehensive metadata extraction
-- **AI Engine**: TF-IDF vectorization with scikit-learn for similarity analysis
-- **Comparison Engine**: COSVerifier class with hash-based exact matching and vector similarity
+- **AI Engine**: Enhanced COSVerifier with SentenceTransformers support
+- **Comparison Methods**: 
+  - Rule-based exact matching (100% confidence for identical documents)
+  - Vector similarity using TF-IDF/SentenceTransformers
+  - ML model inference capability (ONNX Runtime ready)
 
 ### Database Design
 The system uses DuckDB with four main tables (updated per user requirements):
@@ -51,24 +64,33 @@ The system uses DuckDB with four main tables (updated per user requirements):
 
 ## Data Flow
 
-1. **User Verification Flow**:
-   - User uploads PDF through drag-and-drop interface
-   - File is validated (PDF format, size limits)
-   - PDF metadata is extracted using custom analyzer
-   - Document patterns are compared against trusted database
-   - ML algorithms provide confidence scoring
-   - Results are displayed with detailed analysis
+### AI Verification Engine Architecture
+```
+Admin Portal: Upload genuine COS PDFs
+       ↓
+Trusted Patterns Database (stores metadata from genuine docs)
+       ↓
+User Portal: Upload COS for verification
+       ↓
+Extract metadata from uploaded PDF
+       ↓
+Compare against trusted patterns using:
+• Rule-based matching (exact metadata comparison)
+• Vector similarity (SentenceTransformers/TF-IDF)
+• ML model inference (ONNX Runtime support)
+       ↓
+Result: Genuine/Edited/Fake with confidence score
+```
 
-2. **Admin Pattern Management Flow**:
-   - Admin uploads genuine COS documents
-   - Metadata and patterns are extracted and stored
-   - Documents are added to trusted patterns database
-   - System updates verification algorithms with new patterns
-
-3. **Database Operations**:
-   - All verification attempts are logged with results
-   - Trusted patterns are stored with extracted metadata
-   - Statistics are aggregated for dashboard display
+### Verification Process Details
+1. **Admin builds trusted database**: Upload genuine COS documents to create pattern baseline
+2. **User uploads COS**: System extracts comprehensive PDF metadata using PyMuPDF
+3. **Multi-layer analysis**: 
+   - Exact match detection (100% confidence for identical documents)
+   - Vector similarity comparison for near-matches
+   - Field-by-field metadata validation
+4. **Confidence scoring**: Returns percentage confidence with classification (Genuine/Edited/Fake)
+5. **Result display**: User sees verification result with detailed analysis breakdown
 
 ## External Dependencies
 
@@ -121,6 +143,13 @@ The system uses DuckDB with four main tables (updated per user requirements):
 
 ```
 Changelog:
+- July 04, 2025 (Late Evening). Enhanced 100% Confidence Detection System
+  - Updated COSVerifier for perfect exact match detection (100% confidence)
+  - Added SentenceTransformers support with fallback to TF-IDF
+  - Implemented comprehensive debug logging for verification tracking
+  - Enhanced trusted pattern loading and reload mechanism
+  - Added admin portal reset functionality for user verification data
+  - Updated system architecture documentation to match user diagram
 - July 04, 2025 (Evening). Implemented AI Comparison Engine
   - Added COSVerifier class with TF-IDF vectorization and cosine similarity
   - Integrated scikit-learn for advanced pattern matching
