@@ -15,6 +15,12 @@ export default function Dashboard() {
   const [error, setError] = useState('');
 
   const handleFileUpload = (uploadedFile: File) => {
+    console.log('=== DASHBOARD HANDLEFILEUPLOAD DEBUG ===');
+    console.log('Received file in handleFileUpload:', uploadedFile);
+    console.log('File instanceof File:', uploadedFile instanceof File);
+    console.log('File constructor:', uploadedFile.constructor.name);
+    console.log('File keys:', Object.keys(uploadedFile));
+    
     setFile(uploadedFile);
     setResult(null);
     setError('');
@@ -38,6 +44,11 @@ export default function Dashboard() {
       console.log('File type:', documentFile.type);
       console.log('File instanceof File:', documentFile instanceof File);
       
+      // Validate the file object before proceeding
+      if (!documentFile.name || !documentFile.size || !documentFile.type) {
+        throw new Error('Invalid file object - missing required properties');
+      }
+
       // Create form data
       const formData = new FormData();
       formData.append('file', documentFile, documentFile.name);
@@ -46,6 +57,13 @@ export default function Dashboard() {
       console.log('FormData has file:', formData.has('file'));
       const fileEntry = formData.get('file');
       console.log('File entry:', fileEntry);
+      console.log('File entry type:', typeof fileEntry);
+      console.log('File entry instanceof File:', fileEntry instanceof File);
+      
+      // Additional validation
+      if (!formData.has('file') || !fileEntry) {
+        throw new Error('Failed to add file to FormData');
+      }
       
       // Call backend verification API (don't set Content-Type, let browser set it for multipart)
       const response = await fetch('/api/verify', {
