@@ -16,15 +16,12 @@ export default function Dashboard() {
 
   const handleFileUpload = (uploadedFile: File) => {
     console.log('=== DASHBOARD HANDLEFILEUPLOAD DEBUG ===');
-    console.log('Received file in handleFileUpload:', uploadedFile);
-    console.log('File instanceof File:', uploadedFile instanceof File);
-    console.log('File constructor:', uploadedFile.constructor.name);
-    console.log('File keys:', Object.keys(uploadedFile));
+    console.log('Received file - now handled by FileUpload component directly');
     
     setFile(uploadedFile);
     setResult(null);
     setError('');
-    analyzeDocument(uploadedFile);
+    // analyzeDocument is now handled directly by FileUpload component
   };
 
   const analyzeDocument = async (documentFile: File) => {

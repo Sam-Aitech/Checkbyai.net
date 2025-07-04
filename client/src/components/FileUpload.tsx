@@ -11,6 +11,8 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState('');
+  const [localResult, setLocalResult] = useState<any>(null);
+  const [localLoading, setLocalLoading] = useState(false);
 
   console.log('FileUpload component props:');
   console.log('  onFileUpload:', !!onFileUpload);
@@ -81,6 +83,10 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
   const uploadAndVerify = async (selectedFile: File) => {
     console.log('=== DIRECT VERIFICATION UPLOAD ===');
     
+    // Set loading state both locally and via callback
+    setLocalLoading(true);
+    setLocalResult(null);
+    setError('');
     if (onLoading) onLoading(true);
     if (onError) onError('');
     
@@ -127,16 +133,23 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
         mismatchedFields: data.mismatchedFields || []
       };
 
+      // Set results both locally and via callback
+      setLocalResult(transformedResult);
       if (onVerificationResult) {
         onVerificationResult(transformedResult);
+      } else {
+        console.log('Verification completed successfully:', transformedResult);
       }
       
     } catch (err) {
       console.error('Verification error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Verification failed';
+      setError(errorMessage);
       if (onError) {
-        onError(err instanceof Error ? err.message : 'Verification failed');
+        onError(errorMessage);
       }
     } finally {
+      setLocalLoading(false);
       if (onLoading) onLoading(false);
     }
   };
@@ -203,6 +216,45 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
       {error && (
         <div className="mt-4 p-3 bg-red-100 dark:bg-red-900/30 border-l-4 border-red-500 text-red-700 dark:text-red-400">
           <p className="text-sm">{error}</p>
+        </div>
+      )}
+
+      {localLoading && (
+        <div className="mt-6 flex justify-center items-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+          <span className="ml-3 text-gray-600 dark:text-gray-400">Analyzing document...</span>
+        </div>
+      )}
+
+      {localResult && (
+        <div className="mt-6 p-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Verification Result</h3>
+          
+          <div className="flex items-center gap-3 mb-4">
+            <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+              localResult.type === 'Genuine' 
+                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                : localResult.type === 'Edited'
+                ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+            }`}>
+              {localResult.type}
+            </div>
+            <span className="text-gray-600 dark:text-gray-400">
+              Confidence: {localResult.confidence?.toFixed(1)}%
+            </span>
+          </div>
+
+          {localResult.mismatchedFields && localResult.mismatchedFields.length > 0 && (
+            <div className="mb-4">
+              <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Issues detected:</h4>
+              <ul className="list-disc list-inside text-gray-600 dark:text-gray-400">
+                {localResult.mismatchedFields.map((field: string, index: number) => (
+                  <li key={index}>{field}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
     </div>
