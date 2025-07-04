@@ -26,9 +26,21 @@ export default function Dashboard() {
     setError('');
     
     try {
+      // Validate file before upload
+      if (!documentFile || documentFile.size === 0) {
+        throw new Error('Invalid file selected');
+      }
+      
+      console.log('Uploading file:', documentFile.name, 'Size:', documentFile.size, 'Type:', documentFile.type);
+      
       // Create form data
       const formData = new FormData();
-      formData.append('file', documentFile);
+      formData.append('file', documentFile, documentFile.name);
+      
+      // Debug: Log FormData contents
+      console.log('FormData has file:', formData.has('file'));
+      const fileEntry = formData.get('file');
+      console.log('File entry:', fileEntry);
       
       // Call backend verification API
       const response = await fetch('/api/verify', {

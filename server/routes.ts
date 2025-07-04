@@ -79,7 +79,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Verify document
   app.post("/api/verify", upload.single('file'), async (req, res) => {
     try {
+      console.log('Verification request received');
+      console.log('Body:', req.body);
+      console.log('File:', req.file);
+      console.log('Headers:', req.headers);
+      
       if (!req.file) {
+        console.log('No file in request');
         return res.status(400).json({ error: "No file uploaded" });
       }
 
