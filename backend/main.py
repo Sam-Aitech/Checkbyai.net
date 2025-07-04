@@ -266,6 +266,8 @@ async def verify_cos(file: UploadFile = File(...)):
         if trusted_patterns:
             try:
                 print(f"Using COSVerifier with {len(trusted_patterns)} trusted patterns")
+                # Ensure trusted patterns are loaded in the verifier
+                cos_verifier.load_trusted_patterns(trusted_patterns)
                 result = cos_verifier.verify_cos(metadata)
                 print(f"COSVerifier result: {result}")
             except Exception as e:

@@ -4,11 +4,29 @@ import re
 import hashlib
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+try:
+    from sentence_transformers import SentenceTransformer
+    SENTENCE_TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    SENTENCE_TRANSFORMERS_AVAILABLE = False
 
 class COSVerifier:
     def __init__(self):
-        # Use TF-IDF vectorizer as fallback for text embeddings
-        self.vectorizer = TfidfVectorizer(max_features=1000, stop_words='english')
+        # Initialize SentenceTransformer model if available
+        if SENTENCE_TRANSFORMERS_AVAILABLE:
+            try:
+                self.model = SentenceTransformer('all-MiniLM-L6-v2')
+                self.use_sentence_transformer = True
+                print("SentenceTransformer model loaded successfully")
+            except Exception as e:
+                print(f"Failed to load SentenceTransformer: {e}")
+                self.use_sentence_transformer = False
+        else:
+            self.use_sentence_transformer = False
+            
+        # Fallback to TF-IDF vectorizer
+        if not self.use_sentence_transformer:
+            self.vectorizer = TfidfVectorizer(max_features=1000, stop_words='english')
         
         # Key metadata fields for comparison
         self.key_fields = [
@@ -20,22 +38,22 @@ class COSVerifier:
             'xmp:MetadataDate'
         ]
         
-        # Thresholds for different result types
+        # Enhanced thresholds for exact match detection
         self.thresholds = {
-            'exact_match': 0.98,  # For hash-based exact match
-            'genuine': 0.85,      # For vector similarity threshold
-            'edited': 0.6,        # Medium threshold for edited documents
-            'fake': 0.45          # Lower threshold for fake documents
+            'exact_match': 1.0,   # Perfect match for hash-based exact match
+            'genuine': 0.95,      # High threshold for genuine documents
+            'edited': 0.75,       # Medium threshold for edited documents
+            'fake': 0.50          # Lower threshold for fake documents
         }
         
         # Store trusted patterns
         self.trusted_patterns = []
-        self.trusted_embeddings = []
+        self.genuine_embeddings = []
         
     def load_trusted_patterns(self, patterns: list):
         """Load trusted patterns and create embeddings"""
         self.trusted_patterns = []
-        self.trusted_embeddings = []
+        self.genuine_embeddings = []
         
         # Convert all patterns to strings
         pattern_strings = []
@@ -44,9 +62,16 @@ class COSVerifier:
             pattern_strings.append(pattern_str)
             self.trusted_patterns.append(pattern)
         
-        # Fit vectorizer and create embeddings
+        # Create embeddings
         if pattern_strings:
-            self.trusted_embeddings = self.vectorizer.fit_transform(pattern_strings)
+            if self.use_sentence_transformer:
+                # Use SentenceTransformer for high-quality embeddings
+                self.genuine_embeddings = self.model.encode(pattern_strings)
+                print(f"Generated embeddings for {len(pattern_strings)} trusted patterns using SentenceTransformer")
+            else:
+                # Fallback to TF-IDF
+                self.genuine_embeddings = self.vectorizer.fit_transform(pattern_strings)
+                print(f"Generated TF-IDF embeddings for {len(pattern_strings)} trusted patterns")
             
         return len(self.trusted_patterns)
     
@@ -108,18 +133,23 @@ class COSVerifier:
         return True
     
     def _compare_vector_similarity(self, extracted_metadata: dict) -> tuple:
-        """Compare using TF-IDF vectors and cosine similarity"""
+        """Compare using SentenceTransformer or TF-IDF vectors and cosine similarity"""
         if not self.trusted_patterns:
             return 0, None
             
         # Convert extracted metadata to string
         extracted_str = self._pattern_to_string(extracted_metadata)
         
-        # Create TF-IDF vector for extracted document
-        extracted_vector = self.vectorizer.transform([extracted_str])
-        
-        # Calculate cosine similarities with all trusted patterns
-        similarities = cosine_similarity(extracted_vector, self.trusted_embeddings)[0]
+        if self.use_sentence_transformer:
+            # Use SentenceTransformer for high-quality embeddings
+            extracted_embedding = self.model.encode([extracted_str])
+            
+            # Calculate cosine similarities with all trusted patterns
+            similarities = cosine_similarity(extracted_embedding, self.genuine_embeddings)[0]
+        else:
+            # Fallback to TF-IDF
+            extracted_vector = self.vectorizer.transform([extracted_str])
+            similarities = cosine_similarity(extracted_vector, self.genuine_embeddings)[0]
         
         # Find best match
         if len(similarities) > 0:
@@ -127,13 +157,20 @@ class COSVerifier:
             best_similarity = similarities[best_match_idx]
             best_pattern = self.trusted_patterns[best_match_idx]
             
-            # Apply field-based penalty for completely different documents
-            field_similarity = self._calculate_field_similarity(extracted_metadata, best_pattern['metadata'])
+            print(f"Vector similarity: {best_similarity:.4f}")
+            print(f"Best matching pattern: {best_pattern.get('filename', 'Unknown')}")
             
-            # Combine vector similarity with field similarity (weighted average)
-            # Field similarity gets more weight to properly identify fake documents
-            combined_similarity = (best_similarity * 0.3) + (field_similarity * 0.7)
+            # For SentenceTransformer, use higher threshold and less field penalty
+            if self.use_sentence_transformer:
+                # Apply lighter field-based penalty for SentenceTransformer
+                field_similarity = self._calculate_field_similarity(extracted_metadata, best_pattern['metadata'])
+                combined_similarity = (best_similarity * 0.8) + (field_similarity * 0.2)
+            else:
+                # Apply heavier field-based penalty for TF-IDF
+                field_similarity = self._calculate_field_similarity(extracted_metadata, best_pattern['metadata'])
+                combined_similarity = (best_similarity * 0.3) + (field_similarity * 0.7)
             
+            print(f"Combined similarity: {combined_similarity:.4f}")
             return combined_similarity, best_pattern
         
         return 0, None
