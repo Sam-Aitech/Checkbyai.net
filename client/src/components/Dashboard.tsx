@@ -65,10 +65,10 @@ export default function Dashboard() {
         throw new Error('Failed to add file to FormData');
       }
       
-      // Call backend verification API (don't set Content-Type, let browser set it for multipart)
+      // Call backend verification API using direct fetch (same as successful direct upload)
       const response = await fetch('/api/verify', {
         method: 'POST',
-        body: formData,
+        body: formData
         // Don't set Content-Type header, browser will set it automatically with boundary
       });
       

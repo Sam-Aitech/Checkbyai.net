@@ -60,37 +60,16 @@ export default function FileUpload({ onFileUpload }: FileUploadProps) {
     setFile(selectedFile);
     setError('');
     
-    // Trigger parent component callback
+    // Trigger parent component callback immediately
     if (onFileUpload) {
       console.log('Calling onFileUpload callback with file:', selectedFile);
+      console.log('File properties before callback:');
+      console.log('  name:', selectedFile.name);
+      console.log('  size:', selectedFile.size);
+      console.log('  type:', selectedFile.type);
+      console.log('  lastModified:', selectedFile.lastModified);
       
-      // DIRECT UPLOAD TEST - bypass Dashboard component
-      console.log('=== DIRECT UPLOAD TEST ===');
-      
-      const testUpload = async () => {
-        try {
-          const formData = new FormData();
-          formData.append('file', selectedFile, selectedFile.name);
-          
-          console.log('Direct FormData created:', formData.has('file'));
-          console.log('Direct file entry:', formData.get('file'));
-          
-          const response = await fetch('/api/verify', {
-            method: 'POST',
-            body: formData
-          });
-          
-          console.log('Direct upload response status:', response.status);
-          const responseData = await response.json();
-          console.log('Direct upload response:', responseData);
-        } catch (error) {
-          console.error('Direct upload error:', error);
-        }
-      };
-      
-      testUpload();
-      
-      // Also call the original callback
+      // Call immediately without any async operations
       onFileUpload(selectedFile);
     } else {
       console.error('No onFileUpload callback provided!');
