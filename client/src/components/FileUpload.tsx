@@ -2,9 +2,12 @@ import { useState } from 'react';
 
 interface FileUploadProps {
   onFileUpload: (file: File) => void;
+  onVerificationResult?: (result: any) => void;
+  onLoading?: (loading: boolean) => void;
+  onError?: (error: string) => void;
 }
 
-export default function FileUpload({ onFileUpload }: FileUploadProps) {
+export default function FileUpload({ onFileUpload, onVerificationResult, onLoading, onError }: FileUploadProps) {
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState('');
@@ -60,19 +63,77 @@ export default function FileUpload({ onFileUpload }: FileUploadProps) {
     setFile(selectedFile);
     setError('');
     
-    // Trigger parent component callback immediately
+    // Trigger parent component callback
     if (onFileUpload) {
-      console.log('Calling onFileUpload callback with file:', selectedFile);
-      console.log('File properties before callback:');
-      console.log('  name:', selectedFile.name);
-      console.log('  size:', selectedFile.size);
-      console.log('  type:', selectedFile.type);
-      console.log('  lastModified:', selectedFile.lastModified);
-      
-      // Call immediately without any async operations
       onFileUpload(selectedFile);
-    } else {
-      console.error('No onFileUpload callback provided!');
+    }
+    
+    // Also handle verification directly if callbacks are provided
+    if (onVerificationResult) {
+      uploadAndVerify(selectedFile);
+    }
+  };
+
+  const uploadAndVerify = async (selectedFile: File) => {
+    console.log('=== DIRECT VERIFICATION UPLOAD ===');
+    
+    if (onLoading) onLoading(true);
+    if (onError) onError('');
+    
+    try {
+      // Validate file
+      if (!selectedFile || selectedFile.size === 0) {
+        throw new Error('Invalid file selected');
+      }
+      
+      console.log('Uploading file:', selectedFile.name, 'Size:', selectedFile.size);
+      
+      // Create form data
+      const formData = new FormData();
+      formData.append('file', selectedFile, selectedFile.name);
+      
+      console.log('FormData created, has file:', formData.has('file'));
+      
+      // Upload to backend
+      const response = await fetch('/api/verify', {
+        method: 'POST',
+        body: formData
+      });
+      
+      console.log('Response status:', response.status);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`Verification failed: ${errorData.error || 'Unknown error'}`);
+      }
+      
+      const data = await response.json();
+      console.log('Verification response:', data);
+      
+      // Transform backend response
+      const typeMapping: Record<string, 'Genuine' | 'Edited' | 'Fake'> = {
+        'genuine': 'Genuine',
+        'suspicious': 'Edited',
+        'fake': 'Fake'
+      };
+
+      const transformedResult = {
+        type: typeMapping[data.result] || 'Fake',
+        confidence: data.confidence || 0,
+        mismatchedFields: data.mismatchedFields || []
+      };
+
+      if (onVerificationResult) {
+        onVerificationResult(transformedResult);
+      }
+      
+    } catch (err) {
+      console.error('Verification error:', err);
+      if (onError) {
+        onError(err instanceof Error ? err.message : 'Verification failed');
+      }
+    } finally {
+      if (onLoading) onLoading(false);
     }
   };
 
