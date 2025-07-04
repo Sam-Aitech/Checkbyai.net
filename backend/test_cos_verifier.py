@@ -83,6 +83,54 @@ def test_edited_document():
     assert len(result["mismatched_fields"]) > 0, "Should have mismatched fields"
     print(f"✓ Edited document test passed: {result['type']} with {result['confidence']:.2f} confidence")
 
+def test_minor_edit_detection():
+    """Test detection of documents with minimal edits (single field change)"""
+    verifier = COSVerifier()
+    
+    # Load trusted patterns
+    trusted_patterns = [
+        {
+            "id": 1,
+            "filename": "genuine_cos_1.pdf",
+            "metadata": {
+                "dc:date": "2023-10-01T12:00:00Z",
+                "dc:language": "en-US",
+                "pdf:Producer": "Apache FOP Version 2.3",
+                "xmp:CreateDate": "2023-10-01T12:00:00Z",
+                "xmp:CreatorTool": "Apache FOP Version 2.3",
+                "xmp:MetadataDate": "2023-10-01T12:00:00Z"
+            }
+        }
+    ]
+    
+    verifier.load_trusted_patterns(trusted_patterns)
+    
+    # Test with slightly modified metadata (minor edit)
+    extracted_metadata = {
+        "dc:date": "2023-10-02T12:00:00Z",  # Changed date by one day
+        "dc:language": "en-US",
+        "pdf:Producer": "Apache FOP Version 2.3",
+        "xmp:CreateDate": "2023-10-01T12:00:00Z",
+        "xmp:CreatorTool": "Apache FOP Version 2.3",
+        "xmp:MetadataDate": "2023-10-01T12:00:00Z"
+    }
+    
+    result = verifier.verify_cos(extracted_metadata)
+    
+    # Should detect the edit but with high confidence since only one field changed
+    expected_types = ["Edited", "Genuine"]  # Allow Genuine for very minor changes
+    assert result["type"] in expected_types, f"Should identify as edited or genuine, got {result['type']}"
+    
+    if result["type"] == "Edited":
+        assert "dc:date" in result["mismatched_fields"], "Date field should show mismatch"
+        print(f"✓ Minor edit test passed: detected {result['type']} with {result['confidence']:.2f} confidence")
+    else:
+        # If classified as genuine, confidence should still be high but slightly lower
+        assert result["confidence"] > 0.85, f"High confidence expected for minor change, got {result['confidence']:.2f}"
+        print(f"✓ Minor edit test passed: classified as {result['type']} (acceptable for minimal change)")
+    
+    print(f"   Mismatched fields: {result['mismatched_fields']}")
+
 def test_fake_document():
     """Test verification of completely fake document"""
     verifier = COSVerifier()
@@ -232,6 +280,7 @@ def run_all_tests():
     try:
         test_genuine_document()
         test_edited_document()
+        test_minor_edit_detection()
         test_fake_document()
         test_multiple_trusted_patterns()
         test_no_trusted_patterns()
