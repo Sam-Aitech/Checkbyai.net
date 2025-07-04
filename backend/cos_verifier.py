@@ -197,10 +197,25 @@ class COSVerifier:
         if not self.trusted_patterns:
             raise ValueError("No trusted patterns loaded")
         
+        print(f"=== VERIFICATION DEBUG ===")
+        print(f"Extracted metadata keys: {list(extracted_metadata.keys())}")
+        print(f"Key fields we're looking for: {self.key_fields}")
+        for field in self.key_fields:
+            if field in extracted_metadata:
+                print(f"  {field}: {extracted_metadata[field]}")
+            else:
+                print(f"  {field}: MISSING")
+        
+        print(f"Trusted patterns count: {len(self.trusted_patterns)}")
+        for i, pattern in enumerate(self.trusted_patterns):
+            print(f"Pattern {i+1} metadata keys: {list(pattern.get('metadata', {}).keys())}")
+        
         # First check for exact match
         exact_match, matched_pattern = self._compare_exact_match(extracted_metadata)
+        print(f"Exact match result: {exact_match}")
         
         if exact_match:
+            print("EXACT MATCH FOUND - Returning 100% confidence")
             return {
                 "type": "Genuine",
                 "confidence": 1.0,  # 100% confidence for exact matches
