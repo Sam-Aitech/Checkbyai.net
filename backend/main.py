@@ -62,6 +62,28 @@ async def health_check():
     return {"status": "healthy", "message": "COS Verification System is running"}
 
 
+@app.post("/api/auth/login")
+async def login(credentials: dict):
+    """Login endpoint for authentication"""
+    username = credentials.get("username")
+    password = credentials.get("password")
+    
+    # Simple authentication logic - in production use proper password hashing
+    if username and password:
+        # Determine user role
+        role = "admin" if username.lower() == "admin" else "user"
+        
+        return {
+            "token": f"auth_token_{username}",
+            "user": {
+                "username": username,
+                "role": role
+            }
+        }
+    else:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+
 @app.get("/api/stats", response_model=StatsResponse)
 async def get_stats():
     """Get system statistics"""
