@@ -32,7 +32,19 @@ export default function AdminPortal() {
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append('file', file);
-      const response = await apiRequest('POST', '/api/admin/upload-pattern', formData);
+      
+      // Use fetch directly for file uploads to avoid Content-Type override
+      const response = await fetch('/api/admin/upload-pattern', {
+        method: 'POST',
+        body: formData,
+        // Don't set Content-Type header, browser will set it automatically with boundary
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`Upload failed: ${errorData.error || response.statusText}`);
+      }
+      
       return response.json();
     },
     onSuccess: () => {

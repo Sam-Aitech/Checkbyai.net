@@ -42,10 +42,11 @@ export default function Dashboard() {
       const fileEntry = formData.get('file');
       console.log('File entry:', fileEntry);
       
-      // Call backend verification API
+      // Call backend verification API (don't set Content-Type, let browser set it for multipart)
       const response = await fetch('/api/verify', {
         method: 'POST',
-        body: formData
+        body: formData,
+        // Don't set Content-Type header, browser will set it automatically with boundary
       });
       
       if (!response.ok) {
