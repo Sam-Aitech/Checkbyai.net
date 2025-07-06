@@ -1,0 +1,45 @@
+Visual Style Guide
+Color Scheme:
+Primary: Professional blue tones (#003366, #0066CC)
+Secondary: Trust-indicating green (#009933) and caution orange-red (#FF6600)
+Background: Light gradient with subtle security pattern overlay
+Accents: Glowing effects for active processes
+Typography:
+Clean sans-serif font for all labels and descriptions
+Clear hierarchy with bold headers and readable body text
+Floating tooltips explaining technical terms when hovered over
+Interactive Elements:
+Clickable nodes showing detailed explanations of each processing stage
+Toggle switches to see different views (simplified vs. technical)
+Zoom and rotate controls for full 3D exploration
+Technical Implementation Notes
+For generating this 3D diagram as an interactive web application:
+
+Technologies:
+WebGL via Three.js or Babylon.js for 3D rendering
+React for UI components and state management
+D3.js for 2D visualizations integrated with 3D scene
+GSAP for smooth animations
+Assets:
+Custom-designed 3D models for each component
+Animated particle effects for data flows
+Interactive buttons and panels with hover states
+Responsive design for different screen sizes
+Performance Considerations:
+Level-of-detail (LOD) models for smooth performance
+Lazy loading of non-critical assets
+Efficient animation loops using requestAnimationFrame
+Fallback to 2D version for devices without WebGL support
+Extended Features
+1. Real-time Simulation Mode
+Users can upload sample documents and see them processed live through the system
+Visualization of actual metadata fields being extracted and compared
+2. Educational Tooltips
+Hovering over any component provides detailed explanation of that step
+Technical terms are linked to a glossary accessible within the diagram
+3. Scenario Selection
+Predefined scenarios (genuine, edited, fake) that users can select to see different processing paths
+Custom scenario mode where users can manipulate metadata fields to see how results change
+4. Data Flow Visualization
+Dynamic arrows showing the volume and type of data moving through the system
+Highlighting of critical decision points in the verification process

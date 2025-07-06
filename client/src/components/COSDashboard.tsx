@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'wouter';
 import FileUploadSimple from './FileUploadSimple';
+import Enhanced3DDemo from './Enhanced3DDemo';
 
 export default function COSDashboard() {
   const [showFreeCheck, setShowFreeCheck] = useState(false);
@@ -516,233 +517,19 @@ export default function COSDashboard() {
         </div>
       )}
 
-      {/* Animated 3D Demo Modal */}
-      {showDemo && (
-        <div className="fixed inset-0 bg-black bg-opacity-95 flex items-center justify-center z-50 p-4">
-          <div className="bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 rounded-2xl p-8 max-w-6xl w-full max-h-[95vh] overflow-hidden relative">
-            {/* Floating Security Elements */}
-            <div className="absolute inset-0 pointer-events-none overflow-hidden">
-              {[...Array(10)].map((_, i) => (
-                <div
-                  key={i}
-                  className="absolute animate-float opacity-20"
-                  style={{
-                    left: `${Math.random() * 100}%`,
-                    top: `${Math.random() * 100}%`,
-                    animationDelay: `${Math.random() * 5}s`,
-                    animationDuration: `${4 + Math.random() * 3}s`,
-                  }}
-                >
-                  <svg className="w-6 h-6 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                  </svg>
-                </div>
-              ))}
-            </div>
-
-            {/* Close Button */}
-            <button
-              onClick={() => {
-                setShowDemo(false);
-                resetDemo();
-              }}
-              className="absolute top-4 right-4 text-white hover:text-gray-300 z-10 bg-white/10 rounded-full p-2 backdrop-blur-sm"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-
-            {/* Demo Header */}
-            <div className="text-center mb-8">
-              <h2 className="text-4xl font-bold text-white mb-4 bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-                COS Verification Demo
-              </h2>
-              <p className="text-blue-200 text-lg max-w-3xl mx-auto mb-4">
-                Watch how our AI processes and verifies documents in real-time
-              </p>
-              {/* Step Indicator */}
-              <div className="flex justify-center items-center space-x-2">
-                <span className="text-blue-300 text-sm">Step {demoStep} of 5:</span>
-                <span className="text-white font-semibold">
-                  {demoStep === 0 && "Ready to Start"}
-                  {demoStep === 1 && "Document Upload"}
-                  {demoStep === 2 && "Metadata Analysis"}
-                  {demoStep === 3 && "AI/ML Verification"}
-                  {demoStep === 4 && "Result Presentation"}
-                  {demoStep === 5 && "Expert Analysis Option"}
-                </span>
-              </div>
-            </div>
-
-            {/* Main Animation Area */}
-            <div className="relative bg-black/30 rounded-2xl p-8 mb-8 min-h-[500px] overflow-hidden">
-              {/* Animated PDF Document */}
-              {demoStep >= 1 && (
-                <div className={`absolute transition-all duration-2000 ease-in-out ${
-                  demoStep === 1 ? 'left-8 top-8 scale-100' : 
-                  demoStep >= 2 ? 'left-1/2 top-1/4 scale-75 -translate-x-1/2' : ''
-                }`}>
-                  <div className="w-16 h-20 bg-red-500 rounded-lg shadow-xl flex items-center justify-center transform hover:rotate-3 transition-transform">
-                    <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
-                  <p className="text-white text-sm mt-2 text-center">COS.pdf</p>
-                </div>
-              )}
-
-              {/* Metadata Particles */}
-              {demoStep >= 2 && (
-                <div className="absolute left-1/2 top-1/3 transform -translate-x-1/2">
-                  {/* Metadata Cloud */}
-                  <div className="relative">
-                    {['Creator', 'Producer', 'Date', 'Size', 'Hash'].map((field, index) => (
-                      <div
-                        key={field}
-                        className={`absolute animate-float bg-blue-500 text-white px-3 py-1 rounded-full text-xs transition-all duration-1000 ${
-                          demoStep >= 3 ? (field === 'Creator' || field === 'Date' ? 'bg-green-500' : 'bg-red-500') : ''
-                        }`}
-                        style={{
-                          left: `${index * 30 - 60}px`,
-                          top: `${Math.sin(index) * 20}px`,
-                          animationDelay: `${index * 0.2}s`,
-                        }}
-                      >
-                        {field}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Neural Network Visualization */}
-              {demoStep >= 3 && (
-                <div className="absolute right-8 top-1/4 w-48 h-32">
-                  <div className="relative">
-                    {/* Input Layer */}
-                    <div className="absolute left-0 space-y-4">
-                      {[1, 2, 3].map((node) => (
-                        <div key={node} className="w-4 h-4 bg-blue-500 rounded-full animate-pulse" />
-                      ))}
-                    </div>
-                    
-                    {/* Hidden Layer */}
-                    <div className="absolute left-16 space-y-2">
-                      {[1, 2, 3, 4, 5].map((node) => (
-                        <div key={node} className="w-3 h-3 bg-purple-500 rounded-full animate-pulse" style={{ animationDelay: `${node * 0.1}s` }} />
-                      ))}
-                    </div>
-                    
-                    {/* Output Layer */}
-                    <div className="absolute right-0 top-8 space-y-4">
-                      {['Rule', 'Pattern', 'Vector'].map((type, index) => (
-                        <div key={type} className="flex items-center space-x-2">
-                          <div className="w-4 h-4 bg-green-500 rounded-full animate-pulse" style={{ animationDelay: `${index * 0.15}s` }} />
-                          <span className="text-white text-xs">{type}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Result Display */}
-              {demoStep >= 4 && (
-                <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 text-center">
-                  <div className={`inline-block px-8 py-4 rounded-full text-white font-bold text-xl shadow-2xl transition-all duration-1000 transform ${
-                    demoStep >= 4 ? 'scale-100 opacity-100' : 'scale-0 opacity-0'
-                  } bg-gradient-to-r from-green-500 to-emerald-600 animate-pulse`}>
-                    GENUINE DOCUMENT
-                  </div>
-                  
-                  {/* Progress Bar Animation */}
-                  <div className="mt-4 bg-gray-700 rounded-full h-3 w-64 mx-auto overflow-hidden">
-                    <div 
-                      className="bg-gradient-to-r from-green-400 to-emerald-500 h-full rounded-full transition-all duration-2000 ease-out"
-                      style={{ width: demoStep >= 4 ? '95%' : '0%' }}
-                    />
-                  </div>
-                  <p className="text-green-400 mt-2 font-semibold">Analysis Complete</p>
-                </div>
-              )}
-
-              {/* Expert Analysis Panel */}
-              {demoStep >= 5 && (
-                <div className={`absolute top-8 right-8 bg-gradient-to-br from-purple-600/20 to-pink-600/20 backdrop-blur-sm rounded-xl p-6 border border-purple-400/30 transition-all duration-1000 transform ${
-                  demoStep >= 5 ? 'scale-100 opacity-100 translate-y-0' : 'scale-0 opacity-0 translate-y-8'
-                }`}>
-                  <h4 className="text-white font-bold mb-3 flex items-center">
-                    <svg className="w-5 h-5 mr-2 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                    Expert Analysis Available
-                  </h4>
-                  <p className="text-blue-200 text-sm mb-4">Get deeper insights with human expert review</p>
-                  <ul className="text-purple-200 text-xs space-y-1 mb-4">
-                    <li>• Advanced forensic analysis</li>
-                    <li>• Document history tracking</li>
-                    <li>• Legal compliance verification</li>
-                    <li>• Detailed authenticity report</li>
-                  </ul>
-                  <button className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-2 px-4 rounded-lg text-sm font-semibold hover:shadow-lg transition-all duration-300">
-                    Upgrade for Expert Analysis
-                  </button>
-                </div>
-              )}
-
-              {/* Processing Indicators */}
-              <div className="absolute top-4 left-4 space-y-2">
-                {['Upload', 'Extract', 'Analyze', 'Verify', 'Report'].map((stage, index) => (
-                  <div key={stage} className={`flex items-center space-x-2 transition-all duration-500 ${
-                    demoStep > index ? 'opacity-100' : 'opacity-30'
-                  }`}>
-                    <div className={`w-3 h-3 rounded-full ${
-                      demoStep > index ? 'bg-green-500 animate-pulse' : 'bg-gray-500'
-                    }`} />
-                    <span className="text-white text-sm">{stage}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Step Description */}
-              <div className="absolute bottom-4 left-4 max-w-md">
-                <div className="bg-black/50 backdrop-blur-sm rounded-lg p-4 border border-white/10">
-                  <p className="text-white text-sm">
-                    {demoStep === 0 && "Click the button below to start the demo and see how our AI verifies documents"}
-                    {demoStep === 1 && "📄 Document uploaded and flying toward our processing pipeline"}
-                    {demoStep === 2 && "🔍 Extracting metadata fields and comparing against trusted patterns"}
-                    {demoStep === 3 && "🧠 AI neural network analyzing document through multiple verification methods"}
-                    {demoStep === 4 && "✅ Processing complete! Document verified as genuine"}
-                    {demoStep === 5 && "👨‍💼 For complex cases, human experts provide additional analysis and detailed reports"}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Demo Controls */}
-            <div className="text-center">
-              <button 
-                onClick={startDemo}
-                disabled={isAnimating}
-                className="px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full text-white font-bold text-lg hover:shadow-xl hover:shadow-green-500/50 transition-all duration-300 transform hover:-translate-y-1 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isAnimating ? 'Demo Running...' : 'Start Demo'}
-              </button>
-              <button 
-                onClick={() => {
-                  setShowDemo(false);
-                  setShowFreeCheck(true);
-                  resetDemo();
-                }}
-                className="ml-4 px-8 py-4 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full text-white font-bold text-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
-              >
-                Try Free Check
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Enhanced 3D Demo Modal */}
+      <Enhanced3DDemo 
+        isVisible={showDemo}
+        onClose={() => {
+          setShowDemo(false);
+          resetDemo();
+        }}
+        onTryFreeCheck={() => {
+          setShowDemo(false);
+          setShowFreeCheck(true);
+          resetDemo();
+        }}
+      />
     </div>
   );
 }
