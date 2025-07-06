@@ -83,67 +83,132 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
   }, [isVisible]);
 
   const createInitialElements = (scene: THREE.Scene) => {
-    // User avatar node
-    const userGeometry = new THREE.SphereGeometry(0.5, 32, 32);
-    const userMaterial = new THREE.MeshPhongMaterial({ 
+    // Document Upload Portal
+    const portalGeometry = new THREE.CylinderGeometry(1.2, 1.2, 0.1, 32);
+    const portalMaterial = new THREE.MeshPhongMaterial({ 
       color: new THREE.Color(colors.primaryLight),
-      emissive: new THREE.Color(colors.primaryLight).multiplyScalar(0.1)
+      emissive: new THREE.Color(colors.primaryLight).multiplyScalar(0.2),
+      transparent: true,
+      opacity: 0.8
     });
-    const userSphere = new THREE.Mesh(userGeometry, userMaterial);
-    userSphere.position.set(-6, 2, 0);
-    userSphere.userData = { type: 'user' };
-    scene.add(userSphere);
+    const portal = new THREE.Mesh(portalGeometry, portalMaterial);
+    portal.position.set(-5, 0, 0);
+    portal.userData = { type: 'upload-portal', name: 'Document Upload' };
+    scene.add(portal);
 
-    // Processing pipeline nodes
-    const pipelineSteps = [
-      { name: 'Metadata Extraction', position: [-2, 1, 0], color: colors.primaryLight },
-      { name: 'Pattern Recognition', position: [0, 0, 0], color: colors.secondary },
-      { name: 'Anomaly Detection', position: [2, -1, 0], color: colors.caution },
-      { name: 'Cross-Reference', position: [4, 0, 0], color: colors.primary },
-      { name: 'Result Generation', position: [6, 1, 0], color: colors.secondary }
+    // AI Brain Core - Central processing unit
+    const brainGeometry = new THREE.IcosahedronGeometry(1, 2);
+    const brainMaterial = new THREE.MeshPhongMaterial({ 
+      color: new THREE.Color(colors.secondary),
+      emissive: new THREE.Color(colors.secondary).multiplyScalar(0.15),
+      wireframe: false
+    });
+    const brain = new THREE.Mesh(brainGeometry, brainMaterial);
+    brain.position.set(0, 0, 0);
+    brain.userData = { type: 'ai-core', name: 'AI Analysis Engine' };
+    scene.add(brain);
+
+    // Data Processing Modules (floating around the brain)
+    const modules = [
+      { name: 'Metadata Scanner', position: [-2, 2, 1], color: colors.primaryLight, shape: 'octahedron' },
+      { name: 'Pattern Analyzer', position: [2, 2, -1], color: colors.primary, shape: 'dodecahedron' },
+      { name: 'Security Validator', position: [-2, -2, -1], color: colors.caution, shape: 'tetrahedron' },
+      { name: 'Authenticity Engine', position: [2, -2, 1], color: colors.secondary, shape: 'octahedron' }
     ];
 
-    pipelineSteps.forEach((step, index) => {
-      const geometry = new THREE.BoxGeometry(1, 1, 1);
-      const material = new THREE.MeshPhongMaterial({ 
-        color: new THREE.Color(step.color),
-        emissive: new THREE.Color(step.color).multiplyScalar(0.05)
-      });
-      const cube = new THREE.Mesh(geometry, material);
-      cube.position.set(step.position[0], step.position[1], step.position[2]);
-      cube.userData = { 
-        type: 'pipeline', 
-        name: step.name, 
-        step: index + 1
-      };
-      scene.add(cube);
-    });
-
-    // Connection lines between nodes
-    for (let i = 0; i < pipelineSteps.length - 1; i++) {
-      const start = new THREE.Vector3(...pipelineSteps[i].position);
-      const end = new THREE.Vector3(...pipelineSteps[i + 1].position);
+    modules.forEach((module) => {
+      let geometry;
+      switch(module.shape) {
+        case 'octahedron':
+          geometry = new THREE.OctahedronGeometry(0.6);
+          break;
+        case 'dodecahedron':
+          geometry = new THREE.DodecahedronGeometry(0.6);
+          break;
+        case 'tetrahedron':
+          geometry = new THREE.TetrahedronGeometry(0.8);
+          break;
+        default:
+          geometry = new THREE.OctahedronGeometry(0.6);
+      }
       
-      const geometry = new THREE.BufferGeometry().setFromPoints([start, end]);
-      const material = new THREE.LineBasicMaterial({ 
-        color: new THREE.Color(colors.glow),
-        linewidth: 3
+      const material = new THREE.MeshPhongMaterial({ 
+        color: new THREE.Color(module.color),
+        emissive: new THREE.Color(module.color).multiplyScalar(0.1),
+        transparent: true,
+        opacity: 0.9
       });
-      const line = new THREE.Line(geometry, material);
-      line.userData = { type: 'connection' };
-      scene.add(line);
-    }
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.set(module.position[0], module.position[1], module.position[2]);
+      mesh.userData = { type: 'processor', name: module.name };
+      scene.add(mesh);
 
-    // Expert review system
-    const expertGeometry = new THREE.ConeGeometry(0.5, 1, 6);
-    const expertMaterial = new THREE.MeshPhongMaterial({ 
-      color: new THREE.Color(colors.caution),
-      emissive: new THREE.Color(colors.caution).multiplyScalar(0.1)
+      // Add energy connections from modules to brain
+      const points = [
+        new THREE.Vector3(module.position[0], module.position[1], module.position[2]),
+        new THREE.Vector3(0, 0, 0)
+      ];
+      const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
+      const lineMaterial = new THREE.LineBasicMaterial({ 
+        color: new THREE.Color(colors.glow),
+        transparent: true,
+        opacity: 0.6
+      });
+      const line = new THREE.Line(lineGeometry, lineMaterial);
+      scene.add(line);
     });
-    const expertCone = new THREE.Mesh(expertGeometry, expertMaterial);
-    expertCone.position.set(4, 3, 0);
-    expertCone.userData = { type: 'expert' };
-    scene.add(expertCone);
+
+    // Result Display Screens
+    const screenGeometry = new THREE.PlaneGeometry(1.5, 1);
+    const screens = [
+      { position: [5, 1, 0], result: 'GENUINE', color: colors.secondary },
+      { position: [5, 0, 0], result: 'EDITED', color: colors.caution },
+      { position: [5, -1, 0], result: 'FAKE', color: '#CC0000' }
+    ];
+
+    screens.forEach((screen) => {
+      const material = new THREE.MeshBasicMaterial({ 
+        color: new THREE.Color(screen.color),
+        transparent: true,
+        opacity: 0.7
+      });
+      const mesh = new THREE.Mesh(screenGeometry, material);
+      mesh.position.set(screen.position[0], screen.position[1], screen.position[2]);
+      mesh.userData = { type: 'result-screen', result: screen.result };
+      scene.add(mesh);
+
+      // Add glow effect around screens
+      const glowGeometry = new THREE.RingGeometry(0.8, 1.2, 32);
+      const glowMaterial = new THREE.MeshBasicMaterial({ 
+        color: new THREE.Color(screen.color),
+        transparent: true,
+        opacity: 0.2
+      });
+      const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+      glow.position.copy(mesh.position);
+      scene.add(glow);
+    });
+
+    // Data Flow Particles (visual representation of processing)
+    const particleCount = 50;
+    const particles = new THREE.BufferGeometry();
+    const positions = new Float32Array(particleCount * 3);
+    
+    for (let i = 0; i < particleCount; i++) {
+      positions[i * 3] = (Math.random() - 0.5) * 10;
+      positions[i * 3 + 1] = (Math.random() - 0.5) * 6;
+      positions[i * 3 + 2] = (Math.random() - 0.5) * 4;
+    }
+    
+    particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const particleMaterial = new THREE.PointsMaterial({ 
+      color: new THREE.Color(colors.glow),
+      size: 0.05,
+      transparent: true,
+      opacity: 0.6
+    });
+    const particleSystem = new THREE.Points(particles, particleMaterial);
+    scene.add(particleSystem);
   };
 
   const startAnimation = () => {
@@ -390,11 +455,11 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
 
 function getStageDescription(stage: string): string {
   const descriptions = {
-    Upload: "Secure document upload with integrity validation",
-    Extract: "Advanced PDF metadata extraction using PyMuPDF",
-    Analyze: "Pattern recognition and anomaly detection algorithms",
-    Verify: "Cross-reference against trusted document database",
-    Report: "Generate comprehensive verification report with confidence scoring"
+    Upload: "Document enters secure upload portal with integrity validation",
+    Extract: "AI Brain Core activates metadata scanner and pattern analyzer modules",
+    Analyze: "Security validator and authenticity engine process document structure",
+    Verify: "Cross-reference analysis against trusted pattern database",
+    Report: "Result display screens show verification outcome with confidence scoring"
   };
-  return descriptions[stage as keyof typeof descriptions] || "Processing stage";
+  return descriptions[stage as keyof typeof descriptions] || "AI processing stage";
 }
