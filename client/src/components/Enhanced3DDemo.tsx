@@ -163,18 +163,18 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
     setIsAnimating(true);
     
     const steps = [
-      { delay: 1000, step: 1, sound: 'upload' },
-      { delay: 3000, step: 2, sound: 'processing' },
-      { delay: 5000, step: 3, sound: 'processing' },
+      { delay: 1000, step: 1, sound: null },
+      { delay: 3000, step: 2, sound: null },
+      { delay: 5000, step: 3, sound: null },
       { delay: 7000, step: 4, sound: selectedScenario === 'genuine' ? 'success' : selectedScenario === 'edited' ? 'warning' : 'error' },
-      { delay: 9000, step: 5, sound: 'notification' },
+      { delay: 9000, step: 5, sound: null },
       { delay: 11000, step: 0, sound: 'complete' }
     ];
 
     steps.forEach(({ delay, step, sound }) => {
       setTimeout(() => {
         setDemoStep(step);
-        if (step > 0) {
+        if (step > 0 && sound) {
           playSound(sound as any);
         }
         if (step === 0) setIsAnimating(false);

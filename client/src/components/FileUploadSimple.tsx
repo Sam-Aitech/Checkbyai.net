@@ -78,7 +78,6 @@ export default function FileUploadSimple({
     
     // Call onFileUpload callback
     onFileUpload?.(selectedFile);
-    playSound('upload');
     
     // Start verification immediately
     verifyDocument(selectedFile);
@@ -88,7 +87,6 @@ export default function FileUploadSimple({
     setLoading(true);
     setError('');
     onLoading?.(true);
-    playSound('processing');
     
     try {
       const formData = new FormData();
