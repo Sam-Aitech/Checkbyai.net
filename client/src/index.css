@@ -2,6 +2,50 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 3D Animation Keyframes */
+@keyframes float {
+  0%, 100% { 
+    transform: translateY(0px) rotate(0deg) scale(1); 
+  }
+  50% { 
+    transform: translateY(-20px) rotate(180deg) scale(1.1); 
+  }
+}
+
+@keyframes spin-slow {
+  0% { 
+    transform: rotate(0deg) scale(1); 
+  }
+  50% { 
+    transform: rotate(180deg) scale(1.05); 
+  }
+  100% { 
+    transform: rotate(360deg) scale(1); 
+  }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { 
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+  }
+  50% { 
+    box-shadow: 0 0 40px rgba(59, 130, 246, 0.8), 0 0 60px rgba(59, 130, 246, 0.4);
+  }
+}
+
+/* Custom Animation Classes */
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+.animate-spin-slow {
+  animation: spin-slow 8s linear infinite;
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
 :root {
   --background: hsl(0, 0%, 100%);
   --foreground: hsl(20, 14.3%, 4.1%);

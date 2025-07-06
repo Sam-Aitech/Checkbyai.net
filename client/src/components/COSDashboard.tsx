@@ -65,59 +65,161 @@ export default function COSDashboard() {
 
   return (
     <div className="bg-gray-50 min-h-screen">
-      {/* Dashboard Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-3">
-              <svg className="w-8 h-8 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">COS Authenticator</h1>
-                <p className="text-xs text-gray-500">Advanced Document Verification</p>
+      {/* Innovative 3D Dashboard Header */}
+      <header className="relative bg-gradient-to-r from-blue-600 via-blue-700 to-purple-700 shadow-2xl sticky top-0 z-40 overflow-hidden">
+        {/* Animated Background Dots */}
+        <div 
+          className="absolute inset-0 opacity-20"
+          onMouseMove={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            const dots = e.currentTarget.querySelectorAll('.floating-dot');
+            dots.forEach((dot, index) => {
+              const delay = index * 0.1;
+              const dotElement = dot as HTMLElement;
+              const distance = Math.sqrt((x - dotElement.offsetLeft) ** 2 + (y - dotElement.offsetTop) ** 2);
+              const scale = Math.max(0.5, 1 - distance / 500);
+              dotElement.style.transform = `translate(${(x - dotElement.offsetLeft) * 0.02}px, ${(y - dotElement.offsetTop) * 0.02}px) scale(${scale}) rotateZ(${distance * 0.1}deg)`;
+              dotElement.style.transitionDelay = `${delay}s`;
+            });
+          }}
+        >
+          {[...Array(20)].map((_, i) => (
+            <div
+              key={i}
+              className="floating-dot absolute w-2 h-2 bg-white rounded-full animate-pulse transition-transform duration-700 ease-out"
+              style={{
+                left: `${Math.random() * 100}%`,
+                top: `${Math.random() * 100}%`,
+                animationDelay: `${Math.random() * 3}s`,
+              }}
+            />
+          ))}
+        </div>
+
+        {/* 3D Geometric Shapes */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-4 left-1/4 w-8 h-8 border-2 border-white/20 rotate-45 animate-spin" style={{ animationDuration: '8s' }} />
+          <div className="absolute bottom-4 right-1/3 w-6 h-6 bg-white/10 rounded-full animate-bounce" style={{ animationDelay: '2s' }} />
+          <div className="absolute top-1/2 right-1/4 w-10 h-10 border border-white/15 rounded-full animate-ping" style={{ animationDelay: '1s' }} />
+        </div>
+
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-20">
+            <div className="flex items-center space-x-4 group">
+              <div className="relative">
+                <div className="absolute inset-0 bg-white/20 rounded-full blur-xl group-hover:blur-2xl transition-all duration-500" />
+                <div className="relative w-12 h-12 bg-gradient-to-br from-white to-blue-100 rounded-full flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-all duration-300">
+                  <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                </div>
+              </div>
+              <div className="transform group-hover:translate-x-2 transition-transform duration-300">
+                <h1 className="text-2xl font-bold text-white drop-shadow-lg">COS Authenticator</h1>
+                <p className="text-sm text-blue-100 drop-shadow">Advanced Document Verification</p>
               </div>
             </div>
             
             <div className="flex items-center space-x-4">
               <Link href="/">
-                <button className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors duration-200">
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <button className="group relative inline-flex items-center px-6 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white font-medium hover:bg-white/20 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl">
+                  <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
+                  <svg className="w-5 h-5 mr-2 transform group-hover:-translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16l-4-4m0 0l4-4m-4 4h18" />
                   </svg>
-                  Back to Home
+                  <span className="relative z-10">Back to Home</span>
                 </button>
               </Link>
               
               <button 
                 onClick={() => setShowFreeCheck(true)}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors duration-200"
+                className="group relative inline-flex items-center px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl text-white font-semibold shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 hover:scale-105"
               >
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="absolute inset-0 bg-gradient-to-r from-green-400 to-emerald-500 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <svg className="w-5 h-5 mr-2 relative z-10 transform group-hover:rotate-12 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                Try Free Check
+                <span className="relative z-10">Try Free Check</span>
+                <div className="absolute inset-0 rounded-xl bg-white/20 scale-0 group-hover:scale-100 transition-transform duration-500" />
               </button>
             </div>
           </div>
         </div>
+
+        {/* Bottom Glow Effect */}
+        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
       </header>
 
-      {/* Hero Section */}
-      <section className="bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 text-white text-center py-20 bg-cover bg-center relative">
-        <div className="absolute inset-0 bg-black bg-opacity-30"></div>
+      {/* Innovative 3D Hero Section */}
+      <section className="relative bg-gradient-to-br from-blue-600 via-purple-700 to-indigo-800 text-white text-center py-24 overflow-hidden">
+        {/* 3D Floating Elements */}
+        <div className="absolute inset-0 pointer-events-none">
+          {[...Array(15)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute animate-float opacity-30"
+              style={{
+                left: `${Math.random() * 100}%`,
+                top: `${Math.random() * 100}%`,
+                animationDelay: `${Math.random() * 5}s`,
+                animationDuration: `${3 + Math.random() * 4}s`,
+              }}
+            >
+              <div className="w-4 h-4 bg-gradient-to-br from-white/40 to-transparent rounded-full blur-sm" />
+            </div>
+          ))}
+        </div>
+
+        {/* Interactive Cursor Trail */}
+        <div 
+          className="absolute inset-0"
+          onMouseMove={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            // Create trailing effect
+            const trail = document.createElement('div');
+            trail.className = 'absolute w-3 h-3 bg-white/30 rounded-full pointer-events-none animate-ping';
+            trail.style.left = x + 'px';
+            trail.style.top = y + 'px';
+            trail.style.transform = 'translate(-50%, -50%)';
+            e.currentTarget.appendChild(trail);
+            
+            setTimeout(() => trail.remove(), 1000);
+          }}
+        />
+
+        {/* Geometric Background */}
+        <div className="absolute inset-0 opacity-20">
+          <div className="absolute top-20 left-20 w-32 h-32 border border-white/30 rounded-full animate-spin-slow" />
+          <div className="absolute bottom-20 right-20 w-24 h-24 border-2 border-white/20 rotate-45 animate-pulse" />
+          <div className="absolute top-1/2 left-1/4 w-16 h-16 bg-white/10 transform rotate-12 animate-bounce" style={{ animationDelay: '1s' }} />
+        </div>
+
         <div className="container mx-auto px-5 relative z-10">
-          <h1 className="text-5xl md:text-6xl font-bold mb-5 font-sans text-shadow-md">
-            Advanced COS Document Verification
-          </h1>
-          <p className="text-xl md:text-2xl max-w-4xl mx-auto mb-8">
+          <div className="transform hover:scale-105 transition-transform duration-500">
+            <h1 className="text-5xl md:text-7xl font-bold mb-6 font-sans bg-gradient-to-r from-white via-blue-100 to-purple-100 bg-clip-text text-transparent drop-shadow-2xl">
+              Advanced COS Document Verification
+            </h1>
+          </div>
+          <p className="text-xl md:text-2xl max-w-4xl mx-auto mb-10 text-blue-100 drop-shadow-lg leading-relaxed">
             Verify the authenticity of your Certificate of Service using PDF metadata analysis and expert verification
           </p>
           <button 
             onClick={() => setShowFreeCheck(true)}
-            className="inline-block px-8 py-4 bg-green-500 text-white rounded-full font-semibold text-lg transition-all duration-300 hover:bg-green-600 hover:transform hover:-translate-y-1 shadow-lg"
+            className="group relative inline-block px-10 py-5 bg-gradient-to-r from-green-500 via-emerald-600 to-green-600 text-white rounded-full font-bold text-xl transition-all duration-500 hover:shadow-2xl hover:shadow-green-500/50 transform hover:-translate-y-2 hover:scale-110"
           >
-            Check Your COS Now
+            <div className="absolute inset-0 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-pulse" />
+            <span className="relative z-10 flex items-center">
+              <svg className="w-6 h-6 mr-3 transform group-hover:rotate-12 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Check Your COS Now
+            </span>
+            <div className="absolute inset-0 rounded-full bg-white/20 scale-0 group-hover:scale-100 transition-transform duration-700" />
           </button>
         </div>
       </section>
