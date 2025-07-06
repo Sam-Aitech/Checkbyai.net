@@ -97,7 +97,11 @@ function LoadingFallback() {
   )
 }
 
-export default function HeroSection() {
+interface HeroSectionProps {
+  onStartVerification?: () => void;
+}
+
+export default function HeroSection({ onStartVerification }: HeroSectionProps) {
   const [isLoaded, setIsLoaded] = useState(false)
   const [showDemo, setShowDemo] = useState(false)
 
@@ -164,7 +168,7 @@ export default function HeroSection() {
                 <Button 
                   size="lg" 
                   className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
-                  onClick={() => setShowDemo(true)}
+                  onClick={onStartVerification}
                 >
                   Start Verification
                   <ArrowRight className="ml-2 w-5 h-5" />

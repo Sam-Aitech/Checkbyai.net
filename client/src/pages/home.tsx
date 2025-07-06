@@ -80,7 +80,7 @@ export default function Home() {
 
         {/* 3D Landing Page */}
         <Suspense fallback={<LoadingSpinner />}>
-          <HeroSection />
+          <HeroSection onStartVerification={() => setShowPortals(true)} />
         </Suspense>
       </div>
     );
