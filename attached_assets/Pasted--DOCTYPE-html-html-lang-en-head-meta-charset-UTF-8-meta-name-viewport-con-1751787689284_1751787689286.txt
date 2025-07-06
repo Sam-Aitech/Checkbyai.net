@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>COS Authenticity Checker</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --secondary: #0ea5e9;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --light: #f8fafc;
+            --dark: #0f172a;
+            --gray: #64748b;
+            --light-gray: #e2e8f0;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f1f5f9;
+            color: #334155;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        header {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            padding: 20px 0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.8rem;
+            font-weight: 700;
+            font-family: 'Poppins', sans-serif;
+        }
+        
+        .logo i {
+            color: #ffd700;
+        }
+        
+        nav ul {
+            display: flex;
+            list-style: none;
+            gap: 25px;
+        }
+        
+        nav a {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            padding: 5px 10px;
+            border-radius: 4px;
+        }
+        
+        nav a:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+        
+        .hero {
+            background: linear-gradient(rgba(37, 99, 235, 0.9), rgba(14, 165, 233, 0.9)), url('https://images.unsplash.com/photo-1553877522-43269d4ea984?auto=format&fit=crop&w=1200&q=80');
+            background-size: cover;
+            background-position: center;
+            color: white;
+            text-align: center;
+            padding: 80px 20px;
+            margin-bottom: 50px;
+        }
+        
+        .hero h1 {
+            font-size: 3.5rem;
+            margin-bottom: 20px;
+            font-family: 'Poppins', sans-serif;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        
+        .hero p {
+            font-size: 1.5rem;
+            max-width: 800px;
+            margin: 0 auto 30px;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 12px 30px;
+            background-color: var(--success);
+            color: white;
+            text-decoration: none;
+            border-radius: 50px;
+            font-weight: 600;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        .btn-primary {
+            background-color: var(--primary);
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--primary-dark);
+        }
+        
+        .section-title {
+            text-align: center;
+            margin-bottom: 50px;
+            position: relative;
+        }
+        
+        .section-title h2 {
+            font-size: 2.5rem;
+            font-family: 'Poppins', sans-serif;
+            color: var(--dark);
+            margin-bottom: 15px;
+        }
+        
+        .section-title p {
+            font-size: 1.2rem;
+            color: var(--gray);
+            max-width: 700px;
+            margin: 0 auto;
+        }
+        
+        .section-title::after {
+            content: '';
+            display: block;
+            width: 80px;
+            height: 4px;
+            background: var(--primary);
+            margin: 15px auto 0;
+            border-radius: 2px;
+        }
+        
+        .process-steps {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 60px;
+        }
+        
+        .step-card {
+            flex: 1;
+            min-width: 250px;
+            max-width: 300px;
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            z-index: 1;
+        }
+        
+        .step-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 12px 25px rgba(0, 0, 0, 0.15);
+        }
+        
+        .step-number {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 3rem;
+            font-weight: 700;
+            color: rgba(37, 99, 235, 0.1);
+            z-index: -1;
+        }
+        
+        .step-icon {
+            width: 80px;
+            height: 80px;
+            background: var(--primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            color: white;
+            font-size: 2rem;
+        }
+        
+        .step-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+            color: var(--dark);
+        }
+        
+        .step-card p {
+            color: var(--gray);
+            margin-bottom: 20px;
+        }
+        
+        .benefits {
+            background: var(--light);
+            padding: 60px 0;
+            margin-bottom: 60px;
+        }
+        
+        .benefits-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+        }
+        
+        .benefit-card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+            display: flex;
+            align-items: flex-start;
+            gap: 20px;
+            transition: all 0.3s ease;
+        }
+        
+        .benefit-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+        }
+        
+        .benefit-icon {
+            width: 60px;
+            height: 60px;
+            background: rgba(37, 99, 235, 0.1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary);
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+        
+        .benefit-content h3 {
+            font-size: 1.4rem;
+            margin-bottom: 10px;
+            color: var(--dark);
+        }
+        
+        .benefit-content p {
+            color: var(--gray);
+        }
+        
+        .cta-section {
+            text-align: center;
+            padding: 80px 20px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            border-radius: 20px;
+            margin: 60px 0;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .cta-section::before {
+            content: '';
+            position: absolute;
+            top: -50px;
+            right: -50px;
+            width: 200px;
+            height: 200px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+        }
+        
+        .cta-section::after {
+            content: '';
+            position: absolute;
+            bottom: -70px;
+            left: -70px;
+            width: 250px;
+            height: 250px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 50%;
+        }
+        
+        .cta-content {
+            position: relative;
+            z-index: 2;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .cta-content h2 {
+            font-size: 2.8rem;
+            margin-bottom: 20px;
+        }
+        
+        .cta-content p {
+            font-size: 1.2rem;
+            margin-bottom: 30px;
+        }
+        
+        .btn-cta {
+            background-color: white;
+            color: var(--primary);
+            font-size: 1.2rem;
+            padding: 15px 40px;
+        }
+        
+        .btn-cta:hover {
+            background-color: var(--light);
+            color: var(--primary-dark);
+        }
+        
+        .pricing {
+            margin-bottom: 80px;
+        }
+        
+        .pricing-cards {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 30px;
+            margin-top: 40px;
+        }
+        
+        .pricing-card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 350px;
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        
+        .pricing-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+        }
+        
+        .pricing-header {
+            padding: 30px 20px;
+            background: var(--primary);
+            color: white;
+        }
+        
+        .pricing-header h3 {
+            font-size: 1.8rem;
+            margin-bottom: 10px;
+        }
+        
+        .price {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        
+        .price span {
+            font-size: 1.2rem;
+            font-weight: 400;
+        }
+        
+        .pricing-features {
+            padding: 30px 20px;
+        }
+        
+        .pricing-features ul {
+            list-style: none;
+            margin-bottom: 30px;
+        }
+        
+        .pricing-features li {
+            padding: 10px 0;
+            border-bottom: 1px solid var(--light-gray);
+            color: var(--gray);
+        }
+        
+        .pricing-features li:last-child {
+            border-bottom: none;
+        }
+        
+        .pricing-features li i {
+            color: var(--success);
+            margin-right: 10px;
+        }
+        
+        .faq {
+            background: var(--light);
+            padding: 60px 0;
+            margin-bottom: 60px;
+        }
+        
+        .faq-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        
+        .faq-item {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        }
+        
+        .faq-item h3 {
+            font-size: 1.3rem;
+            margin-bottom: 15px;
+            color: var(--dark);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .faq-item h3 i {
+            color: var(--primary);
+        }
+        
+        .faq-item p {
+            color: var(--gray);
+        }
+        
+        footer {
+            background: var(--dark);
+            color: white;
+            padding: 60px 0 30px;
+        }
+        
+        .footer-content {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 40px;
+            margin-bottom: 40px;
+        }
+        
+        .footer-column h3 {
+            font-size: 1.4rem;
+            margin-bottom: 20px;
+            position: relative;
+            padding-bottom: 10px;
+        }
+        
+        .footer-column h3::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 50px;
+            height: 3px;
+            background: var(--primary);
+        }
+        
+        .footer-column ul {
+            list-style: none;
+        }
+        
+        .footer-column ul li {
+            margin-bottom: 10px;
+        }
+        
+        .footer-column a {
+            color: var(--light-gray);
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+        
+        .footer-column a:hover {
+            color: white;
+            padding-left: 5px;
+        }
+        
+        .social-links {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .social-links a {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            color: white;
+            transition: all 0.3s ease;
+        }
+        
+        .social-links a:hover {
+            background: var(--primary);
+            transform: translateY(-3px);
+        }
+        
+        .copyright {
+            text-align: center;
+            padding-top: 30px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--light-gray);
+            font-size: 0.9rem;
+        }
+        
+        /* Verification Highlight Section */
+        .verification-highlight {
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
+            margin: 60px 0;
+            display: flex;
+            flex-wrap: wrap;
+        }
+        
+        .verification-image {
+            flex: 1;
+            min-width: 300px;
+            background: linear-gradient(135deg, #e6f7ff, #b3e0ff);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+        }
+        
+        .verification-image img {
+            max-width: 100%;
+            height: auto;
+        }
+        
+        .verification-content {
+            flex: 1;
+            min-width: 300px;
+            padding: 50px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        .verification-content h2 {
+            font-size: 2.5rem;
+            color: var(--dark);
+            margin-bottom: 20px;
+            font-family: 'Poppins', sans-serif;
+        }
+        
+        .verification-content h2 span {
+            color: var(--primary);
+        }
+        
+        .verification-content p {
+            color: var(--gray);
+            margin-bottom: 30px;
+            font-size: 1.1rem;
+        }
+        
+        .feature-list {
+            list-style: none;
+            margin-bottom: 30px;
+        }
+        
+        .feature-list li {
+            padding: 10px 0;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .feature-list li i {
+            color: var(--success);
+            font-size: 1.3rem;
+        }
+        
+        .verification-stats {
+            display: flex;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .stat-box {
+            text-align: center;
+            padding: 20px;
+            border-radius: 10px;
+            background: var(--light);
+            flex: 1;
+        }
+        
+        .stat-box .number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 5px;
+        }
+        
+        .stat-box .label {
+            color: var(--gray);
+            font-size: 0.9rem;
+        }
+        
+        /* Verification Results */
+        .results-section {
+            background: linear-gradient(to right, #f0f9ff, #e0f2fe);
+            padding: 80px 0;
+            border-radius: 20px;
+            margin: 60px 0;
+        }
+        
+        .results-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 30px;
+            justify-content: center;
+        }
+        
+        .result-card {
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            width: 300px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        
+        .result-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.12);
+        }
+        
+        .result-header {
+            padding: 30px 20px;
+            color: white;
+            font-size: 1.5rem;
+        }
+        
+        .result-header.genuine {
+            background: var(--success);
+        }
+        
+        .result-header.edited {
+            background: var(--warning);
+        }
+        
+        .result-header.fake {
+            background: var(--danger);
+        }
+        
+        .result-icon {
+            font-size: 3rem;
+            margin-bottom: 20px;
+        }
+        
+        .result-content {
+            padding: 30px 20px;
+        }
+        
+        .result-content h3 {
+            margin-bottom: 15px;
+            font-size: 1.5rem;
+            color: var(--dark);
+        }
+        
+        .result-content ul {
+            list-style: none;
+            text-align: left;
+            margin-top: 20px;
+        }
+        
+        .result-content ul li {
+            padding: 8px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .result-content ul li i {
+            color: var(--success);
+        }
+        
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                gap: 20px;
+            }
+            
+            nav ul {
+                gap: 15px;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+            
+            .hero p {
+                font-size: 1.2rem;
+            }
+            
+            .step-card {
+                max-width: 100%;
+            }
+            
+            .verification-highlight {
+                flex-direction: column;
+            }
+            
+            .verification-stats {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-file-contract"></i>
+                    <span>COS Authenticator</span>
+                </div>
+                <nav>
+                    <ul>
+                        <li><a href="#"><i class="fas fa-home"></i> Home</a></li>
+                        <li><a href="#"><i class="fas fa-file-pdf"></i> Check COS</a></li>
+                        <li><a href="#"><i class="fas fa-crown"></i> PRO Service</a></li>
+                        <li><a href="#"><i class="fas fa-question-circle"></i> FAQ</a></li>
+                        <li><a href="#"><i class="fas fa-user"></i> Login</a></li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <h1>Advanced COS Document Verification</h1>
+            <p>Verify the authenticity of your Certificate of Service using PDF metadata analysis and expert verification</p>
+            <a href="#" class="btn btn-primary">Check Your COS Now</a>
+        </div>
+    </section>
+
+    <!-- Verification Highlight -->
+    <section class="container">
+        <div class="verification-highlight">
+            <div class="verification-image">
+                <svg width="400" height="300" viewBox="0 0 500 400">
+                    <rect x="50" y="50" width="400" height="300" rx="10" fill="#0ea5e9" opacity="0.2" />
+                    <rect x="70" y="70" width="360" height="260" rx="5" fill="white" stroke="#0ea5e9" stroke-width="2" />
+                    <path d="M100,100 L400,100" stroke="#2563eb" stroke-width="3" stroke-dasharray="5,5" />
+                    <circle cx="250" cy="180" r="50" fill="#10b981" opacity="0.2" />
+                    <path d="M235,170 L265,200 L295,150" fill="none" stroke="#10b981" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" />
+                    <text x="250" y="260" text-anchor="middle" font-family="Poppins" font-size="24" fill="#2563eb">Certificate of Service</text>
+                    <text x="250" y="290" text-anchor="middle" font-family="Roboto" font-size="18" fill="#64748b">Authenticity Verified</text>
+                    <path d="M120,330 L380,330" stroke="#ef4444" stroke-width="2" />
+                    <circle cx="150" cy="350" r="10" fill="#ef4444" />
+                    <circle cx="250" cy="350" r="10" fill="#f59e0b" />
+                    <circle cx="350" cy="350" r="10" fill="#10b981" />
+                    <text x="150" y="380" text-anchor="middle" font-family="Roboto" font-size="14" fill="#334155">Fake</text>
+                    <text x="250" y="380" text-anchor="middle" font-family="Roboto" font-size="14" fill="#334155">Edited</text>
+                    <text x="350" y="380" text-anchor="middle" font-family="Roboto" font-size="14" fill="#334155">Genuine</text>
+                </svg>
+            </div>
+            <div class="verification-content">
+                <h2>Advanced <span>PDF Metadata Analysis</span> for COS Documents</h2>
+                <p>Our proprietary technology examines PDF metadata to detect alterations and verify the authenticity of your Certificate of Service documents.</p>
+                
+                <ul class="feature-list">
+                    <li>
+                        <i class="fas fa-check-circle"></i>
+                        <span>Deep analysis of PDF metadata properties</span>
+                    </li>
+                    <li>
+                        <i class="fas fa-check-circle"></i>
+                        <span>Comparison against verified genuine templates</span>
+                    </li>
+                    <li>
+                        <i class="fas fa-check-circle"></i>
+                        <span>Detection of document alterations and tampering</span>
+                    </li>
+                    <li>
+                        <i class="fas fa-check-circle"></i>
+                        <span>Verification of digital signatures and timestamps</span>
+                    </li>
+                </ul>
+                
+                <div class="verification-stats">
+                    <div class="stat-box">
+                        <div class="number">99.7%</div>
+                        <div class="label">Accuracy Rate</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="number">50k+</div>
+                        <div class="label">COS Verified</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="number">0.2s</div>
+                        <div class="label">Avg. Analysis Time</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Process Section -->
+    <section class="container">
+        <div class="section-title">
+            <h2>How Our COS Verification Works</h2>
+            <p>Three-step process to verify the authenticity of your Certificate of Service</p>
+        </div>
+        
+        <div class="process-steps">
+            <div class="step-card">
+                <div class="step-number">1</div>
+                <div class="step-icon">
+                    <i class="fas fa-upload"></i>
+                </div>
+                <h3>Upload COS Document</h3>
+                <p>Upload your Certificate of Service in PDF format for analysis.</p>
+                <a href="#" class="btn">Upload PDF</a>
+            </div>
+            
+            <div class="step-card">
+                <div class="step-number">2</div>
+                <div class="step-icon">
+                    <i class="fas fa-search"></i>
+                </div>
+                <h3>Metadata Analysis</h3>
+                <p>Our system extracts and analyzes PDF metadata for authenticity markers.</p>
+                <a href="#" class="btn">View Sample</a>
+            </div>
+            
+            <div class="step-card">
+                <div class="step-number">3</div>
+                <div class="step-icon">
+                    <i class="fas fa-file-certificate"></i>
+                </div>
+                <h3>Get Verification Result</h3>
+                <p>Receive instant verification status: Genuine, Edited, or Fake.</p>
+                <a href="#" class="btn">Example Report</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Results Section -->
+    <section class="results-section">
+        <div class="container">
+            <div class="section-title">
+                <h2>Verification Results</h2>
+                <p>Clear, color-coded results for immediate understanding</p>
+            </div>
+            
+            <div class="results-container">
+                <div class="result-card">
+                    <div class="result-header genuine">
+                        <div class="result-icon">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <h3>Genuine COS</h3>
+                    </div>
+                    <div class="result-content">
+                        <p>Document matches verified templates with no alterations detected.</p>
+                        <ul>
+                            <li><i class="fas fa-check"></i> Metadata matches genuine pattern</li>
+                            <li><i class="fas fa-check"></i> No tampering detected</li>
+                            <li><i class="fas fa-check"></i> Digital signature valid</li>
+                            <li><i class="fas fa-check"></i> Creation date consistent</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="result-card">
+                    <div class="result-header edited">
+                        <div class="result-icon">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <h3>Edited COS</h3>
+                    </div>
+                    <div class="result-content">
+                        <p>Document shows signs of alteration after original creation.</p>
+                        <ul>
+                            <li><i class="fas fa-check"></i> Metadata inconsistencies</li>
+                            <li><i class="fas fa-check"></i> Modification dates detected</li>
+                            <li><i class="fas fa-check"></i> Content alterations found</li>
+                            <li><i class="fas fa-check"></i> Signature validation failed</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="result-card">
+                    <div class="result-header fake">
+                        <div class="result-icon">
+                            <i class="fas fa-times-circle"></i>
+                        </div>
+                        <h3>Fake COS</h3>
+                    </div>
+                    <div class="result-content">
+                        <p>Document does not match genuine templates or contains invalid data.</p>
+                        <ul>
+                            <li><i class="fas fa-check"></i> Metadata doesn't match</li>
+                            <li><i class="fas fa-check"></i> Invalid creation patterns</li>
+                            <li><i class="fas fa-check"></i> Signature missing or invalid</li>
+                            <li><i class="fas fa-check"></i> Template mismatch</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Benefits Section -->
+    <section class="benefits">
+        <div class="container">
+            <div class="section-title">
+                <h2>Why Verify Your COS?</h2>
+                <p>Protect yourself from fraudulent documents and legal complications</p>
+            </div>
+            
+            <div class="benefits-grid">
+                <div class="benefit-card">
+                    <div class="benefit-icon">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <div class="benefit-content">
+                        <h3>Legal Compliance</h3>
+                        <p>Ensure your Certificate of Service meets all legal requirements and standards.</p>
+                    </div>
+                </div>
+                
+                <div class="benefit-card">
+                    <div class="benefit-icon">
+                        <i class="fas fa-user-check"></i>
+                    </div>
+                    <div class="benefit-content">
+                        <h3>Employer Verification</h3>
+                        <p>Confirm employment details directly with employers through our PRO service.</p>
+                    </div>
+                </div>
+                
+                <div class="benefit-card">
+                    <div class="benefit-icon">
+                        <i class="fas fa-file-contract"></i>
+                    </div>
+                    <div class="benefit-content">
+                        <h3>Tamper Detection</h3>
+                        <p>Identify any alterations made to the original document.</p>
+                    </div>
+                </div>
+                
+                <div class="benefit-card">
+                    <div class="benefit-icon">
+                        <i class="fas fa-lock"></i>
+                    </div>
+                    <div class="benefit-content">
+                        <h3>Secure Processing</h3>
+                        <p>Your documents are processed securely with end-to-end encryption.</p>
+                    </div>
+                </div>
+                
+                <div class="benefit-card">
+                    <div class="benefit-icon">
+                        <i class="fas fa-bolt"></i>
+                    </div>
+                    <div class="benefit-content">
+                        <h3>Instant Results</h3>
+                        <p>Get verification results in seconds, not days.</p>
+                    </div>
+                </div>
+                
+                <div class="benefit-card">
+                    <div class="benefit-icon">
+                        <i class="fas fa-certificate"></i>
+                    </div>
+                    <div class="benefit-content">
+                        <h3>Verification Certificate</h3>
+                        <p>Receive a digital verification certificate for your records.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="container">
+        <div class="cta-section">
+            <div class="cta-content">
+                <h2>Verify Your COS Document Today</h2>
+                <p>Ensure your Certificate of Service is authentic and legally compliant with our advanced verification system.</p>
+                <a href="#" class="btn btn-cta">Start Verification Now</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-column">
+                    <h3>COS Authenticator</h3>
+                    <p>Advanced verification for Certificate of Service documents using PDF metadata analysis and expert review.</p>
+                    <div class="social-links">
+                        <a href="#"><i class="fab fa-facebook-f"></i></a>
+                        <a href="#"><i class="fab fa-twitter"></i></a>
+                        <a href="#"><i class="fab fa-linkedin-in"></i></a>
+                        <a href="#"><i class="fab fa-instagram"></i></a>
+                    </div>
+                </div>
+                
+                <div class="footer-column">
+                    <h3>Services</h3>
+                    <ul>
+                        <li><a href="#">COS Verification</a></li>
+                        <li><a href="#">PRO Expert Review</a></li>
+                        <li><a href="#">Bulk Verification</a></li>
+                        <li><a href="#">Document Consultation</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer-column">
+                    <h3>Resources</h3>
+                    <ul>
+                        <li><a href="#">How It Works</a></li>
+                        <li><a href="#">Sample Reports</a></li>
+                        <li><a href="#">Verification Standards</a></li>
+                        <li><a href="#">Compliance Guidelines</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer-column">
+                    <h3>Contact Us</h3>
+                    <ul>
+                        <li><i class="fas fa-envelope"></i> support@cosauthenticator.com</li>
+                        <li><i class="fas fa-phone"></i> +1 (800) 123-4567</li>
+                        <li><i class="fas fa-map-marker-alt"></i> 123 Verification St, Suite 200, San Francisco, CA</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="copyright">
+                <p>&copy; 2023 COS Authenticator. All rights reserved. | Privacy Policy | Terms of Service</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Simple animation for step cards
+        document.addEventListener('DOMContentLoaded', function() {
+            const stepCards = document.querySelectorAll('.step-card');
+            
+            stepCards.forEach((card, index) => {
+                // Add delay for staggered animation
+                card.style.animationDelay = `${index * 0.1}s`;
+            });
+            
+            // Smooth scrolling for anchor links
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    document.querySelector(this.getAttribute('href')).scrollIntoView({
+                        behavior: 'smooth'
+                    });
+                });
+            });
+        });
+    </script>
+</body>
+</html>

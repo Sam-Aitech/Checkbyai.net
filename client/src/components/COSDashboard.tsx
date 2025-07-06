@@ -1,0 +1,313 @@
+import { useState } from 'react';
+
+export default function COSDashboard() {
+  return (
+    <div className="bg-gray-50 min-h-screen">
+      {/* Hero Section */}
+      <section className="bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 text-white text-center py-20 bg-cover bg-center relative">
+        <div className="absolute inset-0 bg-black bg-opacity-30"></div>
+        <div className="container mx-auto px-5 relative z-10">
+          <h1 className="text-5xl md:text-6xl font-bold mb-5 font-sans text-shadow-md">
+            Advanced COS Document Verification
+          </h1>
+          <p className="text-xl md:text-2xl max-w-4xl mx-auto mb-8">
+            Verify the authenticity of your Certificate of Service using PDF metadata analysis and expert verification
+          </p>
+          <button className="inline-block px-8 py-4 bg-green-500 text-white rounded-full font-semibold text-lg transition-all duration-300 hover:bg-green-600 hover:transform hover:-translate-y-1 shadow-lg">
+            Check Your COS Now
+          </button>
+        </div>
+      </section>
+
+      {/* Verification Highlight */}
+      <section className="container mx-auto px-5 py-16">
+        <div className="bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-wrap">
+          <div className="flex-1 min-w-[300px] bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-10">
+            <svg width="400" height="300" viewBox="0 0 500 400" className="max-w-full h-auto">
+              <rect x="50" y="50" width="400" height="300" rx="10" fill="#0ea5e9" fillOpacity="0.2" />
+              <rect x="70" y="70" width="360" height="260" rx="5" fill="white" stroke="#0ea5e9" strokeWidth="2" />
+              <path d="M100,100 L400,100" stroke="#2563eb" strokeWidth="3" strokeDasharray="5,5" />
+              <circle cx="250" cy="180" r="50" fill="#10b981" fillOpacity="0.2" />
+              <path d="M235,170 L265,200 L295,150" fill="none" stroke="#10b981" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
+              <text x="250" y="260" textAnchor="middle" fontFamily="Poppins" fontSize="24" fill="#2563eb">Certificate of Service</text>
+              <text x="250" y="290" textAnchor="middle" fontFamily="Roboto" fontSize="18" fill="#64748b">Authenticity Verified</text>
+              <path d="M120,330 L380,330" stroke="#ef4444" strokeWidth="2" />
+              <circle cx="150" cy="350" r="10" fill="#ef4444" />
+              <circle cx="250" cy="350" r="10" fill="#f59e0b" />
+              <circle cx="350" cy="350" r="10" fill="#10b981" />
+              <text x="150" y="380" textAnchor="middle" fontFamily="Roboto" fontSize="14" fill="#334155">Fake</text>
+              <text x="250" y="380" textAnchor="middle" fontFamily="Roboto" fontSize="14" fill="#334155">Edited</text>
+              <text x="350" y="380" textAnchor="middle" fontFamily="Roboto" fontSize="14" fill="#334155">Genuine</text>
+            </svg>
+          </div>
+          <div className="flex-1 min-w-[300px] p-12 flex flex-col justify-center">
+            <h2 className="text-4xl font-bold text-gray-900 mb-5 font-sans">
+              Advanced <span className="text-blue-600">PDF Metadata Analysis</span> for COS Documents
+            </h2>
+            <p className="text-gray-600 mb-8 text-lg">
+              Our proprietary technology examines PDF metadata to detect alterations and verify the authenticity of your Certificate of Service documents.
+            </p>
+            
+            <ul className="space-y-4 mb-8">
+              <li className="flex items-center gap-4">
+                <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                  <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <span className="text-gray-700">Deep analysis of PDF metadata properties</span>
+              </li>
+              <li className="flex items-center gap-4">
+                <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                  <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <span className="text-gray-700">Comparison against verified genuine templates</span>
+              </li>
+              <li className="flex items-center gap-4">
+                <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                  <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <span className="text-gray-700">Detection of document alterations and tampering</span>
+              </li>
+              <li className="flex items-center gap-4">
+                <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                  <svg className="w-4 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <span className="text-gray-700">Verification of digital signatures and timestamps</span>
+              </li>
+            </ul>
+            
+            <div className="flex gap-5">
+              <div className="text-center p-5 rounded-xl bg-gray-50 flex-1">
+                <div className="text-3xl font-bold text-blue-600 mb-1">99.7%</div>
+                <div className="text-gray-600 text-sm">Accuracy Rate</div>
+              </div>
+              <div className="text-center p-5 rounded-xl bg-gray-50 flex-1">
+                <div className="text-3xl font-bold text-blue-600 mb-1">50k+</div>
+                <div className="text-gray-600 text-sm">COS Verified</div>
+              </div>
+              <div className="text-center p-5 rounded-xl bg-gray-50 flex-1">
+                <div className="text-3xl font-bold text-blue-600 mb-1">0.2s</div>
+                <div className="text-gray-600 text-sm">Avg. Analysis Time</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Process Section */}
+      <section className="container mx-auto px-5 py-16">
+        <div className="text-center mb-12">
+          <h2 className="text-4xl font-bold text-gray-900 mb-4 font-sans">How Our COS Verification Works</h2>
+          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+            Three-step process to verify the authenticity of your Certificate of Service
+          </p>
+          <div className="w-20 h-1 bg-blue-600 mx-auto mt-4 rounded"></div>
+        </div>
+        
+        <div className="flex flex-wrap justify-center gap-8">
+          <div className="flex-1 min-w-[250px] max-w-[300px] bg-white rounded-2xl p-8 shadow-lg transition-all duration-300 hover:transform hover:-translate-y-3 hover:shadow-xl relative overflow-hidden">
+            <div className="absolute top-3 right-3 text-6xl font-bold text-blue-100">1</div>
+            <div className="relative">
+              <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-5 text-white text-2xl">
+                <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <h3 className="text-2xl font-semibold mb-4 text-gray-900">Upload COS Document</h3>
+              <p className="text-gray-600 mb-5">Upload your Certificate of Service in PDF format for analysis.</p>
+              <button className="bg-blue-600 text-white px-6 py-2 rounded-full font-medium transition-all duration-300 hover:bg-blue-700">
+                Upload PDF
+              </button>
+            </div>
+          </div>
+          
+          <div className="flex-1 min-w-[250px] max-w-[300px] bg-white rounded-2xl p-8 shadow-lg transition-all duration-300 hover:transform hover:-translate-y-3 hover:shadow-xl relative overflow-hidden">
+            <div className="absolute top-3 right-3 text-6xl font-bold text-blue-100">2</div>
+            <div className="relative">
+              <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-5 text-white text-2xl">
+                <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <h3 className="text-2xl font-semibold mb-4 text-gray-900">Metadata Analysis</h3>
+              <p className="text-gray-600 mb-5">Our system extracts and analyzes PDF metadata for authenticity markers.</p>
+              <button className="bg-blue-600 text-white px-6 py-2 rounded-full font-medium transition-all duration-300 hover:bg-blue-700">
+                View Sample
+              </button>
+            </div>
+          </div>
+          
+          <div className="flex-1 min-w-[250px] max-w-[300px] bg-white rounded-2xl p-8 shadow-lg transition-all duration-300 hover:transform hover:-translate-y-3 hover:shadow-xl relative overflow-hidden">
+            <div className="absolute top-3 right-3 text-6xl font-bold text-blue-100">3</div>
+            <div className="relative">
+              <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-5 text-white text-2xl">
+                <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <h3 className="text-2xl font-semibold mb-4 text-gray-900">Get Verification Result</h3>
+              <p className="text-gray-600 mb-5">Receive instant verification status: Genuine, Edited, or Fake.</p>
+              <button className="bg-blue-600 text-white px-6 py-2 rounded-full font-medium transition-all duration-300 hover:bg-blue-700">
+                Example Report
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Results Section */}
+      <section className="bg-gradient-to-r from-blue-50 to-cyan-50 py-20 my-16 rounded-3xl">
+        <div className="container mx-auto px-5">
+          <div className="text-center mb-12">
+            <h2 className="text-4xl font-bold text-gray-900 mb-4 font-sans">Verification Results</h2>
+            <p className="text-xl text-gray-600">Clear, color-coded results for immediate understanding</p>
+          </div>
+          
+          <div className="flex flex-wrap justify-center gap-8">
+            <div className="w-[300px] bg-white rounded-2xl overflow-hidden shadow-lg transition-all duration-300 hover:transform hover:-translate-y-3 hover:shadow-xl">
+              <div className="bg-green-500 text-white text-center py-8">
+                <div className="text-5xl mb-5">
+                  <svg className="w-12 h-12 mx-auto" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <h3 className="text-2xl font-semibold">Genuine COS</h3>
+              </div>
+              <div className="p-8">
+                <p className="text-gray-600 mb-5">Document matches verified templates with no alterations detected.</p>
+                <ul className="space-y-2">
+                  <li className="flex items-center gap-3">
+                    <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-gray-700">Metadata matches genuine pattern</span>
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-gray-700">No tampering detected</span>
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-gray-700">Digital signature valid</span>
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-gray-700">Creation date consistent</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+            
+            <div className="w-[300px] bg-white rounded-2xl overflow-hidden shadow-lg transition-all duration-300 hover:transform hover:-translate-y-3 hover:shadow-xl">
+              <div className="bg-yellow-500 text-white text-center py-8">
+                <div className="text-5xl mb-5">
+                  <svg className="w-12 h-12 mx-auto" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <h3 className="text-2xl font-semibold">Edited COS</h3>
+              </div>
+              <div className="p-8">
+                <p className="text-gray-600 mb-5">Document shows signs of alteration after original creation.</p>
+                <ul className="space-y-2">
+                  <li className="flex items-center gap-3">
+                    <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-gray-700">Metadata inconsistencies</span>
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-gray-700">Modification dates detected</span>
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-gray-700">Content alterations found</span>
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-gray-700">Signature validation failed</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+            
+            <div className="w-[300px] bg-white rounded-2xl overflow-hidden shadow-lg transition-all duration-300 hover:transform hover:-translate-y-3 hover:shadow-xl">
+              <div className="bg-red-500 text-white text-center py-8">
+                <div className="text-5xl mb-5">
+                  <svg className="w-12 h-12 mx-auto" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <h3 className="text-2xl font-semibold">Fake COS</h3>
+              </div>
+              <div className="p-8">
+                <p className="text-gray-600 mb-5">Document is completely fabricated or doesn't match any genuine patterns.</p>
+                <ul className="space-y-2">
+                  <li className="flex items-center gap-3">
+                    <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-gray-700">No metadata match found</span>
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-gray-700">Fraudulent creation patterns</span>
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-gray-700">Invalid digital signature</span>
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-gray-700">Suspicious document structure</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Call to Action */}
+      <section className="text-center py-20 bg-gradient-to-br from-blue-600 to-cyan-600 text-white rounded-3xl mx-5 my-16 relative overflow-hidden">
+        <div className="absolute -top-12 -right-12 w-48 h-48 bg-white bg-opacity-10 rounded-full"></div>
+        <div className="absolute -bottom-16 -left-16 w-60 h-60 bg-white bg-opacity-5 rounded-full"></div>
+        <div className="relative z-10 max-w-4xl mx-auto px-5">
+          <h2 className="text-5xl font-bold mb-5">Ready to Verify Your COS Document?</h2>
+          <p className="text-xl mb-8">
+            Join thousands of professionals who trust our advanced verification technology to authenticate their Certificate of Service documents.
+          </p>
+          <button className="bg-white text-blue-600 text-xl font-semibold px-10 py-4 rounded-full transition-all duration-300 hover:bg-gray-100 hover:text-blue-700 hover:transform hover:-translate-y-1 shadow-lg">
+            Get Started Now - It's Free
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
