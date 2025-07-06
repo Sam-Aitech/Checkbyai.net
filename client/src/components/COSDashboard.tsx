@@ -4,6 +4,7 @@ import FileUploadSimple from './FileUploadSimple';
 
 export default function COSDashboard() {
   const [showFreeCheck, setShowFreeCheck] = useState(false);
+  const [showDemo, setShowDemo] = useState(false);
   const [verificationResult, setVerificationResult] = useState<{type: 'Genuine' | 'Edited' | 'Fake'} | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [freeUsageCount, setFreeUsageCount] = useState(0);
@@ -208,19 +209,35 @@ export default function COSDashboard() {
           <p className="text-xl md:text-2xl max-w-4xl mx-auto mb-10 text-blue-100 drop-shadow-lg leading-relaxed">
             Verify the authenticity of your Certificate of Service using PDF metadata analysis and expert verification
           </p>
-          <button 
-            onClick={() => setShowFreeCheck(true)}
-            className="group relative inline-block px-10 py-5 bg-gradient-to-r from-green-500 via-emerald-600 to-green-600 text-white rounded-full font-bold text-xl transition-all duration-500 hover:shadow-2xl hover:shadow-green-500/50 transform hover:-translate-y-2 hover:scale-110"
-          >
-            <div className="absolute inset-0 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-pulse" />
-            <span className="relative z-10 flex items-center">
-              <svg className="w-6 h-6 mr-3 transform group-hover:rotate-12 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Check Your COS Now
-            </span>
-            <div className="absolute inset-0 rounded-full bg-white/20 scale-0 group-hover:scale-100 transition-transform duration-700" />
-          </button>
+          <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
+            <button 
+              onClick={() => setShowFreeCheck(true)}
+              className="group relative inline-block px-10 py-5 bg-gradient-to-r from-green-500 via-emerald-600 to-green-600 text-white rounded-full font-bold text-xl transition-all duration-500 hover:shadow-2xl hover:shadow-green-500/50 transform hover:-translate-y-2 hover:scale-110"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-pulse" />
+              <span className="relative z-10 flex items-center">
+                <svg className="w-6 h-6 mr-3 transform group-hover:rotate-12 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Check Your COS Now
+              </span>
+              <div className="absolute inset-0 rounded-full bg-white/20 scale-0 group-hover:scale-100 transition-transform duration-700" />
+            </button>
+
+            <button 
+              onClick={() => setShowDemo(true)}
+              className="group relative inline-block px-10 py-5 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white rounded-full font-bold text-xl transition-all duration-500 hover:shadow-2xl hover:shadow-purple-500/50 transform hover:-translate-y-2 hover:scale-110"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-pulse" />
+              <span className="relative z-10 flex items-center">
+                <svg className="w-6 h-6 mr-3 transform group-hover:rotate-12 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Watch Demo
+              </span>
+              <div className="absolute inset-0 rounded-full bg-white/20 scale-0 group-hover:scale-100 transition-transform duration-700" />
+            </button>
+          </div>
         </div>
       </section>
 
@@ -654,6 +671,435 @@ export default function COSDashboard() {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3D Demo Modal with Complete Visualization */}
+      {showDemo && (
+        <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4">
+          <div className="bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 rounded-2xl p-8 max-w-7xl w-full max-h-[95vh] overflow-y-auto relative">
+            {/* Floating Security Elements */}
+            <div className="absolute inset-0 pointer-events-none overflow-hidden">
+              {[...Array(10)].map((_, i) => (
+                <div
+                  key={i}
+                  className="absolute animate-float opacity-20"
+                  style={{
+                    left: `${Math.random() * 100}%`,
+                    top: `${Math.random() * 100}%`,
+                    animationDelay: `${Math.random() * 5}s`,
+                    animationDuration: `${4 + Math.random() * 3}s`,
+                  }}
+                >
+                  <svg className="w-6 h-6 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                  </svg>
+                </div>
+              ))}
+            </div>
+
+            {/* Close Button */}
+            <button
+              onClick={() => setShowDemo(false)}
+              className="absolute top-4 right-4 text-white hover:text-gray-300 z-10 bg-white/10 rounded-full p-2 backdrop-blur-sm"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            {/* Demo Header */}
+            <div className="text-center mb-8">
+              <h2 className="text-5xl font-bold text-white mb-4 bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+                COS Verification Demo
+              </h2>
+              <p className="text-blue-200 text-xl max-w-3xl mx-auto">
+                Experience our comprehensive AI-powered document verification ecosystem with security-first architecture
+              </p>
+            </div>
+
+            {/* Three-Section Layout */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+              
+              {/* Left: User Journey Flow */}
+              <div className="space-y-6">
+                <h3 className="text-2xl font-bold text-white mb-6 flex items-center">
+                  <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center mr-3 animate-pulse">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </div>
+                  User Journey
+                </h3>
+
+                {/* User Avatar */}
+                <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 transform hover:scale-105 transition-all duration-300">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center animate-pulse">
+                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h4 className="text-white font-semibold">User Avatar</h4>
+                      <p className="text-blue-200 text-sm">Secure authentication</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Connection Arrow */}
+                <div className="flex justify-center">
+                  <div className="w-px h-8 bg-gradient-to-b from-blue-400 to-green-400 animate-pulse"></div>
+                </div>
+
+                {/* 3D Upload Button */}
+                <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 transform hover:scale-105 transition-all duration-300">
+                  <div className="text-center">
+                    <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl mx-auto mb-3 flex items-center justify-center transform rotate-3 hover:rotate-0 transition-transform duration-300 shadow-lg">
+                      <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                    </div>
+                    <h4 className="text-white font-semibold">3D Upload Button</h4>
+                    <p className="text-blue-200 text-sm">Interactive file upload</p>
+                  </div>
+                </div>
+
+                {/* Connection Arrow */}
+                <div className="flex justify-center">
+                  <div className="w-px h-8 bg-gradient-to-b from-green-400 to-purple-400 animate-pulse"></div>
+                </div>
+
+                {/* Animated File Upload Area */}
+                <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 border-dashed transform hover:scale-105 transition-all duration-300">
+                  <div className="text-center py-6">
+                    <div className="relative">
+                      <svg className="w-12 h-12 text-blue-400 mx-auto mb-3 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-ping"></div>
+                    </div>
+                    <h4 className="text-white font-semibold">Animated Upload Area</h4>
+                    <p className="text-blue-200 text-sm">Drag & drop with visual feedback</p>
+                  </div>
+                </div>
+
+                {/* Connection Arrow */}
+                <div className="flex justify-center">
+                  <div className="w-px h-8 bg-gradient-to-b from-purple-400 to-pink-400 animate-pulse"></div>
+                </div>
+
+                {/* Interactive Result Display */}
+                <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 transform hover:scale-105 transition-all duration-300">
+                  <div className="text-center">
+                    <div className="inline-block px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full text-white font-bold mb-3 animate-pulse">
+                      GENUINE DOCUMENT
+                    </div>
+                    <h4 className="text-white font-semibold">Interactive Result Panel</h4>
+                    <p className="text-blue-200 text-sm">Real-time verification display</p>
+                  </div>
+                </div>
+
+                {/* Connection Arrow */}
+                <div className="flex justify-center">
+                  <div className="w-px h-8 bg-gradient-to-b from-pink-400 to-orange-400 animate-pulse"></div>
+                </div>
+
+                {/* Subscription CTA */}
+                <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 transform hover:scale-105 transition-all duration-300">
+                  <div className="text-center">
+                    <button className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full text-white font-bold hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
+                      Get Detailed Analysis
+                    </button>
+                    <p className="text-blue-200 text-sm mt-2">Subscription call-to-action</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Center: AI/ML Processing Pipeline */}
+              <div className="space-y-4">
+                <h3 className="text-2xl font-bold text-white mb-6 flex items-center">
+                  <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center mr-3 animate-pulse">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                  </div>
+                  AI/ML Pipeline
+                </h3>
+
+                {/* Glowing connection lines */}
+                <div className="relative">
+                  {/* Metadata Extraction */}
+                  <div className="bg-gradient-to-r from-blue-600/20 to-cyan-600/20 backdrop-blur-sm rounded-xl p-4 border border-blue-400/30 transform hover:scale-105 transition-all duration-300 relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-blue-400/10 to-transparent translate-x-[-100%] animate-pulse"></div>
+                    <div className="flex items-center space-x-3 relative z-10">
+                      <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center animate-pulse">
+                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-white">Metadata Extraction</h4>
+                        <p className="text-blue-200 text-xs">PDF structure analysis</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Glowing connection */}
+                  <div className="flex justify-center py-2">
+                    <div className="w-2 h-6 bg-gradient-to-b from-blue-400 to-purple-400 rounded-full animate-pulse"></div>
+                  </div>
+
+                  {/* Pattern Recognition */}
+                  <div className="bg-gradient-to-r from-purple-600/20 to-pink-600/20 backdrop-blur-sm rounded-xl p-4 border border-purple-400/30 transform hover:scale-105 transition-all duration-300 relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-purple-400/10 to-transparent translate-x-[-100%] animate-pulse"></div>
+                    <div className="flex items-center space-x-3 relative z-10">
+                      <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center animate-pulse">
+                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-white">Pattern Recognition</h4>
+                        <p className="text-blue-200 text-xs">Document fingerprinting</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Glowing connection */}
+                  <div className="flex justify-center py-2">
+                    <div className="w-2 h-6 bg-gradient-to-b from-purple-400 to-red-400 rounded-full animate-pulse"></div>
+                  </div>
+
+                  {/* Anomaly Detection */}
+                  <div className="bg-gradient-to-r from-red-600/20 to-orange-600/20 backdrop-blur-sm rounded-xl p-4 border border-red-400/30 transform hover:scale-105 transition-all duration-300 relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-red-400/10 to-transparent translate-x-[-100%] animate-pulse"></div>
+                    <div className="flex items-center space-x-3 relative z-10">
+                      <div className="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center animate-pulse">
+                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-white">Anomaly Detection</h4>
+                        <p className="text-blue-200 text-xs">Suspicious modification detection</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Glowing connection */}
+                  <div className="flex justify-center py-2">
+                    <div className="w-2 h-6 bg-gradient-to-b from-red-400 to-green-400 rounded-full animate-pulse"></div>
+                  </div>
+
+                  {/* Cross-Reference Database */}
+                  <div className="bg-gradient-to-r from-green-600/20 to-teal-600/20 backdrop-blur-sm rounded-xl p-4 border border-green-400/30 transform hover:scale-105 transition-all duration-300 relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-green-400/10 to-transparent translate-x-[-100%] animate-pulse"></div>
+                    <div className="flex items-center space-x-3 relative z-10">
+                      <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center animate-pulse">
+                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-white">Cross-Reference DB</h4>
+                        <p className="text-blue-200 text-xs">Trusted pattern matching</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Glowing connection */}
+                  <div className="flex justify-center py-2">
+                    <div className="w-2 h-6 bg-gradient-to-b from-green-400 to-indigo-400 rounded-full animate-pulse"></div>
+                  </div>
+
+                  {/* Result Generation */}
+                  <div className="bg-gradient-to-r from-indigo-600/20 to-blue-600/20 backdrop-blur-sm rounded-xl p-4 border border-indigo-400/30 transform hover:scale-105 transition-all duration-300 relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-indigo-400/10 to-transparent translate-x-[-100%] animate-pulse"></div>
+                    <div className="flex items-center space-x-3 relative z-10">
+                      <div className="w-10 h-10 bg-indigo-500 rounded-lg flex items-center justify-center animate-pulse">
+                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-white">Result Generation</h4>
+                        <p className="text-blue-200 text-xs">Final verification report</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right: Expert Review System */}
+              <div className="space-y-6">
+                <h3 className="text-2xl font-bold text-white mb-6 flex items-center">
+                  <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center mr-3 animate-pulse">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  Expert Review
+                </h3>
+
+                {/* Automated Analysis Result */}
+                <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 transform hover:scale-105 transition-all duration-300">
+                  <div className="text-center">
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-lg mx-auto mb-3 flex items-center justify-center animate-pulse">
+                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                    </div>
+                    <h4 className="text-white font-semibold">Automated Analysis</h4>
+                    <p className="text-blue-200 text-sm">AI processing complete</p>
+                  </div>
+                </div>
+
+                {/* Connection Line */}
+                <div className="flex justify-center">
+                  <div className="w-px h-8 bg-gradient-to-b from-blue-400 to-yellow-400 animate-pulse"></div>
+                </div>
+
+                {/* Escalation Decision Node */}
+                <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-yellow-400/30 transform hover:scale-105 transition-all duration-300">
+                  <div className="text-center">
+                    <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-orange-600 rounded-lg mx-auto mb-3 flex items-center justify-center animate-pulse">
+                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <h4 className="text-white font-semibold">Escalation Decision</h4>
+                    <p className="text-blue-200 text-sm">Human review needed?</p>
+                  </div>
+                </div>
+
+                {/* Branching Paths */}
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Quick Report Path */}
+                  <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3 border border-green-400/30">
+                    <div className="text-center">
+                      <div className="w-10 h-10 bg-green-500 rounded-lg mx-auto mb-2 flex items-center justify-center animate-pulse">
+                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                      </div>
+                      <h5 className="text-white font-medium text-sm">Quick Report</h5>
+                      <p className="text-blue-200 text-xs">Automated delivery</p>
+                    </div>
+                  </div>
+
+                  {/* Human Expert Path */}
+                  <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3 border border-purple-400/30">
+                    <div className="text-center">
+                      <div className="w-10 h-10 bg-purple-500 rounded-lg mx-auto mb-2 flex items-center justify-center animate-pulse">
+                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                      </div>
+                      <h5 className="text-white font-medium text-sm">Expert Review</h5>
+                      <p className="text-blue-200 text-xs">Manual verification</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Connection Line */}
+                <div className="flex justify-center">
+                  <div className="w-px h-8 bg-gradient-to-b from-purple-400 to-blue-400 animate-pulse"></div>
+                </div>
+
+                {/* Detailed Analysis Report */}
+                <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 transform hover:scale-105 transition-all duration-300">
+                  <div className="text-center">
+                    <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg mx-auto mb-3 flex items-center justify-center animate-pulse">
+                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </div>
+                    <h4 className="text-white font-semibold">Detailed Analysis</h4>
+                    <p className="text-blue-200 text-sm">Comprehensive report</p>
+                  </div>
+                </div>
+
+                {/* Connection Line */}
+                <div className="flex justify-center">
+                  <div className="w-px h-8 bg-gradient-to-b from-blue-400 to-green-400 animate-pulse"></div>
+                </div>
+
+                {/* Secure Delivery */}
+                <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-green-400/30 transform hover:scale-105 transition-all duration-300">
+                  <div className="text-center">
+                    <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg mx-auto mb-3 flex items-center justify-center animate-pulse">
+                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                    </div>
+                    <h4 className="text-white font-semibold">Secure Delivery</h4>
+                    <p className="text-blue-200 text-sm">Encrypted transmission</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Security & Trust Footer */}
+            <div className="mt-8 bg-gradient-to-r from-gray-800/50 to-blue-800/50 backdrop-blur-sm rounded-xl p-6 border border-white/10">
+              <h4 className="text-xl font-bold text-white mb-4 text-center flex items-center justify-center">
+                <svg className="w-6 h-6 mr-2 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                Security & Trust Elements
+              </h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center">
+                  <div className="w-12 h-12 bg-blue-500 rounded-lg mx-auto mb-2 flex items-center justify-center animate-pulse">
+                    <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <p className="text-white text-sm font-medium">Secure File Handling</p>
+                </div>
+                <div className="text-center">
+                  <div className="w-12 h-12 bg-green-500 rounded-lg mx-auto mb-2 flex items-center justify-center animate-pulse">
+                    <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <p className="text-white text-sm font-medium">Data Protection</p>
+                </div>
+                <div className="text-center">
+                  <div className="w-12 h-12 bg-purple-500 rounded-lg mx-auto mb-2 flex items-center justify-center animate-pulse">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
+                    </svg>
+                  </div>
+                  <p className="text-white text-sm font-medium">Encrypted Connections</p>
+                </div>
+                <div className="text-center">
+                  <div className="w-12 h-12 bg-indigo-500 rounded-lg mx-auto mb-2 flex items-center justify-center animate-pulse">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <p className="text-white text-sm font-medium">Privacy Policy</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Demo Footer */}
+            <div className="mt-8 text-center">
+              <button 
+                onClick={() => {
+                  setShowDemo(false);
+                  setShowFreeCheck(true);
+                }}
+                className="px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full text-white font-bold text-lg hover:shadow-xl hover:shadow-green-500/50 transition-all duration-300 transform hover:-translate-y-1 hover:scale-105"
+              >
+                <svg className="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Try It Now - Free Check
+              </button>
             </div>
           </div>
         </div>
