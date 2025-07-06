@@ -5,7 +5,19 @@ interface VerificationResult {
   mismatchedFields?: string[];
 }
 
-export default function FileUploadSimple() {
+interface FileUploadSimpleProps {
+  onFileUpload?: (file: File) => void;
+  onVerificationResult?: (result: VerificationResult) => void;
+  onLoading?: (loading: boolean) => void;
+  onError?: (error: string) => void;
+}
+
+export default function FileUploadSimple({ 
+  onFileUpload, 
+  onVerificationResult, 
+  onLoading, 
+  onError 
+}: FileUploadSimpleProps) {
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState('');
@@ -49,13 +61,18 @@ export default function FileUploadSimple() {
 
   const processFile = (selectedFile: File) => {
     if (selectedFile.type !== 'application/pdf') {
-      setError('Please upload a valid PDF file.');
+      const errorMsg = 'Please upload a valid PDF file.';
+      setError(errorMsg);
+      onError?.(errorMsg);
       return;
     }
     
     setFile(selectedFile);
     setError('');
     setResult(null);
+    
+    // Call onFileUpload callback
+    onFileUpload?.(selectedFile);
     
     // Start verification immediately
     verifyDocument(selectedFile);
@@ -64,6 +81,7 @@ export default function FileUploadSimple() {
   const verifyDocument = async (selectedFile: File) => {
     setLoading(true);
     setError('');
+    onLoading?.(true);
     
     try {
       const formData = new FormData();
@@ -94,11 +112,15 @@ export default function FileUploadSimple() {
       };
 
       setResult(transformedResult);
+      onVerificationResult?.(transformedResult);
       
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Verification failed');
+      const errorMsg = err instanceof Error ? err.message : 'Verification failed';
+      setError(errorMsg);
+      onError?.(errorMsg);
     } finally {
       setLoading(false);
+      onLoading?.(false);
     }
   };
 

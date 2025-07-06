@@ -143,6 +143,17 @@ Result: Genuine/Edited/Fake with confidence score
 
 ```
 Changelog:
+- July 06, 2025 (Early Morning). Added Free Usage Restriction System
+  - Implemented one-time free verification per day using localStorage tracking
+  - Added usage counter and date-based reset mechanism
+  - Created upgrade prompt when free check is exhausted
+  - Added professional limitation screen with Pro service promotion
+  - Removed "Verify Another Document" option for free users
+- July 06, 2025 (Early Morning). Created COS Dashboard with Free Check Modal
+  - Built beautiful marketing dashboard based on user's HTML design
+  - Added interactive free verification modal triggered by "Get Started Now" buttons
+  - Integrated FileUploadSimple component with callback system
+  - Created professional upgrade prompts and Pro service marketing
 - July 04, 2025 (Very Late Evening). Implemented Adaptive Color-Changing Result Badges
   - Added gradient backgrounds with smooth color transitions for all verification badges
   - Genuine documents: Green-to-emerald gradient with pulsing animation

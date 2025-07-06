@@ -1,10 +1,31 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import FileUploadSimple from './FileUploadSimple';
 
 export default function COSDashboard() {
   const [showFreeCheck, setShowFreeCheck] = useState(false);
-  const [verificationResult, setVerificationResult] = useState(null);
+  const [verificationResult, setVerificationResult] = useState<{type: 'Genuine' | 'Edited' | 'Fake'} | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [freeUsageCount, setFreeUsageCount] = useState(0);
+  const [hasUsedFreeCheck, setHasUsedFreeCheck] = useState(false);
+
+  // Check free usage on component mount
+  useEffect(() => {
+    const storedUsageCount = localStorage.getItem('cos_free_usage_count');
+    const storedUsageDate = localStorage.getItem('cos_free_usage_date');
+    const today = new Date().toDateString();
+    
+    if (storedUsageDate === today && storedUsageCount) {
+      const count = parseInt(storedUsageCount, 10);
+      setFreeUsageCount(count);
+      setHasUsedFreeCheck(count >= 1);
+    } else {
+      // Reset daily usage
+      localStorage.setItem('cos_free_usage_count', '0');
+      localStorage.setItem('cos_free_usage_date', today);
+      setFreeUsageCount(0);
+      setHasUsedFreeCheck(false);
+    }
+  }, []);
 
   const handleFileUpload = (file: File) => {
     // This will be handled by FileUploadSimple component
@@ -12,6 +33,17 @@ export default function COSDashboard() {
 
   const handleVerificationResult = (result: any) => {
     setVerificationResult(result);
+    
+    // Track free usage
+    if (!hasUsedFreeCheck) {
+      const newCount = freeUsageCount + 1;
+      setFreeUsageCount(newCount);
+      setHasUsedFreeCheck(true);
+      
+      // Update localStorage
+      localStorage.setItem('cos_free_usage_count', newCount.toString());
+      localStorage.setItem('cos_free_usage_date', new Date().toDateString());
+    }
   };
 
   const handleLoading = (loading: boolean) => {
@@ -361,26 +393,75 @@ export default function COSDashboard() {
             <div className="p-6">
               {!verificationResult ? (
                 <div>
-                  <div className="mb-6 p-4 bg-green-50 rounded-lg border border-green-200">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
-                        <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  {!hasUsedFreeCheck ? (
+                    <>
+                      <div className="mb-6 p-4 bg-green-50 rounded-lg border border-green-200">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                            <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-green-800">Free Verification Available</h3>
+                            <p className="text-green-700 text-sm">Upload your COS document to verify its authenticity instantly</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <FileUploadSimple
+                        onFileUpload={handleFileUpload}
+                        onVerificationResult={handleVerificationResult}
+                        onLoading={handleLoading}
+                        onError={handleError}
+                      />
+                    </>
+                  ) : (
+                    <div className="text-center py-8">
+                      <div className="w-16 h-16 mx-auto mb-4 bg-orange-100 rounded-full flex items-center justify-center">
+                        <svg className="w-8 h-8 text-orange-600" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                         </svg>
                       </div>
-                      <div>
-                        <h3 className="font-semibold text-green-800">Free Verification Available</h3>
-                        <p className="text-green-700 text-sm">Upload your COS document to verify its authenticity instantly</p>
+                      <h3 className="text-xl font-bold text-gray-900 mb-2">Free Check Used</h3>
+                      <p className="text-gray-600 mb-6">You've already used your free verification for today. Upgrade to Pro for unlimited checks.</p>
+                      
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+                        <h4 className="font-semibold text-blue-900 mb-3">🚀 Upgrade to Pro Service</h4>
+                        <ul className="text-left text-blue-800 space-y-2 mb-4">
+                          <li className="flex items-center gap-2">
+                            <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                            Unlimited document verifications
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                            Advanced metadata analysis
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                            Batch document processing
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                            Detailed verification reports
+                          </li>
+                        </ul>
+                        <button className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+                          Upgrade to Pro - $9.99/month
+                        </button>
                       </div>
+                      
+                      <p className="text-sm text-gray-500">Your free check will reset tomorrow. Come back then for another free verification!</p>
                     </div>
-                  </div>
-
-                  <FileUploadSimple
-                    onFileUpload={handleFileUpload}
-                    onVerificationResult={handleVerificationResult}
-                    onLoading={handleLoading}
-                    onError={handleError}
-                  />
+                  )}
                 </div>
               ) : (
                 <div className="text-center">
@@ -409,18 +490,10 @@ export default function COSDashboard() {
                   <div className="space-y-3 mb-6">
                     <button
                       onClick={() => {
-                        setVerificationResult(null);
-                      }}
-                      className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-                    >
-                      Verify Another Document
-                    </button>
-                    <button
-                      onClick={() => {
                         setShowFreeCheck(false);
                         setVerificationResult(null);
                       }}
-                      className="w-full bg-gray-100 text-gray-700 py-3 px-6 rounded-lg font-semibold hover:bg-gray-200 transition-colors"
+                      className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
                     >
                       Close
                     </button>
