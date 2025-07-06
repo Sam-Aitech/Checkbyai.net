@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import * as THREE from 'three';
-import { useSoundEffects } from '../hooks/useSoundEffects';
 
 interface Enhanced3DDemoProps {
   isVisible: boolean;
@@ -14,9 +13,6 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
   const [viewMode, setViewMode] = useState<'simplified' | 'technical'>('simplified');
   const [selectedScenario, setSelectedScenario] = useState<'genuine' | 'edited' | 'fake'>('genuine');
   const [showTooltip, setShowTooltip] = useState<string | null>(null);
-  
-  // Sound effects integration
-  const { playSound } = useSoundEffects();
   const mountRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -158,25 +154,21 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
   };
 
   const startAnimation = () => {
-    playSound('transition');
     setDemoStep(0);
     setIsAnimating(true);
     
     const steps = [
-      { delay: 1000, step: 1, sound: null },
-      { delay: 3000, step: 2, sound: null },
-      { delay: 5000, step: 3, sound: null },
-      { delay: 7000, step: 4, sound: selectedScenario === 'genuine' ? 'success' : selectedScenario === 'edited' ? 'warning' : 'error' },
-      { delay: 9000, step: 5, sound: null },
-      { delay: 11000, step: 0, sound: 'complete' }
+      { delay: 1000, step: 1 },
+      { delay: 3000, step: 2 },
+      { delay: 5000, step: 3 },
+      { delay: 7000, step: 4 },
+      { delay: 9000, step: 5 },
+      { delay: 11000, step: 0 }
     ];
 
-    steps.forEach(({ delay, step, sound }) => {
+    steps.forEach(({ delay, step }) => {
       setTimeout(() => {
         setDemoStep(step);
-        if (step > 0 && sound) {
-          playSound(sound as any);
-        }
         if (step === 0) setIsAnimating(false);
       }, delay);
     });
@@ -215,10 +207,8 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
               <span className="text-white text-sm mr-3">View Mode:</span>
               <button
                 onClick={() => {
-                  playSound('click');
                   setViewMode(viewMode === 'simplified' ? 'technical' : 'simplified');
                 }}
-                onMouseEnter={() => playSound('hover')}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 ${
                   viewMode === 'simplified' 
                     ? 'bg-blue-600 text-white' 
@@ -235,10 +225,8 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
               <select
                 value={selectedScenario}
                 onChange={(e) => {
-                  playSound('click');
                   setSelectedScenario(e.target.value as 'genuine' | 'edited' | 'fake');
                 }}
-                onMouseEnter={() => playSound('hover')}
                 className="bg-gray-700 text-white rounded-md px-3 py-2 text-sm"
               >
                 <option value="genuine">Genuine Document</option>
@@ -374,10 +362,8 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
           <div className="flex justify-center space-x-4">
             <button 
               onClick={() => {
-                playSound('click');
                 startAnimation();
               }}
-              onMouseEnter={() => playSound('hover')}
               disabled={isAnimating}
               className="px-8 py-4 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-full text-white font-bold text-lg hover:shadow-xl hover:shadow-blue-500/50 transition-all duration-300 transform hover:-translate-y-1 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -386,11 +372,9 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
             
             <button 
               onClick={() => {
-                playSound('click');
                 onClose();
                 onTryFreeCheck();
               }}
-              onMouseEnter={() => playSound('hover')}
               className="px-8 py-4 bg-gradient-to-r from-green-600 to-emerald-600 rounded-full text-white font-bold text-lg hover:shadow-xl hover:shadow-green-500/50 transition-all duration-300 transform hover:-translate-y-1"
             >
               Try Free Verification
@@ -399,10 +383,8 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
 
           <button
             onClick={() => {
-              playSound('click');
               onClose();
             }}
-            onMouseEnter={() => playSound('hover')}
             className="px-6 py-3 bg-gray-600 hover:bg-gray-500 rounded-lg text-white font-medium transition-colors duration-200"
           >
             Close Demo

@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Link } from 'wouter';
 import FileUploadSimple from './FileUploadSimple';
 import Enhanced3DDemo from './Enhanced3DDemo';
-import { useSoundEffects } from '../hooks/useSoundEffects';
 
 export default function COSDashboard() {
   const [showFreeCheck, setShowFreeCheck] = useState(false);
@@ -11,13 +10,8 @@ export default function COSDashboard() {
   const [isAnimating, setIsAnimating] = useState(false);
   const [verificationResult, setVerificationResult] = useState<{type: 'Genuine' | 'Edited' | 'Fake'} | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [soundEnabled, setSoundEnabled] = useState(true);
-
   // Track free usage
   const [hasUsedFreeCheck, setHasUsedFreeCheck] = useState(false);
-
-  // Sound effects hook
-  const { playSound, toggleSounds } = useSoundEffects();
 
   // Check if user has used their free verification today
   useEffect(() => {
@@ -32,7 +26,6 @@ export default function COSDashboard() {
   }, []);
 
   const handleFileUpload = async (file: File) => {
-    playSound('upload');
     // Mark free check as used
     const today = new Date().toDateString();
     localStorage.setItem('lastFreeCheck', today);
@@ -41,31 +34,18 @@ export default function COSDashboard() {
 
   const handleVerificationResult = (result: {type: 'Genuine' | 'Edited' | 'Fake'}) => {
     setVerificationResult(result);
-    // Play appropriate sound based on result
-    if (result.type === 'Genuine') {
-      playSound('success');
-    } else if (result.type === 'Edited') {
-      playSound('warning');
-    } else {
-      playSound('error');
-    }
   };
 
   const handleLoading = (loading: boolean) => {
     setIsLoading(loading);
-    if (loading) {
-      playSound('processing');
-    }
   };
 
   const handleError = (error: string) => {
     console.error('Verification error:', error);
-    playSound('error');
   };
 
   // Demo animation handler
   const startDemo = () => {
-    playSound('transition');
     setDemoStep(0);
     setIsAnimating(true);
     
@@ -152,34 +132,11 @@ export default function COSDashboard() {
             </div>
             
             <div className="flex items-center space-x-4">
-              {/* Sound Toggle Button */}
-              <button
-                onClick={() => {
-                  const newState = toggleSounds();
-                  setSoundEnabled(newState);
-                  playSound('click');
-                }}
-                onMouseEnter={() => playSound('hover')}
-                className="group relative p-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg text-white hover:bg-white/20 transition-all duration-300"
-                title={soundEnabled ? 'Disable Sound Effects' : 'Enable Sound Effects'}
-              >
-                {soundEnabled ? (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 14.142M8.707 5.293a1 1 0 00-1.414 0l-4 4a1 1 0 000 1.414l4 4a1 1 0 001.414 0L11 12.414V3a1 1 0 00-1-1H8.707z" />
-                  </svg>
-                ) : (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
-                  </svg>
-                )}
-              </button>
+
 
               <Link href="/">
                 <button 
                   className="group relative inline-flex items-center px-6 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white font-medium hover:bg-white/20 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl"
-                  onClick={() => playSound('click')}
-                  onMouseEnter={() => playSound('hover')}
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
                   <svg className="w-5 h-5 mr-2 transform group-hover:-translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
