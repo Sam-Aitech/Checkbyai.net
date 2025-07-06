@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 // Lazy load the 3D scene for better performance with fallback
 const ThreeScene = lazy(() => import('./ThreeScene'))
 const AnimatedBackground = lazy(() => import('./AnimatedBackground'))
+const Enhanced3DDemo = lazy(() => import('./Enhanced3DDemo'))
 
 interface FeatureCardProps {
   icon: React.ReactNode
@@ -117,6 +118,21 @@ export default function HeroSection() {
   })
 
   return (
+    <>
+      {/* Enhanced 3D Demo Modal */}
+      {showDemo && (
+        <Suspense fallback={<LoadingFallback />}>
+          <Enhanced3DDemo 
+            isVisible={showDemo} 
+            onClose={() => setShowDemo(false)}
+            onTryFreeCheck={() => {
+              setShowDemo(false);
+              window.location.href = '/dashboard';
+            }}
+          />
+        </Suspense>
+      )}
+      
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       {/* Hero Section */}
       <div className="relative">
@@ -249,5 +265,6 @@ export default function HeroSection() {
         </div>
       </div>
     </div>
+    </>
   )
 }
