@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSoundEffects } from '../hooks/useSoundEffects';
 
 interface VerificationResult {
   type: 'Genuine' | 'Edited' | 'Fake';
@@ -23,6 +24,9 @@ export default function FileUploadSimple({
   const [error, setError] = useState('');
   const [result, setResult] = useState<VerificationResult | null>(null);
   const [loading, setLoading] = useState(false);
+  
+  // Sound effects integration
+  const { playSound } = useSoundEffects();
 
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
@@ -64,6 +68,7 @@ export default function FileUploadSimple({
       const errorMsg = 'Please upload a valid PDF file.';
       setError(errorMsg);
       onError?.(errorMsg);
+      playSound('error');
       return;
     }
     
@@ -73,6 +78,7 @@ export default function FileUploadSimple({
     
     // Call onFileUpload callback
     onFileUpload?.(selectedFile);
+    playSound('upload');
     
     // Start verification immediately
     verifyDocument(selectedFile);
@@ -82,6 +88,7 @@ export default function FileUploadSimple({
     setLoading(true);
     setError('');
     onLoading?.(true);
+    playSound('processing');
     
     try {
       const formData = new FormData();
@@ -114,10 +121,20 @@ export default function FileUploadSimple({
       setResult(transformedResult);
       onVerificationResult?.(transformedResult);
       
+      // Play appropriate sound based on result
+      if (transformedResult.type === 'Genuine') {
+        playSound('success');
+      } else if (transformedResult.type === 'Edited') {
+        playSound('warning');
+      } else {
+        playSound('error');
+      }
+      
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Verification failed';
       setError(errorMsg);
       onError?.(errorMsg);
+      playSound('error');
     } finally {
       setLoading(false);
       onLoading?.(false);
