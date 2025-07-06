@@ -1,6 +1,27 @@
 import { useState } from 'react';
+import FileUploadSimple from './FileUploadSimple';
 
 export default function COSDashboard() {
+  const [showFreeCheck, setShowFreeCheck] = useState(false);
+  const [verificationResult, setVerificationResult] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleFileUpload = (file: File) => {
+    // This will be handled by FileUploadSimple component
+  };
+
+  const handleVerificationResult = (result: any) => {
+    setVerificationResult(result);
+  };
+
+  const handleLoading = (loading: boolean) => {
+    setIsLoading(loading);
+  };
+
+  const handleError = (error: string) => {
+    console.error('Verification error:', error);
+  };
+
   return (
     <div className="bg-gray-50 min-h-screen">
       {/* Hero Section */}
@@ -13,7 +34,10 @@ export default function COSDashboard() {
           <p className="text-xl md:text-2xl max-w-4xl mx-auto mb-8">
             Verify the authenticity of your Certificate of Service using PDF metadata analysis and expert verification
           </p>
-          <button className="inline-block px-8 py-4 bg-green-500 text-white rounded-full font-semibold text-lg transition-all duration-300 hover:bg-green-600 hover:transform hover:-translate-y-1 shadow-lg">
+          <button 
+            onClick={() => setShowFreeCheck(true)}
+            className="inline-block px-8 py-4 bg-green-500 text-white rounded-full font-semibold text-lg transition-all duration-300 hover:bg-green-600 hover:transform hover:-translate-y-1 shadow-lg"
+          >
             Check Your COS Now
           </button>
         </div>
@@ -303,11 +327,115 @@ export default function COSDashboard() {
           <p className="text-xl mb-8">
             Join thousands of professionals who trust our advanced verification technology to authenticate their Certificate of Service documents.
           </p>
-          <button className="bg-white text-blue-600 text-xl font-semibold px-10 py-4 rounded-full transition-all duration-300 hover:bg-gray-100 hover:text-blue-700 hover:transform hover:-translate-y-1 shadow-lg">
+          <button 
+            onClick={() => setShowFreeCheck(true)}
+            className="bg-white text-blue-600 text-xl font-semibold px-10 py-4 rounded-full transition-all duration-300 hover:bg-gray-100 hover:text-blue-700 hover:transform hover:-translate-y-1 shadow-lg"
+          >
             Get Started Now - It's Free
           </button>
         </div>
       </section>
+
+      {/* Free Check Modal */}
+      {showFreeCheck && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Free COS Verification</h2>
+                  <p className="text-gray-600 mt-1">Upload your Certificate of Service for instant verification</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowFreeCheck(false);
+                    setVerificationResult(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600 text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-6">
+              {!verificationResult ? (
+                <div>
+                  <div className="mb-6 p-4 bg-green-50 rounded-lg border border-green-200">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                        <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-green-800">Free Verification Available</h3>
+                        <p className="text-green-700 text-sm">Upload your COS document to verify its authenticity instantly</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <FileUploadSimple
+                    onFileUpload={handleFileUpload}
+                    onVerificationResult={handleVerificationResult}
+                    onLoading={handleLoading}
+                    onError={handleError}
+                  />
+                </div>
+              ) : (
+                <div className="text-center">
+                  <div className="mb-6">
+                    <div className="w-16 h-16 mx-auto mb-4 bg-green-100 rounded-full flex items-center justify-center">
+                      <svg className="w-8 h-8 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">Verification Complete!</h3>
+                    <p className="text-gray-600">Your COS document has been analyzed</p>
+                  </div>
+
+                  <div className="mb-6">
+                    <div className={`inline-block px-6 py-3 rounded-full text-lg font-semibold transition-all duration-700 ease-in-out transform hover:scale-105 ${
+                      verificationResult.type === 'Genuine' 
+                        ? 'bg-gradient-to-r from-green-400 to-emerald-500 text-white shadow-lg shadow-green-500/25 animate-pulse'
+                        : verificationResult.type === 'Edited'
+                        ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white shadow-lg shadow-yellow-500/25 animate-bounce'
+                        : 'bg-gradient-to-r from-red-400 to-rose-500 text-white shadow-lg shadow-red-500/25 animate-pulse'
+                    }`}>
+                      {verificationResult.type}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 mb-6">
+                    <button
+                      onClick={() => {
+                        setVerificationResult(null);
+                      }}
+                      className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                    >
+                      Verify Another Document
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowFreeCheck(false);
+                        setVerificationResult(null);
+                      }}
+                      className="w-full bg-gray-100 text-gray-700 py-3 px-6 rounded-lg font-semibold hover:bg-gray-200 transition-colors"
+                    >
+                      Close
+                    </button>
+                  </div>
+
+                  <div className="text-sm text-gray-500 bg-gray-50 p-4 rounded-lg">
+                    <p className="font-medium mb-1">✨ Want more detailed analysis?</p>
+                    <p>Upgrade to our Pro service for advanced metadata analysis, batch verification, and detailed reporting.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
