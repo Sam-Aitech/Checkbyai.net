@@ -8,7 +8,7 @@ export default function COSDashboard() {
   const [freeUsageCount, setFreeUsageCount] = useState(0);
   const [hasUsedFreeCheck, setHasUsedFreeCheck] = useState(false);
 
-  // Check free usage on component mount
+  // Check free usage on component mount and handle setup parameter
   useEffect(() => {
     const storedUsageCount = localStorage.getItem('cos_free_usage_count');
     const storedUsageDate = localStorage.getItem('cos_free_usage_date');
@@ -24,6 +24,14 @@ export default function COSDashboard() {
       localStorage.setItem('cos_free_usage_date', today);
       setFreeUsageCount(0);
       setHasUsedFreeCheck(false);
+    }
+
+    // Check if accessed via setup button
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('setup') === 'true') {
+      setShowFreeCheck(true);
+      // Clean up the URL parameter
+      window.history.replaceState({}, '', '/dashboard');
     }
   }, []);
 
