@@ -42,13 +42,13 @@ export default function Home() {
               </div>
               
               <div className="flex items-center space-x-4">
-                <Link href="/dashboard?setup=true">
+                <Link href="/verify">
                   <Button 
                     variant="default" 
                     size="sm"
                     className="bg-green-600 hover:bg-green-700 text-white"
                   >
-                    Setup - Try Free
+                    Start Verification
                   </Button>
                 </Link>
                 
