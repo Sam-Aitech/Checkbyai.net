@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'wouter';
 import FileUploadSimple from './FileUploadSimple';
 
 export default function COSDashboard() {
@@ -64,6 +65,44 @@ export default function COSDashboard() {
 
   return (
     <div className="bg-gray-50 min-h-screen">
+      {/* Dashboard Header */}
+      <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center space-x-3">
+              <svg className="w-8 h-8 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">COS Authenticator</h1>
+                <p className="text-xs text-gray-500">Advanced Document Verification</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-4">
+              <Link href="/">
+                <button className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors duration-200">
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16l-4-4m0 0l4-4m-4 4h18" />
+                  </svg>
+                  Back to Home
+                </button>
+              </Link>
+              
+              <button 
+                onClick={() => setShowFreeCheck(true)}
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors duration-200"
+              >
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Try Free Check
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
       {/* Hero Section */}
       <section className="bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 text-white text-center py-20 bg-cover bg-center relative">
         <div className="absolute inset-0 bg-black bg-opacity-30"></div>
