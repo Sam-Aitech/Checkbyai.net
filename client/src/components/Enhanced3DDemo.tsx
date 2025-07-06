@@ -24,7 +24,7 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
     primaryLight: '#0066CC',
     secondary: '#009933',
     caution: '#FF6600',
-    background: '#f8fafc',
+    background: 'transparent',
     glow: '#4FC3F7'
   };
 
@@ -34,7 +34,7 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
 
     // Scene setup
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(colors.background);
+    // No background color - transparent
     sceneRef.current = scene;
 
     // Camera setup
@@ -69,13 +69,7 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
     const animate = () => {
       requestAnimationFrame(animate);
       
-      // Rotate elements slightly for dynamic effect
-      scene.children.forEach((child, index) => {
-        if (child.userData.rotatable) {
-          child.rotation.y += 0.01 * (index % 2 === 0 ? 1 : -1);
-        }
-      });
-      
+      // Static rendering without rotation animations
       renderer.render(scene, camera);
     };
     animate();
@@ -97,7 +91,7 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
     });
     const userSphere = new THREE.Mesh(userGeometry, userMaterial);
     userSphere.position.set(-6, 2, 0);
-    userSphere.userData = { type: 'user', rotatable: true };
+    userSphere.userData = { type: 'user' };
     scene.add(userSphere);
 
     // Processing pipeline nodes
@@ -120,7 +114,6 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
       cube.userData = { 
         type: 'pipeline', 
         name: step.name, 
-        rotatable: true,
         step: index + 1
       };
       scene.add(cube);
@@ -149,7 +142,7 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
     });
     const expertCone = new THREE.Mesh(expertGeometry, expertMaterial);
     expertCone.position.set(4, 3, 0);
-    expertCone.userData = { type: 'expert', rotatable: true };
+    expertCone.userData = { type: 'expert' };
     scene.add(expertCone);
   };
 
