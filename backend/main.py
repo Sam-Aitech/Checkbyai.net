@@ -14,6 +14,7 @@ from functools import lru_cache
 from datetime import datetime, timedelta
 
 from cos_verifier import COSVerifier
+from ai_engine import AIEngine
 
 # Performance-optimized FastAPI app
 app = FastAPI(
@@ -50,7 +51,12 @@ app.add_middleware(
 def get_cos_verifier():
     return COSVerifier()
 
+@lru_cache(maxsize=1)
+def get_ai_engine():
+    return AIEngine()
+
 cos_verifier = get_cos_verifier()
+ai_engine = get_ai_engine()
 
 # High-performance in-memory database with indexing
 class PerformanceDatabase:
@@ -198,8 +204,8 @@ async def upload_trusted(file: UploadFile = File(...)):
         with open(temp_path, "wb") as f:
             f.write(pdf_data)
             
-        # Extract metadata
-        metadata = extract_pdf_metadata(temp_path)
+        # Extract metadata using AI engine
+        metadata = await ai_engine.extract_metadata(temp_path)
         
         # Remove temporary file
         os.remove(temp_path)
@@ -256,8 +262,15 @@ async def verify_cos(file: UploadFile = File(...)):
         with open(temp_path, "wb") as f:
             f.write(pdf_data)
             
-        # Extract metadata
-        metadata = extract_pdf_metadata(temp_path)
+        # Extract metadata using AI engine
+        metadata = await ai_engine.extract_metadata(temp_path)
+        
+        print(f"=== EXTRACTED METADATA DEBUG ===")
+        print(f"Metadata keys: {list(metadata.keys())}")
+        if 'xmp_tags' in metadata:
+            print(f"XMP tags found: {metadata['xmp_tags']}")
+        else:
+            print("No XMP tags in metadata")
         
         # Remove temporary file
         os.remove(temp_path)
@@ -292,10 +305,17 @@ async def verify_cos(file: UploadFile = File(...)):
             **result
         }
         
-        # Transform result to match frontend expectations
+        # Transform result to match frontend expectations with metadata details
         return {
+            "id": result_id,
             "result": result["type"].lower(),
             "confidence": result["confidence"],
+            "details": {
+                "metadata": metadata,
+                "patternMatching": result.get("pattern_matching", {}),
+                "metadataVerification": result.get("metadata_verification", {}),
+                "vectorSimilarity": result.get("vector_similarity", 0.0)
+            },
             "mismatchedFields": result.get("mismatched_fields", [])
         }
         

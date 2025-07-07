@@ -143,15 +143,14 @@ Result: Genuine/Edited/Fake with confidence score
 
 ```
 Changelog:
-- July 07, 2025 (Late Morning). Enhanced Direct XMP Metadata Extraction with PyMuPDF
-  - Updated backend to use PyMuPDF's direct metadata_xml attribute for complete XMP access
-  - Enhanced AI engine to extract comprehensive PDF metadata including raw XMP data
-  - Added robust XMP XML parsing for all namespace-specific tags (dc:, pdf:, xmp:)
-  - Implemented comprehensive metadata extraction with encryption detection and file analysis
-  - Updated frontend to display organized XMP tags with fallback to raw metadata
-  - Enhanced debugging output to track XMP extraction success and parsed tag counts
-  - Created complete metadata display showing XMP tags, raw metadata, and parsed XMP data
-  - System now fetches all available PDF details including producer, creator, dates, version, language, encryption status
+- July 07, 2025 (Late Morning). Fixed Backend-Frontend Integration for XMP Metadata Display
+  - Fixed backend main.py to use enhanced AI engine instead of basic metadata extraction
+  - Updated verification endpoint to properly pass XMP metadata to frontend
+  - Enhanced API response to include complete metadata details with XMP tags
+  - Added comprehensive debugging output to track metadata flow from backend to frontend
+  - Fixed integration so admin portal now receives and displays all XMP metadata properly
+  - Updated data structure to pass xmp_tags, raw_metadata, and parsed_xmp to frontend
+  - All PDF details now properly fetched and displayed in organized XMP tag format
 - July 07, 2025 (Late Morning). Added Admin Portal Document Analysis Window
   - Created comprehensive Document Analysis tab in Admin Portal for detailed COS verification
   - Added XMP metadata showcase displaying all extracted document properties (producer, creator, creation date, pages)
