@@ -45,28 +45,7 @@ export default function UserPortal() {
     };
   };
 
-  const verifyMutation = useMutation({
-    mutationFn: async (file: File) => {
-      console.log('UserPortal mutation disabled - using FileUpload component instead');
-      // This mutation is disabled as FileUpload component handles verification directly
-      throw new Error('This verification method is disabled');
-    },
-    onSuccess: (result) => {
-      const transformedResult = transformResult(result);
-      setVerificationResult(transformedResult);
-      toast({
-        title: "Verification Complete",
-        description: `Document verified as ${transformedResult.type.toUpperCase()}`,
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Verification Failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
+  // Verification is handled by FileUpload component directly
 
   // Animate verification steps
   const animateVerificationSteps = async () => {
@@ -103,17 +82,8 @@ export default function UserPortal() {
   const handleFileUpload = async (file: File) => {
     console.log('UserPortal handleFileUpload - starting verification animation');
     
-    // Start the animation and real verification simultaneously
-    const animationPromise = animateVerificationSteps();
-    const verificationPromise = verifyMutation.mutateAsync(file);
-    
-    // Wait for both to complete
-    try {
-      await Promise.all([animationPromise, verificationPromise]);
-    } catch (error) {
-      console.error('Verification failed:', error);
-      setLoading(false);
-    }
+    // Start the animation - FileUpload component handles verification directly
+    await animateVerificationSteps();
   };
 
   const handleVerificationResult = (result: VerificationResult) => {
