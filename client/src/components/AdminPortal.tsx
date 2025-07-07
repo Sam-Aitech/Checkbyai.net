@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { isUnauthorizedError } from "@/lib/authUtils";
 import FileUpload from "./FileUpload";
-import { Database, CheckCircle, AlertTriangle, TrendingUp, Search, Trash2, Download, Plus } from "lucide-react";
+import { Database, CheckCircle, AlertTriangle, TrendingUp, Search, Trash2, Download, Plus, Lock, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -15,6 +17,59 @@ export default function AdminPortal() {
   const [autoApprove, setAutoApprove] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isAuthenticated, isAdmin, isLoading, user } = useAuth();
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to access the admin portal",
+        variant: "destructive",
+      });
+      setTimeout(() => {
+        window.location.href = "/api/login";
+      }, 1000);
+      return;
+    }
+  }, [isAuthenticated, isLoading, toast]);
+
+  // Show access denied if not admin
+  if (!isLoading && isAuthenticated && !isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-6">
+        <div className="w-24 h-24 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
+          <Lock className="w-12 h-12 text-red-600 dark:text-red-400" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Access Denied</h2>
+          <p className="text-gray-600 dark:text-gray-300 max-w-md">
+            You don't have permission to access the admin portal. Administrator privileges are required.
+          </p>
+        </div>
+        <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
+          <ShieldCheck className="w-4 h-4" />
+          <span>Current Role: {user?.role || 'User'}</span>
+        </div>
+        <Button 
+          onClick={() => window.location.href = "/api/logout"}
+          variant="outline"
+        >
+          Logout
+        </Button>
+      </div>
+    );
+  }
+
+  // Show loading while checking authentication
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
+        <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+        <p className="text-gray-600 dark:text-gray-300">Checking permissions...</p>
+      </div>
+    );
+  }
 
   const { data: stats } = useQuery({
     queryKey: ['/api/stats'],
@@ -56,6 +111,17 @@ export default function AdminPortal() {
       });
     },
     onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
       toast({
         title: "Upload Failed",
         description: error.message,

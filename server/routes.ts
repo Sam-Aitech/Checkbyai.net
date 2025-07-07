@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { setupAuth, isAuthenticated, isAdmin } from "./replitAuth";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -25,6 +26,21 @@ const upload = multer({
 const pdfAnalyzer = new PDFAnalyzer();
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Auth middleware
+  await setupAuth(app);
+
+  // Auth routes
+  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
   // Debug middleware for file uploads
   app.use('/api/verify', (req, res, next) => {
     console.log('=== VERIFY REQUEST DEBUG ===');
@@ -65,7 +81,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Upload trusted pattern (admin)
-  app.post("/api/admin/upload-pattern", upload.single('file'), async (req, res) => {
+  app.post("/api/admin/upload-pattern", isAuthenticated, isAdmin, upload.single('file'), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
@@ -145,7 +161,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get recent verification activity (admin)
-  app.get("/api/admin/recent-activity", async (req, res) => {
+  app.get("/api/admin/recent-activity", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const activity = await storage.getRecentActivity();
       res.json(activity);
@@ -155,7 +171,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete trusted pattern (admin)
-  app.delete("/api/admin/trusted-patterns/:id", async (req, res) => {
+  app.delete("/api/admin/trusted-patterns/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteTrustedPattern(id);
@@ -166,7 +182,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Clear all verification results (admin) - keeps trusted patterns
-  app.delete("/api/admin/clear-verification-data", async (req, res) => {
+  app.delete("/api/admin/clear-verification-data", isAuthenticated, isAdmin, async (req, res) => {
     try {
       await storage.clearVerificationResults();
       res.json({ success: true, message: "All user verification data cleared. Trusted patterns preserved." });

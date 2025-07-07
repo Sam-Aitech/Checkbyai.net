@@ -1,8 +1,9 @@
 import { useState, Suspense, lazy } from "react";
 import { Link } from "wouter";
-import { Shield, Database, LayoutDashboard, ArrowRight } from "lucide-react";
+import { Shield, Database, LayoutDashboard, ArrowRight, User, LogIn, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
 
 // Lazy load heavy components for better performance
 const UserPortal = lazy(() => import("@/components/UserPortal"));
@@ -20,6 +21,7 @@ function LoadingSpinner() {
 export default function Home() {
   const [showPortals, setShowPortals] = useState(false);
   const [activeMode, setActiveMode] = useState<'user' | 'admin'>('user');
+  const { isAuthenticated, isAdmin, user, isLoading } = useAuth();
 
   const { data: stats } = useQuery({
     queryKey: ['/api/stats'],
@@ -110,6 +112,53 @@ export default function Home() {
             </div>
             
             <div className="flex items-center space-x-4">
+              {!isLoading && (
+                <>
+                  {isAuthenticated ? (
+                    <div className="flex items-center space-x-3">
+                      <div className="flex items-center space-x-2 text-sm">
+                        <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                          {user?.profileImageUrl ? (
+                            <img 
+                              src={user.profileImageUrl} 
+                              alt="Profile" 
+                              className="w-8 h-8 rounded-full object-cover"
+                            />
+                          ) : (
+                            <User className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                          )}
+                        </div>
+                        <div>
+                          <div className="font-medium text-gray-900 dark:text-white">
+                            {user?.firstName || user?.email || 'User'}
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {user?.role === 'admin' ? 'Administrator' : 'User'}
+                          </div>
+                        </div>
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => window.location.href = "/api/logout"}
+                      >
+                        <LogOut className="mr-2 w-4 h-4" />
+                        Logout
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => window.location.href = "/api/login"}
+                    >
+                      <LogIn className="mr-2 w-4 h-4" />
+                      Login
+                    </Button>
+                  )}
+                </>
+              )}
+              
               <Link href="/dashboard">
                 <Button variant="outline" size="sm">
                   <LayoutDashboard className="mr-2 w-4 h-4" />
