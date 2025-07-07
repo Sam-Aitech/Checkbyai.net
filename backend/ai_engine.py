@@ -34,27 +34,27 @@ class AIEngine:
         """Extract comprehensive metadata from PDF using PyMuPDF"""
         try:
             doc = fitz.open(file_path)
-            metadata = doc.metadata
             
-            # Extract XMP metadata if available
+            # Get raw metadata dictionary
+            raw_metadata = doc.metadata
+            
+            # Get XMP metadata as a string using metadata_xml
+            xmp_data = doc.metadata_xml
+            
+            # Parse XMP metadata for specific namespace tags
             xmp_metadata = {}
-            try:
-                xmp_info = doc.get_xml_metadata()
-                if xmp_info:
-                    # Parse XMP metadata for specific namespace tags
-                    xmp_metadata = self._parse_xmp_metadata(xmp_info)
-            except:
-                pass
+            if xmp_data:
+                xmp_metadata = self._parse_xmp_metadata(xmp_data)
             
             # Basic metadata with XMP enhancement
             extracted_metadata = {
-                'producer': metadata.get('producer', '') or xmp_metadata.get('pdf:Producer', ''),
-                'creator': metadata.get('creator', '') or xmp_metadata.get('xmp:CreatorTool', ''),
-                'title': metadata.get('title', '') or xmp_metadata.get('dc:title', ''),
-                'subject': metadata.get('subject', '') or xmp_metadata.get('dc:subject', ''),
-                'author': metadata.get('author', '') or xmp_metadata.get('dc:creator', ''),
-                'creation_date': metadata.get('creationDate', '') or xmp_metadata.get('xmp:CreateDate', ''),
-                'modification_date': metadata.get('modDate', '') or xmp_metadata.get('xmp:ModifyDate', ''),
+                'producer': raw_metadata.get('producer', '') or xmp_metadata.get('pdf:Producer', ''),
+                'creator': raw_metadata.get('creator', '') or xmp_metadata.get('xmp:CreatorTool', ''),
+                'title': raw_metadata.get('title', '') or xmp_metadata.get('dc:title', ''),
+                'subject': raw_metadata.get('subject', '') or xmp_metadata.get('dc:subject', ''),
+                'author': raw_metadata.get('author', '') or xmp_metadata.get('dc:creator', ''),
+                'creation_date': raw_metadata.get('creationDate', '') or xmp_metadata.get('xmp:CreateDate', ''),
+                'modification_date': raw_metadata.get('modDate', '') or xmp_metadata.get('xmp:ModifyDate', ''),
                 'metadata_date': xmp_metadata.get('xmp:MetadataDate', ''),
                 'pages': doc.page_count,
                 'file_size': os.path.getsize(file_path),
@@ -62,21 +62,24 @@ class AIEngine:
                 'language': xmp_metadata.get('dc:language', 'en-US'),
                 'format': xmp_metadata.get('dc:format', 'application/pdf'),
                 'creator_tool': xmp_metadata.get('xmp:CreatorTool', ''),
+                'is_encrypted': raw_metadata.get('encryption', False),
                 
-                # Additional XMP metadata
+                # Complete XMP tags for organized display
                 'xmp_tags': {
-                    'dc:date': xmp_metadata.get('dc:date', metadata.get('creationDate', '')),
-                    'dc:format': 'application/pdf',
+                    'dc:date': xmp_metadata.get('dc:date', raw_metadata.get('creationDate', '')),
+                    'dc:format': xmp_metadata.get('dc:format', 'application/pdf'),
                     'dc:language': xmp_metadata.get('dc:language', 'en-US'),
                     'pdf:PDFVersion': xmp_metadata.get('pdf:PDFVersion', '1.4'),
-                    'pdf:Producer': metadata.get('producer', '') or xmp_metadata.get('pdf:Producer', ''),
-                    'xmp:CreateDate': metadata.get('creationDate', '') or xmp_metadata.get('xmp:CreateDate', ''),
-                    'xmp:CreatorTool': metadata.get('creator', '') or xmp_metadata.get('xmp:CreatorTool', ''),
-                    'xmp:MetadataDate': xmp_metadata.get('xmp:MetadataDate', metadata.get('modDate', ''))
+                    'pdf:Producer': raw_metadata.get('producer', '') or xmp_metadata.get('pdf:Producer', ''),
+                    'xmp:CreateDate': raw_metadata.get('creationDate', '') or xmp_metadata.get('xmp:CreateDate', ''),
+                    'xmp:CreatorTool': raw_metadata.get('creator', '') or xmp_metadata.get('xmp:CreatorTool', ''),
+                    'xmp:MetadataDate': xmp_metadata.get('xmp:MetadataDate', raw_metadata.get('modDate', ''))
                 },
                 
-                # Raw XMP data for debugging
-                'raw_xmp': xmp_metadata
+                # Raw data for technical analysis
+                'raw_metadata': raw_metadata,
+                'raw_xmp_data': xmp_data,
+                'parsed_xmp': xmp_metadata
             }
             
             # Additional analysis
@@ -95,11 +98,24 @@ class AIEngine:
             })
             
             doc.close()
+            
+            print(f"Successfully extracted metadata from {file_path}")
+            print(f"XMP data length: {len(xmp_data) if xmp_data else 0}")
+            print(f"Parsed XMP tags: {list(xmp_metadata.keys()) if xmp_metadata else 'None'}")
+            
             return extracted_metadata
             
         except Exception as e:
             print(f"Error extracting metadata: {e}")
-            return {}
+            return {
+                'error': str(e),
+                'pages': 0,
+                'file_size': os.path.getsize(file_path) if os.path.exists(file_path) else 0,
+                'xmp_tags': {},
+                'raw_metadata': {},
+                'raw_xmp_data': None,
+                'parsed_xmp': {}
+            }
     
     async def extract_patterns(self, file_path: str) -> Dict[str, Any]:
         """Extract document patterns for trusted pattern storage"""
