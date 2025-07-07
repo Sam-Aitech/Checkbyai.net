@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import FileUpload from "./FileUpload";
 import FileUploadSimple from "./FileUploadSimple";
-import { CloudUpload, CheckCircle, AlertTriangle, XCircle } from "lucide-react";
+import { CloudUpload, CheckCircle, AlertTriangle, XCircle, Clock, Loader2 } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -13,6 +13,14 @@ interface VerificationResult {
 
 export default function UserPortal() {
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [verificationSteps, setVerificationSteps] = useState([
+    { id: 1, title: "Metadata Extraction", description: "Extract XMP metadata including creation date, producer, and creator tool information", status: "pending" },
+    { id: 2, title: "Pattern Analysis", description: "Compare against trusted patterns using rule-based matching and vector similarity", status: "pending" },
+    { id: 3, title: "AI Verification", description: "ML model inference using ONNX Runtime for advanced pattern recognition", status: "pending" },
+    { id: 4, title: "Result Generation", description: "Generate verification result and detailed analysis", status: "pending" }
+  ]);
   const { toast } = useToast();
 
   const transformResult = (backendResult: any): VerificationResult => {
@@ -52,10 +60,71 @@ export default function UserPortal() {
     },
   });
 
-  const handleFileUpload = (file: File) => {
-    console.log('UserPortal handleFileUpload - verification handled by FileUpload component');
-    // File verification is now handled directly by the FileUpload component
-    // No need to trigger mutation here
+  // Animate verification steps
+  const animateVerificationSteps = async () => {
+    setLoading(true);
+    setCurrentStep(0);
+    
+    // Reset all steps to pending
+    setVerificationSteps(prev => prev.map(step => ({ ...step, status: "pending" })));
+    
+    // Animate through each step
+    for (let i = 0; i < verificationSteps.length; i++) {
+      setCurrentStep(i);
+      
+      // Set current step to processing
+      setVerificationSteps(prev => prev.map((step, index) => 
+        index === i ? { ...step, status: "processing" } : step
+      ));
+      
+      // Wait for animation
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Set current step to completed
+      setVerificationSteps(prev => prev.map((step, index) => 
+        index === i ? { ...step, status: "completed" } : step
+      ));
+      
+      // Wait before next step
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    
+    setLoading(false);
+  };
+
+  const handleFileUpload = async (file: File) => {
+    console.log('UserPortal handleFileUpload - starting verification animation');
+    
+    // Start the animation and real verification simultaneously
+    const animationPromise = animateVerificationSteps();
+    const verificationPromise = verifyMutation.mutateAsync(file);
+    
+    // Wait for both to complete
+    try {
+      await Promise.all([animationPromise, verificationPromise]);
+    } catch (error) {
+      console.error('Verification failed:', error);
+      setLoading(false);
+    }
+  };
+
+  const handleVerificationResult = (result: VerificationResult) => {
+    setVerificationResult(result);
+  };
+
+  const handleLoading = (isLoading: boolean) => {
+    if (!isLoading && verificationResult) {
+      // Animation will be handled by animateVerificationSteps
+    }
+  };
+
+  const handleError = (error: string) => {
+    setLoading(false);
+    toast({
+      title: "Verification Error",
+      description: error,
+      variant: "destructive"
+    });
   };
 
   return (
@@ -81,6 +150,9 @@ export default function UserPortal() {
 
           <FileUploadSimple 
             onFileUpload={handleFileUpload}
+            onVerificationResult={handleVerificationResult}
+            onLoading={handleLoading}
+            onError={handleError}
             restrictToOneCheck={true}
           />
         </div>
@@ -90,54 +162,93 @@ export default function UserPortal() {
           <h3 className="text-xl font-semibold text-gray-900 mb-6">Verification Process</h3>
           
           <div className="space-y-4">
-            <div className="flex items-start space-x-4">
-              <div className="flex-shrink-0 w-8 h-8 bg-green-100 text-green-600 rounded-full flex items-center justify-center">
-                <CheckCircle className="h-4 w-4" />
+            {verificationSteps.map((step, index) => (
+              <div key={step.id} className="flex items-start space-x-4">
+                <div className="flex-shrink-0">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-500 ${
+                    step.status === 'completed' 
+                      ? 'bg-green-500 text-white scale-110' 
+                      : step.status === 'processing'
+                      ? 'bg-blue-500 text-white animate-pulse'
+                      : 'bg-gray-200 text-gray-500'
+                  }`}>
+                    {step.status === 'completed' ? (
+                      <CheckCircle className="w-5 h-5" />
+                    ) : step.status === 'processing' ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <Clock className="w-5 h-5" />
+                    )}
+                  </div>
+                </div>
+                
+                <div className="flex-grow">
+                  <div className="flex items-center justify-between">
+                    <h4 className={`font-medium transition-colors duration-300 ${
+                      step.status === 'completed' ? 'text-green-700' : 
+                      step.status === 'processing' ? 'text-blue-700' : 'text-gray-700'
+                    }`}>
+                      {step.title}
+                    </h4>
+                    {step.status === 'completed' && (
+                      <span className="text-green-600 text-sm font-medium animate-fadeIn">✓ Complete</span>
+                    )}
+                    {step.status === 'processing' && (
+                      <span className="text-blue-600 text-sm font-medium animate-pulse">Processing...</span>
+                    )}
+                  </div>
+                  <p className={`text-sm mt-1 transition-colors duration-300 ${
+                    step.status === 'completed' ? 'text-green-600' : 
+                    step.status === 'processing' ? 'text-blue-600' : 'text-gray-500'
+                  }`}>
+                    {step.description}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h4 className="font-medium text-gray-900">Metadata Extraction</h4>
-                <p className="text-sm text-gray-600">Extract XMP metadata including creation date, producer, and creator tool information</p>
-              </div>
-            </div>
+            ))}
+          </div>
 
-            <div className="flex items-start space-x-4">
-              <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                verifyMutation.isPending 
-                  ? 'bg-yellow-100 text-yellow-600' 
-                  : 'bg-gray-100 text-gray-400'
+          {/* Results Section */}
+          {!loading && verificationResult && (
+            <div className="mt-8 pt-6 border-t border-gray-200">
+              <h4 className="text-lg font-semibold text-gray-900 mb-4">Verification Results</h4>
+              <div className={`p-6 rounded-lg border-2 ${
+                verificationResult.type === 'Genuine' 
+                  ? 'bg-green-50 border-green-200' 
+                  : verificationResult.type === 'Edited'
+                  ? 'bg-yellow-50 border-yellow-200'
+                  : 'bg-red-50 border-red-200'
               }`}>
-                {verifyMutation.isPending ? (
-                  <div className="animate-spin h-4 w-4 border-2 border-yellow-600 border-t-transparent rounded-full"></div>
-                ) : (
-                  <span className="text-sm font-medium">2</span>
+                <div className="flex items-center space-x-3">
+                  {verificationResult.type === 'Genuine' && <CheckCircle className="h-8 w-8 text-green-600" />}
+                  {verificationResult.type === 'Edited' && <AlertTriangle className="h-8 w-8 text-yellow-600" />}
+                  {verificationResult.type === 'Fake' && <XCircle className="h-8 w-8 text-red-600" />}
+                  
+                  <div>
+                    <h5 className="text-lg font-semibold">
+                      Document is {verificationResult.type}
+                    </h5>
+                    <p className="text-sm text-gray-600">
+                      {verificationResult.type === 'Genuine' && 'This document appears to be authentic'}
+                      {verificationResult.type === 'Edited' && 'This document may have been modified'}
+                      {verificationResult.type === 'Fake' && 'This document appears to be fraudulent'}
+                    </p>
+                  </div>
+                </div>
+                
+                {verificationResult.mismatchedFields && verificationResult.mismatchedFields.length > 0 && (
+                  <div className="mt-4">
+                    <h6 className="font-medium text-gray-900 mb-2">Mismatched Fields:</h6>
+                    <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
+                      {verificationResult.mismatchedFields.map((field, index) => (
+                        <li key={index}>{field}</li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
               </div>
-              <div>
-                <h4 className="font-medium text-gray-900">Pattern Analysis</h4>
-                <p className="text-sm text-gray-600">Compare against trusted patterns using rule-based matching and vector similarity</p>
-              </div>
             </div>
-
-            <div className="flex items-start space-x-4">
-              <div className="flex-shrink-0 w-8 h-8 bg-gray-100 text-gray-400 rounded-full flex items-center justify-center">
-                <span className="text-sm font-medium">3</span>
-              </div>
-              <div>
-                <h4 className="font-medium text-gray-900">AI Verification</h4>
-                <p className="text-sm text-gray-600">ML model inference using ONNX Runtime for advanced pattern recognition</p>
-              </div>
-            </div>
-
-            <div className="flex items-start space-x-4">
-              <div className="flex-shrink-0 w-8 h-8 bg-gray-100 text-gray-400 rounded-full flex items-center justify-center">
-                <span className="text-sm font-medium">4</span>
-              </div>
-              <div>
-                <h4 className="font-medium text-gray-900">Result Generation</h4>
-                <p className="text-sm text-gray-600">Generate verification result and detailed analysis</p>
-              </div>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 

@@ -160,3 +160,19 @@
 .fa-plus:before { content: "\f067"; }
 .fa-trash:before { content: "\f1f8"; }
 .fa-chart-line:before { content: "\f201"; }
+
+/* Custom animations for verification process */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.5s ease-out;
+}
