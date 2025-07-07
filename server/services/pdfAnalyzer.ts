@@ -231,22 +231,8 @@ export class PDFAnalyzer {
       const result = parser.parse(cleanXmp);
       console.log('XML parsing successful');
       
-      // Extract values using multiple traversal strategies
-      this.extractValueFromPath(result, 'dc:date', parsed);
-      this.extractValueFromPath(result, 'dc:format', parsed);
-      this.extractValueFromPath(result, 'dc:language', parsed);
-      this.extractValueFromPath(result, 'pdf:Producer', parsed);
-      this.extractValueFromPath(result, 'pdf:PDFVersion', parsed);
-      this.extractValueFromPath(result, 'xmp:CreateDate', parsed);
-      this.extractValueFromPath(result, 'xmp:ModifyDate', parsed);
-      this.extractValueFromPath(result, 'xmp:MetadataDate', parsed);
-      this.extractValueFromPath(result, 'xmp:CreatorTool', parsed);
-      this.extractValueFromPath(result, 'dc:title', parsed);
-      this.extractValueFromPath(result, 'dc:creator', parsed);
-      this.extractValueFromPath(result, 'dc:subject', parsed);
-      
-      // Always try regex fallback to complement XML parsing
-      console.log('Complementing XML parsing with regex fallback...');
+      // Use regex parsing primarily for more reliable extraction
+      console.log('Using regex parsing for reliable XMP extraction...');
       this.parseXMPWithRegex(xmpData, parsed);
       
       console.log(`Parsed XMP fields: ${Object.keys(parsed).join(', ')}`);
@@ -325,64 +311,58 @@ export class PDFAnalyzer {
     const patterns = {
       'dc:date': [
         /<dc:date[^>]*>([^<]+)<\/dc:date>/i,
-        /dc:date="([^"]+)"/i,
-        /<date[^>]*>([^<]+)<\/date>/i
+        /dc:date="([^"]+)"/i
       ],
       'dc:format': [
         /<dc:format[^>]*>([^<]+)<\/dc:format>/i,
-        /dc:format="([^"]+)"/i,
-        /<format[^>]*>([^<]+)<\/format>/i
+        /dc:format="([^"]+)"/i
       ],
       'dc:language': [
         /<dc:language[^>]*>([^<]+)<\/dc:language>/i,
-        /dc:language="([^"]+)"/i,
-        /<language[^>]*>([^<]+)<\/language>/i
+        /dc:language="([^"]+)"/i
       ],
       'pdf:Producer': [
         /<pdf:Producer[^>]*>([^<]+)<\/pdf:Producer>/i,
-        /pdf:Producer="([^"]+)"/i,
-        /<Producer[^>]*>([^<]+)<\/Producer>/i
+        /pdf:Producer="([^"]+)"/i
       ],
       'pdf:PDFVersion': [
         /<pdf:PDFVersion[^>]*>([^<]+)<\/pdf:PDFVersion>/i,
-        /pdf:PDFVersion="([^"]+)"/i,
-        /<PDFVersion[^>]*>([^<]+)<\/PDFVersion>/i
+        /pdf:PDFVersion="([^"]+)"/i
       ],
       'xmp:CreateDate': [
         /<xmp:CreateDate[^>]*>([^<]+)<\/xmp:CreateDate>/i,
-        /xmp:CreateDate="([^"]+)"/i,
-        /<CreateDate[^>]*>([^<]+)<\/CreateDate>/i
+        /xmp:CreateDate="([^"]+)"/i
       ],
       'xmp:ModifyDate': [
         /<xmp:ModifyDate[^>]*>([^<]+)<\/xmp:ModifyDate>/i,
-        /xmp:ModifyDate="([^"]+)"/i,
-        /<ModifyDate[^>]*>([^<]+)<\/ModifyDate>/i
+        /xmp:ModifyDate="([^"]+)"/i
       ],
       'xmp:MetadataDate': [
         /<xmp:MetadataDate[^>]*>([^<]+)<\/xmp:MetadataDate>/i,
-        /xmp:MetadataDate="([^"]+)"/i,
-        /<MetadataDate[^>]*>([^<]+)<\/MetadataDate>/i
+        /xmp:MetadataDate="([^"]+)"/i
       ],
       'xmp:CreatorTool': [
         /<xmp:CreatorTool[^>]*>([^<]+)<\/xmp:CreatorTool>/i,
-        /xmp:CreatorTool="([^"]+)"/i,
-        /<CreatorTool[^>]*>([^<]+)<\/CreatorTool>/i
+        /xmp:CreatorTool="([^"]+)"/i
       ]
     };
     
     console.log('=== REGEX PARSING FALLBACK ===');
+    console.log(`XMP data snippet: ${xmpData.substring(0, 1000)}`);
+    
     for (const [field, regexList] of Object.entries(patterns)) {
-      if (!target[field]) {
-        for (const regex of regexList) {
-          const match = xmpData.match(regex);
-          if (match && match[1]) {
-            console.log(`Found ${field}: ${match[1]}`);
-            target[field] = match[1].trim();
-            break;
-          }
+      for (const regex of regexList) {
+        const match = xmpData.match(regex);
+        if (match && match[1] && match[1].trim() !== '') {
+          const value = match[1].trim();
+          console.log(`Found ${field}: "${value}"`);
+          target[field] = value;
+          break;
         }
       }
     }
+    
+    console.log(`After regex parsing: ${JSON.stringify(target, null, 2)}`);
   }
   
   private enhanceMetadataWithXMP(metadata: PDFMetadata, xmpData: any): void {
