@@ -119,7 +119,7 @@ export class PDFAnalyzer {
         'xmp:MetadataDate': parsedXmp['xmp:MetadataDate'] || metadata.metadataDate || metadata.modificationDate || 'Not available'
       };
       
-      console.log(`Extracted metadata keys: ${Object.keys(metadata)}`);
+      console.log(`Raw XMP first 500 chars: ${metadata.rawXmpData?.substring(0, 500)}`);
       console.log(`Parsed XMP data: ${JSON.stringify(parsedXmp, null, 2)}`);
       console.log(`XMP tags: ${JSON.stringify(metadata.xmp_tags, null, 2)}`);
       
@@ -245,11 +245,9 @@ export class PDFAnalyzer {
       this.extractValueFromPath(result, 'dc:creator', parsed);
       this.extractValueFromPath(result, 'dc:subject', parsed);
       
-      // Also try regex fallback for complex nested structures
-      if (Object.keys(parsed).length === 0) {
-        console.log('XML parsing yielded no results, falling back to regex...');
-        this.parseXMPWithRegex(xmpData, parsed);
-      }
+      // Always try regex fallback to complement XML parsing
+      console.log('Complementing XML parsing with regex fallback...');
+      this.parseXMPWithRegex(xmpData, parsed);
       
       console.log(`Parsed XMP fields: ${Object.keys(parsed).join(', ')}`);
       
@@ -372,11 +370,13 @@ export class PDFAnalyzer {
       ]
     };
     
+    console.log('=== REGEX PARSING FALLBACK ===');
     for (const [field, regexList] of Object.entries(patterns)) {
       if (!target[field]) {
         for (const regex of regexList) {
           const match = xmpData.match(regex);
           if (match && match[1]) {
+            console.log(`Found ${field}: ${match[1]}`);
             target[field] = match[1].trim();
             break;
           }
