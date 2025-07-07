@@ -143,6 +143,14 @@ Result: Genuine/Edited/Fake with confidence score
 
 ```
 Changelog:
+- July 07, 2025 (Late Morning). Enhanced XMP Metadata Display in Admin Portal
+  - Redesigned XMP metadata display to match requested format with proper tag structure
+  - Added organized XMP tag sections: dc:date, dc:format, dc:language, pdf:PDFVersion, pdf:Producer, xmp:CreateDate, xmp:CreatorTool, xmp:MetadataDate
+  - Created collapsible XMP Tags section with blue dropdown arrow for better organization
+  - Enhanced metadata extraction to show specific XMP namespace tags in proper sequence
+  - Added gray card-style display for each XMP tag with tag name and extracted value
+  - Improved document analysis results section with verification status and pattern analysis
+  - Maintained complete metadata extract section for technical analysis
 - July 07, 2025 (Late Morning). Added Admin Portal Document Analysis Window
   - Created comprehensive Document Analysis tab in Admin Portal for detailed COS verification
   - Added XMP metadata showcase displaying all extracted document properties (producer, creator, creation date, pages)

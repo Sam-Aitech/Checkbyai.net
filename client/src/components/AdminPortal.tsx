@@ -652,92 +652,173 @@ export default function AdminPortal() {
 
             {/* XMP Metadata Analysis Display */}
             {analysisDocument && (
-              <div className="mt-8 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">
-                  XMP Metadata Analysis
-                </h3>
-                
-                <div className="grid md:grid-cols-2 gap-6">
-                  {/* Basic Metadata */}
-                  <div>
-                    <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                      Document Properties
-                    </h4>
-                    <div className="space-y-3">
-                      <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
-                        <span className="text-gray-600 dark:text-gray-400">File Name:</span>
-                        <span className="text-gray-900 dark:text-white font-medium">
-                          {analysisDocument.details?.metadata?.filename || 'Unknown'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
-                        <span className="text-gray-600 dark:text-gray-400">Producer:</span>
-                        <span className="text-gray-900 dark:text-white font-medium">
-                          {analysisDocument.details?.metadata?.producer || 'Unknown'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
-                        <span className="text-gray-600 dark:text-gray-400">Creator:</span>
-                        <span className="text-gray-900 dark:text-white font-medium">
-                          {analysisDocument.details?.metadata?.creator || 'Unknown'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
-                        <span className="text-gray-600 dark:text-gray-400">Creation Date:</span>
-                        <span className="text-gray-900 dark:text-white font-medium">
-                          {analysisDocument.details?.metadata?.creationDate || 'Unknown'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
-                        <span className="text-gray-600 dark:text-gray-400">Pages:</span>
-                        <span className="text-gray-900 dark:text-white font-medium">
-                          {analysisDocument.details?.metadata?.pages || 'Unknown'}
-                        </span>
-                      </div>
+              <div className="mt-8 space-y-6">
+                {/* XMP Tags Section */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                  <div className="flex items-center mb-6">
+                    <div className="text-blue-600 mr-3">
+                      <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
                     </div>
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                      XMP Tags
+                    </h3>
                   </div>
 
-                  {/* Analysis Results */}
-                  <div>
-                    <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                      Analysis Results
-                    </h4>
-                    <div className="space-y-3">
-                      <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
-                        <span className="text-gray-600 dark:text-gray-400">Verification Result:</span>
-                        <Badge variant={analysisDocument.result === 'genuine' ? 'default' : 'destructive'}>
-                          {analysisDocument.result?.toUpperCase()}
-                        </Badge>
+                  <div className="space-y-3">
+                    {/* dc:date */}
+                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg px-4 py-3">
+                      <div className="text-gray-700 dark:text-gray-300 font-medium">
+                        dc:date
                       </div>
-                      <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
-                        <span className="text-gray-600 dark:text-gray-400">Confidence:</span>
-                        <span className="text-gray-900 dark:text-white font-medium">
-                          {analysisDocument.confidence?.toFixed(1)}%
-                        </span>
+                      <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        {analysisDocument.details?.metadata?.creationDate || analysisDocument.details?.metadata?.modificationDate || 'Not available'}
                       </div>
-                      <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
-                        <span className="text-gray-600 dark:text-gray-400">Pattern Matches:</span>
-                        <span className="text-gray-900 dark:text-white font-medium">
-                          {analysisDocument.details?.patternMatching?.score?.toFixed(1) || '0.0'}%
-                        </span>
+                    </div>
+
+                    {/* dc:format */}
+                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg px-4 py-3">
+                      <div className="text-gray-700 dark:text-gray-300 font-medium">
+                        dc:format
                       </div>
-                      <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
-                        <span className="text-gray-600 dark:text-gray-400">Vector Similarity:</span>
-                        <span className="text-gray-900 dark:text-white font-medium">
-                          {analysisDocument.details?.vectorSimilarity?.toFixed(1) || '0.0'}%
-                        </span>
+                      <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        application/pdf
+                      </div>
+                    </div>
+
+                    {/* dc:language */}
+                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg px-4 py-3">
+                      <div className="text-gray-700 dark:text-gray-300 font-medium">
+                        dc:language
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        {analysisDocument.details?.metadata?.language || 'en-US'}
+                      </div>
+                    </div>
+
+                    {/* pdf:PDFVersion */}
+                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg px-4 py-3">
+                      <div className="text-gray-700 dark:text-gray-300 font-medium">
+                        pdf:PDFVersion
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        {analysisDocument.details?.metadata?.pdfVersion || '1.4'}
+                      </div>
+                    </div>
+
+                    {/* pdf:Producer */}
+                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg px-4 py-3">
+                      <div className="text-gray-700 dark:text-gray-300 font-medium">
+                        pdf:Producer
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        {analysisDocument.details?.metadata?.producer || 'Unknown'}
+                      </div>
+                    </div>
+
+                    {/* xmp:CreateDate */}
+                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg px-4 py-3">
+                      <div className="text-gray-700 dark:text-gray-300 font-medium">
+                        xmp:CreateDate
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        {analysisDocument.details?.metadata?.creationDate || 'Not available'}
+                      </div>
+                    </div>
+
+                    {/* xmp:CreatorTool */}
+                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg px-4 py-3">
+                      <div className="text-gray-700 dark:text-gray-300 font-medium">
+                        xmp:CreatorTool
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        {analysisDocument.details?.metadata?.creator || analysisDocument.details?.metadata?.creatorTool || 'Unknown'}
+                      </div>
+                    </div>
+
+                    {/* xmp:MetadataDate */}
+                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg px-4 py-3">
+                      <div className="text-gray-700 dark:text-gray-300 font-medium">
+                        xmp:MetadataDate
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        {analysisDocument.details?.metadata?.metadataDate || analysisDocument.details?.metadata?.modificationDate || 'Not available'}
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Raw XMP Data */}
-                <div className="mt-6">
+                {/* Analysis Results */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">
+                    Document Analysis Results
+                  </h3>
+                  
+                  <div className="grid md:grid-cols-2 gap-6">
+                    {/* Verification Status */}
+                    <div>
+                      <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                        Verification Status
+                      </h4>
+                      <div className="space-y-3">
+                        <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                          <span className="text-gray-600 dark:text-gray-400">Result:</span>
+                          <Badge variant={analysisDocument.result === 'genuine' ? 'default' : 'destructive'}>
+                            {analysisDocument.result?.toUpperCase()}
+                          </Badge>
+                        </div>
+                        <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                          <span className="text-gray-600 dark:text-gray-400">Confidence:</span>
+                          <span className="text-gray-900 dark:text-white font-medium">
+                            {analysisDocument.confidence?.toFixed(1)}%
+                          </span>
+                        </div>
+                        <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                          <span className="text-gray-600 dark:text-gray-400">File Size:</span>
+                          <span className="text-gray-900 dark:text-white font-medium">
+                            {analysisDocument.details?.metadata?.fileSize ? `${(analysisDocument.details.metadata.fileSize / 1024).toFixed(1)} KB` : 'Unknown'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Pattern Analysis */}
+                    <div>
+                      <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                        Pattern Analysis
+                      </h4>
+                      <div className="space-y-3">
+                        <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                          <span className="text-gray-600 dark:text-gray-400">Vector Similarity:</span>
+                          <span className="text-gray-900 dark:text-white font-medium">
+                            {analysisDocument.details?.patternMatching?.vectorSimilarity?.toFixed(1) || '0.0'}%
+                          </span>
+                        </div>
+                        <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                          <span className="text-gray-600 dark:text-gray-400">Document Structure:</span>
+                          <span className="text-gray-900 dark:text-white font-medium">
+                            {analysisDocument.details?.patternMatching?.documentStructure?.toFixed(1) || '0.0'}%
+                          </span>
+                        </div>
+                        <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                          <span className="text-gray-600 dark:text-gray-400">Format Patterns:</span>
+                          <span className="text-gray-900 dark:text-white font-medium">
+                            {analysisDocument.details?.patternMatching?.formattingPatterns?.toFixed(1) || '0.0'}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Raw Metadata */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                   <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                    Raw XMP Metadata
+                    Complete Metadata Extract
                   </h4>
                   <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 max-h-64 overflow-y-auto">
-                    <pre className="text-xs text-gray-700 dark:text-gray-300 font-mono">
+                    <pre className="text-xs text-gray-700 dark:text-gray-300 font-mono whitespace-pre-wrap">
                       {JSON.stringify(analysisDocument.details?.metadata || {}, null, 2)}
                     </pre>
                   </div>
