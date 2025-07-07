@@ -1,9 +1,8 @@
 import { useState, Suspense, lazy } from "react";
 import { Link } from "wouter";
-import { Shield, Database, LayoutDashboard, ArrowRight, User, LogIn, LogOut } from "lucide-react";
+import { Shield, Database, LayoutDashboard, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/useAuth";
 import UserProfile from "@/components/UserProfile";
 
 // Lazy load heavy components for better performance
@@ -40,7 +39,7 @@ export default function Home() {
               <div className="flex items-center space-x-2 sm:space-x-3">
                 <Shield className="text-blue-600 text-xl sm:text-2xl" />
                 <div>
-                  <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">COS Verifier</h1>
+                  <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">Document Authenticator</h1>
                   <p className="text-xs text-gray-500 dark:text-gray-400 hidden sm:block">AI-Powered Document Authentication</p>
                 </div>
               </div>
@@ -68,84 +67,38 @@ export default function Home() {
           </div>
         </nav>
 
-        {/* 3D Landing Page */}
+        {/* Hero Section */}
         <Suspense fallback={<LoadingSpinner />}>
-          <HeroSection onStartVerification={() => setShowPortals(true)} />
+          <HeroSection onGetStarted={() => setShowPortals(true)} />
         </Suspense>
       </div>
     );
   }
 
-  // Show application portals
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Application Header */}
-      <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-4">
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => setShowPortals(false)}
-                className="text-gray-600 hover:text-blue-600"
-              >
-                ← Back to Home
-              </Button>
-              
-              <div className="flex items-center space-x-2">
-                <Shield className="text-blue-600 text-xl" />
-                <h1 className="text-lg font-bold text-gray-900 dark:text-white">COS Verifier</h1>
+      {/* Header */}
+      <header className="bg-white dark:bg-gray-800 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center space-x-3">
+              <Shield className="text-blue-600 text-2xl" />
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Document Authenticator</h1>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Advanced AI-Powered Document Verification</p>
               </div>
             </div>
             
             <div className="flex items-center space-x-4">
-              {!isLoading && (
-                <>
-                  {isAuthenticated ? (
-                    <div className="flex items-center space-x-3">
-                      <div className="flex items-center space-x-2 text-sm">
-                        <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                          {user?.profileImageUrl ? (
-                            <img 
-                              src={user.profileImageUrl} 
-                              alt="Profile" 
-                              className="w-8 h-8 rounded-full object-cover"
-                            />
-                          ) : (
-                            <User className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                          )}
-                        </div>
-                        <div>
-                          <div className="font-medium text-gray-900 dark:text-white">
-                            {user?.firstName || user?.email || 'User'}
-                          </div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            {user?.role === 'admin' ? 'Administrator' : 'User'}
-                          </div>
-                        </div>
-                      </div>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => window.location.href = "/api/logout"}
-                      >
-                        <LogOut className="mr-2 w-4 h-4" />
-                        Logout
-                      </Button>
-                    </div>
-                  ) : (
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => window.location.href = "/api/login"}
-                    >
-                      <LogIn className="mr-2 w-4 h-4" />
-                      Login
-                    </Button>
-                  )}
-                </>
-              )}
+              {/* Authentication temporarily disabled to prevent infinite loops */}
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => window.location.href = "/api/login"}
+              >
+                <LogIn className="mr-2 w-4 h-4" />
+                Login
+              </Button>
               
               <Link href="/dashboard">
                 <Button variant="outline" size="sm">
