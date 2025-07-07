@@ -31,7 +31,7 @@ export default function Dashboard() {
       </h1>
       
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-4 sm:p-6 mb-4 sm:mb-6">
-        <h2 className="text-base sm:text-lg font-medium mb-3 sm:mb-4 text-gray-900 dark:text-gray-100 text-center sm:text-left">Upload COS Document</h2>
+        <h2 className="text-base sm:text-lg font-medium mb-3 sm:mb-4 text-gray-900 dark:text-gray-100 text-center sm:text-left">Upload Document</h2>
         <FileUploadSimple restrictToOneCheck={true} />
         
         {loading && (

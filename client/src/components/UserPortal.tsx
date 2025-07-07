@@ -62,9 +62,9 @@ export default function UserPortal() {
     <div>
       {/* Hero Section */}
       <div className="text-center mb-12">
-        <h2 className="text-3xl font-bold text-gray-900 mb-4">Verify Certificate of Sponsorship</h2>
+        <h2 className="text-3xl font-bold text-gray-900 mb-4">Verify Document Authenticity</h2>
         <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-          Upload your COS document for instant verification against our database of trusted patterns. 
+          Upload your document for instant verification against our database of trusted patterns. 
           Our AI-powered system analyzes PDF metadata to detect genuine, edited, or fraudulent documents.
         </p>
       </div>
@@ -75,7 +75,7 @@ export default function UserPortal() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
           <div className="text-center mb-6">
             <CloudUpload className="h-12 w-12 text-primary mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Upload COS Document</h3>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">Upload Document</h3>
             <p className="text-gray-600">Drag and drop your PDF file or click to browse</p>
           </div>
 

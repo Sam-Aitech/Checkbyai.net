@@ -143,6 +143,13 @@ Result: Genuine/Edited/Fake with confidence score
 
 ```
 Changelog:
+- July 07, 2025 (Late Morning). Removed "COS" Text References from Dashboard
+  - Updated main dashboard heading from "Advanced COS Document Verification" to "Advanced Document Verification"
+  - Changed all "Upload COS Document" references to "Upload Document" 
+  - Updated "Document Authenticator" branding (removed COS references)
+  - Modified verification flow descriptions to use generic "document" terminology
+  - Made UserPortal heading more generic: "Verify Document Authenticity"
+  - Ensured consistent document terminology across all user-facing components
 - July 07, 2025 (Late Morning). Implemented User Portal Document Verification Restriction
   - Added one-document-per-day verification limit for regular users
   - Created localStorage-based usage tracking system with daily reset

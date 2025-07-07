@@ -126,7 +126,7 @@ export default function COSDashboard() {
                 </div>
               </div>
               <div className="transform group-hover:translate-x-2 transition-transform duration-300">
-                <h1 className="text-lg sm:text-2xl font-bold text-white drop-shadow-lg">COS Authenticator</h1>
+                <h1 className="text-lg sm:text-2xl font-bold text-white drop-shadow-lg">Document Authenticator</h1>
                 <p className="text-xs sm:text-sm text-blue-100 drop-shadow hidden sm:block">Advanced Document Verification</p>
               </div>
             </div>
@@ -221,11 +221,11 @@ export default function COSDashboard() {
         <div className="container mx-auto px-5 relative z-10">
           <div className="transform hover:scale-105 transition-transform duration-500">
             <h1 className="text-5xl md:text-7xl font-bold mb-6 font-sans bg-gradient-to-r from-white via-blue-100 to-purple-100 bg-clip-text text-transparent drop-shadow-2xl">
-              Advanced COS Document Verification
+              Advanced Document Verification
             </h1>
           </div>
           <p className="text-xl md:text-2xl max-w-4xl mx-auto mb-10 text-blue-100 drop-shadow-lg leading-relaxed">
-            Verify the authenticity of your Certificate of Service using PDF metadata analysis and expert verification
+            Verify the authenticity of your documents using PDF metadata analysis and expert verification
           </p>
           <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
             <button 
@@ -262,7 +262,7 @@ export default function COSDashboard() {
       {/* Verification Highlight */}
       <section className="py-20 bg-white">
         <div className="container mx-auto px-5 text-center">
-          <h2 className="text-4xl font-bold text-gray-900 mb-12">How COS Verification Works</h2>
+          <h2 className="text-4xl font-bold text-gray-900 mb-12">How Document Verification Works</h2>
           
           <div className="flex flex-wrap justify-center gap-8">
             <div className="w-[300px] bg-white rounded-2xl overflow-hidden shadow-lg transition-all duration-300 hover:transform hover:-translate-y-3 hover:shadow-xl">
@@ -272,7 +272,7 @@ export default function COSDashboard() {
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                   </svg>
                 </div>
-                <h3 className="text-2xl font-semibold">Genuine COS</h3>
+                <h3 className="text-2xl font-semibold">Genuine Document</h3>
               </div>
               <div className="p-8">
                 <p className="text-gray-600 mb-5">Document matches verified templates with no alterations detected.</p>
@@ -421,7 +421,7 @@ export default function COSDashboard() {
                           </div>
                           <div>
                             <h3 className="font-semibold text-green-800">Free Verification Available</h3>
-                            <p className="text-green-700 text-sm">Upload your COS document to verify its authenticity instantly</p>
+                            <p className="text-green-700 text-sm">Upload your document to verify its authenticity instantly</p>
                           </div>
                         </div>
                       </div>
@@ -489,7 +489,7 @@ export default function COSDashboard() {
                       </svg>
                     </div>
                     <h3 className="text-xl font-bold text-gray-900 mb-2">Verification Complete!</h3>
-                    <p className="text-gray-600">Your COS document has been analyzed</p>
+                    <p className="text-gray-600">Your document has been analyzed</p>
                   </div>
 
                   <div className="mb-6">

@@ -177,7 +177,7 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
           />
         </svg>
         
-        <h3 className="mt-2 text-lg font-medium text-gray-900 dark:text-gray-100">Upload COS Document</h3>
+        <h3 className="mt-2 text-lg font-medium text-gray-900 dark:text-gray-100">Upload Document</h3>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Drag and drop your PDF file here, or click to select</p>
         
         <input 
