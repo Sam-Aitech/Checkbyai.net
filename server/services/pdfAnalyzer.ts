@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { XMLParser } from 'fast-xml-parser';
 
 export interface PDFMetadata {
   producer?: string;
@@ -10,6 +11,32 @@ export interface PDFMetadata {
   creationDate?: string;
   modificationDate?: string;
   trapped?: string;
+  pages?: number;
+  fileSize?: number;
+  pdfVersion?: string;
+  language?: string;
+  format?: string;
+  creatorTool?: string;
+  metadataDate?: string;
+  isEncrypted?: boolean;
+  
+  // XMP Tags for organized display
+  xmp_tags?: {
+    'dc:date'?: string;
+    'dc:format'?: string;
+    'dc:language'?: string;
+    'pdf:PDFVersion'?: string;
+    'pdf:Producer'?: string;
+    'xmp:CreateDate'?: string;
+    'xmp:CreatorTool'?: string;
+    'xmp:MetadataDate'?: string;
+  };
+  
+  // Raw data for debugging
+  rawMetadata?: any;
+  rawXmpData?: string;
+  parsedXmp?: any;
+  
   [key: string]: any;
 }
 
@@ -33,22 +60,35 @@ export interface VerificationAnalysis {
 export class PDFAnalyzer {
   async extractMetadata(filePath: string): Promise<PDFMetadata> {
     try {
-      // Simple metadata extraction - in a real implementation, you'd use a proper PDF library
+      console.log(`=== PDF ANALYZER: Extracting metadata from ${filePath} ===`);
+      
       const buffer = await fs.promises.readFile(filePath);
       const pdfString = buffer.toString('binary');
       
-      const metadata: PDFMetadata = {};
+      // Get file stats
+      const stats = await fs.promises.stat(filePath);
+      const fileSize = stats.size;
       
-      // Extract basic PDF metadata using regex patterns
-      const patterns = {
-        producer: /\/Producer\s*\(([^)]+)\)/,
-        creator: /\/Creator\s*\(([^)]+)\)/,
-        title: /\/Title\s*\(([^)]+)\)/,
-        author: /\/Author\s*\(([^)]+)\)/,
-        creationDate: /\/CreationDate\s*\(([^)]+)\)/,
-        modificationDate: /\/ModDate\s*\(([^)]+)\)/,
+      console.log(`File size: ${fileSize} bytes`);
+      
+      const metadata: PDFMetadata = {
+        fileSize,
+        pages: this.extractPageCount(pdfString),
+        format: 'application/pdf'
       };
       
+      // Extract basic PDF metadata using enhanced regex patterns
+      const patterns = {
+        producer: /\/Producer\s*\(([^)]+)\)/i,
+        creator: /\/Creator\s*\(([^)]+)\)/i,
+        title: /\/Title\s*\(([^)]+)\)/i,
+        author: /\/Author\s*\(([^)]+)\)/i,
+        creationDate: /\/CreationDate\s*\(([^)]+)\)/i,
+        modificationDate: /\/ModDate\s*\(([^)]+)\)/i,
+        pdfVersion: /^%PDF-([0-9]\.[0-9])/m,
+      };
+      
+      // Extract basic metadata
       for (const [key, pattern] of Object.entries(patterns)) {
         const match = pdfString.match(pattern);
         if (match) {
@@ -56,9 +96,322 @@ export class PDFAnalyzer {
         }
       }
       
+      // Extract XMP metadata if available
+      const xmpData = this.extractXMPMetadata(pdfString);
+      if (xmpData) {
+        metadata.rawXmpData = xmpData;
+        metadata.parsedXmp = this.parseXMPMetadata(xmpData);
+        
+        // Enhance metadata with XMP data
+        this.enhanceMetadataWithXMP(metadata, metadata.parsedXmp);
+      }
+      
+      // Create organized XMP tags for display
+      metadata.xmp_tags = {
+        'dc:date': metadata.creationDate || metadata.modificationDate || 'Not available',
+        'dc:format': metadata.format || 'application/pdf',
+        'dc:language': metadata.language || 'en-US',
+        'pdf:PDFVersion': metadata.pdfVersion || '1.4',
+        'pdf:Producer': metadata.producer || 'Unknown',
+        'xmp:CreateDate': metadata.creationDate || 'Not available',
+        'xmp:CreatorTool': metadata.creator || metadata.creatorTool || 'Unknown',
+        'xmp:MetadataDate': metadata.metadataDate || metadata.modificationDate || 'Not available'
+      };
+      
+      console.log(`Extracted metadata keys: ${Object.keys(metadata)}`);
+      console.log(`XMP tags: ${JSON.stringify(metadata.xmp_tags, null, 2)}`);
+      
       return metadata;
     } catch (error) {
-      throw new Error(`Failed to extract metadata: ${error}`);
+      console.error('Error extracting PDF metadata:', error);
+      return {
+        fileSize: 0,
+        pages: 0,
+        xmp_tags: {},
+        error: error.message
+      };
+    }
+  }
+  
+  private extractPageCount(pdfString: string): number {
+    try {
+      const countMatch = pdfString.match(/\/Count\s+(\d+)/);
+      if (countMatch) {
+        return parseInt(countMatch[1], 10);
+      }
+      
+      // Fallback: count page objects
+      const pageMatches = pdfString.match(/\/Type\s*\/Page[^s]/g);
+      return pageMatches ? pageMatches.length : 1;
+    } catch {
+      return 1;
+    }
+  }
+  
+  private extractXMPMetadata(pdfString: string): string | null {
+    try {
+      console.log('Searching for XMP metadata in PDF...');
+      
+      // Look for XMP metadata packet - more comprehensive search
+      let xmpStart = pdfString.indexOf('<?xpacket begin=');
+      if (xmpStart === -1) {
+        xmpStart = pdfString.indexOf('<?xpacket');
+      }
+      
+      let xmpEnd = pdfString.indexOf('<?xpacket end=');
+      if (xmpEnd === -1) {
+        xmpEnd = pdfString.indexOf('</x:xmpmeta>');
+        if (xmpEnd !== -1) {
+          xmpEnd += '</x:xmpmeta>'.length;
+        }
+      } else {
+        xmpEnd = pdfString.indexOf('?>', xmpEnd) + 2;
+      }
+      
+      if (xmpStart !== -1 && xmpEnd !== -1 && xmpEnd > xmpStart) {
+        const xmpData = pdfString.substring(xmpStart, xmpEnd);
+        console.log(`Found XMP packet: ${xmpData.length} bytes`);
+        return xmpData;
+      }
+      
+      // Alternative: look for rdf:RDF blocks
+      const rdfMatch = pdfString.match(/<rdf:RDF[\s\S]*?<\/rdf:RDF>/i);
+      if (rdfMatch) {
+        console.log(`Found RDF block: ${rdfMatch[0].length} bytes`);
+        return rdfMatch[0];
+      }
+      
+      // Look for embedded XML metadata streams
+      const metadataMatch = pdfString.match(/<metadata[\s\S]*?<\/metadata>/i);
+      if (metadataMatch) {
+        console.log(`Found metadata block: ${metadataMatch[0].length} bytes`);
+        return metadataMatch[0];
+      }
+      
+      console.log('No XMP metadata found in PDF');
+      return null;
+    } catch (error) {
+      console.error('Error extracting XMP metadata:', error);
+      return null;
+    }
+  }
+  
+  private parseXMPMetadata(xmpData: string): any {
+    const parsed: any = {};
+    
+    try {
+      console.log('Parsing XMP metadata with XML parser...');
+      
+      // Clean up the XMP data
+      let cleanXmp = xmpData;
+      
+      // Remove XMP packet declarations
+      cleanXmp = cleanXmp.replace(/<\?xpacket[^>]*\?>/g, '');
+      
+      // Ensure we have valid XML
+      if (!cleanXmp.includes('<rdf:RDF')) {
+        // If no RDF wrapper, try to extract meaningful XML content
+        const xmlMatch = cleanXmp.match(/<[^?][^>]*>[\s\S]*<\/[^>]*>/);
+        if (xmlMatch) {
+          cleanXmp = xmlMatch[0];
+        }
+      }
+      
+      // Configure XML parser
+      const parser = new XMLParser({
+        ignoreAttributes: false,
+        attributeNamePrefix: '@_',
+        parseAttributeValue: true,
+        parseTagValue: true,
+        trimValues: true
+      });
+      
+      const result = parser.parse(cleanXmp);
+      console.log('XML parsing successful');
+      
+      // Extract values using multiple traversal strategies
+      this.extractValueFromPath(result, 'dc:date', parsed);
+      this.extractValueFromPath(result, 'dc:format', parsed);
+      this.extractValueFromPath(result, 'dc:language', parsed);
+      this.extractValueFromPath(result, 'pdf:Producer', parsed);
+      this.extractValueFromPath(result, 'pdf:PDFVersion', parsed);
+      this.extractValueFromPath(result, 'xmp:CreateDate', parsed);
+      this.extractValueFromPath(result, 'xmp:ModifyDate', parsed);
+      this.extractValueFromPath(result, 'xmp:MetadataDate', parsed);
+      this.extractValueFromPath(result, 'xmp:CreatorTool', parsed);
+      this.extractValueFromPath(result, 'dc:title', parsed);
+      this.extractValueFromPath(result, 'dc:creator', parsed);
+      this.extractValueFromPath(result, 'dc:subject', parsed);
+      
+      // Also try regex fallback for complex nested structures
+      if (Object.keys(parsed).length === 0) {
+        console.log('XML parsing yielded no results, falling back to regex...');
+        this.parseXMPWithRegex(xmpData, parsed);
+      }
+      
+      console.log(`Parsed XMP fields: ${Object.keys(parsed).join(', ')}`);
+      
+    } catch (error) {
+      console.error('Error in XML parsing, trying regex fallback:', error);
+      this.parseXMPWithRegex(xmpData, parsed);
+    }
+    
+    return parsed;
+  }
+  
+  private extractValueFromPath(obj: any, path: string, target: any): void {
+    try {
+      // Convert path to different possible formats
+      const paths = [
+        path,
+        path.replace(':', '_'),
+        path.replace(':', ''),
+        `@_${path}`,
+      ];
+      
+      // Search recursively through the object
+      const searchValue = (current: any, depth: number = 0): string | null => {
+        if (depth > 10) return null; // Prevent infinite recursion
+        
+        if (typeof current === 'string') {
+          return current;
+        }
+        
+        if (typeof current === 'object' && current !== null) {
+          // Check direct properties
+          for (const testPath of paths) {
+            if (current[testPath]) {
+              const value = current[testPath];
+              if (typeof value === 'string') return value;
+              if (typeof value === 'object' && value !== null) {
+                const nested = searchValue(value, depth + 1);
+                if (nested) return nested;
+              }
+            }
+          }
+          
+          // Recursively search all properties
+          for (const key in current) {
+            if (key.toLowerCase().includes(path.split(':')[1]?.toLowerCase() || path.toLowerCase())) {
+              const value = current[key];
+              if (typeof value === 'string') return value;
+              if (typeof value === 'object') {
+                const nested = searchValue(value, depth + 1);
+                if (nested) return nested;
+              }
+            }
+          }
+          
+          // Deep recursive search
+          for (const key in current) {
+            const nested = searchValue(current[key], depth + 1);
+            if (nested) return nested;
+          }
+        }
+        
+        return null;
+      };
+      
+      const value = searchValue(obj);
+      if (value) {
+        target[path] = value;
+      }
+    } catch (error) {
+      console.error(`Error extracting ${path}:`, error);
+    }
+  }
+  
+  private parseXMPWithRegex(xmpData: string, target: any): void {
+    const patterns = {
+      'dc:date': [
+        /<dc:date[^>]*>([^<]+)<\/dc:date>/i,
+        /dc:date="([^"]+)"/i,
+        /<date[^>]*>([^<]+)<\/date>/i
+      ],
+      'dc:format': [
+        /<dc:format[^>]*>([^<]+)<\/dc:format>/i,
+        /dc:format="([^"]+)"/i,
+        /<format[^>]*>([^<]+)<\/format>/i
+      ],
+      'dc:language': [
+        /<dc:language[^>]*>([^<]+)<\/dc:language>/i,
+        /dc:language="([^"]+)"/i,
+        /<language[^>]*>([^<]+)<\/language>/i
+      ],
+      'pdf:Producer': [
+        /<pdf:Producer[^>]*>([^<]+)<\/pdf:Producer>/i,
+        /pdf:Producer="([^"]+)"/i,
+        /<Producer[^>]*>([^<]+)<\/Producer>/i
+      ],
+      'pdf:PDFVersion': [
+        /<pdf:PDFVersion[^>]*>([^<]+)<\/pdf:PDFVersion>/i,
+        /pdf:PDFVersion="([^"]+)"/i,
+        /<PDFVersion[^>]*>([^<]+)<\/PDFVersion>/i
+      ],
+      'xmp:CreateDate': [
+        /<xmp:CreateDate[^>]*>([^<]+)<\/xmp:CreateDate>/i,
+        /xmp:CreateDate="([^"]+)"/i,
+        /<CreateDate[^>]*>([^<]+)<\/CreateDate>/i
+      ],
+      'xmp:ModifyDate': [
+        /<xmp:ModifyDate[^>]*>([^<]+)<\/xmp:ModifyDate>/i,
+        /xmp:ModifyDate="([^"]+)"/i,
+        /<ModifyDate[^>]*>([^<]+)<\/ModifyDate>/i
+      ],
+      'xmp:MetadataDate': [
+        /<xmp:MetadataDate[^>]*>([^<]+)<\/xmp:MetadataDate>/i,
+        /xmp:MetadataDate="([^"]+)"/i,
+        /<MetadataDate[^>]*>([^<]+)<\/MetadataDate>/i
+      ],
+      'xmp:CreatorTool': [
+        /<xmp:CreatorTool[^>]*>([^<]+)<\/xmp:CreatorTool>/i,
+        /xmp:CreatorTool="([^"]+)"/i,
+        /<CreatorTool[^>]*>([^<]+)<\/CreatorTool>/i
+      ]
+    };
+    
+    for (const [field, regexList] of Object.entries(patterns)) {
+      if (!target[field]) {
+        for (const regex of regexList) {
+          const match = xmpData.match(regex);
+          if (match && match[1]) {
+            target[field] = match[1].trim();
+            break;
+          }
+        }
+      }
+    }
+  }
+  
+  private enhanceMetadataWithXMP(metadata: PDFMetadata, xmpData: any): void {
+    // Enhance basic metadata with XMP data
+    if (xmpData['pdf:Producer'] && !metadata.producer) {
+      metadata.producer = xmpData['pdf:Producer'];
+    }
+    if (xmpData['xmp:CreatorTool'] && !metadata.creator) {
+      metadata.creator = xmpData['xmp:CreatorTool'];
+      metadata.creatorTool = xmpData['xmp:CreatorTool'];
+    }
+    if (xmpData['dc:title'] && !metadata.title) {
+      metadata.title = xmpData['dc:title'];
+    }
+    if (xmpData['dc:creator'] && !metadata.author) {
+      metadata.author = xmpData['dc:creator'];
+    }
+    if (xmpData['xmp:CreateDate'] && !metadata.creationDate) {
+      metadata.creationDate = xmpData['xmp:CreateDate'];
+    }
+    if (xmpData['xmp:ModifyDate'] && !metadata.modificationDate) {
+      metadata.modificationDate = xmpData['xmp:ModifyDate'];
+    }
+    if (xmpData['xmp:MetadataDate']) {
+      metadata.metadataDate = xmpData['xmp:MetadataDate'];
+    }
+    if (xmpData['pdf:PDFVersion']) {
+      metadata.pdfVersion = xmpData['pdf:PDFVersion'];
+    }
+    if (xmpData['dc:language']) {
+      metadata.language = xmpData['dc:language'];
     }
   }
 
