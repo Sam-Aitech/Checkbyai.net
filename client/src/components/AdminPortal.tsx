@@ -19,68 +19,20 @@ export default function AdminPortal() {
   const queryClient = useQueryClient();
   const { isAuthenticated, isAdmin, isLoading, user } = useAuth();
 
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      toast({
-        title: "Authentication Required",
-        description: "Please log in to access the admin portal",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/api/login";
-      }, 1000);
-      return;
-    }
-  }, [isAuthenticated, isLoading, toast]);
-
-  // Show access denied if not admin
-  if (!isLoading && isAuthenticated && !isAdmin) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-6">
-        <div className="w-24 h-24 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
-          <Lock className="w-12 h-12 text-red-600 dark:text-red-400" />
-        </div>
-        <div className="space-y-2">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Access Denied</h2>
-          <p className="text-gray-600 dark:text-gray-300 max-w-md">
-            You don't have permission to access the admin portal. Administrator privileges are required.
-          </p>
-        </div>
-        <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
-          <ShieldCheck className="w-4 h-4" />
-          <span>Current Role: {user?.role || 'User'}</span>
-        </div>
-        <Button 
-          onClick={() => window.location.href = "/api/logout"}
-          variant="outline"
-        >
-          Logout
-        </Button>
-      </div>
-    );
-  }
-
-  // Show loading while checking authentication
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
-        <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-        <p className="text-gray-600 dark:text-gray-300">Checking permissions...</p>
-      </div>
-    );
-  }
-
+  // All hooks must be called before any conditional logic
   const { data: stats } = useQuery({
     queryKey: ['/api/stats'],
+    enabled: isAuthenticated && isAdmin,
   });
 
   const { data: trustedPatterns = [] } = useQuery({
     queryKey: ['/api/trusted-patterns'],
+    enabled: isAuthenticated && isAdmin,
   });
 
   const { data: recentActivity = [] } = useQuery({
     queryKey: ['/api/admin/recent-activity'],
+    enabled: isAuthenticated && isAdmin,
   });
 
   const uploadPatternMutation = useMutation({
@@ -172,9 +124,61 @@ export default function AdminPortal() {
     },
   });
 
+  // Authentication effect - must be after all hooks
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to access the admin portal",
+        variant: "destructive",
+      });
+      setTimeout(() => {
+        window.location.href = "/api/login";
+      }, 1000);
+      return;
+    }
+  }, [isAuthenticated, isLoading, toast]);
+
   const filteredPatterns = trustedPatterns.filter((pattern: any) =>
     pattern.filename.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Show access denied if not admin
+  if (!isLoading && isAuthenticated && !isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-6">
+        <div className="w-24 h-24 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
+          <Lock className="w-12 h-12 text-red-600 dark:text-red-400" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Access Denied</h2>
+          <p className="text-gray-600 dark:text-gray-300 max-w-md">
+            You don't have permission to access the admin portal. Administrator privileges are required.
+          </p>
+        </div>
+        <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
+          <ShieldCheck className="w-4 h-4" />
+          <span>Current Role: {user?.role || 'User'}</span>
+        </div>
+        <Button 
+          onClick={() => window.location.href = "/api/logout"}
+          variant="outline"
+        >
+          Logout
+        </Button>
+      </div>
+    );
+  }
+
+  // Show loading while checking authentication
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
+        <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+        <p className="text-gray-600 dark:text-gray-300">Checking permissions...</p>
+      </div>
+    );
+  }
 
   const handleFileUpload = (file: File) => {
     uploadPatternMutation.mutate(file);
