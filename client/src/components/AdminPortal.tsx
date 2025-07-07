@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import FileUpload from "./FileUpload";
-import { Database, CheckCircle, AlertTriangle, TrendingUp, Search, Trash2, Download, Plus, Lock, ShieldCheck } from "lucide-react";
+import { Database, CheckCircle, AlertTriangle, TrendingUp, Search, Trash2, Download, Plus, Lock, ShieldCheck, FileSearch, Code, Save, X, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -15,6 +15,10 @@ export default function AdminPortal() {
   const [searchTerm, setSearchTerm] = useState("");
   const [validateMetadata, setValidateMetadata] = useState(true);
   const [autoApprove, setAutoApprove] = useState(false);
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const [analysisDocument, setAnalysisDocument] = useState(null);
+  const [decisionNotes, setDecisionNotes] = useState("");
+  const [adminCommands, setAdminCommands] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { isAuthenticated, isAdmin, isLoading, user } = useAuth();
@@ -192,11 +196,137 @@ export default function AdminPortal() {
     return new Date(dateString).toLocaleTimeString();
   };
 
+  // Document Analysis Functions
+  const analyzeDocumentMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await fetch('/api/verify', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error('Analysis failed');
+      }
+      
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setAnalysisDocument(data);
+      toast({
+        title: "Document Analyzed",
+        description: "XMP metadata extracted and analyzed successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Analysis Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const saveDecisionMutation = useMutation({
+    mutationFn: async (decision: { result: string; notes: string; commands: string }) => {
+      // Here you could save the admin decision to a database
+      console.log('Admin Decision:', decision);
+      return decision;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Decision Saved",
+        description: "Admin decision and commands have been recorded.",
+      });
+      setDecisionNotes("");
+      setAdminCommands("");
+    },
+  });
+
+  const handleAnalysisUpload = (file: File) => {
+    analyzeDocumentMutation.mutate(file);
+  };
+
+  const handleSaveDecision = (result: string) => {
+    saveDecisionMutation.mutate({
+      result,
+      notes: decisionNotes,
+      commands: adminCommands
+    });
+  };
+
   return (
-    <div className="px-3 sm:px-6 lg:px-8">
-      {/* Mobile-Optimized Admin Header */}
-      <div className="text-center mb-8 sm:mb-12">
-        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3 sm:mb-4">Admin Portal</h2>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Header */}
+      <div className="bg-white dark:bg-gray-800 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4 sm:py-6">
+            <div className="flex items-center">
+              <ShieldCheck className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 mr-2 sm:mr-3" />
+              <div>
+                <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 dark:text-white">
+                  Admin Portal
+                </h1>
+                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                  Advanced document verification management
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              {user && (
+                <div className="text-right">
+                  <p className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white">
+                    {user.first_name} {user.last_name}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Administrator</p>
+                </div>
+              )}
+              <img
+                src={user?.profile_image_url || '/default-avatar.png'}
+                alt="Profile"
+                className="h-8 w-8 sm:h-10 sm:w-10 rounded-full"
+              />
+            </div>
+          </div>
+          
+          {/* Navigation Tabs */}
+          <div className="border-b border-gray-200 dark:border-gray-700">
+            <nav className="-mb-px flex space-x-8">
+              <button
+                onClick={() => setActiveTab("dashboard")}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === "dashboard"
+                    ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                    : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                }`}
+              >
+                <Database className="w-4 h-4 inline mr-2" />
+                Dashboard
+              </button>
+              <button
+                onClick={() => setActiveTab("analysis")}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === "analysis"
+                    ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                    : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                }`}
+              >
+                <FileSearch className="w-4 h-4 inline mr-2" />
+                Document Analysis
+              </button>
+            </nav>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {activeTab === "dashboard" && (
+          <div>
+            {/* Mobile-Optimized Admin Header */}
+            <div className="text-center mb-8 sm:mb-12">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-3 sm:mb-4">Dashboard</h2>
         <p className="text-sm sm:text-lg text-gray-600 max-w-3xl mx-auto px-2">
           Manage trusted COS document patterns and monitor system performance. Upload genuine documents to expand the verification database.
         </p>
@@ -414,6 +544,208 @@ export default function AdminPortal() {
             </tbody>
           </table>
         </div>
+      </div>
+          </div>
+        )}
+
+        {activeTab === "analysis" && (
+          <div>
+            {/* Document Analysis Header */}
+            <div className="text-center mb-8">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-3 sm:mb-4">
+                Document Analysis
+              </h2>
+              <p className="text-sm sm:text-lg text-gray-600 dark:text-gray-400 max-w-3xl mx-auto px-2">
+                Upload documents for detailed XMP metadata analysis and admin decision-making.
+              </p>
+            </div>
+
+            <div className="grid lg:grid-cols-2 gap-8">
+              {/* Upload Section */}
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">
+                  Upload Document for Analysis
+                </h3>
+                
+                <FileUpload onFileUpload={handleAnalysisUpload} />
+                
+                {analyzeDocumentMutation.isPending && (
+                  <div className="mt-4 flex items-center justify-center p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mr-3"></div>
+                    <span className="text-blue-800 dark:text-blue-200">Analyzing document...</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Admin Decision Panel */}
+              {analysisDocument && (
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">
+                    Admin Decision Panel
+                  </h3>
+                  
+                  <div className="space-y-4">
+                    {/* Decision Notes */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Decision Notes
+                      </label>
+                      <textarea
+                        value={decisionNotes}
+                        onChange={(e) => setDecisionNotes(e.target.value)}
+                        placeholder="Add your analysis notes and reasoning..."
+                        className="w-full h-24 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
+                      />
+                    </div>
+
+                    {/* Admin Commands */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Admin Commands
+                      </label>
+                      <div className="relative">
+                        <Code className="absolute left-3 top-3 text-gray-400 h-4 w-4" />
+                        <textarea
+                          value={adminCommands}
+                          onChange={(e) => setAdminCommands(e.target.value)}
+                          placeholder="Enter command setup for future processing..."
+                          className="w-full h-32 pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm resize-none"
+                        />
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Commands for automated processing and decision workflows
+                      </p>
+                    </div>
+
+                    {/* Decision Buttons */}
+                    <div className="flex space-x-3 pt-4">
+                      <Button
+                        onClick={() => handleSaveDecision('approve')}
+                        className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                        disabled={saveDecisionMutation.isPending}
+                      >
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Approve
+                      </Button>
+                      <Button
+                        onClick={() => handleSaveDecision('reject')}
+                        className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                        disabled={saveDecisionMutation.isPending}
+                      >
+                        <X className="w-4 h-4 mr-2" />
+                        Reject
+                      </Button>
+                      <Button
+                        onClick={() => handleSaveDecision('review')}
+                        variant="outline"
+                        className="flex-1"
+                        disabled={saveDecisionMutation.isPending}
+                      >
+                        <Eye className="w-4 h-4 mr-2" />
+                        Review
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* XMP Metadata Analysis Display */}
+            {analysisDocument && (
+              <div className="mt-8 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">
+                  XMP Metadata Analysis
+                </h3>
+                
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* Basic Metadata */}
+                  <div>
+                    <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                      Document Properties
+                    </h4>
+                    <div className="space-y-3">
+                      <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                        <span className="text-gray-600 dark:text-gray-400">File Name:</span>
+                        <span className="text-gray-900 dark:text-white font-medium">
+                          {analysisDocument.details?.metadata?.filename || 'Unknown'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                        <span className="text-gray-600 dark:text-gray-400">Producer:</span>
+                        <span className="text-gray-900 dark:text-white font-medium">
+                          {analysisDocument.details?.metadata?.producer || 'Unknown'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                        <span className="text-gray-600 dark:text-gray-400">Creator:</span>
+                        <span className="text-gray-900 dark:text-white font-medium">
+                          {analysisDocument.details?.metadata?.creator || 'Unknown'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                        <span className="text-gray-600 dark:text-gray-400">Creation Date:</span>
+                        <span className="text-gray-900 dark:text-white font-medium">
+                          {analysisDocument.details?.metadata?.creationDate || 'Unknown'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                        <span className="text-gray-600 dark:text-gray-400">Pages:</span>
+                        <span className="text-gray-900 dark:text-white font-medium">
+                          {analysisDocument.details?.metadata?.pages || 'Unknown'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Analysis Results */}
+                  <div>
+                    <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                      Analysis Results
+                    </h4>
+                    <div className="space-y-3">
+                      <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                        <span className="text-gray-600 dark:text-gray-400">Verification Result:</span>
+                        <Badge variant={analysisDocument.result === 'genuine' ? 'default' : 'destructive'}>
+                          {analysisDocument.result?.toUpperCase()}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                        <span className="text-gray-600 dark:text-gray-400">Confidence:</span>
+                        <span className="text-gray-900 dark:text-white font-medium">
+                          {analysisDocument.confidence?.toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                        <span className="text-gray-600 dark:text-gray-400">Pattern Matches:</span>
+                        <span className="text-gray-900 dark:text-white font-medium">
+                          {analysisDocument.details?.patternMatching?.score?.toFixed(1) || '0.0'}%
+                        </span>
+                      </div>
+                      <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                        <span className="text-gray-600 dark:text-gray-400">Vector Similarity:</span>
+                        <span className="text-gray-900 dark:text-white font-medium">
+                          {analysisDocument.details?.vectorSimilarity?.toFixed(1) || '0.0'}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Raw XMP Data */}
+                <div className="mt-6">
+                  <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                    Raw XMP Metadata
+                  </h4>
+                  <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 max-h-64 overflow-y-auto">
+                    <pre className="text-xs text-gray-700 dark:text-gray-300 font-mono">
+                      {JSON.stringify(analysisDocument.details?.metadata || {}, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
