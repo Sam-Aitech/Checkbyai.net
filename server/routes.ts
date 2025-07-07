@@ -1,29 +1,22 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import Stripe from "stripe";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated, isAdmin } from "./replitAuth";
+import { insertVerificationResultSchema } from "@shared/schema";
 import multer from "multer";
-import path from "path";
-import fs from "fs";
-import { PDFAnalyzer } from "./services/pdfAnalyzer";
-import { insertTrustedPatternSchema, insertVerificationResultSchema } from "@shared/schema";
+import { z } from "zod";
 
-const upload = multer({
-  dest: 'uploads/',
-  limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB
-  },
-  fileFilter: (req: any, file: any, cb: any) => {
-    console.log('Multer fileFilter called:', file);
-    if (file.mimetype === 'application/pdf') {
-      cb(null, true);
-    } else {
-      cb(new Error('Only PDF files are allowed'));
-    }
-  }
+// Initialize Stripe
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
+}
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: "2024-11-20.acacia",
 });
 
-const pdfAnalyzer = new PDFAnalyzer();
+// Configure multer for file uploads
+const upload = multer({ dest: 'uploads/' });
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -41,154 +34,257 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Debug middleware for file uploads
-  app.use('/api/verify', (req, res, next) => {
-    console.log('=== VERIFY REQUEST DEBUG ===');
-    console.log('Method:', req.method);
-    console.log('Content-Type:', req.headers['content-type']);
-    console.log('Content-Length:', req.headers['content-length']);
-    console.log('Body keys:', Object.keys(req.body || {}));
-    console.log('Raw body available:', !!req.body);
-    next();
+  // Check user's daily verification limit
+  app.get('/api/auth/check-limit', async (req: any, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        // Anonymous users get 1 verification per day via localStorage
+        return res.json({ canVerify: true, isAnonymous: true, verificationsLeft: 1 });
+      }
+
+      const userId = req.user.claims.sub;
+      const canVerify = await storage.checkDailyLimit(userId);
+      const user = await storage.getUser(userId);
+      
+      if (user?.subscriptionStatus === 'pro') {
+        return res.json({ canVerify: true, isAnonymous: false, verificationsLeft: 'unlimited' });
+      }
+      
+      const today = new Date().toISOString().split('T')[0];
+      const usedToday = user?.lastVerificationDate === today ? (user.dailyVerificationsUsed || 0) : 0;
+      const verificationsLeft = Math.max(0, 1 - usedToday);
+      
+      res.json({ canVerify, isAnonymous: false, verificationsLeft });
+    } catch (error) {
+      console.error("Error checking limit:", error);
+      res.status(500).json({ message: "Failed to check limit" });
+    }
   });
 
-  app.use('/api/admin/upload-pattern', (req, res, next) => {
-    console.log('=== ADMIN UPLOAD REQUEST DEBUG ===');
-    console.log('Method:', req.method);
-    console.log('Content-Type:', req.headers['content-type']);
-    console.log('Content-Length:', req.headers['content-length']);
-    next();
+  // Subscription management routes
+  app.post('/api/create-subscription', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Check if user already has an active subscription
+      if (user.stripeSubscriptionId) {
+        const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
+        if (subscription.status === 'active') {
+          return res.json({
+            subscriptionId: subscription.id,
+            clientSecret: subscription.latest_invoice?.payment_intent?.client_secret,
+            status: 'active'
+          });
+        }
+      }
+
+      if (!user.email) {
+        return res.status(400).json({ message: 'No user email on file' });
+      }
+
+      // Create or retrieve Stripe customer
+      let customer;
+      if (user.stripeCustomerId) {
+        customer = await stripe.customers.retrieve(user.stripeCustomerId);
+      } else {
+        customer = await stripe.customers.create({
+          email: user.email,
+          name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+        });
+        await storage.updateUserStripeInfo(userId, customer.id);
+      }
+
+      // Create subscription (you'll need to create a price in Stripe dashboard)
+      const subscription = await stripe.subscriptions.create({
+        customer: customer.id,
+        items: [{
+          price: 'price_1234567890', // Replace with your actual price ID from Stripe
+        }],
+        payment_behavior: 'default_incomplete',
+        payment_settings: { save_default_payment_method: 'on_subscription' },
+        expand: ['latest_invoice.payment_intent'],
+      });
+
+      // Update user with subscription info
+      await storage.updateUserStripeInfo(userId, customer.id, subscription.id);
+
+      res.json({
+        subscriptionId: subscription.id,
+        clientSecret: subscription.latest_invoice?.payment_intent?.client_secret,
+        status: subscription.status
+      });
+    } catch (error: any) {
+      console.error("Subscription creation error:", error);
+      res.status(500).json({ message: error.message });
+    }
   });
 
-  // Get statistics
-  app.get("/api/stats", async (req, res) => {
+  // Stripe webhook for subscription status updates
+  app.post('/api/stripe-webhook', async (req, res) => {
+    const sig = req.headers['stripe-signature'];
+    let event;
+
+    try {
+      event = stripe.webhooks.constructEvent(req.body, sig!, process.env.STRIPE_WEBHOOK_SECRET!);
+    } catch (err: any) {
+      console.log(`Webhook signature verification failed.`, err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    // Handle subscription events
+    switch (event.type) {
+      case 'customer.subscription.updated':
+      case 'customer.subscription.deleted':
+        const subscription = event.data.object;
+        // Find user by Stripe subscription ID and update their status
+        // Note: You'll need to implement a method to find user by subscription ID
+        break;
+      case 'invoice.payment_succeeded':
+        // Update user to pro status
+        break;
+      case 'invoice.payment_failed':
+        // Handle failed payment
+        break;
+    }
+
+    res.json({ received: true });
+  });
+
+  // Document verification route
+  app.post('/api/verify', upload.single('file'), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: 'No file uploaded' });
+      }
+
+      let userId: string | undefined;
+      
+      // Check authentication and limits
+      if (req.isAuthenticated()) {
+        userId = req.user.claims.sub;
+        const canVerify = await storage.checkDailyLimit(userId);
+        
+        if (!canVerify) {
+          return res.status(429).json({ 
+            message: 'Daily verification limit reached. Upgrade to Pro for unlimited verifications.',
+            upgradeRequired: true 
+          });
+        }
+        
+        // Update usage count for authenticated users
+        await storage.updateDailyVerificationUsage(userId);
+      }
+
+      // Import and use existing verification logic
+      const { AIEngine } = await import('../backend/ai_engine.py');
+      const aiEngine = new AIEngine();
+      await aiEngine.initialize();
+
+      const metadata = await aiEngine.extract_metadata(req.file.path);
+      const trustedPatterns = await storage.getTrustedPatterns();
+      
+      const analysis = await aiEngine.analyze_against_patterns(metadata, trustedPatterns);
+      
+      const result = analysis.confidence > 90 ? 'genuine' : 
+                    analysis.confidence > 50 ? 'suspicious' : 'fake';
+
+      // Store verification result
+      const verificationId = await storage.createVerificationResult(
+        req.file.originalname,
+        result,
+        Math.floor(analysis.confidence),
+        metadata,
+        analysis,
+        req.ip,
+        userId
+      );
+
+      res.json({
+        id: verificationId,
+        result,
+        confidence: analysis.confidence,
+        details: analysis,
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('Verification error:', error);
+      res.status(500).json({ message: 'Verification failed' });
+    }
+  });
+
+  // Stats endpoint
+  app.get('/api/stats', async (req, res) => {
     try {
       const stats = await storage.getStats();
       res.json(stats);
     } catch (error) {
-      res.status(500).json({ error: "Failed to fetch statistics" });
+      console.error("Error fetching stats:", error);
+      res.status(500).json({ message: "Failed to fetch stats" });
     }
   });
 
-  // Get trusted patterns
-  app.get("/api/trusted-patterns", async (req, res) => {
+  // Admin routes
+  app.get('/api/admin/trusted-patterns', isAdmin, async (req, res) => {
     try {
       const patterns = await storage.getTrustedPatterns();
       res.json(patterns);
     } catch (error) {
-      res.status(500).json({ error: "Failed to fetch trusted patterns" });
+      console.error("Error fetching trusted patterns:", error);
+      res.status(500).json({ message: "Failed to fetch trusted patterns" });
     }
   });
 
-  // Upload trusted pattern (admin)
-  app.post("/api/admin/upload-pattern", isAuthenticated, isAdmin, upload.single('file'), async (req, res) => {
+  app.post('/api/admin/trusted-patterns', isAdmin, upload.single('file'), async (req, res) => {
     try {
       if (!req.file) {
-        return res.status(400).json({ error: "No file uploaded" });
+        return res.status(400).json({ message: 'No file uploaded' });
       }
 
-      const metadata = await pdfAnalyzer.extractMetadata(req.file.path);
-      
-      const patternData = insertTrustedPatternSchema.parse({
-        filename: req.file.originalname,
-        metadata: metadata,
-        status: 'active',
-        extractedPatterns: {}
-      });
+      // Extract metadata and patterns from uploaded file
+      const { AIEngine } = await import('../backend/ai_engine.py');
+      const aiEngine = new AIEngine();
+      await aiEngine.initialize();
 
-      const pattern = await storage.createTrustedPattern(patternData);
+      const metadata = await aiEngine.extract_metadata(req.file.path);
+      const patterns = await aiEngine.extract_patterns(req.file.path);
       
-      // Clean up uploaded file
-      fs.unlinkSync(req.file.path);
-      
-      res.json(pattern);
+      const patternId = await storage.createTrustedPattern(
+        req.file.originalname,
+        metadata,
+        patterns
+      );
+
+      res.json({ id: patternId, message: 'Trusted pattern created successfully' });
     } catch (error) {
-      // Clean up file on error
-      if (req.file) {
-        fs.unlinkSync(req.file.path);
-      }
-      console.error('Upload pattern error:', error);
-      res.status(500).json({ error: "Failed to process uploaded pattern" });
+      console.error("Error creating trusted pattern:", error);
+      res.status(500).json({ message: "Failed to create trusted pattern" });
     }
   });
 
-  // Verify document
-  app.post("/api/verify", upload.single('file'), async (req, res) => {
-    try {
-      console.log('Verification request received');
-      console.log('Body:', req.body);
-      console.log('File:', req.file);
-      console.log('Headers:', req.headers);
-      
-      if (!req.file) {
-        console.log('No file in request');
-        return res.status(400).json({ error: "No file uploaded" });
-      }
-
-      const metadata = await pdfAnalyzer.extractMetadata(req.file.path);
-      const trustedPatterns = await storage.getTrustedPatterns();
-      
-      const analysis = await pdfAnalyzer.analyzeAgainstTrustedPatterns(metadata, trustedPatterns);
-      
-      const resultData = insertVerificationResultSchema.parse({
-        filename: req.file.originalname,
-        result: analysis.result,
-        confidence: analysis.confidence,
-        metadata: metadata,
-        analysisDetails: analysis.details,
-        ipAddress: req.ip || req.connection.remoteAddress || 'unknown'
-      });
-
-      const result = await storage.createVerificationResult(resultData);
-      
-      // Clean up uploaded file
-      fs.unlinkSync(req.file.path);
-      
-      res.json({
-        id: result.id,
-        result: result.result,
-        confidence: result.confidence,
-        details: result.analysisDetails,
-        metadata: metadata // Include the extracted metadata with XMP tags
-      });
-    } catch (error) {
-      // Clean up file on error
-      if (req.file) {
-        fs.unlinkSync(req.file.path);
-      }
-      console.error('Verification error:', error);
-      res.status(500).json({ error: "Failed to verify document" });
-    }
-  });
-
-  // Get recent verification activity (admin)
-  app.get("/api/admin/recent-activity", isAuthenticated, isAdmin, async (req, res) => {
-    try {
-      const activity = await storage.getRecentActivity();
-      res.json(activity);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch recent activity" });
-    }
-  });
-
-  // Delete trusted pattern (admin)
-  app.delete("/api/admin/trusted-patterns/:id", isAuthenticated, isAdmin, async (req, res) => {
+  app.delete('/api/admin/trusted-patterns/:id', isAdmin, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteTrustedPattern(id);
-      res.json({ success: true });
+      res.json({ message: 'Trusted pattern deleted successfully' });
     } catch (error) {
-      res.status(500).json({ error: "Failed to delete pattern" });
+      console.error("Error deleting trusted pattern:", error);
+      res.status(500).json({ message: "Failed to delete trusted pattern" });
     }
   });
 
-  // Clear all verification results (admin) - keeps trusted patterns
-  app.delete("/api/admin/clear-verification-data", isAuthenticated, isAdmin, async (req, res) => {
+  app.get('/api/admin/recent-activity', isAdmin, async (req, res) => {
     try {
-      await storage.clearVerificationResults();
-      res.json({ success: true, message: "All user verification data cleared. Trusted patterns preserved." });
+      const activity = await storage.getRecentActivity(20);
+      res.json(activity);
     } catch (error) {
-      res.status(500).json({ error: "Failed to clear verification data" });
+      console.error("Error fetching recent activity:", error);
+      res.status(500).json({ message: "Failed to fetch recent activity" });
     }
   });
 

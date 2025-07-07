@@ -1,4 +1,13 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb, real, varchar, index } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  varchar,
+  timestamp,
+  jsonb,
+  index,
+  integer,
+  boolean,
+} from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -20,44 +29,50 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
-  role: varchar("role").notNull().default("user"), // user, admin
+  role: varchar("role").default("user"), // 'user' or 'admin'
+  subscriptionStatus: varchar("subscription_status").default("free"), // 'free', 'pro'
+  stripeCustomerId: varchar("stripe_customer_id"),
+  stripeSubscriptionId: varchar("stripe_subscription_id"),
+  dailyVerificationsUsed: integer("daily_verifications_used").default(0),
+  lastVerificationDate: varchar("last_verification_date"), // YYYY-MM-DD format
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Trusted patterns table
 export const trustedPatterns = pgTable("trusted_patterns", {
-  id: serial("id").primaryKey(),
-  filename: text("filename").notNull(),
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  filename: varchar("filename").notNull(),
   metadata: jsonb("metadata").notNull(),
-  uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
-  status: text("status").notNull().default("active"), // active, pending, disabled
-  extractedPatterns: jsonb("extracted_patterns"),
+  patterns: jsonb("patterns").notNull(),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+  status: varchar("status").default("active"),
 });
 
+// Verification results table
 export const verificationResults = pgTable("verification_results", {
-  id: serial("id").primaryKey(),
-  filename: text("filename").notNull(),
-  result: text("result").notNull(), // genuine, suspicious, fake
-  confidence: real("confidence").notNull(),
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  userId: varchar("user_id").references(() => users.id),
+  filename: varchar("filename").notNull(),
+  result: varchar("result").notNull(), // 'genuine', 'suspicious', 'fake'
+  confidence: integer("confidence").notNull(), // 0-100
   metadata: jsonb("metadata").notNull(),
-  analysisDetails: jsonb("analysis_details"),
-  ipAddress: text("ip_address"),
-  verifiedAt: timestamp("verified_at").defaultNow().notNull(),
+  analysisDetails: jsonb("analysis_details").notNull(),
+  ipAddress: varchar("ip_address"),
+  verifiedAt: timestamp("verified_at").defaultNow(),
 });
 
-export const insertTrustedPatternSchema = createInsertSchema(trustedPatterns).omit({
-  id: true,
-  uploadedAt: true,
-});
-
-export const insertVerificationResultSchema = createInsertSchema(verificationResults).omit({
-  id: true,
-  verifiedAt: true,
-});
-
+// Type exports
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
 export type TrustedPattern = typeof trustedPatterns.$inferSelect;
-export type InsertTrustedPattern = z.infer<typeof insertTrustedPatternSchema>;
 export type VerificationResult = typeof verificationResults.$inferSelect;
+
+// Zod schemas
+export const insertUserSchema = createInsertSchema(users);
+export const insertTrustedPatternSchema = createInsertSchema(trustedPatterns);
+export const insertVerificationResultSchema = createInsertSchema(verificationResults);
+
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type InsertTrustedPattern = z.infer<typeof insertTrustedPatternSchema>;
 export type InsertVerificationResult = z.infer<typeof insertVerificationResultSchema>;

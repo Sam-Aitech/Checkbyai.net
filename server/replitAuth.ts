@@ -63,7 +63,6 @@ async function upsertUser(
     firstName: claims["first_name"],
     lastName: claims["last_name"],
     profileImageUrl: claims["profile_image_url"],
-    role: "user", // Default role, can be changed manually in database for admins
   });
 }
 
@@ -158,19 +157,17 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
 };
 
 export const isAdmin: RequestHandler = async (req, res, next) => {
-  const user = req.user as any;
-  
-  if (!user?.claims?.sub) {
+  if (!req.isAuthenticated()) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
-  try {
-    const dbUser = await storage.getUser(user.claims.sub);
-    if (!dbUser || dbUser.role !== 'admin') {
-      return res.status(403).json({ message: "Admin access required" });
-    }
-    next();
-  } catch (error) {
-    res.status(500).json({ message: "Internal server error" });
+  const user = req.user as any;
+  const userId = user.claims?.sub;
+  const dbUser = await storage.getUser(userId);
+  
+  if (!dbUser || dbUser.role !== 'admin') {
+    return res.status(403).json({ message: "Admin access required" });
   }
+
+  next();
 };

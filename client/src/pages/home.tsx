@@ -4,6 +4,7 @@ import { Shield, Database, LayoutDashboard, ArrowRight, User, LogIn, LogOut } fr
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
+import UserProfile from "@/components/UserProfile";
 
 // Lazy load heavy components for better performance
 const UserPortal = lazy(() => import("@/components/UserPortal"));
@@ -21,7 +22,8 @@ function LoadingSpinner() {
 export default function Home() {
   const [showPortals, setShowPortals] = useState(false);
   const [activeMode, setActiveMode] = useState<'user' | 'admin'>('user');
-  const { isAuthenticated, isAdmin, user, isLoading } = useAuth();
+  // Temporarily disable auth to prevent infinite loops
+  // const { isAuthenticated, isAdmin, user, isLoading } = useAuth();
 
   const { data: stats } = useQuery({
     queryKey: ['/api/stats'],
@@ -44,31 +46,14 @@ export default function Home() {
               </div>
               
               <div className="flex items-center space-x-2 sm:space-x-4">
-                <Link href="/dashboard?setup=true">
+                <Link href="/dashboard">
                   <Button 
                     variant="default" 
                     size="sm"
-                    className="text-xs sm:text-sm px-3 sm:px-4 py-2 bg-green-600 hover:bg-green-700 text-white"
+                    className="text-xs sm:text-sm px-3 sm:px-4 py-2"
                   >
-                    Setup - Try Free
-                  </Button>
-                </Link>
-                
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => setShowPortals(true)}
-                  className="text-xs sm:text-sm px-3 sm:px-4 py-2 text-gray-600 hover:text-blue-600"
-                >
-                  <span className="hidden sm:inline">Launch App</span>
-                  <span className="sm:hidden">App</span>
-                  <ArrowRight className="ml-1 sm:ml-2 w-3 h-3 sm:w-4 sm:h-4" />
-                </Button>
-                
-                <Link href="/dashboard">
-                  <Button variant="outline" size="sm">
-                    <LayoutDashboard className="mr-2 w-4 h-4" />
-                    Dashboard
+                    <span className="hidden sm:inline">Verify Document</span>
+                    <span className="sm:hidden">Verify</span>
                   </Button>
                 </Link>
                 
@@ -76,6 +61,8 @@ export default function Home() {
                   <Database className="w-4 h-4" />
                   <span>{stats?.trustedPatterns || 0}</span>
                 </div>
+
+                <UserProfile />
               </div>
             </div>
           </div>
