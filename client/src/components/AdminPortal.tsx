@@ -5,7 +5,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import FileUpload from "./FileUpload";
-import { Database, CheckCircle, AlertTriangle, TrendingUp, Search, Trash2, Download, Plus, Lock, ShieldCheck, FileSearch, Code, Save, X, Eye } from "lucide-react";
+import DocumentAnalysis3D from "./3D/DocumentAnalysis3D";
+import { Database, CheckCircle, AlertTriangle, TrendingUp, Search, Trash2, Download, Plus, Lock, ShieldCheck, FileSearch, Code, Save, X, Eye, Box, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -19,6 +20,7 @@ export default function AdminPortal() {
   const [analysisDocument, setAnalysisDocument] = useState(null);
   const [decisionNotes, setDecisionNotes] = useState("");
   const [adminCommands, setAdminCommands] = useState("");
+  const [view3D, setView3D] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { isAuthenticated, isAdmin, isLoading, user } = useAuth();
@@ -653,18 +655,73 @@ export default function AdminPortal() {
             {/* XMP Metadata Analysis Display */}
             {analysisDocument && (
               <div className="mt-8 space-y-6">
-                {/* XMP Tags Section */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                  <div className="flex items-center mb-6">
-                    <div className="text-blue-600 mr-3">
-                      <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-                      XMP Tags
-                    </h3>
+                {/* View Toggle */}
+                <div className="flex justify-center mb-6">
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-1 border border-gray-200 dark:border-gray-700">
+                    <Button
+                      variant={!view3D ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setView3D(false)}
+                      className="mr-1"
+                    >
+                      <FileSearch className="h-4 w-4 mr-2" />
+                      Traditional View
+                    </Button>
+                    <Button
+                      variant={view3D ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setView3D(true)}
+                      className="bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700"
+                    >
+                      <Box className="h-4 w-4 mr-2" />
+                      3D Analysis
+                      <Zap className="h-3 w-3 ml-1" />
+                    </Button>
                   </div>
+                </div>
+
+                {/* 3D Visualization */}
+                {view3D ? (
+                  <div className="space-y-6">
+                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                      <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center">
+                          <Box className="h-6 w-6 text-blue-600 mr-3" />
+                          3D Metadata Visualization
+                        </h3>
+                        <Badge className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
+                          Interactive
+                        </Badge>
+                      </div>
+                      
+                      <DocumentAnalysis3D 
+                        metadata={analysisDocument.metadata}
+                        analysisResult={{
+                          result: analysisDocument.result,
+                          confidence: analysisDocument.confidence
+                        }}
+                      />
+                      
+                      <div className="mt-4 text-sm text-gray-600 dark:text-gray-400 text-center">
+                        🎯 Interactive 3D visualization of PDF metadata • Hover nodes for details • Click and drag to explore
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* Traditional XMP View */
+                  <div className="space-y-6">
+                    {/* XMP Tags Section */}
+                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                      <div className="flex items-center mb-6">
+                        <div className="text-blue-600 mr-3">
+                          <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                        <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                          XMP Tags
+                        </h3>
+                      </div>
 
                   <div className="space-y-3">
                     {/* dc:date */}
@@ -857,6 +914,8 @@ export default function AdminPortal() {
                     </div>
                   </div>
                 </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
