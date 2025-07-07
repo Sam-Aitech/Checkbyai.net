@@ -283,6 +283,11 @@ export default function AdminPortal() {
           <FileUpload
             onFileUpload={handleFileUpload}
           />
+          <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg">
+            <p className="text-sm text-green-800 dark:text-green-200">
+              <strong>Admin Mode:</strong> Unlimited document uploads for building trusted patterns database.
+            </p>
+          </div>
 
           <div className="space-y-3 sm:space-y-4 mb-4 sm:mb-6 mt-4 sm:mt-6">
             <div className="flex items-center space-x-2 sm:space-x-3">

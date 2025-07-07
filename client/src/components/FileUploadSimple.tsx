@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { Link } from 'wouter';
+import { Lock, Crown, CheckCircle } from 'lucide-react';
 
 interface VerificationResult {
   type: 'Genuine' | 'Edited' | 'Fake';
@@ -10,19 +12,43 @@ interface FileUploadSimpleProps {
   onVerificationResult?: (result: VerificationResult) => void;
   onLoading?: (loading: boolean) => void;
   onError?: (error: string) => void;
+  restrictToOneCheck?: boolean; // New prop to control restriction
 }
 
 export default function FileUploadSimple({ 
   onFileUpload, 
   onVerificationResult, 
   onLoading, 
-  onError 
+  onError,
+  restrictToOneCheck = true // Default to restricted
 }: FileUploadSimpleProps) {
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<VerificationResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [hasUsedFreeCheck, setHasUsedFreeCheck] = useState(false);
+  const [verificationCount, setVerificationCount] = useState(0);
+
+  // Check usage on component mount
+  useEffect(() => {
+    if (!restrictToOneCheck) return;
+    
+    const today = new Date().toDateString();
+    const storedDate = localStorage.getItem('lastVerificationDate');
+    const storedCount = parseInt(localStorage.getItem('verificationsToday') || '0');
+    
+    if (storedDate === today) {
+      setVerificationCount(storedCount);
+      setHasUsedFreeCheck(storedCount >= 1);
+    } else {
+      // Reset for new day
+      localStorage.setItem('lastVerificationDate', today);
+      localStorage.setItem('verificationsToday', '0');
+      setVerificationCount(0);
+      setHasUsedFreeCheck(false);
+    }
+  }, [restrictToOneCheck]);
 
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
@@ -60,6 +86,12 @@ export default function FileUploadSimple({
   };
 
   const processFile = (selectedFile: File) => {
+    // Check if user has already used their free verification
+    if (restrictToOneCheck && hasUsedFreeCheck) {
+      setError('You have already used your free verification for today. Upgrade to Pro for unlimited checks.');
+      return;
+    }
+
     if (selectedFile.type !== 'application/pdf') {
       const errorMsg = 'Please upload a valid PDF file.';
       setError(errorMsg);
@@ -114,6 +146,18 @@ export default function FileUploadSimple({
       setResult(transformedResult);
       onVerificationResult?.(transformedResult);
       
+      // Update usage tracking after successful verification
+      if (restrictToOneCheck) {
+        const newCount = verificationCount + 1;
+        setVerificationCount(newCount);
+        setHasUsedFreeCheck(newCount >= 1);
+        
+        // Store in localStorage
+        const today = new Date().toDateString();
+        localStorage.setItem('lastVerificationDate', today);
+        localStorage.setItem('verificationsToday', newCount.toString());
+      }
+      
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Verification failed';
       setError(errorMsg);
@@ -124,8 +168,61 @@ export default function FileUploadSimple({
     }
   };
 
+  // Show restriction overlay if user has used their free check
+  if (restrictToOneCheck && hasUsedFreeCheck && !result) {
+    return (
+      <div className="w-full">
+        <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 sm:p-8 text-center min-h-[160px] sm:min-h-[200px] flex flex-col justify-center bg-gray-50 dark:bg-gray-800/50 relative">
+          <div className="absolute inset-0 bg-gray-100 dark:bg-gray-800 rounded-lg opacity-90 flex items-center justify-center">
+            <div className="text-center space-y-4 p-6">
+              <div className="flex justify-center">
+                <Lock className="w-12 h-12 text-gray-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Free Check Used</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">You've already used your free document verification today.</p>
+              </div>
+              <div className="space-y-3">
+                <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-4 rounded-lg">
+                  <div className="flex items-center justify-center mb-2">
+                    <Crown className="w-5 h-5 mr-2" />
+                    <span className="font-semibold">Upgrade to Pro</span>
+                  </div>
+                  <p className="text-sm opacity-90 mb-3">Get unlimited document verifications, priority support, and advanced analytics</p>
+                  <button className="bg-white text-blue-600 px-4 py-2 rounded-md font-medium hover:bg-gray-50 transition-colors">
+                    Upgrade Now
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Your free check will reset tomorrow
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full">
+      {/* Usage indicator for restricted mode */}
+      {restrictToOneCheck && (
+        <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <CheckCircle className="w-4 h-4 text-blue-600 mr-2" />
+              <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                Free User
+              </span>
+            </div>
+            <div className="text-sm text-blue-600 dark:text-blue-300">
+              {hasUsedFreeCheck ? '0/1' : '1/1'} checks remaining today
+            </div>
+          </div>
+        </div>
+      )}
+
       <div 
         className={`border-2 border-dashed rounded-lg p-6 sm:p-8 text-center transition-all duration-200 min-h-[160px] sm:min-h-[200px] flex flex-col justify-center ${
           isDragging 

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import FileUpload from "./FileUpload";
+import FileUploadSimple from "./FileUploadSimple";
 import { CloudUpload, CheckCircle, AlertTriangle, XCircle } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -78,8 +79,9 @@ export default function UserPortal() {
             <p className="text-gray-600">Drag and drop your PDF file or click to browse</p>
           </div>
 
-          <FileUpload
+          <FileUploadSimple 
             onFileUpload={handleFileUpload}
+            restrictToOneCheck={true}
           />
         </div>
 

@@ -143,6 +143,14 @@ Result: Genuine/Edited/Fake with confidence score
 
 ```
 Changelog:
+- July 07, 2025 (Late Morning). Implemented User Portal Document Verification Restriction
+  - Added one-document-per-day verification limit for regular users
+  - Created localStorage-based usage tracking system with daily reset
+  - Implemented restriction overlay with upgrade prompts when limit reached
+  - Added usage indicator showing remaining checks for free users
+  - Admin portal remains unrestricted for building trusted patterns database
+  - Added visual distinction between free user (restricted) and admin (unlimited) modes
+  - Enhanced user experience with clear messaging about limitations and upgrade options
 - July 07, 2025 (Late Morning). Optimized for Mobile Use
   - Enhanced touch interactions with minimum 44px touch targets
   - Implemented responsive design across all components (home, dashboard, admin portal)
