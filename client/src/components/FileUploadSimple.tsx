@@ -13,6 +13,7 @@ interface FileUploadSimpleProps {
   onLoading?: (loading: boolean) => void;
   onError?: (error: string) => void;
   restrictToOneCheck?: boolean; // New prop to control restriction
+  isAdmin?: boolean; // New prop to identify admin users
 }
 
 export default function FileUploadSimple({ 
@@ -20,7 +21,8 @@ export default function FileUploadSimple({
   onVerificationResult, 
   onLoading, 
   onError,
-  restrictToOneCheck = true // Default to restricted
+  restrictToOneCheck = true, // Default to restricted
+  isAdmin = false // Default to non-admin
 }: FileUploadSimpleProps) {
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -32,7 +34,8 @@ export default function FileUploadSimple({
 
   // Check usage on component mount
   useEffect(() => {
-    if (!restrictToOneCheck) return;
+    // Admin users bypass restrictions
+    if (!restrictToOneCheck || isAdmin) return;
     
     const today = new Date().toDateString();
     const storedDate = localStorage.getItem('lastVerificationDate');
@@ -48,7 +51,7 @@ export default function FileUploadSimple({
       setVerificationCount(0);
       setHasUsedFreeCheck(false);
     }
-  }, [restrictToOneCheck]);
+  }, [restrictToOneCheck, isAdmin]);
 
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
@@ -86,8 +89,8 @@ export default function FileUploadSimple({
   };
 
   const processFile = (selectedFile: File) => {
-    // Check if user has already used their free verification
-    if (restrictToOneCheck && hasUsedFreeCheck) {
+    // Check if user has already used their free verification (skip for admin)
+    if (restrictToOneCheck && hasUsedFreeCheck && !isAdmin) {
       setError('You have already used your free verification for today. Upgrade to Pro for unlimited checks.');
       return;
     }
@@ -146,8 +149,8 @@ export default function FileUploadSimple({
       setResult(transformedResult);
       onVerificationResult?.(transformedResult);
       
-      // Update usage tracking after successful verification
-      if (restrictToOneCheck) {
+      // Update usage tracking after successful verification (skip for admin)
+      if (restrictToOneCheck && !isAdmin) {
         const newCount = verificationCount + 1;
         setVerificationCount(newCount);
         setHasUsedFreeCheck(newCount >= 1);
@@ -168,8 +171,8 @@ export default function FileUploadSimple({
     }
   };
 
-  // Show restriction overlay if user has used their free check
-  if (restrictToOneCheck && hasUsedFreeCheck && !result) {
+  // Show restriction overlay if user has used their free check (skip for admin)
+  if (restrictToOneCheck && hasUsedFreeCheck && !result && !isAdmin) {
     return (
       <div className="w-full">
         <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 sm:p-8 text-center min-h-[160px] sm:min-h-[200px] flex flex-col justify-center bg-gray-50 dark:bg-gray-800/50 relative">
@@ -207,7 +210,7 @@ export default function FileUploadSimple({
   return (
     <div className="w-full">
       {/* Usage indicator for restricted mode */}
-      {restrictToOneCheck && (
+      {restrictToOneCheck && !isAdmin && (
         <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
@@ -218,6 +221,23 @@ export default function FileUploadSimple({
             </div>
             <div className="text-sm text-blue-600 dark:text-blue-300">
               {hasUsedFreeCheck ? '0/1' : '1/1'} checks remaining today
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin indicator */}
+      {isAdmin && (
+        <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <Crown className="w-4 h-4 text-green-600 mr-2" />
+              <span className="text-sm font-medium text-green-800 dark:text-green-200">
+                Admin User
+              </span>
+            </div>
+            <div className="text-sm text-green-600 dark:text-green-300">
+              Unlimited verifications
             </div>
           </div>
         </div>

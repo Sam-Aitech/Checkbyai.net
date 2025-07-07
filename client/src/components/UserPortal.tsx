@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import FileUpload from "./FileUpload";
 import FileUploadSimple from "./FileUploadSimple";
 import { CloudUpload, CheckCircle, AlertTriangle, XCircle, Clock, Loader2 } from "lucide-react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -22,6 +22,14 @@ export default function UserPortal() {
     { id: 4, title: "Result Generation", description: "Generate verification result and detailed analysis", status: "pending" }
   ]);
   const { toast } = useToast();
+
+  // Check if user is admin
+  const { data: user } = useQuery({
+    queryKey: ['/api/auth/user'],
+    retry: false
+  });
+  
+  const isAdmin = user?.role === 'admin';
 
   const transformResult = (backendResult: any): VerificationResult => {
     // Transform backend response to match our interface
@@ -153,7 +161,8 @@ export default function UserPortal() {
             onVerificationResult={handleVerificationResult}
             onLoading={handleLoading}
             onError={handleError}
-            restrictToOneCheck={true}
+            restrictToOneCheck={!isAdmin}
+            isAdmin={isAdmin}
           />
         </div>
 

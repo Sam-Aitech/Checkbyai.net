@@ -143,6 +143,13 @@ Result: Genuine/Edited/Fake with confidence score
 
 ```
 Changelog:
+- July 07, 2025 (Late Morning). Added Admin Unlimited Document Verification
+  - Updated FileUploadSimple component to support admin bypass of restrictions
+  - Admin users now see "Admin User - Unlimited verifications" indicator instead of usage limits
+  - Added isAdmin prop to FileUploadSimple component for role-based access control
+  - Admin users can verify unlimited documents while regular users remain restricted to 1/day
+  - Enhanced UserPortal and Dashboard to check user authentication status via API
+  - System now properly distinguishes between admin and regular user capabilities
 - July 07, 2025 (Late Morning). Removed "COS" Text References from Dashboard
   - Updated main dashboard heading from "Advanced COS Document Verification" to "Advanced Document Verification"
   - Changed all "Upload COS Document" references to "Upload Document" 

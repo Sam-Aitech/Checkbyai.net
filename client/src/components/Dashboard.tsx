@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { useQuery } from "@tanstack/react-query";
 import FileUploadSimple from './FileUploadSimple';
 
 interface VerificationResult {
@@ -8,6 +10,14 @@ interface VerificationResult {
 
 export default function Dashboard() {
   const [file, setFile] = useState<File | null>(null);
+  
+  // Check if user is admin
+  const { data: user } = useQuery({
+    queryKey: ['/api/auth/user'],
+    retry: false
+  });
+  
+  const isAdmin = user?.role === 'admin';
   const [result, setResult] = useState<VerificationResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -32,7 +42,10 @@ export default function Dashboard() {
       
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-4 sm:p-6 mb-4 sm:mb-6">
         <h2 className="text-base sm:text-lg font-medium mb-3 sm:mb-4 text-gray-900 dark:text-gray-100 text-center sm:text-left">Upload Document</h2>
-        <FileUploadSimple restrictToOneCheck={true} />
+        <FileUploadSimple 
+          restrictToOneCheck={!isAdmin} 
+          isAdmin={isAdmin}
+        />
         
         {loading && (
           <div className="mt-6 flex justify-center">
