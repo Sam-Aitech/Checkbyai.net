@@ -391,6 +391,7 @@ export default function COSDashboard() {
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => {
+                    setShowFreeCheck(false);
                     setVerificationResult(null);
                   }}
                   className="text-gray-400 hover:text-gray-600 text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100"
