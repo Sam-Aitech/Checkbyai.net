@@ -36,17 +36,47 @@ class AIEngine:
             doc = fitz.open(file_path)
             metadata = doc.metadata
             
-            # Basic metadata
+            # Extract XMP metadata if available
+            xmp_metadata = {}
+            try:
+                xmp_info = doc.get_xml_metadata()
+                if xmp_info:
+                    # Parse XMP metadata for specific namespace tags
+                    xmp_metadata = self._parse_xmp_metadata(xmp_info)
+            except:
+                pass
+            
+            # Basic metadata with XMP enhancement
             extracted_metadata = {
-                'producer': metadata.get('producer', ''),
-                'creator': metadata.get('creator', ''),
-                'title': metadata.get('title', ''),
-                'subject': metadata.get('subject', ''),
-                'author': metadata.get('author', ''),
-                'creation_date': metadata.get('creationDate', ''),
-                'modification_date': metadata.get('modDate', ''),
+                'producer': metadata.get('producer', '') or xmp_metadata.get('pdf:Producer', ''),
+                'creator': metadata.get('creator', '') or xmp_metadata.get('xmp:CreatorTool', ''),
+                'title': metadata.get('title', '') or xmp_metadata.get('dc:title', ''),
+                'subject': metadata.get('subject', '') or xmp_metadata.get('dc:subject', ''),
+                'author': metadata.get('author', '') or xmp_metadata.get('dc:creator', ''),
+                'creation_date': metadata.get('creationDate', '') or xmp_metadata.get('xmp:CreateDate', ''),
+                'modification_date': metadata.get('modDate', '') or xmp_metadata.get('xmp:ModifyDate', ''),
+                'metadata_date': xmp_metadata.get('xmp:MetadataDate', ''),
                 'pages': doc.page_count,
-                'file_size': os.path.getsize(file_path)
+                'file_size': os.path.getsize(file_path),
+                'pdf_version': xmp_metadata.get('pdf:PDFVersion', '1.4'),
+                'language': xmp_metadata.get('dc:language', 'en-US'),
+                'format': xmp_metadata.get('dc:format', 'application/pdf'),
+                'creator_tool': xmp_metadata.get('xmp:CreatorTool', ''),
+                
+                # Additional XMP metadata
+                'xmp_tags': {
+                    'dc:date': xmp_metadata.get('dc:date', metadata.get('creationDate', '')),
+                    'dc:format': 'application/pdf',
+                    'dc:language': xmp_metadata.get('dc:language', 'en-US'),
+                    'pdf:PDFVersion': xmp_metadata.get('pdf:PDFVersion', '1.4'),
+                    'pdf:Producer': metadata.get('producer', '') or xmp_metadata.get('pdf:Producer', ''),
+                    'xmp:CreateDate': metadata.get('creationDate', '') or xmp_metadata.get('xmp:CreateDate', ''),
+                    'xmp:CreatorTool': metadata.get('creator', '') or xmp_metadata.get('xmp:CreatorTool', ''),
+                    'xmp:MetadataDate': xmp_metadata.get('xmp:MetadataDate', metadata.get('modDate', ''))
+                },
+                
+                # Raw XMP data for debugging
+                'raw_xmp': xmp_metadata
             }
             
             # Additional analysis
@@ -347,6 +377,59 @@ class AIEngine:
             comparisons += 1
             
         return score / comparisons if comparisons > 0 else 50.0
+    
+    def _parse_xmp_metadata(self, xmp_xml: str) -> Dict[str, Any]:
+        """Parse XMP XML metadata to extract namespace-specific tags"""
+        xmp_data = {}
+        
+        try:
+            # Simple XML parsing for common XMP tags
+            import re
+            
+            # Extract common XMP namespace tags
+            patterns = {
+                'dc:title': r'<dc:title[^>]*>([^<]*)</dc:title>',
+                'dc:creator': r'<dc:creator[^>]*>([^<]*)</dc:creator>',
+                'dc:subject': r'<dc:subject[^>]*>([^<]*)</dc:subject>',
+                'dc:date': r'<dc:date[^>]*>([^<]*)</dc:date>',
+                'dc:format': r'<dc:format[^>]*>([^<]*)</dc:format>',
+                'dc:language': r'<dc:language[^>]*>([^<]*)</dc:language>',
+                'pdf:Producer': r'<pdf:Producer[^>]*>([^<]*)</pdf:Producer>',
+                'pdf:PDFVersion': r'<pdf:PDFVersion[^>]*>([^<]*)</pdf:PDFVersion>',
+                'xmp:CreateDate': r'<xmp:CreateDate[^>]*>([^<]*)</xmp:CreateDate>',
+                'xmp:ModifyDate': r'<xmp:ModifyDate[^>]*>([^<]*)</xmp:ModifyDate>',
+                'xmp:MetadataDate': r'<xmp:MetadataDate[^>]*>([^<]*)</xmp:MetadataDate>',
+                'xmp:CreatorTool': r'<xmp:CreatorTool[^>]*>([^<]*)</xmp:CreatorTool>'
+            }
+            
+            for tag, pattern in patterns.items():
+                match = re.search(pattern, xmp_xml, re.IGNORECASE)
+                if match:
+                    xmp_data[tag] = match.group(1).strip()
+            
+            # Also try attribute-based extraction
+            attr_patterns = {
+                'dc:date': r'dc:date="([^"]*)"',
+                'dc:format': r'dc:format="([^"]*)"',
+                'dc:language': r'dc:language="([^"]*)"',
+                'pdf:Producer': r'pdf:Producer="([^"]*)"',
+                'pdf:PDFVersion': r'pdf:PDFVersion="([^"]*)"',
+                'xmp:CreateDate': r'xmp:CreateDate="([^"]*)"',
+                'xmp:ModifyDate': r'xmp:ModifyDate="([^"]*)"',
+                'xmp:MetadataDate': r'xmp:MetadataDate="([^"]*)"',
+                'xmp:CreatorTool': r'xmp:CreatorTool="([^"]*)"'
+            }
+            
+            for tag, pattern in attr_patterns.items():
+                if tag not in xmp_data:  # Only if not already found
+                    match = re.search(pattern, xmp_xml, re.IGNORECASE)
+                    if match:
+                        xmp_data[tag] = match.group(1).strip()
+                        
+        except Exception as e:
+            print(f"Error parsing XMP metadata: {e}")
+        
+        return xmp_data
     
     def _compare_fonts(self, fonts1: List[str], fonts2: List[str]) -> float:
         """Compare font usage between documents"""

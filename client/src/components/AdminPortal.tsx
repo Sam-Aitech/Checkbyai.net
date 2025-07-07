@@ -673,7 +673,9 @@ export default function AdminPortal() {
                         dc:date
                       </div>
                       <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                        {analysisDocument.details?.metadata?.creationDate || analysisDocument.details?.metadata?.modificationDate || 'Not available'}
+                        {analysisDocument.details?.metadata?.xmp_tags?.['dc:date'] || 
+                         analysisDocument.details?.metadata?.creation_date || 
+                         'Not available'}
                       </div>
                     </div>
 
@@ -683,7 +685,9 @@ export default function AdminPortal() {
                         dc:format
                       </div>
                       <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                        application/pdf
+                        {analysisDocument.details?.metadata?.xmp_tags?.['dc:format'] || 
+                         analysisDocument.details?.metadata?.format || 
+                         'application/pdf'}
                       </div>
                     </div>
 
@@ -693,7 +697,9 @@ export default function AdminPortal() {
                         dc:language
                       </div>
                       <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                        {analysisDocument.details?.metadata?.language || 'en-US'}
+                        {analysisDocument.details?.metadata?.xmp_tags?.['dc:language'] || 
+                         analysisDocument.details?.metadata?.language || 
+                         'en-US'}
                       </div>
                     </div>
 
@@ -703,7 +709,9 @@ export default function AdminPortal() {
                         pdf:PDFVersion
                       </div>
                       <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                        {analysisDocument.details?.metadata?.pdfVersion || '1.4'}
+                        {analysisDocument.details?.metadata?.xmp_tags?.['pdf:PDFVersion'] || 
+                         analysisDocument.details?.metadata?.pdf_version || 
+                         '1.4'}
                       </div>
                     </div>
 
@@ -713,7 +721,9 @@ export default function AdminPortal() {
                         pdf:Producer
                       </div>
                       <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                        {analysisDocument.details?.metadata?.producer || 'Unknown'}
+                        {analysisDocument.details?.metadata?.xmp_tags?.['pdf:Producer'] || 
+                         analysisDocument.details?.metadata?.producer || 
+                         'Unknown'}
                       </div>
                     </div>
 
@@ -723,7 +733,9 @@ export default function AdminPortal() {
                         xmp:CreateDate
                       </div>
                       <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                        {analysisDocument.details?.metadata?.creationDate || 'Not available'}
+                        {analysisDocument.details?.metadata?.xmp_tags?.['xmp:CreateDate'] || 
+                         analysisDocument.details?.metadata?.creation_date || 
+                         'Not available'}
                       </div>
                     </div>
 
@@ -733,7 +745,10 @@ export default function AdminPortal() {
                         xmp:CreatorTool
                       </div>
                       <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                        {analysisDocument.details?.metadata?.creator || analysisDocument.details?.metadata?.creatorTool || 'Unknown'}
+                        {analysisDocument.details?.metadata?.xmp_tags?.['xmp:CreatorTool'] || 
+                         analysisDocument.details?.metadata?.creator_tool || 
+                         analysisDocument.details?.metadata?.creator || 
+                         'Unknown'}
                       </div>
                     </div>
 
@@ -743,7 +758,10 @@ export default function AdminPortal() {
                         xmp:MetadataDate
                       </div>
                       <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                        {analysisDocument.details?.metadata?.metadataDate || analysisDocument.details?.metadata?.modificationDate || 'Not available'}
+                        {analysisDocument.details?.metadata?.xmp_tags?.['xmp:MetadataDate'] || 
+                         analysisDocument.details?.metadata?.metadata_date || 
+                         analysisDocument.details?.metadata?.modification_date || 
+                         'Not available'}
                       </div>
                     </div>
                   </div>
@@ -817,10 +835,26 @@ export default function AdminPortal() {
                   <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
                     Complete Metadata Extract
                   </h4>
-                  <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 max-h-64 overflow-y-auto">
-                    <pre className="text-xs text-gray-700 dark:text-gray-300 font-mono whitespace-pre-wrap">
-                      {JSON.stringify(analysisDocument.details?.metadata || {}, null, 2)}
-                    </pre>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {/* Enhanced XMP Data */}
+                    <div>
+                      <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">XMP Tags Data</h5>
+                      <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3 max-h-48 overflow-y-auto">
+                        <pre className="text-xs text-gray-700 dark:text-gray-300 font-mono whitespace-pre-wrap">
+                          {JSON.stringify(analysisDocument.details?.metadata?.xmp_tags || {}, null, 2)}
+                        </pre>
+                      </div>
+                    </div>
+                    
+                    {/* Complete Metadata */}
+                    <div>
+                      <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Full Metadata</h5>
+                      <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3 max-h-48 overflow-y-auto">
+                        <pre className="text-xs text-gray-700 dark:text-gray-300 font-mono whitespace-pre-wrap">
+                          {JSON.stringify(analysisDocument.details?.metadata || {}, null, 2)}
+                        </pre>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
