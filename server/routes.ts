@@ -148,7 +148,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         id: result.id,
         result: result.result,
         confidence: result.confidence,
-        details: result.analysisDetails
+        details: result.analysisDetails,
+        metadata: metadata // Include the extracted metadata with XMP tags
       });
     } catch (error) {
       // Clean up file on error

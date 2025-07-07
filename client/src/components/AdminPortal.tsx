@@ -673,8 +673,8 @@ export default function AdminPortal() {
                         dc:date
                       </div>
                       <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                        {analysisDocument.details?.metadata?.xmp_tags?.['dc:date'] || 
-                         analysisDocument.details?.metadata?.creation_date || 
+                        {analysisDocument.metadata?.xmp_tags?.['dc:date'] || 
+                         analysisDocument.metadata?.creation_date || 
                          'Not available'}
                       </div>
                     </div>
@@ -685,8 +685,8 @@ export default function AdminPortal() {
                         dc:format
                       </div>
                       <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                        {analysisDocument.details?.metadata?.xmp_tags?.['dc:format'] || 
-                         analysisDocument.details?.metadata?.format || 
+                        {analysisDocument.metadata?.xmp_tags?.['dc:format'] || 
+                         analysisDocument.metadata?.format || 
                          'application/pdf'}
                       </div>
                     </div>
@@ -697,8 +697,8 @@ export default function AdminPortal() {
                         dc:language
                       </div>
                       <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                        {analysisDocument.details?.metadata?.xmp_tags?.['dc:language'] || 
-                         analysisDocument.details?.metadata?.language || 
+                        {analysisDocument.metadata?.xmp_tags?.['dc:language'] || 
+                         analysisDocument.metadata?.language || 
                          'en-US'}
                       </div>
                     </div>
@@ -709,8 +709,8 @@ export default function AdminPortal() {
                         pdf:PDFVersion
                       </div>
                       <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                        {analysisDocument.details?.metadata?.xmp_tags?.['pdf:PDFVersion'] || 
-                         analysisDocument.details?.metadata?.pdf_version || 
+                        {analysisDocument.metadata?.xmp_tags?.['pdf:PDFVersion'] || 
+                         analysisDocument.metadata?.pdf_version || 
                          '1.4'}
                       </div>
                     </div>
@@ -721,8 +721,8 @@ export default function AdminPortal() {
                         pdf:Producer
                       </div>
                       <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                        {analysisDocument.details?.metadata?.xmp_tags?.['pdf:Producer'] || 
-                         analysisDocument.details?.metadata?.producer || 
+                        {analysisDocument.metadata?.xmp_tags?.['pdf:Producer'] || 
+                         analysisDocument.metadata?.producer || 
                          'Unknown'}
                       </div>
                     </div>
@@ -733,8 +733,8 @@ export default function AdminPortal() {
                         xmp:CreateDate
                       </div>
                       <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                        {analysisDocument.details?.metadata?.xmp_tags?.['xmp:CreateDate'] || 
-                         analysisDocument.details?.metadata?.creation_date || 
+                        {analysisDocument.metadata?.xmp_tags?.['xmp:CreateDate'] || 
+                         analysisDocument.metadata?.creation_date || 
                          'Not available'}
                       </div>
                     </div>
@@ -745,9 +745,9 @@ export default function AdminPortal() {
                         xmp:CreatorTool
                       </div>
                       <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                        {analysisDocument.details?.metadata?.xmp_tags?.['xmp:CreatorTool'] || 
-                         analysisDocument.details?.metadata?.creator_tool || 
-                         analysisDocument.details?.metadata?.creator || 
+                        {analysisDocument.metadata?.xmp_tags?.['xmp:CreatorTool'] || 
+                         analysisDocument.metadata?.creator_tool || 
+                         analysisDocument.metadata?.creator || 
                          'Unknown'}
                       </div>
                     </div>
@@ -758,9 +758,9 @@ export default function AdminPortal() {
                         xmp:MetadataDate
                       </div>
                       <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                        {analysisDocument.details?.metadata?.xmp_tags?.['xmp:MetadataDate'] || 
-                         analysisDocument.details?.metadata?.metadata_date || 
-                         analysisDocument.details?.metadata?.modification_date || 
+                        {analysisDocument.metadata?.xmp_tags?.['xmp:MetadataDate'] || 
+                         analysisDocument.metadata?.metadata_date || 
+                         analysisDocument.metadata?.modification_date || 
                          'Not available'}
                       </div>
                     </div>
@@ -795,7 +795,7 @@ export default function AdminPortal() {
                         <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
                           <span className="text-gray-600 dark:text-gray-400">File Size:</span>
                           <span className="text-gray-900 dark:text-white font-medium">
-                            {analysisDocument.details?.metadata?.fileSize ? `${(analysisDocument.details.metadata.fileSize / 1024).toFixed(1)} KB` : 'Unknown'}
+                            {analysisDocument.metadata?.fileSize ? `${(analysisDocument.metadata.fileSize / 1024).toFixed(1)} KB` : 'Unknown'}
                           </span>
                         </div>
                       </div>
