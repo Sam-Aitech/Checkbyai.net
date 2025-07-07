@@ -109,17 +109,18 @@ export class PDFAnalyzer {
       // Create organized XMP tags for display using parsed XMP data
       const parsedXmp = metadata.parsedXmp || {};
       metadata.xmp_tags = {
-        'dc:date': parsedXmp['dc:date'] || parsedXmp['xmp:CreateDate'] || metadata.creationDate || metadata.modificationDate || 'Not available',
-        'dc:format': parsedXmp['dc:format'] || metadata.format || 'application/pdf',
+        'dc:date': parsedXmp['dc:date'] || metadata.creationDate || metadata.modificationDate || 'Not available',
+        'dc:format': parsedXmp['dc:format'] || (metadata.format && metadata.format !== 'application/pdf' ? metadata.format : 'application/pdf'),
         'dc:language': parsedXmp['dc:language'] || metadata.language || 'en-US',
-        'pdf:PDFVersion': parsedXmp['pdf:PDFVersion'] || metadata.pdfVersion || '1.4',
+        'pdf:PDFVersion': parsedXmp['pdf:PDFVersion'] || (metadata.pdfVersion && metadata.pdfVersion !== 'application/pdf' ? metadata.pdfVersion : '1.4'),
         'pdf:Producer': parsedXmp['pdf:Producer'] || metadata.producer || 'Unknown',
         'xmp:CreateDate': parsedXmp['xmp:CreateDate'] || parsedXmp['dc:date'] || metadata.creationDate || 'Not available',
         'xmp:CreatorTool': parsedXmp['xmp:CreatorTool'] || metadata.creator || metadata.creatorTool || 'Unknown',
-        'xmp:MetadataDate': parsedXmp['xmp:MetadataDate'] || parsedXmp['xmp:ModifyDate'] || metadata.metadataDate || metadata.modificationDate || 'Not available'
+        'xmp:MetadataDate': parsedXmp['xmp:MetadataDate'] || metadata.metadataDate || metadata.modificationDate || 'Not available'
       };
       
       console.log(`Extracted metadata keys: ${Object.keys(metadata)}`);
+      console.log(`Parsed XMP data: ${JSON.stringify(parsedXmp, null, 2)}`);
       console.log(`XMP tags: ${JSON.stringify(metadata.xmp_tags, null, 2)}`);
       
       return metadata;
