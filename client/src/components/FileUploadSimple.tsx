@@ -127,22 +127,25 @@ export default function FileUploadSimple({
   return (
     <div className="w-full">
       <div 
-        className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+        className={`border-2 border-dashed rounded-lg p-6 sm:p-8 text-center transition-all duration-200 min-h-[160px] sm:min-h-[200px] flex flex-col justify-center ${
           isDragging 
-            ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20' 
-            : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+            ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20 scale-[1.02]' 
+            : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 active:scale-[0.98]'
         }`}
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
       >
-        <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+        <svg className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
           <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
         </svg>
         
-        <h3 className="mt-2 text-lg font-medium text-gray-900 dark:text-gray-100">Upload COS Document</h3>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Drag and drop your PDF file here, or click to select</p>
+        <h3 className="mt-2 text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100">Upload COS Document</h3>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 px-2">
+          <span className="hidden sm:inline">Drag and drop your PDF file here, or click to select</span>
+          <span className="sm:hidden">Tap to select your PDF file</span>
+        </p>
         
         <input 
           type="file" 
@@ -154,7 +157,7 @@ export default function FileUploadSimple({
         
         <label 
           htmlFor="file-upload-simple"
-          className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"
+          className="mt-4 inline-flex items-center px-4 sm:px-6 py-3 sm:py-2 border border-transparent text-sm sm:text-base font-medium rounded-lg shadow-sm text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 cursor-pointer touch-manipulation transition-colors"
         >
           Select PDF File
         </label>

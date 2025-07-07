@@ -31,24 +31,24 @@ export default function Home() {
   if (!showPortals) {
     return (
       <div className="min-h-screen">
-        {/* Modern Navigation Header */}
-        <nav className="fixed top-0 w-full z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-700">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center h-16">
-              <div className="flex items-center space-x-3">
-                <Shield className="text-blue-600 text-2xl" />
+        {/* Mobile-Optimized Navigation Header */}
+        <nav className="fixed top-0 w-full z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-b border-gray-200 dark:border-gray-700">
+          <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center h-14 sm:h-16">
+              <div className="flex items-center space-x-2 sm:space-x-3">
+                <Shield className="text-blue-600 text-xl sm:text-2xl" />
                 <div>
-                  <h1 className="text-xl font-bold text-gray-900 dark:text-white">COS Verifier</h1>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">AI-Powered Document Authentication</p>
+                  <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">COS Verifier</h1>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 hidden sm:block">AI-Powered Document Authentication</p>
                 </div>
               </div>
               
-              <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2 sm:space-x-4">
                 <Link href="/dashboard?setup=true">
                   <Button 
                     variant="default" 
                     size="sm"
-                    className="bg-green-600 hover:bg-green-700 text-white"
+                    className="text-xs sm:text-sm px-3 sm:px-4 py-2 bg-green-600 hover:bg-green-700 text-white"
                   >
                     Setup - Try Free
                   </Button>
@@ -58,10 +58,11 @@ export default function Home() {
                   variant="ghost" 
                   size="sm"
                   onClick={() => setShowPortals(true)}
-                  className="text-gray-600 hover:text-blue-600"
+                  className="text-xs sm:text-sm px-3 sm:px-4 py-2 text-gray-600 hover:text-blue-600"
                 >
-                  Launch App
-                  <ArrowRight className="ml-2 w-4 h-4" />
+                  <span className="hidden sm:inline">Launch App</span>
+                  <span className="sm:hidden">App</span>
+                  <ArrowRight className="ml-1 sm:ml-2 w-3 h-3 sm:w-4 sm:h-4" />
                 </Button>
                 
                 <Link href="/dashboard">

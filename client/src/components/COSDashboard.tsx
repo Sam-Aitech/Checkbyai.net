@@ -74,7 +74,7 @@ export default function COSDashboard() {
 
   return (
     <div className="bg-gray-50 min-h-screen">
-      {/* Innovative 3D Dashboard Header */}
+      {/* Mobile-Optimized 3D Dashboard Header */}
       <header className="relative bg-gradient-to-r from-blue-600 via-blue-700 to-purple-700 shadow-2xl sticky top-0 z-40 overflow-hidden">
         {/* Animated Background Dots */}
         <div 
@@ -114,9 +114,9 @@ export default function COSDashboard() {
           <div className="absolute top-1/2 right-1/4 w-10 h-10 border border-white/15 rounded-full animate-ping" style={{ animationDelay: '1s' }} />
         </div>
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-20">
-            <div className="flex items-center space-x-4 group">
+        <div className="relative max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16 sm:h-20">
+            <div className="flex items-center space-x-2 sm:space-x-4 group">
               <div className="relative">
                 <div className="absolute inset-0 bg-white/20 rounded-full blur-xl group-hover:blur-2xl transition-all duration-500" />
                 <div className="relative w-12 h-12 bg-gradient-to-br from-white to-blue-100 rounded-full flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-all duration-300">
@@ -126,36 +126,42 @@ export default function COSDashboard() {
                 </div>
               </div>
               <div className="transform group-hover:translate-x-2 transition-transform duration-300">
-                <h1 className="text-2xl font-bold text-white drop-shadow-lg">COS Authenticator</h1>
-                <p className="text-sm text-blue-100 drop-shadow">Advanced Document Verification</p>
+                <h1 className="text-lg sm:text-2xl font-bold text-white drop-shadow-lg">COS Authenticator</h1>
+                <p className="text-xs sm:text-sm text-blue-100 drop-shadow hidden sm:block">Advanced Document Verification</p>
               </div>
             </div>
             
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-4">
 
 
               <Link href="/">
                 <button 
-                  className="group relative inline-flex items-center px-6 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white font-medium hover:bg-white/20 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl"
+                  className="group relative inline-flex items-center px-3 sm:px-6 py-2 sm:py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg sm:rounded-xl text-white font-medium hover:bg-white/20 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl touch-manipulation"
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
-                  <svg className="w-5 h-5 mr-2 transform group-hover:-translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2 transform group-hover:-translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16l-4-4m0 0l4-4m-4 4h18" />
                   </svg>
-                  <span className="relative z-10">Back to Home</span>
+                  <span className="relative z-10 text-sm sm:text-base">
+                    <span className="hidden sm:inline">Back to Home</span>
+                    <span className="sm:hidden">Back</span>
+                  </span>
                 </button>
               </Link>
               
               <button 
                 onClick={() => setShowFreeCheck(true)}
-                className="group relative inline-flex items-center px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl text-white font-semibold shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 hover:scale-105"
+                className="group relative inline-flex items-center px-3 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg sm:rounded-xl text-white font-semibold shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 hover:scale-105 touch-manipulation"
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-green-400 to-emerald-500 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <svg className="w-5 h-5 mr-2 relative z-10 transform group-hover:rotate-12 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="absolute inset-0 bg-gradient-to-r from-green-400 to-emerald-500 rounded-lg sm:rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2 relative z-10 transform group-hover:rotate-12 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span className="relative z-10">Try Free Check</span>
-                <div className="absolute inset-0 rounded-xl bg-white/20 scale-0 group-hover:scale-100 transition-transform duration-500" />
+                <span className="relative z-10 text-sm sm:text-base">
+                  <span className="hidden sm:inline">Try Free Check</span>
+                  <span className="sm:hidden">Try Free</span>
+                </span>
+                <div className="absolute inset-0 rounded-lg sm:rounded-xl bg-white/20 scale-0 group-hover:scale-100 transition-transform duration-500" />
               </button>
             </div>
           </div>

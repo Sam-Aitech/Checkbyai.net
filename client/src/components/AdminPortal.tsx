@@ -193,61 +193,61 @@ export default function AdminPortal() {
   };
 
   return (
-    <div>
-      {/* Admin Header */}
-      <div className="text-center mb-12">
-        <h2 className="text-3xl font-bold text-gray-900 mb-4">Admin Portal</h2>
-        <p className="text-lg text-gray-600 max-w-3xl mx-auto">
+    <div className="px-3 sm:px-6 lg:px-8">
+      {/* Mobile-Optimized Admin Header */}
+      <div className="text-center mb-8 sm:mb-12">
+        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3 sm:mb-4">Admin Portal</h2>
+        <p className="text-sm sm:text-lg text-gray-600 max-w-3xl mx-auto px-2">
           Manage trusted COS document patterns and monitor system performance. Upload genuine documents to expand the verification database.
         </p>
       </div>
 
-      {/* Stats Dashboard */}
-      <div className="grid md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      {/* Mobile-Responsive Stats Dashboard */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-6">
           <div className="flex items-center">
             <div className="p-2 bg-blue-100 rounded-lg">
-              <Database className="text-blue-600 h-6 w-6" />
+              <Database className="text-blue-600 h-4 w-4 sm:h-6 sm:w-6" />
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Trusted Patterns</p>
-              <p className="text-2xl font-semibold text-gray-900">{stats?.trustedPatterns || 0}</p>
+            <div className="ml-2 sm:ml-4 min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Trusted Patterns</p>
+              <p className="text-lg sm:text-2xl font-semibold text-gray-900">{stats?.trustedPatterns || 0}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-6">
           <div className="flex items-center">
             <div className="p-2 bg-green-100 rounded-lg">
-              <CheckCircle className="text-green-600 h-6 w-6" />
+              <CheckCircle className="text-green-600 h-4 w-4 sm:h-6 sm:w-6" />
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Verifications Today</p>
-              <p className="text-2xl font-semibold text-gray-900">{stats?.verificationsToday || 0}</p>
+            <div className="ml-2 sm:ml-4 min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Verifications Today</p>
+              <p className="text-lg sm:text-2xl font-semibold text-gray-900">{stats?.verificationsToday || 0}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-6">
           <div className="flex items-center">
             <div className="p-2 bg-yellow-100 rounded-lg">
-              <AlertTriangle className="text-yellow-600 h-6 w-6" />
+              <AlertTriangle className="text-yellow-600 h-4 w-4 sm:h-6 sm:w-6" />
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Suspicious Docs</p>
-              <p className="text-2xl font-semibold text-gray-900">{stats?.suspiciousDocs || 0}</p>
+            <div className="ml-2 sm:ml-4 min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Suspicious Docs</p>
+              <p className="text-lg sm:text-2xl font-semibold text-gray-900">{stats?.suspiciousDocs || 0}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-6">
           <div className="flex items-center">
             <div className="p-2 bg-gray-100 rounded-lg">
-              <TrendingUp className="text-gray-600 h-6 w-6" />
+              <TrendingUp className="text-gray-600 h-4 w-4 sm:h-6 sm:w-6" />
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Success Rate</p>
-              <p className="text-2xl font-semibold text-gray-900">{stats?.successRate || '0'}%</p>
+            <div className="ml-2 sm:ml-4 min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Success Rate</p>
+              <p className="text-lg sm:text-2xl font-semibold text-gray-900">{stats?.successRate || '0'}%</p>
             </div>
           </div>
         </div>
@@ -274,34 +274,34 @@ export default function AdminPortal() {
         </div>
       </div>
 
-      {/* Admin Actions */}
-      <div className="grid lg:grid-cols-2 gap-8">
+      {/* Mobile-Responsive Admin Actions */}
+      <div className="grid lg:grid-cols-2 gap-4 sm:gap-8">
         {/* Upload Genuine Documents */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
-          <h3 className="text-xl font-semibold text-gray-900 mb-6">Upload Genuine COS Documents</h3>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-8">
+          <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4 sm:mb-6">Upload Genuine COS Documents</h3>
           
           <FileUpload
             onFileUpload={handleFileUpload}
           />
 
-          <div className="space-y-4 mb-6 mt-6">
-            <div className="flex items-center space-x-3">
+          <div className="space-y-3 sm:space-y-4 mb-4 sm:mb-6 mt-4 sm:mt-6">
+            <div className="flex items-center space-x-2 sm:space-x-3">
               <Checkbox
                 id="validateMetadata"
                 checked={validateMetadata}
                 onCheckedChange={setValidateMetadata}
               />
-              <label htmlFor="validateMetadata" className="text-sm text-gray-700">
+              <label htmlFor="validateMetadata" className="text-sm text-gray-700 touch-manipulation">
                 Validate metadata patterns
               </label>
             </div>
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 sm:space-x-3">
               <Checkbox
                 id="autoApprove"
                 checked={autoApprove}
                 onCheckedChange={setAutoApprove}
               />
-              <label htmlFor="autoApprove" className="text-sm text-gray-700">
+              <label htmlFor="autoApprove" className="text-sm text-gray-700 touch-manipulation">
                 Auto-approve verified documents
               </label>
             </div>
@@ -309,7 +309,7 @@ export default function AdminPortal() {
 
           <Button
             onClick={() => {/* Handle bulk upload */}}
-            className="w-full"
+            className="w-full touch-manipulation py-3 sm:py-2"
             disabled={uploadPatternMutation.isPending}
           >
             <Plus className="h-4 w-4 mr-2" />

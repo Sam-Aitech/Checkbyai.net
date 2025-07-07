@@ -34,10 +34,10 @@ export default function VerificationResults({ result }: VerificationResultsProps
   };
 
   return (
-    <div className={`border-l-4 ${getResultColor()} p-6 rounded-lg dark:bg-gray-800 dark:border-gray-600`}>
-      <div className="flex items-center justify-between">
-        <h3 className="text-xl font-bold dark:text-gray-100">Verification Result</h3>
-        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getBadgeColor()}`}>
+    <div className={`border-l-4 ${getResultColor()} p-4 sm:p-6 rounded-lg dark:bg-gray-800 dark:border-gray-600`}>
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h3 className="text-lg sm:text-xl font-bold dark:text-gray-100">Verification Result</h3>
+        <span className={`inline-flex items-center px-3 sm:px-2.5 py-1 sm:py-0.5 rounded-full text-sm sm:text-xs font-medium ${getBadgeColor()}`}>
           {result.type}
         </span>
       </div>
