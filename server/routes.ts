@@ -6,6 +6,7 @@ import { setupAuth, isAuthenticated, isAdmin } from "./replitAuth";
 import { insertVerificationResultSchema } from "@shared/schema";
 import multer from "multer";
 import { z } from "zod";
+import { PDFAnalyzer } from "./services/pdfAnalyzer";
 
 // Initialize Stripe
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -180,15 +181,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateDailyVerificationUsage(userId);
       }
 
-      // Import and use existing verification logic
-      const { AIEngine } = await import('../backend/ai_engine.py');
-      const aiEngine = new AIEngine();
-      await aiEngine.initialize();
-
-      const metadata = await aiEngine.extract_metadata(req.file.path);
+      // Use Node.js PDF analyzer instead of Python
+      const pdfAnalyzer = new PDFAnalyzer();
+      const metadata = await pdfAnalyzer.extractMetadata(req.file.path);
       const trustedPatterns = await storage.getTrustedPatterns();
       
-      const analysis = await aiEngine.analyze_against_patterns(metadata, trustedPatterns);
+      const analysis = await pdfAnalyzer.analyzeAgainstTrustedPatterns(metadata, trustedPatterns);
       
       const result = analysis.confidence > 90 ? 'genuine' : 
                     analysis.confidence > 50 ? 'suspicious' : 'fake';
@@ -246,13 +244,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'No file uploaded' });
       }
 
-      // Extract metadata and patterns from uploaded file
-      const { AIEngine } = await import('../backend/ai_engine.py');
-      const aiEngine = new AIEngine();
-      await aiEngine.initialize();
-
-      const metadata = await aiEngine.extract_metadata(req.file.path);
-      const patterns = await aiEngine.extract_patterns(req.file.path);
+      // Extract metadata and patterns from uploaded file using Node.js
+      const pdfAnalyzer = new PDFAnalyzer();
+      const metadata = await pdfAnalyzer.extractMetadata(req.file.path);
+      // For trusted patterns, we'll store the metadata as the pattern
+      const patterns = { metadata, documentType: 'trusted_cos' };
       
       const patternId = await storage.createTrustedPattern(
         req.file.originalname,
