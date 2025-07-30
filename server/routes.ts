@@ -13,7 +13,7 @@ if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
 }
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2024-11-20.acacia",
+  apiVersion: "2025-06-30.basil",
 });
 
 // Configure multer for file uploads
@@ -78,7 +78,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (subscription.status === 'active') {
           return res.json({
             subscriptionId: subscription.id,
-            clientSecret: subscription.latest_invoice?.payment_intent?.client_secret,
+            clientSecret: null, // Will be handled by frontend
             status: 'active'
           });
         }
@@ -114,9 +114,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update user with subscription info
       await storage.updateUserStripeInfo(userId, customer.id, subscription.id);
 
+      const paymentIntent = subscription.latest_invoice && 
+                            typeof subscription.latest_invoice === 'object' && 
+                            (subscription.latest_invoice as any).payment_intent;
+      
       res.json({
         subscriptionId: subscription.id,
-        clientSecret: subscription.latest_invoice?.payment_intent?.client_secret,
+        clientSecret: paymentIntent && typeof paymentIntent === 'object' 
+                      ? (paymentIntent as any).client_secret 
+                      : null,
         status: subscription.status
       });
     } catch (error: any) {
@@ -168,17 +174,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check authentication and limits
       if (req.isAuthenticated()) {
         userId = req.user.claims.sub;
-        const canVerify = await storage.checkDailyLimit(userId);
-        
-        if (!canVerify) {
-          return res.status(429).json({ 
-            message: 'Daily verification limit reached. Upgrade to Pro for unlimited verifications.',
-            upgradeRequired: true 
-          });
+        if (userId) {
+          const canVerify = await storage.checkDailyLimit(userId);
+          
+          if (!canVerify) {
+            return res.status(429).json({ 
+              message: 'Daily verification limit reached. Upgrade to Pro for unlimited verifications.',
+              upgradeRequired: true 
+            });
+          }
+          
+          // Update usage count for authenticated users
+          await storage.updateDailyVerificationUsage(userId);
         }
-        
-        // Update usage count for authenticated users
-        await storage.updateDailyVerificationUsage(userId);
       }
 
       // Use Node.js PDF analyzer instead of Python
