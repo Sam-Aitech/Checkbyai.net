@@ -317,9 +317,9 @@ export default function FileUploadSimple({
           
           <div className="flex items-center gap-3 mb-4">
             <div className={`px-4 py-2 rounded-full text-base font-semibold transition-all duration-700 ease-in-out transform hover:scale-105 ${
-              result.type === 'Genuine' 
+              result.type === 'genuine' 
                 ? 'bg-gradient-to-r from-green-400 to-emerald-500 text-white shadow-lg shadow-green-500/25 animate-pulse'
-                : result.type === 'Edited'
+                : result.type === 'suspicious'
                 ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white shadow-lg shadow-yellow-500/25 animate-bounce'
                 : 'bg-gradient-to-r from-red-400 to-rose-500 text-white shadow-lg shadow-red-500/25 animate-pulse'
             }`}>
