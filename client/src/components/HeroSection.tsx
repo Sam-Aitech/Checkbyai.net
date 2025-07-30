@@ -3,6 +3,7 @@ import { useSpring, animated } from 'react-spring'
 import { useInView } from 'react-intersection-observer'
 import { Shield, Zap, Lock, Award, ArrowRight, Play } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import GoogleLoginButton from '@/components/GoogleLoginButton'
 
 // Lazy load the 3D scene for better performance with fallback
 const ThreeScene = lazy(() => import('./ThreeScene'))
@@ -181,6 +182,24 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                   <Play className="mr-2 w-5 h-5" />
                   Watch Demo
                 </Button>
+              </div>
+              
+              {/* Quick Sign-up Options */}
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                  Sign up for unlimited COS checks
+                </h3>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <GoogleLoginButton size="lg" className="flex-1" />
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="flex-1"
+                    onClick={() => window.location.href = "/api/login"}
+                  >
+                    Continue with Replit
+                  </Button>
+                </div>
               </div>
               
               <div className="flex items-center space-x-6 pt-4">

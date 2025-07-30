@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import UserProfile from "@/components/UserProfile";
 import FileUploadSimple from "@/components/FileUploadSimple";
+import GoogleLoginButton from "@/components/GoogleLoginButton";
 import SEOHead from "@/components/SEOHead";
 
 // Lazy load heavy components for better performance
@@ -106,15 +107,18 @@ export default function Home() {
             </div>
             
             <div className="flex items-center space-x-4">
-              {/* Authentication temporarily disabled to prevent infinite loops */}
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => window.location.href = "/api/login"}
-              >
-                <LogIn className="mr-2 w-4 h-4" />
-                Login
-              </Button>
+              {/* Multiple login options */}
+              <div className="flex items-center space-x-2">
+                <GoogleLoginButton variant="outline" size="sm" />
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => window.location.href = "/api/login"}
+                >
+                  <LogIn className="mr-2 w-4 h-4" />
+                  Replit
+                </Button>
+              </div>
               
               <Link href="/dashboard">
                 <Button variant="outline" size="sm">
