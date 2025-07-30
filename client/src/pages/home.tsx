@@ -166,16 +166,16 @@ export default function Home() {
 
   // SEO data for home page
   const homePageSEO = {
-    title: "Document Authenticator - AI-Powered Document Verification System",
-    description: "Advanced AI-powered document verification system using machine learning to detect fake or edited documents with unprecedented accuracy. Verify PDF documents instantly with our secure authentication platform.",
-    keywords: "document verification, AI authentication, PDF verification, document validation, fake document detection, certificate verification, document security, machine learning verification",
+    title: "COS Check - Certificate of Sponsorship Verification | Free COS Document Authenticator",
+    description: "Official COS check service for Certificate of Sponsorship verification. Instantly verify COS documents with AI-powered authentication. Detect fake or edited COS certificates with 99.9% accuracy. Free COS verification check available.",
+    keywords: "COS check, Certificate of Sponsorship verification, COS document verification, COS authenticator, verify COS certificate, COS validation, fake COS detection, COS document check, Certificate of Sponsorship authenticator, UK visa COS verification",
     canonicalUrl: "https://document-authenticator.replit.app/",
     ogImage: "https://document-authenticator.replit.app/og-image.jpg",
     structuredData: {
       "@context": "https://schema.org",
       "@type": "WebApplication",
-      "name": "Document Authenticator",
-      "description": "AI-powered document verification system using machine learning to detect fake or edited documents with unprecedented accuracy",
+      "name": "COS Check - Certificate of Sponsorship Verification",
+      "description": "Official COS check service for Certificate of Sponsorship verification. AI-powered COS document authentication with instant results for UK visa applications.",
       "url": "https://document-authenticator.replit.app/",
       "applicationCategory": "SecurityApplication",
       "operatingSystem": "Web Browser",

@@ -16,5 +16,10 @@ Disallow: /api/
 # Allow important pages
 Allow: /
 Allow: /dashboard
+Allow: /cos-check
 Allow: /about
 Allow: /contact
+
+# Crawl important COS-related content
+Allow: /cos-verification
+Allow: /certificate-of-sponsorship-check
