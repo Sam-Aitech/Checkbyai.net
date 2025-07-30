@@ -151,7 +151,7 @@ Changelog:
   - Fixed TypeScript interface issues by adding confidence property to VerificationResult
   - Configured Google OAuth callback URL for current Replit domain
   - Users can now sign up with Google account or Replit account for smoother onboarding
-  - Note: Google Cloud Console requires `replit.dev` added to authorized domains and proper OAuth consent screen configuration
+  - Note: Google Cloud Console setup requires leaving authorized domains empty and configuring explicit redirect URI for Replit domain
 - July 30, 2025 (Evening). Comprehensive SEO Optimization for "COS Check" Ranking
   - Completely optimized website to rank #1 for "COS check" searches
   - Updated all meta titles, descriptions, and keywords to target Certificate of Sponsorship verification
