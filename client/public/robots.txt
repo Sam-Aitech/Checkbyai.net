@@ -23,3 +23,5 @@ Allow: /contact
 # Crawl important COS-related content
 Allow: /cos-verification
 Allow: /certificate-of-sponsorship-check
+Allow: /cos-check-ai.html
+Allow: /cos-guide.html

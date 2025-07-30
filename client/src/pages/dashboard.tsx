@@ -3,12 +3,12 @@ import SEOHead from "@/components/SEOHead";
 
 export default function DashboardPage() {
   const dashboardSEO = {
-    title: "COS Check Dashboard - Upload & Verify Certificate of Sponsorship",
-    description: "Upload and verify your Certificate of Sponsorship (COS) documents using our advanced AI-powered COS verification system. Get instant COS check results with confidence scores for document authenticity.",
-    keywords: "COS upload, verify COS documents, COS verification dashboard, Certificate of Sponsorship check, COS authenticity check, UK visa COS verification",
+    title: "COS Check by AI Dashboard - Upload & Verify Certificate of Sponsorship",
+    description: "COS check by AI dashboard - Upload and verify your Certificate of Sponsorship documents using our advanced check by AI verification system. Get instant COS check by AI results with confidence scores for document authenticity.",
+    keywords: "COS check by AI, check by AI, COS upload, verify COS documents, COS verification dashboard, Certificate of Sponsorship check, AI COS verification, artificial intelligence COS check, UK visa COS verification",
     canonicalUrl: "https://document-authenticator.replit.app/dashboard",
-    ogTitle: "COS Check Dashboard - Certificate of Sponsorship Verification",
-    ogDescription: "Upload and verify your Certificate of Sponsorship instantly with AI-powered COS authentication technology."
+    ogTitle: "COS Check by AI Dashboard - Certificate of Sponsorship Verification",
+    ogDescription: "Upload and verify your Certificate of Sponsorship instantly with check by AI authentication technology powered by artificial intelligence."
   };
 
   return (

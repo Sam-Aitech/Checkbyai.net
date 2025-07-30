@@ -150,18 +150,18 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
             <animated.div style={heroAnimation} className="space-y-8">
               <div className="inline-flex items-center px-4 py-2 bg-blue-100 dark:bg-blue-900 rounded-full text-blue-800 dark:text-blue-200 text-sm font-medium">
                 <Shield className="w-4 h-4 mr-2" />
-                COS Check - AI-Powered Verification
+                COS Check by AI - Advanced Verification
               </div>
               
               <h1 className="text-5xl lg:text-6xl font-bold text-gray-900 dark:text-white leading-tight">
-                COS Check - Verify Your
+                COS Check by AI - 
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
-                  {' '}Certificate of Sponsorship
+                  {' '}Check by AI Technology
                 </span>
               </h1>
               
               <p className="text-xl text-gray-600 dark:text-gray-300 leading-relaxed max-w-2xl">
-                Official COS check service for Certificate of Sponsorship verification. Advanced AI technology powered by machine learning algorithms to detect fake or edited COS documents with 99.9% accuracy and instant results.
+                COS check by AI - Official Certificate of Sponsorship verification service powered by advanced artificial intelligence. Check by AI technology using machine learning algorithms to detect fake or edited COS documents with 99.9% accuracy and instant results.
               </p>
               
               <div className="flex flex-col sm:flex-row gap-4">
@@ -170,7 +170,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                   className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
                   onClick={onStartVerification}
                 >
-                  Start COS Check Now
+                  Start COS Check by AI
                   <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
                 
@@ -247,32 +247,32 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
-              Why Choose Our COS Check Service?
+              Why Choose COS Check by AI?
             </h2>
             <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-              The most trusted Certificate of Sponsorship verification platform. Advanced AI technology meets enterprise-grade security to deliver unmatched COS document authentication capabilities.
+              The most trusted Certificate of Sponsorship verification platform powered by artificial intelligence. Advanced AI technology meets enterprise-grade security to deliver unmatched COS document authentication capabilities with check by AI precision.
             </p>
           </div>
           
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             <FeatureCard
               icon={<Shield className="w-8 h-8 text-blue-600" />}
-              title="Official COS Verification"
-              description="Advanced machine learning algorithms analyze Certificate of Sponsorship metadata, patterns, and structure to detect fake COS documents with 99.9% accuracy."
+              title="COS Check by AI Verification"
+              description="Advanced AI machine learning algorithms analyze Certificate of Sponsorship metadata, patterns, and structure to detect fake COS documents with 99.9% accuracy using check by AI technology."
               delay={0}
             />
             
             <FeatureCard
               icon={<Zap className="w-8 h-8 text-green-600" />}
-              title="Instant COS Check Results"
-              description="Process COS documents instantly with sub-second response times. Get immediate verification results for your Certificate of Sponsorship authenticity."
+              title="Instant COS Check by AI Results"
+              description="Process COS documents instantly with AI-powered sub-second response times. Get immediate verification results for your Certificate of Sponsorship authenticity using advanced check by AI algorithms."
               delay={200}
             />
             
             <FeatureCard
               icon={<Lock className="w-8 h-8 text-red-600" />}
-              title="Secure COS Processing"
-              description="Bank-grade encryption and secure data handling ensure your Certificate of Sponsorship documents are processed with maximum security and privacy."
+              title="Secure AI COS Processing"
+              description="Bank-grade encryption and secure AI data handling ensure your Certificate of Sponsorship documents are processed with maximum security and privacy using check by AI technology."
               delay={400}
             />
           </div>
