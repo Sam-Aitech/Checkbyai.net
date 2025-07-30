@@ -149,7 +149,7 @@ Changelog:
   - Updated authentication system to support both Google OAuth and existing Replit Auth
   - Fixed TypeScript interface issues by adding confidence property to VerificationResult
   - Configured Google OAuth callback URL for current Replit domain
-  - Removed sign-up box from homepage to focus on core COS verification functionality
+  - Removed sign-up box from homepage and added clean "Sign In" button with modal dialog containing Google and Replit auth options
   - Users can now sign up with Google account or Replit account for smoother onboarding
   - Note: Google Cloud Console setup requires leaving authorized domains empty and configuring explicit redirect URI for Replit domain
 - July 30, 2025 (Evening). Comprehensive SEO Optimization for "COS Check" Ranking
