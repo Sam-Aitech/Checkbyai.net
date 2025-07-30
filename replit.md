@@ -143,6 +143,14 @@ Result: Genuine/Edited/Fake with confidence score
 
 ```
 Changelog:
+- July 30, 2025 (Evening). Google OAuth Integration for Easier Sign-up
+  - Added Google OAuth authentication using passport-google-oauth20 strategy
+  - Created GoogleLoginButton component with official Google branding and styling
+  - Enhanced HeroSection with prominent dual authentication options (Google + Replit)
+  - Updated authentication system to support both Google OAuth and existing Replit Auth
+  - Fixed TypeScript interface issues by adding confidence property to VerificationResult
+  - Configured Google OAuth callback URL for current Replit domain
+  - Users can now sign up with Google account or Replit account for smoother onboarding
 - July 30, 2025 (Evening). Comprehensive SEO Optimization for "COS Check" Ranking
   - Completely optimized website to rank #1 for "COS check" searches
   - Updated all meta titles, descriptions, and keywords to target Certificate of Sponsorship verification

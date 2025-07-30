@@ -3,7 +3,8 @@ import { Link } from 'wouter';
 import { Lock, Crown, CheckCircle } from 'lucide-react';
 
 interface VerificationResult {
-  type: 'Genuine' | 'Edited' | 'Fake';
+  type: 'genuine' | 'suspicious' | 'fake';
+  confidence: number;
   mismatchedFields?: string[];
 }
 
@@ -135,14 +136,15 @@ export default function FileUploadSimple({
       const data = await response.json();
       
       // Transform backend response
-      const typeMapping: Record<string, 'Genuine' | 'Edited' | 'Fake'> = {
-        'genuine': 'Genuine',
-        'suspicious': 'Edited',
-        'fake': 'Fake'
+      const typeMapping: Record<string, 'genuine' | 'suspicious' | 'fake'> = {
+        'genuine': 'genuine',
+        'suspicious': 'suspicious',
+        'fake': 'fake'
       };
 
       const transformedResult: VerificationResult = {
-        type: typeMapping[data.result] || 'Fake',
+        type: typeMapping[data.result] || 'fake',
+        confidence: data.confidence || 0,
         mismatchedFields: data.mismatchedFields || []
       };
 

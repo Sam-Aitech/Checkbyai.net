@@ -108,7 +108,7 @@ export async function setupAuth(app: Express) {
         
         return done(null, sessionUser);
       } catch (error) {
-        return done(error, null);
+        return done(error, false);
       }
     }));
   }
@@ -161,7 +161,7 @@ export async function setupAuth(app: Express) {
     );
 
     app.get("/api/auth/google/callback", 
-      passport.authenticate("google", { failureRedirect: "/login" }),
+      passport.authenticate("google", { failureRedirect: "/?error=auth_failed" }),
       (req, res) => {
         // Successful authentication, redirect to dashboard
         res.redirect("/dashboard");
