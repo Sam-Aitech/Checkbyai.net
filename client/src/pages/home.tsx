@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import UserProfile from "@/components/UserProfile";
 import FileUploadSimple from "@/components/FileUploadSimple";
+import SEOHead from "@/components/SEOHead";
 
 // Lazy load heavy components for better performance
 const UserPortal = lazy(() => import("@/components/UserPortal"));
@@ -76,7 +77,7 @@ export default function Home() {
               
               <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
                 <Database className="w-4 h-4" />
-                <span>{stats?.trustedPatterns || 0}</span>
+                <span>{(stats as any)?.trustedPatterns || 0}</span>
               </div>
 
               <UserProfile />
@@ -147,7 +148,7 @@ export default function Home() {
               
               <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
                 <Database className="w-4 h-4" />
-                <span>{stats?.trustedPatterns || 0}</span>
+                <span>{(stats as any)?.trustedPatterns || 0}</span>
               </div>
             </div>
           </div>
@@ -163,9 +164,45 @@ export default function Home() {
     </div>
   );
 
+  // SEO data for home page
+  const homePageSEO = {
+    title: "Document Authenticator - AI-Powered Document Verification System",
+    description: "Advanced AI-powered document verification system using machine learning to detect fake or edited documents with unprecedented accuracy. Verify PDF documents instantly with our secure authentication platform.",
+    keywords: "document verification, AI authentication, PDF verification, document validation, fake document detection, certificate verification, document security, machine learning verification",
+    canonicalUrl: "https://document-authenticator.replit.app/",
+    ogImage: "https://document-authenticator.replit.app/og-image.jpg",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Document Authenticator",
+      "description": "AI-powered document verification system using machine learning to detect fake or edited documents with unprecedented accuracy",
+      "url": "https://document-authenticator.replit.app/",
+      "applicationCategory": "SecurityApplication",
+      "operatingSystem": "Web Browser",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "featureList": [
+        "AI-powered document verification",
+        "PDF metadata analysis", 
+        "Fake document detection",
+        "Real-time verification results",
+        "Secure document processing"
+      ],
+      "provider": {
+        "@type": "Organization",
+        "name": "Document Authenticator",
+        "url": "https://document-authenticator.replit.app/"
+      }
+    }
+  };
+
   // Return JSX with verification modal
   return (
     <>
+      <SEOHead {...homePageSEO} />
       {/* Main Page Content */}
       {mainContent}
       
@@ -203,7 +240,7 @@ export default function Home() {
                   
                   <FileUploadSimple
                     onFileUpload={handleFileUpload}
-                    onResult={handleVerificationResult}
+                    onVerificationResult={handleVerificationResult}
                     onError={handleVerificationError}
                     onLoading={setIsLoading}
                     isAdmin={false}

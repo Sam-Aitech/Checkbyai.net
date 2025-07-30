@@ -1,0 +1,20 @@
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://document-authenticator.replit.app/sitemap.xml
+
+# Crawl-delay
+Crawl-delay: 1
+
+# Block development files
+Disallow: /src/
+Disallow: /*.js
+Disallow: /*.css
+Disallow: /api/
+
+# Allow important pages
+Allow: /
+Allow: /dashboard
+Allow: /about
+Allow: /contact
