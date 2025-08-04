@@ -4,6 +4,41 @@ import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
 
+// WWW redirect middleware - redirect www to non-www
+app.use((req, res, next) => {
+  if (req.headers.host && req.headers.host.startsWith('www.')) {
+    const newHost = req.headers.host.replace('www.', '');
+    const redirectUrl = `${req.protocol}://${newHost}${req.originalUrl}`;
+    return res.redirect(301, redirectUrl);
+  }
+  next();
+});
+
+// Security and Performance Headers
+app.use((req, res, next) => {
+  // Security headers
+  res.header('X-Content-Type-Options', 'nosniff');
+  res.header('X-Frame-Options', 'DENY');
+  res.header('X-XSS-Protection', '1; mode=block');
+  res.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+  
+  // Performance headers for static assets
+  if (req.url.match(/\.(jpg|jpeg|png|gif|ico|css|js|svg|woff|woff2|ttf|eot)$/)) {
+    res.header('Cache-Control', 'public, max-age=31536000, immutable'); // 1 year
+    res.header('Expires', new Date(Date.now() + 31536000000).toUTCString());
+  }
+  
+  // Disable directory listing and powered-by header
+  res.header('X-Powered-By', '');
+  
+  // Block directory listing attempts
+  if (req.url.endsWith('/') && req.url !== '/') {
+    return res.status(404).send('Directory listing disabled');
+  }
+  
+  next();
+});
+
 // Add CORS middleware
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');

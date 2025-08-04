@@ -5,6 +5,7 @@ import { Shield, Zap, Lock, Award, ArrowRight, Play, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import GoogleLoginButton from '@/components/GoogleLoginButton'
+import NavigationLinks from '@/components/NavigationLinks'
 
 // Lazy load the 3D scene for better performance with fallback
 const ThreeScene = lazy(() => import('./ThreeScene'))
@@ -161,7 +162,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
               </h1>
               
               <p className="text-xl text-gray-600 dark:text-gray-300 leading-relaxed max-w-2xl">
-                COS check by AI - Official Certificate of Sponsorship verification service powered by advanced artificial intelligence. Check by AI technology using machine learning algorithms to detect fake or edited COS documents with 99.9% accuracy and instant results.
+                <a href="/cos-check-ai.html" className="text-blue-600 hover:text-blue-700 underline">COS check by AI</a> - Official Certificate of Sponsorship verification service powered by advanced artificial intelligence. <a href="/dashboard" className="text-blue-600 hover:text-blue-700 underline">Check by AI technology</a> using machine learning algorithms to detect fake or edited COS documents with 99.9% accuracy and instant results.
               </p>
               
               <div className="flex flex-col sm:flex-row gap-4">
@@ -250,7 +251,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
               Why Choose COS Check by AI?
             </h2>
             <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-              The most trusted Certificate of Sponsorship verification platform powered by artificial intelligence. Advanced AI technology meets enterprise-grade security to deliver unmatched COS document authentication capabilities with check by AI precision.
+              The most trusted <a href="/cos-guide.html" className="text-blue-600 hover:text-blue-700 underline">Certificate of Sponsorship verification platform</a> powered by artificial intelligence. Advanced AI technology meets enterprise-grade security to deliver unmatched <a href="/dashboard" className="text-blue-600 hover:text-blue-700 underline">COS document authentication</a> capabilities with check by AI precision.
             </p>
           </div>
           
@@ -297,6 +298,21 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
             <StatCard number="0.001" label="Average Response Time (s)" delay={400} />
             <StatCard number="10000+" label="Documents Verified" delay={600} />
           </div>
+        </div>
+      </div>
+      
+      {/* Quick Navigation Section */}
+      <div className="py-16 bg-white dark:bg-gray-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+              Explore COS Check by AI Services
+            </h2>
+            <p className="text-lg text-gray-600 dark:text-gray-300">
+              Discover all our AI-powered verification tools and resources
+            </p>
+          </div>
+          <NavigationLinks className="max-w-4xl mx-auto" />
         </div>
       </div>
     </div>
