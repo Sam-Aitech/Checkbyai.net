@@ -46,8 +46,7 @@ function FeatureCard({ icon, title, description, delay }: FeatureCardProps) {
           {title}
         </h3>
       </div>
-      <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
-        {description}
+      <p className="text-gray-600 dark:text-gray-300 leading-relaxed" dangerouslySetInnerHTML={{ __html: description }}>
       </p>
     </animated.div>
   )
@@ -259,21 +258,21 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
             <FeatureCard
               icon={<Shield className="w-8 h-8 text-blue-600" />}
               title="COS Check by AI Verification"
-              description="Advanced AI machine learning algorithms analyze Certificate of Sponsorship metadata, patterns, and structure to detect fake COS documents with 99.9% accuracy using check by AI technology."
+              description="Advanced AI machine learning algorithms analyze Certificate of Sponsorship metadata, patterns, and structure to detect fake COS documents with 99.9% accuracy using <a href='/cos-check-ai.html' class='text-blue-600 hover:text-blue-700 underline'>check by AI technology</a>."
               delay={0}
             />
             
             <FeatureCard
               icon={<Zap className="w-8 h-8 text-green-600" />}
               title="Instant COS Check by AI Results"
-              description="Process COS documents instantly with AI-powered sub-second response times. Get immediate verification results for your Certificate of Sponsorship authenticity using advanced check by AI algorithms."
+              description="Process COS documents instantly with AI-powered sub-second response times. Get immediate <a href='/dashboard' class='text-blue-600 hover:text-blue-700 underline'>verification results</a> for your Certificate of Sponsorship authenticity using advanced check by AI algorithms."
               delay={200}
             />
             
             <FeatureCard
               icon={<Lock className="w-8 h-8 text-red-600" />}
               title="Secure AI COS Processing"
-              description="Bank-grade encryption and secure AI data handling ensure your Certificate of Sponsorship documents are processed with maximum security and privacy using check by AI technology."
+              description="Bank-grade encryption and secure AI data handling ensure your <a href='/cos-guide.html' class='text-blue-600 hover:text-blue-700 underline'>Certificate of Sponsorship documents</a> are processed with maximum security and privacy using check by AI technology."
               delay={400}
             />
           </div>
@@ -288,7 +287,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
               Trusted by Organizations Worldwide
             </h2>
             <p className="text-xl text-gray-600 dark:text-gray-300">
-              Real performance metrics from real-world deployment
+              Real performance metrics from real-world <a href="/dashboard" className="text-blue-600 hover:text-blue-700 underline">COS check by AI deployment</a>
             </p>
           </div>
           
@@ -309,7 +308,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
               Explore COS Check by AI Services
             </h2>
             <p className="text-lg text-gray-600 dark:text-gray-300">
-              Discover all our AI-powered verification tools and resources
+              Discover all our <a href="/cos-check-ai.html" className="text-blue-600 hover:text-blue-700 underline">AI-powered verification tools</a> and <a href="/cos-guide.html" className="text-blue-600 hover:text-blue-700 underline">resources</a> for Certificate of Sponsorship checking
             </p>
           </div>
           <NavigationLinks className="max-w-4xl mx-auto" />
