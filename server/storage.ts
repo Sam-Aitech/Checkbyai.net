@@ -2,13 +2,16 @@ import {
   users,
   trustedPatterns,
   verificationResults,
+  feedback,
   type User,
   type UpsertUser,
   type TrustedPattern,
   type VerificationResult,
+  type Feedback,
+  type InsertFeedback,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, gte, count } from "drizzle-orm";
+import { eq, desc, gte, count, avg, sql } from "drizzle-orm";
 
 // Interface for storage operations
 export interface IStorage {
@@ -42,6 +45,16 @@ export interface IStorage {
     suspiciousToday: number;
     totalUsers: number;
     proUsers: number;
+  }>;
+  
+  // Feedback operations
+  createFeedback(feedbackData: InsertFeedback): Promise<Feedback>;
+  getFeedbackStats(): Promise<{
+    totalFeedback: number;
+    averageRating: number;
+    helpfulCount: number;
+    accuracyBreakdown: { correct: number; incorrect: number; unsure: number };
+    recentFeedback: Feedback[];
   }>;
 }
 
@@ -225,6 +238,68 @@ export class DatabaseStorage implements IStorage {
       suspiciousToday: Math.floor(suspiciousToday.count * 0.15), // Approximate suspicious rate
       totalUsers: totalUsers.count,
       proUsers: proUsers.count,
+    };
+  }
+
+  async createFeedback(feedbackData: InsertFeedback): Promise<Feedback> {
+    const [newFeedback] = await db
+      .insert(feedback)
+      .values(feedbackData)
+      .returning();
+    return newFeedback;
+  }
+
+  async getFeedbackStats(): Promise<{
+    totalFeedback: number;
+    averageRating: number;
+    helpfulCount: number;
+    accuracyBreakdown: { correct: number; incorrect: number; unsure: number };
+    recentFeedback: Feedback[];
+  }> {
+    const [totalCount] = await db
+      .select({ count: count() })
+      .from(feedback);
+
+    const [avgRating] = await db
+      .select({ average: avg(feedback.rating) })
+      .from(feedback);
+
+    const [helpfulCount] = await db
+      .select({ count: count() })
+      .from(feedback)
+      .where(eq(feedback.helpful, true));
+
+    const [correctCount] = await db
+      .select({ count: count() })
+      .from(feedback)
+      .where(eq(feedback.accuracy, 'correct'));
+
+    const [incorrectCount] = await db
+      .select({ count: count() })
+      .from(feedback)
+      .where(eq(feedback.accuracy, 'incorrect'));
+
+    const [unsureCount] = await db
+      .select({ count: count() })
+      .from(feedback)
+      .where(eq(feedback.accuracy, 'unsure'));
+
+    const recentFeedback = await db
+      .select()
+      .from(feedback)
+      .orderBy(desc(feedback.createdAt))
+      .limit(10);
+
+    return {
+      totalFeedback: totalCount.count,
+      averageRating: Number(avgRating.average) || 0,
+      helpfulCount: helpfulCount.count,
+      accuracyBreakdown: {
+        correct: correctCount.count,
+        incorrect: incorrectCount.count,
+        unsure: unsureCount.count,
+      },
+      recentFeedback,
     };
   }
 }

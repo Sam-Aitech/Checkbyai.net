@@ -62,17 +62,36 @@ export const verificationResults = pgTable("verification_results", {
   verifiedAt: timestamp("verified_at").defaultNow(),
 });
 
+// Feedback table for continuous improvement
+export const feedback = pgTable("feedback", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  verificationId: integer("verification_id").references(() => verificationResults.id),
+  userId: varchar("user_id").references(() => users.id),
+  rating: integer("rating"), // 1-5 stars
+  comment: text("comment"),
+  helpful: boolean("helpful"), // Was the verification helpful?
+  accuracy: varchar("accuracy"), // 'correct', 'incorrect', 'unsure'
+  suggestedResult: varchar("suggested_result"), // If user thinks result was wrong
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Type exports
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
 export type TrustedPattern = typeof trustedPatterns.$inferSelect;
 export type VerificationResult = typeof verificationResults.$inferSelect;
+export type Feedback = typeof feedback.$inferSelect;
 
 // Zod schemas
 export const insertUserSchema = createInsertSchema(users);
 export const insertTrustedPatternSchema = createInsertSchema(trustedPatterns);
 export const insertVerificationResultSchema = createInsertSchema(verificationResults);
+export const insertFeedbackSchema = createInsertSchema(feedback).omit({ 
+  id: true, 
+  createdAt: true 
+});
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertTrustedPattern = z.infer<typeof insertTrustedPatternSchema>;
 export type InsertVerificationResult = z.infer<typeof insertVerificationResultSchema>;
+export type InsertFeedback = z.infer<typeof insertFeedbackSchema>;
