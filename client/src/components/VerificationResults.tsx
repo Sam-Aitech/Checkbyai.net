@@ -1,12 +1,19 @@
+import { useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import FeedbackForm from "./FeedbackForm";
+
 interface VerificationResultsProps {
   result: {
     type: 'genuine' | 'suspicious' | 'fake';
     confidence: number;
     mismatchedFields?: string[];
   };
+  verificationId?: number;
 }
 
-export default function VerificationResults({ result }: VerificationResultsProps) {
+export default function VerificationResults({ result, verificationId }: VerificationResultsProps) {
+  const [showFeedback, setShowFeedback] = useState(false);
   const getResultColor = () => {
     switch (result.type) {
       case 'genuine':
@@ -62,6 +69,29 @@ export default function VerificationResults({ result }: VerificationResultsProps
             {result.type === 'suspicious' && "The document's metadata partially matches our verified templates. It may have been altered but retains some original properties."}
             {result.type === 'fake' && "The document's metadata does not match any of our verified templates. It may have been fabricated or heavily altered."}
           </p>
+        </div>
+
+        {/* Feedback Section */}
+        <div className="pt-4 border-t border-gray-200 dark:border-gray-600">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowFeedback(!showFeedback)}
+            className="w-full flex items-center justify-center space-x-2"
+            data-testid="toggle-feedback"
+          >
+            <span>Rate this verification</span>
+            {showFeedback ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </Button>
+          
+          {showFeedback && (
+            <div className="mt-4">
+              <FeedbackForm 
+                verificationId={verificationId}
+                onSubmitSuccess={() => setShowFeedback(false)}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>
