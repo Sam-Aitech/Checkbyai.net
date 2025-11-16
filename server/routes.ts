@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import Stripe from "stripe";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated, isAdmin } from "./replitAuth";
-import { insertVerificationResultSchema } from "@shared/schema";
+import { insertVerificationResultSchema, insertFeedbackSchema } from "@shared/schema";
 import multer from "multer";
 import { z } from "zod";
 import { PDFAnalyzer } from "./services/pdfAnalyzer";
@@ -289,6 +289,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching recent activity:", error);
       res.status(500).json({ message: "Failed to fetch recent activity" });
+    }
+  });
+
+  // Feedback routes
+  app.post('/api/feedback', async (req: any, res) => {
+    try {
+      const feedbackData = insertFeedbackSchema.parse(req.body);
+      
+      // Add userId if authenticated
+      if (req.isAuthenticated()) {
+        feedbackData.userId = req.user.claims.sub;
+      }
+      
+      const newFeedback = await storage.createFeedback(feedbackData);
+      res.json(newFeedback);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid feedback data", errors: error.errors });
+      }
+      console.error("Error creating feedback:", error);
+      res.status(500).json({ message: "Failed to submit feedback" });
+    }
+  });
+
+  app.get('/api/feedback/stats', isAdmin, async (req, res) => {
+    try {
+      const stats = await storage.getFeedbackStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching feedback stats:", error);
+      res.status(500).json({ message: "Failed to fetch feedback stats" });
     }
   });
 
