@@ -126,11 +126,12 @@ export class PDFAnalyzer {
       return metadata;
     } catch (error) {
       console.error('Error extracting PDF metadata:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return {
         fileSize: 0,
         pages: 0,
         xmp_tags: {},
-        error: error.message
+        error: errorMessage
       };
     }
   }

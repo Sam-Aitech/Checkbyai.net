@@ -15,11 +15,7 @@ import { Crown, User, LogOut, Settings } from "lucide-react";
 import SubscriptionModal from "./SubscriptionModal";
 
 export default function UserProfile() {
-  // Temporarily disable auth to prevent infinite loops
-  const user = null;
-  const isAuthenticated = false;
-  const isPro = false;
-  const isAdmin = false;
+  const { user, isAuthenticated, isPro, isAdmin } = useAuth();
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
 
   if (!isAuthenticated) {
@@ -51,7 +47,7 @@ export default function UserProfile() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-8 w-8 rounded-full">
               <Avatar className="h-8 w-8">
-                <AvatarImage src={user?.profileImageUrl} alt={user?.email || ''} />
+                <AvatarImage src={user?.profileImageUrl ?? undefined} alt={user?.email || ''} />
                 <AvatarFallback className="text-xs">{initials}</AvatarFallback>
               </Avatar>
             </Button>

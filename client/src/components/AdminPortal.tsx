@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import FileUpload from "./FileUpload";
+import type { StatsResponse, TrustedPattern, VerificationResult, AnalysisDocument } from "@shared/api-types";
 
 import { Database, CheckCircle, AlertTriangle, TrendingUp, Search, Trash2, Download, Plus, Lock, ShieldCheck, FileSearch, Code, Save, X, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,7 @@ export default function AdminPortal() {
   const [validateMetadata, setValidateMetadata] = useState(true);
   const [autoApprove, setAutoApprove] = useState(false);
   const [activeTab, setActiveTab] = useState("dashboard");
-  const [analysisDocument, setAnalysisDocument] = useState(null);
+  const [analysisDocument, setAnalysisDocument] = useState<AnalysisDocument | null>(null);
   const [decisionNotes, setDecisionNotes] = useState("");
   const [adminCommands, setAdminCommands] = useState("");
 
@@ -26,17 +27,17 @@ export default function AdminPortal() {
   const { isAuthenticated, isAdmin, isLoading, user } = useAuth();
 
   // All hooks must be called before any conditional logic
-  const { data: stats } = useQuery({
+  const { data: stats } = useQuery<StatsResponse>({
     queryKey: ['/api/stats'],
     enabled: isAuthenticated && isAdmin,
   });
 
-  const { data: trustedPatterns = [] } = useQuery({
+  const { data: trustedPatterns = [] } = useQuery<TrustedPattern[]>({
     queryKey: ['/api/trusted-patterns'],
     enabled: isAuthenticated && isAdmin,
   });
 
-  const { data: recentActivity = [] } = useQuery({
+  const { data: recentActivity = [] } = useQuery<VerificationResult[]>({
     queryKey: ['/api/admin/recent-activity'],
     enabled: isAuthenticated && isAdmin,
   });
@@ -280,13 +281,13 @@ export default function AdminPortal() {
               {user && (
                 <div className="text-right">
                   <p className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white">
-                    {user.first_name} {user.last_name}
+                    {user.firstName} {user.lastName}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">Administrator</p>
                 </div>
               )}
               <img
-                src={user?.profile_image_url || '/default-avatar.png'}
+                src={user?.profileImageUrl || '/default-avatar.png'}
                 alt="Profile"
                 className="h-8 w-8 sm:h-10 sm:w-10 rounded-full"
               />
@@ -426,7 +427,7 @@ export default function AdminPortal() {
               <Checkbox
                 id="validateMetadata"
                 checked={validateMetadata}
-                onCheckedChange={setValidateMetadata}
+                onCheckedChange={(checked) => setValidateMetadata(checked === true)}
               />
               <label htmlFor="validateMetadata" className="text-sm text-gray-700 touch-manipulation">
                 Validate metadata patterns
@@ -436,7 +437,7 @@ export default function AdminPortal() {
               <Checkbox
                 id="autoApprove"
                 checked={autoApprove}
-                onCheckedChange={setAutoApprove}
+                onCheckedChange={(checked) => setAutoApprove(checked === true)}
               />
               <label htmlFor="autoApprove" className="text-sm text-gray-700 touch-manipulation">
                 Auto-approve verified documents
