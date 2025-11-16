@@ -102,8 +102,8 @@ app.use((req, res, next) => {
 
   // Clean URL middleware - serve .html files without extension
   app.use((req, res, next) => {
-    // Skip if URL already has an extension or is an API route
-    if (req.path.includes('.') || req.path.startsWith('/api/') || req.path === '/') {
+    // Skip if URL already has an extension, is an API route, or is a Vite internal route
+    if (req.path.includes('.') || req.path.startsWith('/api/') || req.path.startsWith('/@') || req.path.startsWith('/src/') || req.path === '/') {
       return next();
     }
     
