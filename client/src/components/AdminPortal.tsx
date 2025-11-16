@@ -7,11 +7,12 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import FileUpload from "./FileUpload";
 import type { StatsResponse, TrustedPattern, VerificationResult, AnalysisDocument } from "@shared/api-types";
 
-import { Database, CheckCircle, AlertTriangle, TrendingUp, Search, Trash2, Download, Plus, Lock, ShieldCheck, FileSearch, Code, Save, X, Eye } from "lucide-react";
+import { Database, CheckCircle, AlertTriangle, TrendingUp, Search, Trash2, Download, Plus, Lock, ShieldCheck, FileSearch, Code, Save, X, Eye, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import FeedbackAnalytics from "./FeedbackAnalytics";
 
 export default function AdminPortal() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -318,6 +319,17 @@ export default function AdminPortal() {
               >
                 <FileSearch className="w-4 h-4 inline mr-2" />
                 Document Analysis
+              </button>
+              <button
+                onClick={() => setActiveTab("feedback")}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === "feedback"
+                    ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                    : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                }`}
+              >
+                <MessageSquare className="w-4 h-4 inline mr-2" />
+                User Feedback
               </button>
             </nav>
           </div>
@@ -862,6 +874,22 @@ export default function AdminPortal() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Feedback Tab */}
+        {activeTab === "feedback" && (
+          <div>
+            <div className="text-center mb-8 sm:mb-12">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-3 sm:mb-4">
+                User Feedback Analytics
+              </h2>
+              <p className="text-sm sm:text-lg text-gray-600 dark:text-gray-400 max-w-3xl mx-auto px-2">
+                Monitor user feedback to improve AI verification accuracy and user experience
+              </p>
+            </div>
+            
+            <FeedbackAnalytics />
           </div>
         )}
       </div>
