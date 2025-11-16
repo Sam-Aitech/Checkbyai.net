@@ -41,12 +41,18 @@ export default function FeedbackAnalytics() {
     return null;
   }
 
-  const accuracyPercentage = stats.totalFeedback > 0
-    ? Math.round((stats.accuracyBreakdown.correct / stats.totalFeedback) * 100)
+  const totalAccuracyResponses = (stats.accuracyBreakdown.correct || 0) + (stats.accuracyBreakdown.incorrect || 0) + (stats.accuracyBreakdown.unsure || 0);
+  
+  const accuracyPercentage = totalAccuracyResponses > 0
+    ? Math.round((stats.accuracyBreakdown.correct / totalAccuracyResponses) * 100)
     : 0;
 
   const helpfulPercentage = stats.totalFeedback > 0
     ? Math.round((stats.helpfulCount / stats.totalFeedback) * 100)
+    : 0;
+    
+  const displayRating = typeof stats.averageRating === 'number' && !isNaN(stats.averageRating) 
+    ? stats.averageRating 
     : 0;
 
   return (
@@ -74,7 +80,7 @@ export default function FeedbackAnalytics() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold flex items-center">
-              {stats.averageRating.toFixed(1)}
+              {displayRating.toFixed(1)}
               <span className="text-sm text-muted-foreground ml-1">/ 5.0</span>
             </div>
             <div className="flex mt-1">
@@ -82,7 +88,7 @@ export default function FeedbackAnalytics() {
                 <Star
                   key={star}
                   className={`w-4 h-4 ${
-                    star <= Math.round(stats.averageRating)
+                    star <= Math.round(displayRating)
                       ? "fill-yellow-400 text-yellow-400"
                       : "text-gray-300"
                   }`}
@@ -139,8 +145,8 @@ export default function FeedbackAnalytics() {
                   <div
                     className="bg-green-500 h-2.5 rounded-full"
                     style={{
-                      width: stats.totalFeedback > 0
-                        ? `${(stats.accuracyBreakdown.correct / stats.totalFeedback) * 100}%`
+                      width: totalAccuracyResponses > 0
+                        ? `${(stats.accuracyBreakdown.correct / totalAccuracyResponses) * 100}%`
                         : '0%',
                     }}
                   ></div>
@@ -161,8 +167,8 @@ export default function FeedbackAnalytics() {
                   <div
                     className="bg-red-500 h-2.5 rounded-full"
                     style={{
-                      width: stats.totalFeedback > 0
-                        ? `${(stats.accuracyBreakdown.incorrect / stats.totalFeedback) * 100}%`
+                      width: totalAccuracyResponses > 0
+                        ? `${(stats.accuracyBreakdown.incorrect / totalAccuracyResponses) * 100}%`
                         : '0%',
                     }}
                   ></div>
@@ -183,8 +189,8 @@ export default function FeedbackAnalytics() {
                   <div
                     className="bg-yellow-500 h-2.5 rounded-full"
                     style={{
-                      width: stats.totalFeedback > 0
-                        ? `${(stats.accuracyBreakdown.unsure / stats.totalFeedback) * 100}%`
+                      width: totalAccuracyResponses > 0
+                        ? `${(stats.accuracyBreakdown.unsure / totalAccuracyResponses) * 100}%`
                         : '0%',
                     }}
                   ></div>

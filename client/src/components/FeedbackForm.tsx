@@ -26,11 +26,7 @@ export default function FeedbackForm({ verificationId, onSubmitSuccess }: Feedba
 
   const submitFeedbackMutation = useMutation({
     mutationFn: async (feedbackData: any) => {
-      return await apiRequest("/api/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(feedbackData),
-      });
+      return await apiRequest("POST", "/api/feedback", feedbackData);
     },
     onSuccess: () => {
       setSubmitted(true);
@@ -64,7 +60,7 @@ export default function FeedbackForm({ verificationId, onSubmitSuccess }: Feedba
     const feedbackData = {
       verificationId: verificationId || null,
       rating,
-      helpful: helpful || null,
+      helpful: helpful === null ? null : helpful,
       accuracy: accuracy || null,
       suggestedResult: suggestedResult || null,
       comment: comment || null,

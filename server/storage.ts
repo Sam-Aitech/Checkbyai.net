@@ -291,13 +291,13 @@ export class DatabaseStorage implements IStorage {
       .limit(10);
 
     return {
-      totalFeedback: totalCount.count,
+      totalFeedback: Number(totalCount.count) || 0,
       averageRating: Number(avgRating.average) || 0,
-      helpfulCount: helpfulCount.count,
+      helpfulCount: Number(helpfulCount.count) || 0,
       accuracyBreakdown: {
-        correct: correctCount.count,
-        incorrect: incorrectCount.count,
-        unsure: unsureCount.count,
+        correct: Number(correctCount.count) || 0,
+        incorrect: Number(incorrectCount.count) || 0,
+        unsure: Number(unsureCount.count) || 0,
       },
       recentFeedback,
     };

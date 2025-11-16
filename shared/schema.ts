@@ -67,11 +67,11 @@ export const feedback = pgTable("feedback", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   verificationId: integer("verification_id").references(() => verificationResults.id),
   userId: varchar("user_id").references(() => users.id),
-  rating: integer("rating"), // 1-5 stars
+  rating: integer("rating").notNull(), // 1-5 stars (required)
   comment: text("comment"),
-  helpful: boolean("helpful"), // Was the verification helpful?
-  accuracy: varchar("accuracy"), // 'correct', 'incorrect', 'unsure'
-  suggestedResult: varchar("suggested_result"), // If user thinks result was wrong
+  helpful: boolean("helpful"),
+  accuracy: varchar("accuracy"),
+  suggestedResult: varchar("suggested_result"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
