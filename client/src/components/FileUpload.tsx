@@ -121,14 +121,15 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
       console.log('Verification response:', data);
       
       // Transform backend response
-      const typeMapping: Record<string, 'Genuine' | 'Edited' | 'Fake'> = {
-        'genuine': 'Genuine',
-        'suspicious': 'Edited',
-        'fake': 'Fake'
+      const typeMapping: Record<string, 'genuine' | 'suspicious' | 'fake'> = {
+        'genuine': 'genuine',
+        'suspicious': 'suspicious',
+        'fake': 'fake'
       };
 
       const transformedResult = {
-        type: typeMapping[data.result] || 'Fake',
+        type: typeMapping[data.result] || 'fake',
+        confidence: data.confidence || 0,
         mismatchedFields: data.mismatchedFields || []
       };
 

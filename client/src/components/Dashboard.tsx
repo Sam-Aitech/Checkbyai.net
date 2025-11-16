@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useQuery } from "@tanstack/react-query";
 import FileUploadSimple from './FileUploadSimple';
+import type { User } from '@shared/api-types';
 
 interface VerificationResult {
-  type: 'Genuine' | 'Edited' | 'Fake';
+  type: 'genuine' | 'suspicious' | 'fake';
   confidence: number;
   mismatchedFields?: string[];
 }
@@ -12,7 +13,7 @@ export default function Dashboard() {
   const [file, setFile] = useState<File | null>(null);
   
   // Check if user is admin
-  const { data: user } = useQuery({
+  const { data: user } = useQuery<User>({
     queryKey: ['/api/auth/user'],
     retry: false
   });
@@ -59,12 +60,6 @@ export default function Dashboard() {
           </div>
         )}
       </div>
-      
-      {result && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-6">
-          <VerificationResults result={result} />
-        </div>
-      )}
     </div>
   );
 }

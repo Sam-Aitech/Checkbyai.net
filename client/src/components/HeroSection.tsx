@@ -1,5 +1,5 @@
 import { useState, useEffect, Suspense, lazy } from 'react'
-import { useSpring, animated } from 'react-spring'
+import { useSpring, animated } from '@react-spring/web'
 import { useInView } from 'react-intersection-observer'
 import { Shield, Zap, Lock, Award, ArrowRight, Play, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'

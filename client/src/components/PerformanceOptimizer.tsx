@@ -1,9 +1,9 @@
 import { useEffect, useState, ReactNode } from 'react'
-// import { getCLS, getFID, getFCP, getLCP, getTTFB } from 'web-vitals'
+import { onCLS, onINP, onFCP, onLCP, onTTFB, type Metric } from 'web-vitals'
 
 interface PerformanceMetrics {
   cls: number | null
-  fid: number | null
+  inp: number | null
   fcp: number | null
   lcp: number | null
   ttfb: number | null
@@ -20,18 +20,18 @@ interface LazyComponentProps {
 export function usePerformanceMetrics() {
   const [metrics, setMetrics] = useState<PerformanceMetrics>({
     cls: null,
-    fid: null,
+    inp: null,
     fcp: null,
     lcp: null,
     ttfb: null,
   })
 
   useEffect(() => {
-    getCLS((metric) => setMetrics(prev => ({ ...prev, cls: metric.value })))
-    getFID((metric) => setMetrics(prev => ({ ...prev, fid: metric.value })))
-    getFCP((metric) => setMetrics(prev => ({ ...prev, fcp: metric.value })))
-    getLCP((metric) => setMetrics(prev => ({ ...prev, lcp: metric.value })))
-    getTTFB((metric) => setMetrics(prev => ({ ...prev, ttfb: metric.value })))
+    onCLS((metric: Metric) => setMetrics(prev => ({ ...prev, cls: metric.value })))
+    onINP((metric: Metric) => setMetrics(prev => ({ ...prev, inp: metric.value })))
+    onFCP((metric: Metric) => setMetrics(prev => ({ ...prev, fcp: metric.value })))
+    onLCP((metric: Metric) => setMetrics(prev => ({ ...prev, lcp: metric.value })))
+    onTTFB((metric: Metric) => setMetrics(prev => ({ ...prev, ttfb: metric.value })))
   }, [])
 
   return metrics

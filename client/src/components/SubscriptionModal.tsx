@@ -107,8 +107,11 @@ export default function SubscriptionModal({ open, onOpenChange, onSuccess }: Sub
   const [clientSecret, setClientSecret] = useState("");
   const { toast } = useToast();
 
-  const createSubscription = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/create-subscription"),
+  const createSubscription = useMutation<{ clientSecret: string }>({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/create-subscription");
+      return (await res.json()) as { clientSecret: string };
+    },
     onSuccess: (data) => {
       setClientSecret(data.clientSecret);
     },

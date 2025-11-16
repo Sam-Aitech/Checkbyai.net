@@ -5,9 +5,11 @@ import { CloudUpload, CheckCircle, AlertTriangle, XCircle, Clock, Loader2 } from
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import type { User } from '@shared/api-types';
 
 interface VerificationResult {
-  type: 'Genuine' | 'Edited' | 'Fake';
+  type: 'genuine' | 'suspicious' | 'fake';
+  confidence: number;
   mismatchedFields?: string[];
 }
 
@@ -24,26 +26,12 @@ export default function UserPortal() {
   const { toast } = useToast();
 
   // Check if user is admin
-  const { data: user } = useQuery({
+  const { data: user } = useQuery<User>({
     queryKey: ['/api/auth/user'],
     retry: false
   });
   
   const isAdmin = user?.role === 'admin';
-
-  const transformResult = (backendResult: any): VerificationResult => {
-    // Transform backend response to match our interface
-    const typeMapping: Record<string, 'Genuine' | 'Edited' | 'Fake'> = {
-      'genuine': 'Genuine',
-      'suspicious': 'Edited',
-      'fake': 'Fake'
-    };
-
-    return {
-      type: typeMapping[backendResult.result] || 'Fake',
-      mismatchedFields: backendResult.mismatchedFields || []
-    };
-  };
 
   // Verification is handled by FileUpload component directly
 
@@ -192,25 +180,25 @@ export default function UserPortal() {
             <div className="mt-8 pt-6 border-t border-gray-200">
               <h4 className="text-lg font-semibold text-gray-900 mb-4">Verification Results</h4>
               <div className={`p-6 rounded-lg border-2 ${
-                verificationResult.type === 'Genuine' 
+                verificationResult.type === 'genuine' 
                   ? 'bg-green-50 border-green-200' 
-                  : verificationResult.type === 'Edited'
+                  : verificationResult.type === 'suspicious'
                   ? 'bg-yellow-50 border-yellow-200'
                   : 'bg-red-50 border-red-200'
               }`}>
                 <div className="flex items-center space-x-3">
-                  {verificationResult.type === 'Genuine' && <CheckCircle className="h-8 w-8 text-green-600" />}
-                  {verificationResult.type === 'Edited' && <AlertTriangle className="h-8 w-8 text-yellow-600" />}
-                  {verificationResult.type === 'Fake' && <XCircle className="h-8 w-8 text-red-600" />}
+                  {verificationResult.type === 'genuine' && <CheckCircle className="h-8 w-8 text-green-600" />}
+                  {verificationResult.type === 'suspicious' && <AlertTriangle className="h-8 w-8 text-yellow-600" />}
+                  {verificationResult.type === 'fake' && <XCircle className="h-8 w-8 text-red-600" />}
                   
                   <div>
                     <h5 className="text-lg font-semibold">
-                      Document is {verificationResult.type}
+                      Document is {verificationResult.type.charAt(0).toUpperCase() + verificationResult.type.slice(1)}
                     </h5>
                     <p className="text-sm text-gray-600">
-                      {verificationResult.type === 'Genuine' && 'This document appears to be authentic'}
-                      {verificationResult.type === 'Edited' && 'This document may have been modified'}
-                      {verificationResult.type === 'Fake' && 'This document appears to be fraudulent'}
+                      {verificationResult.type === 'genuine' && 'This document appears to be authentic'}
+                      {verificationResult.type === 'suspicious' && 'This document may have been modified'}
+                      {verificationResult.type === 'fake' && 'This document appears to be fraudulent'}
                     </p>
                   </div>
                 </div>
@@ -238,13 +226,13 @@ export default function UserPortal() {
           
           <div className="flex items-center gap-3 mb-4">
             <div className={`px-4 py-2 rounded-full text-base font-semibold transition-all duration-700 ease-in-out transform hover:scale-105 ${
-              verificationResult.type === 'Genuine' 
+              verificationResult.type === 'genuine' 
                 ? 'bg-gradient-to-r from-green-400 to-emerald-500 text-white shadow-lg shadow-green-500/25 animate-pulse'
-                : verificationResult.type === 'Edited'
+                : verificationResult.type === 'suspicious'
                 ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white shadow-lg shadow-yellow-500/25 animate-bounce'
                 : 'bg-gradient-to-r from-red-400 to-rose-500 text-white shadow-lg shadow-red-500/25 animate-pulse'
             }`}>
-              {verificationResult.type}
+              {verificationResult.type.charAt(0).toUpperCase() + verificationResult.type.slice(1)}
             </div>
           </div>
 

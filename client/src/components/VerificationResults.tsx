@@ -1,6 +1,6 @@
 interface VerificationResultsProps {
   result: {
-    type: 'Genuine' | 'Edited' | 'Fake';
+    type: 'genuine' | 'suspicious' | 'fake';
     confidence: number;
     mismatchedFields?: string[];
   };
@@ -9,11 +9,11 @@ interface VerificationResultsProps {
 export default function VerificationResults({ result }: VerificationResultsProps) {
   const getResultColor = () => {
     switch (result.type) {
-      case 'Genuine':
+      case 'genuine':
         return 'bg-green-50 border-green-200 text-green-800';
-      case 'Edited':
+      case 'suspicious':
         return 'bg-yellow-50 border-yellow-200 text-yellow-800';
-      case 'Fake':
+      case 'fake':
         return 'bg-red-50 border-red-200 text-red-800';
       default:
         return 'bg-gray-50 border-gray-200 text-gray-800';
@@ -22,11 +22,11 @@ export default function VerificationResults({ result }: VerificationResultsProps
 
   const getBadgeColor = () => {
     switch (result.type) {
-      case 'Genuine':
+      case 'genuine':
         return 'bg-green-100 text-green-800';
-      case 'Edited':
+      case 'suspicious':
         return 'bg-yellow-100 text-yellow-800';
-      case 'Fake':
+      case 'fake':
         return 'bg-red-100 text-red-800';
       default:
         return 'bg-gray-100 text-gray-800';
@@ -38,7 +38,7 @@ export default function VerificationResults({ result }: VerificationResultsProps
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h3 className="text-lg sm:text-xl font-bold dark:text-gray-100">Verification Result</h3>
         <span className={`inline-flex items-center px-3 sm:px-2.5 py-1 sm:py-0.5 rounded-full text-sm sm:text-xs font-medium ${getBadgeColor()}`}>
-          {result.type}
+          {result.type.charAt(0).toUpperCase() + result.type.slice(1)}
         </span>
       </div>
       
@@ -58,9 +58,9 @@ export default function VerificationResults({ result }: VerificationResultsProps
         <div className="pt-4 border-t border-gray-200 dark:border-gray-600">
           <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Analysis Details</h4>
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-            {result.type === 'Genuine' && "The document's metadata matches our verified templates. It appears to be an authentic document."}
-            {result.type === 'Edited' && "The document's metadata partially matches our verified templates. It may have been altered but retains some original properties."}
-            {result.type === 'Fake' && "The document's metadata does not match any of our verified templates. It may have been fabricated or heavily altered."}
+            {result.type === 'genuine' && "The document's metadata matches our verified templates. It appears to be an authentic document."}
+            {result.type === 'suspicious' && "The document's metadata partially matches our verified templates. It may have been altered but retains some original properties."}
+            {result.type === 'fake' && "The document's metadata does not match any of our verified templates. It may have been fabricated or heavily altered."}
           </p>
         </div>
       </div>

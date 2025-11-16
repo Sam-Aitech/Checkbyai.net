@@ -3,12 +3,18 @@ import { Link } from 'wouter';
 import FileUploadSimple from './FileUploadSimple';
 import Enhanced3DDemo from './Enhanced3DDemo';
 
+interface VerificationResult {
+  type: 'genuine' | 'suspicious' | 'fake';
+  confidence: number;
+  mismatchedFields?: string[];
+}
+
 export default function COSDashboard() {
   const [showFreeCheck, setShowFreeCheck] = useState(false);
   const [showDemo, setShowDemo] = useState(false);
   const [demoStep, setDemoStep] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
-  const [verificationResult, setVerificationResult] = useState<{type: 'Genuine' | 'Edited' | 'Fake'} | null>(null);
+  const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   // Track free usage
   const [hasUsedFreeCheck, setHasUsedFreeCheck] = useState(false);
@@ -32,7 +38,7 @@ export default function COSDashboard() {
     setHasUsedFreeCheck(true);
   };
 
-  const handleVerificationResult = (result: {type: 'Genuine' | 'Edited' | 'Fake'}) => {
+  const handleVerificationResult = (result: VerificationResult) => {
     setVerificationResult(result);
   };
 
@@ -494,13 +500,13 @@ export default function COSDashboard() {
 
                   <div className="mb-6">
                     <div className={`inline-block px-6 py-3 rounded-full text-lg font-semibold transition-all duration-700 ease-in-out transform hover:scale-105 ${
-                      verificationResult.type === 'Genuine' 
+                      verificationResult.type === 'genuine' 
                         ? 'bg-gradient-to-r from-green-400 to-emerald-500 text-white shadow-lg shadow-green-500/25 animate-pulse'
-                        : verificationResult.type === 'Edited'
+                        : verificationResult.type === 'suspicious'
                         ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white shadow-lg shadow-yellow-500/25 animate-bounce'
                         : 'bg-gradient-to-r from-red-400 to-rose-500 text-white shadow-lg shadow-red-500/25 animate-pulse'
                     }`}>
-                      {verificationResult.type}
+                      {verificationResult.type.charAt(0).toUpperCase() + verificationResult.type.slice(1)}
                     </div>
                   </div>
 
