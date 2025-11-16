@@ -211,12 +211,12 @@ async def upload_trusted(file: UploadFile = File(...)):
         os.remove(temp_path)
         
         # Create trusted pattern
-        pattern_id = len(trusted_patterns) + 1
+        pattern_id = len(db.get_trusted_patterns()) + 1
         pattern = TrustedPattern(pattern_id, file.filename or "unknown", metadata)
-        trusted_patterns.append(pattern)
+        db.add_trusted_pattern(pattern)
         
         # Reload patterns in AI verifier
-        pattern_list = [{"id": p.id, "filename": p.filename, "metadata": p.metadata} for p in trusted_patterns]
+        pattern_list = [{"id": p.id, "filename": p.filename, "metadata": p.metadata} for p in db.get_trusted_patterns()]
         cos_verifier.load_trusted_patterns(pattern_list)
         
         return {"message": "Trusted pattern added successfully", "pattern_id": pattern_id}
@@ -224,7 +224,7 @@ async def upload_trusted(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
 
-def extract_pdf_metadata(pdf_path: str) -> dict:
+def extract_pdf_metadata(pdf_path: str) -> Optional[dict]:
     """Extract XMP metadata from PDF using PyMuPDF"""
     try:
         doc = fitz.open(pdf_path)
@@ -243,7 +243,7 @@ async def verify_cos(file: UploadFile = File(...)):
     """Verify a COS document against trusted patterns"""
     try:
         # For demo purposes, return a mock result if no trusted patterns exist
-        if not trusted_patterns:
+        if not db.get_trusted_patterns():
             # Return a demo result for testing
             return {
                 "result": "fake",
@@ -276,11 +276,11 @@ async def verify_cos(file: UploadFile = File(...)):
         os.remove(temp_path)
         
         # Compare with trusted patterns using AI engine
-        if trusted_patterns:
+        if db.get_trusted_patterns():
             try:
-                print(f"Using COSVerifier with {len(trusted_patterns)} trusted patterns")
+                print(f"Using COSVerifier with {len(db.get_trusted_patterns())} trusted patterns")
                 # Ensure trusted patterns are loaded in the verifier
-                cos_verifier.load_trusted_patterns(trusted_patterns)
+                cos_verifier.load_trusted_patterns(db.get_trusted_patterns())
                 result = cos_verifier.verify_cos(metadata)
                 print(f"COSVerifier result: {result}")
             except Exception as e:
@@ -292,18 +292,19 @@ async def verify_cos(file: UploadFile = File(...)):
             result = compare_with_trusted(metadata)
         
         # Store submission
-        submission_id = len(submitted_documents) + 1
-        submitted_documents[submission_id] = {
+        submission_id = len(db.submitted_documents) + 1
+        db.submitted_documents[submission_id] = {
             "filename": file.filename,
             "metadata": metadata
         }
         
         # Store result
-        result_id = len(verification_results) + 1
-        verification_results[result_id] = {
+        result_id = len(db.verification_results) + 1
+        result_with_id = {
             "cos_id": submission_id,
             **result
         }
+        db.add_verification_result(result_id, result_with_id)
         
         # Transform result to match frontend expectations with metadata details
         return {
@@ -340,7 +341,7 @@ def compare_with_trusted(extracted_metadata: dict) -> dict:
     extracted_hash = hashlib.sha256(extracted_hash.encode()).hexdigest()
     
     # Check for exact hash match
-    for i, pattern in enumerate(trusted_patterns):
+    for i, pattern in enumerate(db.get_trusted_patterns()):
         if pattern.pattern_hash == extracted_hash:
             return {
                 "type": "Genuine",
@@ -349,7 +350,7 @@ def compare_with_trusted(extracted_metadata: dict) -> dict:
             }
     
     # If no exact match, do field-by-field comparison
-    for pattern in trusted_patterns:
+    for pattern in db.get_trusted_patterns():
         match_count = 0
         total_fields = len(key_fields)
         
