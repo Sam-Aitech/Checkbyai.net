@@ -1,0 +1,114 @@
+Add real content depth (this helps SEO and AI search)
+
+Look at who’s ranking when people search things like “how to check if CoS is genuine” – it’s mostly in-depth guides from immigration firms and UK visa specialists. 
+asherandtomar.co.uk
++3
+Borderless Immigration
++3
+The SmartMove2UK
++3
+
+Right now you have essentially one short page.
+
+3.1. Create a small but strong content hub
+
+Make 3–5 high-quality guides that answer common queries:
+
+“How to Check if a UK Certificate of Sponsorship is Genuine (Manual + AI Guide)”
+
+“Common CoS Scams and Red Flags for UK Visa Applicants”
+
+“Employer’s Guide: Avoiding Fake Certificates of Sponsorship”
+
+“Step-by-Step: What to Do if You Think Your CoS is Fake”
+
+Each article should:
+
+Be 1,500–2,500 words with real detail.
+
+Reference official gov.uk guidance for authority. 
+GOV.UK
+
+Include:
+
+Practical checklists
+
+Screenshots / examples (with anonymised data)
+
+Clear guidance on when to seek legal/immigration advice.
+
+This type of content is exactly what:
+
+Google ranks,
+
+And AI assistants quote or link to when answering visa-related questions.
+
+3.2. Use internal links smartly
+
+On every guide:
+
+Link back to the main COS checker page with descriptive anchors:
+
+“Use our AI-powered CoS checker to run an instant authenticity check.”
+
+Link between guides where relevant, building a topic cluster around CoS verification.
+
+4. Technical & UX improvements
+
+Even without full access to your source, there are standard must-dos:
+
+Mobile-first design & speed
+
+Use Lighthouse / PageSpeed Insights.
+
+Compress images, lazy-load, avoid bloated JS (especially if it’s a SPA).
+
+Clean URL structure
+
+/cos-check-ai (no .html ideally)
+
+/guides/check-cos-genuine
+
+Schema markup
+
+Add Organization and/or WebSite schema (logo, URL, sameAs).
+
+Add FAQPage schema on your FAQ section so FAQs can show in SERPs.
+
+If you position as a service: use LocalBusiness/ProfessionalService or WebApplication schema.
+
+Trust & compliance pages
+
+Clear About, Privacy, Terms, Contact, and Data security (how you handle uploaded CoS).
+
+This strongly supports EEAT (Experience, Expertise, Authoritativeness, Trust).
+
+5. Off-page SEO: backlinks and authority
+
+To outrank existing players, you’ll need trusted links from UK immigration / legal / student visa ecosystems.
+
+Ideas:
+
+Partnerships with immigration advisors / law firms
+
+Offer them a free or white-label CoS checker.
+
+In return, get a “Recommended tools” link from their site.
+
+Guest posts / expert interviews
+
+Write guest articles on:
+
+“How AI can help detect fake CoS”
+
+“Protecting visa applicants from sponsorship scams”
+
+Community presence
+
+Reddit, Facebook, Telegram groups about UK visas:
+
+Provide genuine advice (no spam).
+
+Occasionally reference your tool as one option.
+
+Backlinks from relevant sites like immigration blogs / law firms / visa guides are extremely valuable in your niche.

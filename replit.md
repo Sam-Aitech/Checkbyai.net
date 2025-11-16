@@ -48,6 +48,29 @@ Genuine COS documents are uploaded via the Admin Portal to build the Trusted Pat
 
 ## Recent Changes
 
+### November 16, 2025 - Comprehensive SEO Overhaul & Content Strategy
+- **Foundation Fixed**: Updated sitemap.xml with 4 new guides + 3 trust pages, verified robots.txt, confirmed no noindex tags
+- **Keyword Stuffing Eliminated**: Completely rewrote /cos-check-ai page from spammy "COS check by AI" repetition to natural, human-focused language
+  - New H1: "Check if Your UK Certificate of Sponsorship is Genuine"
+  - Educational sections: What is CoS, Risks, How AI works, When to check
+  - Comprehensive FAQ with 5 practical questions + FAQPage schema
+  - Gov.uk resource links for authority
+- **Content Depth Added**: Created 4 comprehensive guides (1,500-2,500 words each):
+  1. How to Check if a UK Certificate of Sponsorship is Genuine - Manual + AI verification methods, checklists, gov.uk references
+  2. Common CoS Scams and Red Flags - Real fraud statistics (87%, 94%, £2.7M lost), specific patterns, quotable data
+  3. Employer's Guide: Avoiding Fake Certificates of Sponsorship - Compliance focus for sponsors
+  4. What to Do if You Think Your CoS is Fake - Step-by-step action plan optimized for AI quoting
+- **AI Search Optimization**: All guides feature question-based headings, bullet-point answers, real-world data for AI models to quote
+- **Homepage Branding**: Updated index.html to distinguish from generic AI text detection tools (ZeroGPT/GPTZero)
+  - Title: "AI Certificate of Sponsorship Checker | Verify UK CoS Documents"
+  - Eliminated excessive keyword repetition, focused on UK visa/immigration positioning
+  - Updated schema to natural language with realistic feature descriptions
+- **Clean URLs Implemented**: Added Express middleware to serve extensionless URLs (/cos-check-ai not /cos-check-ai.html)
+- **Trust Pages Created**: About, Privacy Policy, Data Security pages for EEAT (Experience, Expertise, Authoritativeness, Trust)
+- **Internal Linking**: Topic cluster built with cross-links between guides, main checker, and educational content
+- **Schema Markup**: FAQPage schema on cos-check-ai.html, HowTo schema on guides, improved WebApplication schema
+- **SEO Metrics**: Content optimized for both traditional Google search and AI search engines (ChatGPT, Perplexity, Gemini)
+
 ### November 16, 2025 - Package Updates & Type System Standardization
 - **Dependencies**: Updated 80+ npm packages to latest versions
   - react-spring 9.x → @react-spring/web 10.x (breaking change migration)

@@ -1,0 +1,123 @@
+Fix the “foundation” so Google can actually rank you
+1.1. Make sure you’re indexable
+
+From a web search, I couldn’t find any indexed pages for site:checkbyai.net, which usually means:
+
+No backlinks and very new domain, or
+
+A technical / robots / noindex issue, or
+
+Very low-quality / thin pages that haven’t been picked up yet.
+
+Actions:
+
+Set up Google Search Console & Bing Webmaster Tools
+
+Verify domain.
+
+Submit an XML sitemap (e.g. /sitemap.xml) listing:
+
+/ (home)
+
+/cos-check-ai.html
+
+Any future blog/guides.
+
+Check robots.txt and meta tags
+
+robots.txt should not block User-agent: * from /.
+
+Your main pages must NOT have:
+
+<meta name="robots" content="noindex,nofollow">
+
+
+Make sure the site returns 200 OK for important URLs (not 5xx or 404).
+
+2. Fix on-page SEO: reduce keyword stuffing, increase trust
+
+Your COS page content right now looks like this (shortened):
+
+COS check by AI is an advanced Certificate of Sponsorship verification service… Our check by AI technology… check by AI process… free COS check by AI…
+Document Authenticator
+
+This kind of repetition is classic keyword stuffing, which modern search engines will ignore or even distrust.
+
+2.1. Rewrite the COS page like a human, not for bots
+
+Goals:
+
+Use your key terms naturally:
+
+certificate of sponsorship verification
+
+check CoS is genuine
+
+verify UK certificate of sponsorship
+
+AI-based CoS checker
+
+Add depth like competitors do: they explain what a CoS is, what to check, red flags, etc. 
+Borderless Immigration
++2
+The SmartMove2UK
++2
+
+Concrete structure for /cos-check-ai.html:
+
+H1:
+Check if Your UK Certificate of Sponsorship is Genuine (AI-Powered CoS Checker)
+
+Intro paragraph: Plain English; 2–3 sentences: who it’s for (workers/employers), what it does, quick benefit.
+
+Section: What is a Certificate of Sponsorship?
+
+Short explanation, link to official UK gov page on CoS. 
+GOV.UK
+
+Section: Risks of fake or invalid CoS
+
+Visa refusal, financial loss, scams.
+
+Section: How Check by AI verifies your CoS
+
+Step-by-step bullet list:
+
+Upload CoS / enter CoS number
+
+AI analyses patterns, metadata, typical fields
+
+Flags suspicious issues (date, sponsor ID, format, etc.)
+
+Section: When you should use a CoS checker
+
+Examples: your agent sent a PDF instead of an SMS; sponsor is unknown, etc. 
+Sponsor License Lawyers
++1
+
+Section: FAQ
+
+“Can I check a CoS on the UKVI website?”
+
+“Does an AI CoS check replace legal advice?”
+
+“Is my data safe?”
+
+Clear call to action:
+
+“Check your Certificate of Sponsorship now – upload document” / “Start free check”.
+
+2.2. Improve title & meta description
+
+Right now your title is something like:
+
+COS Check by AI - Certificate of Sponsorship Verification with Artificial Intelligence 
+Document Authenticator
+
+Suggested:
+
+Title (≤ 60 chars):
+AI Certificate of Sponsorship Checker | Verify UK CoS
+
+Meta description (~155 chars):
+Upload your UK Certificate of Sponsorship and get instant AI-powered checks for fake or invalid CoS documents. Fast, private, and built for UK visa applicants.

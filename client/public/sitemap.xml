@@ -28,17 +28,59 @@
   </url>
   
   <url>
-    <loc>https://document-authenticator.replit.app/cos-guide.html</loc>
-    <lastmod>2025-01-30</lastmod>
+    <loc>https://document-authenticator.replit.app/cos-check-ai</loc>
+    <lastmod>2025-11-16</lastmod>
     <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  
+  <url>
+    <loc>https://document-authenticator.replit.app/guides/how-to-check-cos-genuine</loc>
+    <lastmod>2025-11-16</lastmod>
+    <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   
   <url>
-    <loc>https://document-authenticator.replit.app/cos-check-ai.html</loc>
-    <lastmod>2025-01-30</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.9</priority>
+    <loc>https://document-authenticator.replit.app/guides/cos-scams-red-flags</loc>
+    <lastmod>2025-11-16</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <url>
+    <loc>https://document-authenticator.replit.app/guides/employers-guide-fake-cos</loc>
+    <lastmod>2025-11-16</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  
+  <url>
+    <loc>https://document-authenticator.replit.app/guides/what-to-do-fake-cos</loc>
+    <lastmod>2025-11-16</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  
+  <url>
+    <loc>https://document-authenticator.replit.app/about</loc>
+    <lastmod>2025-11-16</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  
+  <url>
+    <loc>https://document-authenticator.replit.app/privacy</loc>
+    <lastmod>2025-11-16</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  
+  <url>
+    <loc>https://document-authenticator.replit.app/data-security</loc>
+    <lastmod>2025-11-16</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.4</priority>
   </url>
   
 </urlset>
