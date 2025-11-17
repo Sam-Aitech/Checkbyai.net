@@ -170,23 +170,23 @@ export default function Home() {
 
   // SEO data for home page
   const homePageSEO = {
-    title: "COS Check - Certificate of Sponsorship Verification | Free COS Document Authenticator",
-    description: "Official COS check service for Certificate of Sponsorship verification. Instantly verify COS documents with AI-powered authentication. Detect fake or edited COS certificates with 99.9% accuracy. Free COS verification check available.",
-    keywords: "COS check, Certificate of Sponsorship verification, COS document verification, COS authenticator, verify COS certificate, COS validation, fake COS detection, COS document check, Certificate of Sponsorship authenticator, UK visa COS verification",
-    canonicalUrl: "https://document-authenticator.replit.app/",
-    ogImage: "https://document-authenticator.replit.app/og-image.jpg",
+    title: "AI Certificate of Sponsorship Checker | Verify UK CoS Documents",
+    description: "Verify your UK Certificate of Sponsorship instantly with AI-powered fraud detection. Protect yourself from fake CoS documents and visa scams. Free verification for UK visa applicants.",
+    keywords: "certificate of sponsorship verification, verify UK CoS, AI CoS checker, fake CoS detection, UK visa document verification, sponsor license verification, CoS authenticity check",
+    canonicalUrl: "https://checkbyai.net/",
+    ogImage: "https://checkbyai.net/og-image.svg",
     structuredData: {
       "@context": "https://schema.org",
       "@type": "WebApplication",
-      "name": "COS Check - Certificate of Sponsorship Verification",
-      "description": "Official COS check service for Certificate of Sponsorship verification. AI-powered COS document authentication with instant results for UK visa applications.",
-      "url": "https://document-authenticator.replit.app/",
+      "name": "Certificate of Sponsorship Verification Tool",
+      "description": "AI-powered verification service for UK Certificates of Sponsorship. Detects fake CoS documents and helps visa applicants verify sponsor authenticity before applying for UK work visas.",
+      "url": "https://checkbyai.net/",
       "applicationCategory": "SecurityApplication",
       "operatingSystem": "Web Browser",
       "offers": {
         "@type": "Offer",
         "price": "0",
-        "priceCurrency": "USD"
+        "priceCurrency": "GBP"
       },
       "featureList": [
         "AI-powered document verification",
@@ -197,8 +197,8 @@ export default function Home() {
       ],
       "provider": {
         "@type": "Organization",
-        "name": "Document Authenticator",
-        "url": "https://document-authenticator.replit.app/"
+        "name": "Check By AI",
+        "url": "https://checkbyai.net/"
       }
     }
   };

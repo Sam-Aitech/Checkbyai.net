@@ -48,6 +48,35 @@ Genuine COS documents are uploaded via the Admin Portal to build the Trusted Pat
 
 ## Recent Changes
 
+### November 17, 2025 - Complete Domain Migration & SEO Cleanup
+- **Domain Updates**: Migrated all URLs from `document-authenticator.replit.app` to `checkbyai.net`
+  - Updated sitemap.xml with correct domain for all 11 pages
+  - Updated robots.txt sitemap URL to `https://checkbyai.net/sitemap.xml`
+  - Updated canonical URLs in index.html and all React components
+  - Updated Open Graph and Twitter meta tags across all pages
+  - Updated structured data (schema.org) URLs to production domain
+- **Keyword Stuffing Eliminated**: Removed excessive "COS check by AI" repetition
+  - Dashboard page: Rewrote from robotic to natural language
+  - HeroSection H1: Changed to "Check if Your UK Certificate of Sponsorship is Genuine"
+  - Removed unnatural keyword repetition while maintaining SEO value
+- **Content Improvements**:
+  - All meta descriptions now sound human and conversational
+  - H1 tags clear and keyword-rich without stuffing
+  - Each page has unique title and description
+  - Updated button text from "Start COS Check by AI" to "Verify Your CoS Now"
+- **Technical SEO Verification**:
+  - ✅ robots.txt allows all crawlers (`User-agent: *` / `Allow: /`)
+  - ✅ No `noindex` meta tags on any pages
+  - ✅ Server-rendered H1 content for crawlers
+  - ✅ Clean sitemap with 11 indexed pages
+  - ✅ All canonical URLs use production domain
+- **Search Engine Setup**:
+  - Created comprehensive SEO_SETUP_GUIDE.md with step-by-step instructions
+  - Google Search Console setup guide
+  - Bing Webmaster Tools setup guide
+  - URL verification checklist
+  - Post-deployment monitoring instructions
+
 ### November 16, 2025 - Comprehensive SEO Overhaul & Content Strategy
 - **Foundation Fixed**: Updated sitemap.xml with 4 new guides + 3 trust pages, verified robots.txt, confirmed no noindex tags
 - **Keyword Stuffing Eliminated**: Completely rewrote /cos-check-ai page from spammy "COS check by AI" repetition to natural, human-focused language

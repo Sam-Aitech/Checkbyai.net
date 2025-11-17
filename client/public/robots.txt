@@ -2,7 +2,7 @@ User-agent: *
 Allow: /
 
 # Sitemap
-Sitemap: https://document-authenticator.replit.app/sitemap.xml
+Sitemap: https://checkbyai.net/sitemap.xml
 
 # Crawl-delay
 Crawl-delay: 1
