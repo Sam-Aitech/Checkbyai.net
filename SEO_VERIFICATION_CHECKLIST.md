@@ -61,9 +61,11 @@ curl -I https://checkbyai.net/cos-check-ai
 ### 1. Google Search Console
 1. Visit: https://search.google.com/search-console
 2. Add property: `https://checkbyai.net`
-3. Verify ownership (HTML tag or file upload)
+3. Verify ownership: **HTML file already uploaded** (`google68dfa0093d925662.html`)
 4. Submit sitemap: `https://checkbyai.net/sitemap.xml`
 5. Request indexing for key pages
+
+**Note:** Verification file is ready at: `https://checkbyai.net/google68dfa0093d925662.html`
 
 ### 2. Bing Webmaster Tools
 1. Visit: https://www.bing.com/webmasters
