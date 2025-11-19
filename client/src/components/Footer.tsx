@@ -32,23 +32,23 @@ export default function Footer() {
             <h4 className="text-lg font-semibold mb-4">Quick Links</h4>
             <ul className="space-y-2">
               <li>
-                <Link href="/">
-                  <a className="text-gray-400 hover:text-white transition-colors">Home</a>
+                <Link href="/" className="text-gray-400 hover:text-white transition-colors">
+                  Home
                 </Link>
               </li>
               <li>
-                <Link href="/dashboard">
-                  <a className="text-gray-400 hover:text-white transition-colors">Verify CoS</a>
+                <Link href="/dashboard" className="text-gray-400 hover:text-white transition-colors">
+                  Verify CoS
                 </Link>
               </li>
               <li>
-                <Link href="/cos-check-ai">
-                  <a className="text-gray-400 hover:text-white transition-colors">How It Works</a>
+                <Link href="/cos-check-ai" className="text-gray-400 hover:text-white transition-colors">
+                  How It Works
                 </Link>
               </li>
               <li>
-                <Link href="/about">
-                  <a className="text-gray-400 hover:text-white transition-colors">About</a>
+                <Link href="/about" className="text-gray-400 hover:text-white transition-colors">
+                  About
                 </Link>
               </li>
             </ul>
@@ -59,23 +59,23 @@ export default function Footer() {
             <h4 className="text-lg font-semibold mb-4">Resources</h4>
             <ul className="space-y-2">
               <li>
-                <Link href="/guides/how-to-check-cos-genuine">
-                  <a className="text-gray-400 hover:text-white transition-colors">Verification Guide</a>
+                <Link href="/guides/how-to-check-cos-genuine" className="text-gray-400 hover:text-white transition-colors">
+                  Verification Guide
                 </Link>
               </li>
               <li>
-                <Link href="/guides/cos-scams-red-flags">
-                  <a className="text-gray-400 hover:text-white transition-colors">Scam Red Flags</a>
+                <Link href="/guides/cos-scams-red-flags" className="text-gray-400 hover:text-white transition-colors">
+                  Scam Red Flags
                 </Link>
               </li>
               <li>
-                <Link href="/privacy">
-                  <a className="text-gray-400 hover:text-white transition-colors">Privacy Policy</a>
+                <Link href="/privacy" className="text-gray-400 hover:text-white transition-colors">
+                  Privacy Policy
                 </Link>
               </li>
               <li>
-                <Link href="/data-security">
-                  <a className="text-gray-400 hover:text-white transition-colors">Data Security</a>
+                <Link href="/data-security" className="text-gray-400 hover:text-white transition-colors">
+                  Data Security
                 </Link>
               </li>
             </ul>
