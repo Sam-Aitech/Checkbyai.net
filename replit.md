@@ -48,6 +48,20 @@ Genuine COS documents are uploaded via the Admin Portal to build the Trusted Pat
 
 ## Recent Changes
 
+### November 19, 2025 - YouTube Channel Integration for SEO
+- **Social Media Presence**: Added YouTube channel (@CheckByAi) across all key locations
+  - Schema.org Organization markup: Added to sameAs array for brand authority
+  - Social profile meta tags: Added rel="me" and og:see_also for YouTube
+  - Footer component: Created new Footer.tsx with YouTube link and icon
+  - About page: Added YouTube in Contact section and new "Stay Updated" section
+  - Index.html: Updated canonical domain and added YouTube to structured data
+- **SEO Benefits**:
+  - Enhanced brand authority signals to Google
+  - Cross-platform discovery between website and YouTube
+  - Social proof for visitors
+  - Better rich snippets in search results
+- **User Engagement**: YouTube icon prominently displayed in footer for easy access to video tutorials and fraud alerts
+
 ### November 17, 2025 - Complete Domain Migration & SEO Cleanup
 - **Domain Updates**: Migrated all URLs from `document-authenticator.replit.app` to `checkbyai.net`
   - Updated sitemap.xml with correct domain for all 11 pages

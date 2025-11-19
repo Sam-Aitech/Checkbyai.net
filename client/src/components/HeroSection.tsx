@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import GoogleLoginButton from '@/components/GoogleLoginButton'
 import NavigationLinks from '@/components/NavigationLinks'
+import Footer from '@/components/Footer'
 
 // Lazy load the 3D scene for better performance with fallback
 const ThreeScene = lazy(() => import('./ThreeScene'))
@@ -314,6 +315,9 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
           <NavigationLinks className="max-w-4xl mx-auto" />
         </div>
       </div>
+      
+      {/* Footer */}
+      <Footer />
     </div>
     </>
   )

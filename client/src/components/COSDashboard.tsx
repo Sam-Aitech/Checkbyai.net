@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'wouter';
 import FileUploadSimple from './FileUploadSimple';
 import Enhanced3DDemo from './Enhanced3DDemo';
+import Footer from './Footer';
 
 interface VerificationResult {
   type: 'genuine' | 'suspicious' | 'fake';
@@ -546,6 +547,9 @@ export default function COSDashboard() {
           resetDemo();
         }}
       />
+      
+      {/* Footer */}
+      <Footer />
     </div>
   );
 }
