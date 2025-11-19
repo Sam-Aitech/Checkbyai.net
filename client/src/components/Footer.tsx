@@ -42,14 +42,14 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/cos-check-ai" className="text-gray-400 hover:text-white transition-colors">
+                <a href="/cos-check-ai.html" className="text-gray-400 hover:text-white transition-colors">
                   How It Works
-                </Link>
+                </a>
               </li>
               <li>
-                <Link href="/about" className="text-gray-400 hover:text-white transition-colors">
+                <a href="/about.html" className="text-gray-400 hover:text-white transition-colors">
                   About
-                </Link>
+                </a>
               </li>
             </ul>
           </div>
@@ -59,24 +59,24 @@ export default function Footer() {
             <h4 className="text-lg font-semibold mb-4">Resources</h4>
             <ul className="space-y-2">
               <li>
-                <Link href="/guides/how-to-check-cos-genuine" className="text-gray-400 hover:text-white transition-colors">
+                <a href="/guides/how-to-check-cos-genuine.html" className="text-gray-400 hover:text-white transition-colors">
                   Verification Guide
-                </Link>
+                </a>
               </li>
               <li>
-                <Link href="/guides/cos-scams-red-flags" className="text-gray-400 hover:text-white transition-colors">
+                <a href="/guides/cos-scams-red-flags.html" className="text-gray-400 hover:text-white transition-colors">
                   Scam Red Flags
-                </Link>
+                </a>
               </li>
               <li>
-                <Link href="/privacy" className="text-gray-400 hover:text-white transition-colors">
+                <a href="/privacy.html" className="text-gray-400 hover:text-white transition-colors">
                   Privacy Policy
-                </Link>
+                </a>
               </li>
               <li>
-                <Link href="/data-security" className="text-gray-400 hover:text-white transition-colors">
+                <a href="/data-security.html" className="text-gray-400 hover:text-white transition-colors">
                   Data Security
-                </Link>
+                </a>
               </li>
             </ul>
           </div>
