@@ -28,7 +28,7 @@ The system operates with a three-portal design where an Admin Portal uploads gen
 **Key Features:**
 - **User Portal**: File upload interface, real-time verification results display with confidence scores, and analysis breakdown.
 - **Admin Portal**: Management of trusted COS documents, system statistics dashboard, and detailed document analysis view with XMP metadata display and admin decision tools.
-- **Authentication**: Database-backed user authentication with role-based access control (admin/user) and session management. Supports Replit Auth and Google OAuth. Includes daily verification limits for free users and unlimited for pro/admin users.
+- **Authentication**: Database-backed user authentication with role-based access control (admin/user) and session management. Supports Google OAuth and Email OTP verification via Resend. Includes daily verification limits for free users and unlimited for pro/admin users.
 
 **Data Flow:**
 Genuine COS documents are uploaded via the Admin Portal to build the Trusted Patterns Database. User-submitted COS documents are processed by the AI Verification Engine, which extracts metadata, compares it against trusted patterns using exact matching, vector similarity, and ML inference, and outputs a classification with a confidence score.
@@ -47,6 +47,36 @@ Genuine COS documents are uploaded via the Admin Portal to build the Trusted Pat
 - **passport-google-oauth20**: For Google OAuth authentication.
 
 ## Recent Changes
+
+### November 20, 2025 - Authentication System Overhaul
+- **Removed Replit Auth**: Completely removed Replit login popup and dependencies
+  - Deleted server/replitAuth.ts, replaced with server/auth.ts
+  - No more permission popups or Replit-specific authentication flow
+- **Google OAuth**: Implemented one-click Google Sign-In using passport-google-oauth20
+  - Streamlined callback flow redirects to /dashboard on success
+  - User profiles automatically created with Google email, name, and profile picture
+- **Email OTP**: Added passwordless email authentication using Resend API
+  - Users enter email → receive 6-digit code → verify and log in
+  - OTP codes expire in 10 minutes for security
+  - Professional email templates branded for Check By AI
+- **New Login Page**: Created `/login` route with modern UI featuring:
+  - Google Sign-In button (primary option)
+  - Email OTP form (email input → code verification)
+  - Mobile-optimized with responsive design
+  - Two-step verification flow for email authentication
+- **Updated User Schema**: Added fields for multi-auth support:
+  - `phone`, `googleId`, `authProvider` (google/email/phone)
+  - `verificationCode`, `codeExpiry`, `isVerified`
+  - Supports future SMS OTP integration (Twilio ready but not implemented)
+- **Session Management**: Updated all routes to use new user object structure
+  - Changed from `req.user.claims.sub` to `req.user.id`
+  - Logout now uses POST /api/auth/logout endpoint
+  - UserProfile component updated with proper logout handler
+- **Integration Setup**: Configured external services
+  - RESEND_API_KEY for email delivery
+  - GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET for OAuth
+  - DNS records configured for checkbyai.net domain verification
+  - SMS OTP (Twilio) infrastructure ready but requires user setup
 
 ### November 19, 2025 - YouTube Channel Integration & Brand Schema Enhancement
 - **Social Media Presence**: Added YouTube channel (@CheckByAi) across all key locations
