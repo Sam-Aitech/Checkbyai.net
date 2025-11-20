@@ -1,14 +1,17 @@
 import {
+  users,
   ipVerifications,
   trustedPatterns,
   verificationResults,
   feedback,
+  type User,
+  type UpsertUser,
   type IpVerification,
+  type InsertIpVerification,
   type TrustedPattern,
   type VerificationResult,
   type Feedback,
   type InsertFeedback,
-  type InsertIpVerification,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, gte, count, avg, sql } from "drizzle-orm";
@@ -27,6 +30,10 @@ export interface IStorage {
   updateUserSubscription(userId: string, status: 'free' | 'pro'): Promise<User>;
   updateDailyVerificationUsage(userId: string): Promise<User>;
   checkDailyLimit(userId: string): Promise<boolean>;
+  
+  // IP verification operations (for anonymous users)
+  getIpVerification(hashedIp: string): Promise<IpVerification | undefined>;
+  upsertIpVerification(data: InsertIpVerification): Promise<IpVerification>;
   
   // Trusted patterns operations
   getTrustedPatterns(): Promise<TrustedPattern[]>;
@@ -187,6 +194,30 @@ export class DatabaseStorage implements IStorage {
     
     // Free users get 1 verification per day
     return (user.dailyVerificationsUsed || 0) < 1;
+  }
+
+  // IP verification operations (for anonymous users)
+  async getIpVerification(hashedIp: string): Promise<IpVerification | undefined> {
+    const [record] = await db
+      .select()
+      .from(ipVerifications)
+      .where(eq(ipVerifications.ipAddress, hashedIp));
+    return record;
+  }
+
+  async upsertIpVerification(data: InsertIpVerification): Promise<IpVerification> {
+    const [record] = await db
+      .insert(ipVerifications)
+      .values(data)
+      .onConflictDoUpdate({
+        target: ipVerifications.ipAddress,
+        set: {
+          lastVerificationDate: data.lastVerificationDate,
+          verificationCount: sql`${ipVerifications.verificationCount} + 1`,
+        },
+      })
+      .returning();
+    return record;
   }
 
   // Trusted patterns operations

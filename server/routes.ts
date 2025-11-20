@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import Stripe from "stripe";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated, isAdmin } from "./auth";
+import { checkIpRateLimit, recordIpVerification, getClientIp, hashIpAddress } from "./ipRateLimit";
 import { insertVerificationResultSchema, insertFeedbackSchema } from "@shared/schema";
 import multer from "multer";
 import { z } from "zod";
@@ -162,7 +163,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ received: true });
   });
 
-  // Document verification route
+  // Document verification route (supports both authenticated and anonymous users)
   app.post('/api/verify', upload.single('file'), async (req: any, res) => {
     try {
       if (!req.file) {
@@ -170,9 +171,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       let userId: string | undefined;
+      let hashedIp: string | undefined;
       
       // Check authentication and limits
       if (req.isAuthenticated()) {
+        // Authenticated users: check user-based limits
         userId = req.user.id;
         if (userId) {
           const canVerify = await storage.checkDailyLimit(userId);
@@ -187,6 +190,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Update usage count for authenticated users
           await storage.updateDailyVerificationUsage(userId);
         }
+      } else {
+        // Anonymous users: check IP-based rate limit (7 days)
+        const clientIp = getClientIp(req);
+        hashedIp = hashIpAddress(clientIp);
+        
+        const ipRecord = await storage.getIpVerification(hashedIp);
+        
+        if (ipRecord) {
+          const lastVerification = new Date(ipRecord.lastVerificationDate);
+          const now = new Date();
+          const daysSinceVerification = (now.getTime() - lastVerification.getTime()) / (1000 * 60 * 60 * 24);
+          
+          if (daysSinceVerification < 7) {
+            const daysRemaining = Math.ceil(7 - daysSinceVerification);
+            const hoursRemaining = Math.ceil((7 - daysSinceVerification) * 24);
+            
+            return res.status(429).json({
+              message: "Rate limit exceeded",
+              error: "You can only verify one document every 7 days",
+              daysRemaining,
+              hoursRemaining,
+              nextVerificationDate: new Date(lastVerification.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            });
+          }
+        }
+        
+        // Record IP verification
+        await recordIpVerification(hashedIp);
       }
 
       // Use Node.js PDF analyzer instead of Python
