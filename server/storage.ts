@@ -1,14 +1,14 @@
 import {
-  users,
+  ipVerifications,
   trustedPatterns,
   verificationResults,
   feedback,
-  type User,
-  type UpsertUser,
+  type IpVerification,
   type TrustedPattern,
   type VerificationResult,
   type Feedback,
   type InsertFeedback,
+  type InsertIpVerification,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, gte, count, avg, sql } from "drizzle-orm";

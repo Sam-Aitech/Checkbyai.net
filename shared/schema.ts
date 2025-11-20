@@ -45,6 +45,15 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// IP-based verification tracking (for anonymous users)
+export const ipVerifications = pgTable("ip_verifications", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  ipAddress: varchar("ip_address").notNull().unique(),
+  lastVerificationDate: timestamp("last_verification_date").notNull(),
+  verificationCount: integer("verification_count").default(1),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Trusted patterns table
 export const trustedPatterns = pgTable("trusted_patterns", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
@@ -84,12 +93,14 @@ export const feedback = pgTable("feedback", {
 // Type exports
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+export type IpVerification = typeof ipVerifications.$inferSelect;
 export type TrustedPattern = typeof trustedPatterns.$inferSelect;
 export type VerificationResult = typeof verificationResults.$inferSelect;
 export type Feedback = typeof feedback.$inferSelect;
 
 // Zod schemas
 export const insertUserSchema = createInsertSchema(users);
+export const insertIpVerificationSchema = createInsertSchema(ipVerifications);
 export const insertTrustedPatternSchema = createInsertSchema(trustedPatterns);
 export const insertVerificationResultSchema = createInsertSchema(verificationResults);
 export const insertFeedbackSchema = createInsertSchema(feedback).omit({ 
@@ -98,6 +109,7 @@ export const insertFeedbackSchema = createInsertSchema(feedback).omit({
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type InsertIpVerification = z.infer<typeof insertIpVerificationSchema>;
 export type InsertTrustedPattern = z.infer<typeof insertTrustedPatternSchema>;
 export type InsertVerificationResult = z.infer<typeof insertVerificationResultSchema>;
 export type InsertFeedback = z.infer<typeof insertFeedbackSchema>;
