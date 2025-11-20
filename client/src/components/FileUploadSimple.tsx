@@ -130,7 +130,14 @@ export default function FileUploadSimple({
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(`Verification failed: ${errorData.error || 'Unknown error'}`);
+        
+        // Handle IP rate limit (429) with helpful message
+        if (response.status === 429 && errorData.daysRemaining) {
+          const message = `You can only verify one document every 7 days. Please try again in ${errorData.daysRemaining} day${errorData.daysRemaining > 1 ? 's' : ''} (${errorData.hoursRemaining} hours).`;
+          throw new Error(message);
+        }
+        
+        throw new Error(`Verification failed: ${errorData.error || errorData.message || 'Unknown error'}`);
       }
       
       const data = await response.json();
