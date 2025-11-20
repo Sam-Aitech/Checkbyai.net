@@ -26,6 +26,7 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   updateUserVerificationCode(identifier: string, code: string, expiry: Date): Promise<void>;
+  updateUserPassword(userId: string, hashedPassword: string): Promise<void>;
   verifyUser(identifier: string): Promise<User | undefined>;
   updateUserStripeInfo(userId: string, customerId: string, subscriptionId?: string): Promise<User>;
   updateUserSubscription(userId: string, status: 'free' | 'pro'): Promise<User>;
@@ -123,6 +124,16 @@ export class DatabaseStorage implements IStorage {
         updatedAt: new Date(),
       })
       .where(sql`${users.email} = ${identifier} OR ${users.phone} = ${identifier}`);
+  }
+
+  async updateUserPassword(userId: string, hashedPassword: string): Promise<void> {
+    await db
+      .update(users)
+      .set({
+        hashedPassword,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
   }
 
   async verifyUser(identifier: string): Promise<User | undefined> {
