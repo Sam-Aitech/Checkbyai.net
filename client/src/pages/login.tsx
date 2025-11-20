@@ -78,8 +78,8 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-slate-900 to-gray-800 p-4">
+      <Card className="w-full max-w-md shadow-2xl border-gray-700">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-6">
             <img 
@@ -137,7 +137,7 @@ export default function LoginPage() {
               </div>
               <Button 
                 type="submit" 
-                className="w-full" 
+                className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white font-semibold shadow-lg" 
                 disabled={isLoading}
                 data-testid="button-send-code"
               >
@@ -164,7 +164,7 @@ export default function LoginPage() {
                     variant="ghost"
                     size="sm"
                     onClick={handleBackToEmail}
-                    className="h-auto p-0 text-blue-600 hover:text-blue-700"
+                    className="h-auto p-0 text-orange-600 hover:text-orange-700"
                     data-testid="button-back-to-email"
                   >
                     <ArrowLeft className="mr-1 h-3 w-3" />
@@ -191,7 +191,7 @@ export default function LoginPage() {
               </div>
               <Button 
                 type="submit" 
-                className="w-full" 
+                className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white font-semibold shadow-lg" 
                 disabled={isLoading || code.length !== 6}
                 data-testid="button-verify-code"
               >
