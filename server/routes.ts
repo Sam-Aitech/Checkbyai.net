@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import Stripe from "stripe";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated, isAdmin } from "./replitAuth";
+import { setupAuth, isAuthenticated, isAdmin } from "./auth";
 import { insertVerificationResultSchema, insertFeedbackSchema } from "@shared/schema";
 import multer from "multer";
 import { z } from "zod";
@@ -26,7 +26,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const user = await storage.getUser(userId);
       res.json(user);
     } catch (error) {
@@ -43,7 +43,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ canVerify: true, isAnonymous: true, verificationsLeft: 1 });
       }
 
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const canVerify = await storage.checkDailyLimit(userId);
       const user = await storage.getUser(userId);
       
@@ -65,7 +65,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Subscription management routes
   app.post('/api/create-subscription', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const user = await storage.getUser(userId);
 
       if (!user) {
@@ -173,7 +173,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check authentication and limits
       if (req.isAuthenticated()) {
-        userId = req.user.claims.sub;
+        userId = req.user.id;
         if (userId) {
           const canVerify = await storage.checkDailyLimit(userId);
           
@@ -299,7 +299,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Add userId if authenticated
       if (req.isAuthenticated()) {
-        feedbackData.userId = req.user.claims.sub;
+        feedbackData.userId = req.user.id;
       }
       
       const newFeedback = await storage.createFeedback(feedbackData);
