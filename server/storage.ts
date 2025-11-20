@@ -15,9 +15,14 @@ import { eq, desc, gte, count, avg, sql } from "drizzle-orm";
 
 // Interface for storage operations
 export interface IStorage {
-  // User operations (mandatory for Replit Auth)
+  // User operations
   getUser(id: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByPhone(phone: string): Promise<User | undefined>;
+  getUserByGoogleId(googleId: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
+  updateUserVerificationCode(identifier: string, code: string, expiry: Date): Promise<void>;
+  verifyUser(identifier: string): Promise<User | undefined>;
   updateUserStripeInfo(userId: string, customerId: string, subscriptionId?: string): Promise<User>;
   updateUserSubscription(userId: string, status: 'free' | 'pro'): Promise<User>;
   updateDailyVerificationUsage(userId: string): Promise<User>;
@@ -59,9 +64,24 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
-  // User operations (mandatory for Replit Auth)
+  // User operations
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user;
+  }
+
+  async getUserByPhone(phone: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.phone, phone));
+    return user;
+  }
+
+  async getUserByGoogleId(googleId: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.googleId, googleId));
     return user;
   }
 
@@ -76,6 +96,32 @@ export class DatabaseStorage implements IStorage {
           updatedAt: new Date(),
         },
       })
+      .returning();
+    return user;
+  }
+
+  async updateUserVerificationCode(identifier: string, code: string, expiry: Date): Promise<void> {
+    // Update by email or phone
+    await db
+      .update(users)
+      .set({
+        verificationCode: code,
+        codeExpiry: expiry,
+        updatedAt: new Date(),
+      })
+      .where(sql`${users.email} = ${identifier} OR ${users.phone} = ${identifier}`);
+  }
+
+  async verifyUser(identifier: string): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({
+        isVerified: true,
+        verificationCode: null,
+        codeExpiry: null,
+        updatedAt: new Date(),
+      })
+      .where(sql`${users.email} = ${identifier} OR ${users.phone} = ${identifier}`)
       .returning();
     return user;
   }
