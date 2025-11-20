@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -13,16 +14,36 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Crown, User, LogOut, Settings } from "lucide-react";
 import SubscriptionModal from "./SubscriptionModal";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 export default function UserProfile() {
   const { user, isAuthenticated, isPro, isAdmin } = useAuth();
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+
+  const handleLogout = async () => {
+    try {
+      await apiRequest("/api/auth/logout", {
+        method: "POST",
+      });
+      toast({
+        title: "Logged out",
+        description: "You have been successfully logged out.",
+      });
+      setLocation("/");
+      window.location.reload();
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  };
 
   if (!isAuthenticated) {
     return (
       <div className="flex items-center gap-2">
         <Button variant="outline" asChild>
-          <a href="/api/login">Sign In</a>
+          <a href="/login">Sign In</a>
         </Button>
       </div>
     );
@@ -85,11 +106,9 @@ export default function UserProfile() {
             )}
             
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <a href="/api/logout">
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Log out</span>
-              </a>
+            <DropdownMenuItem onClick={handleLogout}>
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>Log out</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

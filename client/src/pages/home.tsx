@@ -107,18 +107,16 @@ export default function Home() {
             </div>
             
             <div className="flex items-center space-x-4">
-              {/* Multiple login options */}
-              <div className="flex items-center space-x-2">
-                <GoogleLoginButton variant="outline" size="sm" />
+              {/* Login button */}
+              <Link href="/login">
                 <Button 
                   variant="outline" 
                   size="sm"
-                  onClick={() => window.location.href = "/api/login"}
                 >
                   <LogIn className="mr-2 w-4 h-4" />
-                  Replit
+                  Sign In
                 </Button>
-              </div>
+              </Link>
               
               <Link href="/dashboard">
                 <Button variant="outline" size="sm">
