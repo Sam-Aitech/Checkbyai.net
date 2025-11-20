@@ -27,11 +27,13 @@ export const users = pgTable("users", {
   id: varchar("id").primaryKey().notNull(),
   email: varchar("email").unique(),
   phone: varchar("phone").unique(),
+  username: varchar("username").unique(),
+  hashedPassword: varchar("hashed_password"),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   googleId: varchar("google_id").unique(),
-  authProvider: varchar("auth_provider").notNull(), // 'google', 'email', 'phone'
+  authProvider: varchar("auth_provider").notNull(), // 'google', 'email', 'phone', 'admin'
   verificationCode: varchar("verification_code"),
   codeExpiry: timestamp("code_expiry"),
   isVerified: boolean("is_verified").default(false),
