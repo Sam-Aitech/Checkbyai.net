@@ -5,6 +5,7 @@ import type { Express, RequestHandler } from "express";
 import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
 import crypto from "crypto";
+import bcrypt from "bcrypt";
 
 if (!process.env.REPLIT_DOMAINS) {
   throw new Error("Environment variable REPLIT_DOMAINS not provided");
@@ -250,6 +251,57 @@ export async function setupAuth(app: Express) {
     } catch (error) {
       console.error("Error verifying OTP:", error);
       res.status(500).json({ message: "Failed to verify code" });
+    }
+  });
+
+  // Admin login with username/password
+  app.post("/api/auth/admin-login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ error: "Username and password required" });
+      }
+
+      // Get user by username
+      const user = await storage.getUserByUsername(username);
+      
+      if (!user || !user.hashedPassword) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      // Verify admin role
+      if (user.role !== 'admin') {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      // Verify password
+      const isPasswordValid = await bcrypt.compare(password, user.hashedPassword);
+      
+      if (!isPasswordValid) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      // Create session
+      const sessionUser = {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        authProvider: 'admin',
+      };
+
+      req.login(sessionUser, (err) => {
+        if (err) {
+          return res.status(500).json({ error: "Failed to create session" });
+        }
+        res.json({ message: "Login successful", user: sessionUser });
+      });
+    } catch (error) {
+      console.error("Error in admin login:", error);
+      res.status(500).json({ error: "Login failed" });
     }
   });
 
