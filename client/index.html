@@ -54,24 +54,17 @@
     <link rel="manifest" href="/site.webmanifest" />
     
     <!-- Resource Hints for Performance -->
-    <!-- Preconnect to critical domains -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    
-    <!-- DNS Prefetch for additional domains -->
-    <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
-    <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
+    <!-- DNS Prefetch for external domains -->
     <link rel="dns-prefetch" href="https://www.youtube.com" />
     
     <!-- Preload critical assets -->
     <link rel="modulepreload" href="/src/main.tsx" />
     
-    <!-- Optimize font loading with font-display -->
+    <!-- Optimize system font rendering -->
     <style>
-      @font-face {
-        font-family: 'system-ui-override';
-        font-style: normal;
-        font-weight: 400;
+      /* Use system fonts for instant rendering */
+      body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
         font-display: swap;
       }
     </style>
