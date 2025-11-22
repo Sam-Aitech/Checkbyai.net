@@ -103,6 +103,12 @@
   --destructive-foreground: hsl(60, 9.1%, 97.8%);
   --ring: hsl(20, 14.3%, 4.1%);
   --radius: 0.5rem;
+  
+  /* Brand Color Palette */
+  --brand-dark-blue: hsl(200, 100%, 20%);
+  --brand-bright-blue: hsl(210, 100%, 40%);
+  --brand-green: hsl(120, 100%, 30%);
+  --brand-orange: hsl(24, 100%, 50%);
 }
 
 .dark {
