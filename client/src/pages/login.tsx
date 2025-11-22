@@ -84,8 +84,11 @@ export default function LoginPage() {
           <div className="flex justify-center mb-6">
             <img 
               src="/checkbyai-logo.png" 
-              alt="CheckByAi.net" 
+              alt="CheckByAi.net Logo - AI-powered Certificate of Sponsorship Verification" 
               className="h-16 w-auto sm:h-20"
+              width="80"
+              height="80"
+              loading="eager"
             />
           </div>
           <CardTitle className="text-2xl font-bold">Welcome to Check By AI</CardTitle>
