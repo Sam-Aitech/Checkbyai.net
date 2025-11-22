@@ -1,25 +1,42 @@
+import { lazy, Suspense } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import Home from "@/pages/home";
-import LoginPage from "@/pages/login";
-import AdminLogin from "@/pages/AdminLogin";
-import DashboardPage from "@/pages/dashboard";
-import AdminPortal from "@/components/AdminPortal";
-import NotFound from "@/pages/not-found";
+
+// Lazy load all routes for better performance
+const Home = lazy(() => import("@/pages/home"));
+const LoginPage = lazy(() => import("@/pages/login"));
+const AdminLogin = lazy(() => import("@/pages/AdminLogin"));
+const DashboardPage = lazy(() => import("@/pages/dashboard"));
+const AdminPortal = lazy(() => import("@/components/AdminPortal"));
+const NotFound = lazy(() => import("@/pages/not-found"));
+
+// Minimal loading component for route transitions
+function RouteLoader() {
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-900 dark:to-gray-800">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+      </div>
+    </div>
+  );
+}
 
 function Router() {
   return (
-    <Switch>
-      <Route path="/" component={Home} />
-      <Route path="/login" component={LoginPage} />
-      <Route path="/adminlogin" component={AdminLogin} />
-      <Route path="/dashboard" component={DashboardPage} />
-      <Route path="/admin" component={AdminPortal} />
-      <Route component={NotFound} />
-    </Switch>
+    <Suspense fallback={<RouteLoader />}>
+      <Switch>
+        <Route path="/" component={Home} />
+        <Route path="/login" component={LoginPage} />
+        <Route path="/adminlogin" component={AdminLogin} />
+        <Route path="/dashboard" component={DashboardPage} />
+        <Route path="/admin" component={AdminPortal} />
+        <Route component={NotFound} />
+      </Switch>
+    </Suspense>
   );
 }
 

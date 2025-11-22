@@ -53,9 +53,28 @@
     <!-- Favicons -->
     <link rel="manifest" href="/site.webmanifest" />
     
-    <!-- Preconnect to external domains -->
+    <!-- Resource Hints for Performance -->
+    <!-- Preconnect to critical domains -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    
+    <!-- DNS Prefetch for additional domains -->
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
+    <link rel="dns-prefetch" href="https://www.youtube.com" />
+    
+    <!-- Preload critical assets -->
+    <link rel="modulepreload" href="/src/main.tsx" />
+    
+    <!-- Optimize font loading with font-display -->
+    <style>
+      @font-face {
+        font-family: 'system-ui-override';
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+      }
+    </style>
     
     <!-- Structured Data -->
     <script type="application/ld+json">
