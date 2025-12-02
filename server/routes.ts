@@ -8,6 +8,7 @@ import { insertVerificationResultSchema, insertFeedbackSchema } from "@shared/sc
 import multer from "multer";
 import { z } from "zod";
 import { PDFAnalyzer } from "./services/pdfAnalyzer";
+import bcrypt from "bcrypt";
 
 // Initialize Stripe
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -33,6 +34,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // Email/Password Login
+  app.post('/api/auth/login', async (req: any, res) => {
+    try {
+      const { email, password } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ message: "Email and password required" });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      if (!user || !user.hashedPassword) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+
+      const passwordMatch = await bcrypt.compare(password, user.hashedPassword);
+      if (!passwordMatch) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+
+      req.login(user, (err: any) => {
+        if (err) {
+          return res.status(500).json({ message: "Login failed" });
+        }
+        res.json({ message: "Logged in successfully", user });
+      });
+    } catch (error) {
+      console.error("Login error:", error);
+      res.status(500).json({ message: "Login failed" });
     }
   });
 
