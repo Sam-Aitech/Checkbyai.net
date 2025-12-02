@@ -7,11 +7,12 @@ Sitemap: https://checkbyai.net/sitemap.xml
 # Crawl-delay
 Crawl-delay: 1
 
-# Block development files
+# Block development files and private content
 Disallow: /src/
 Disallow: /*.js
 Disallow: /*.css
 Disallow: /api/
+Disallow: /uploads/
 
 # Allow important pages
 Allow: /

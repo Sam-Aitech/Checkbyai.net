@@ -284,6 +284,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Verification error:', error);
       res.status(500).json({ message: 'Verification failed' });
+    } finally {
+      // Delete uploaded file immediately after processing (security measure)
+      if (req.file && req.file.path) {
+        try {
+          const fs = await import('fs');
+          fs.promises.unlink(req.file.path).catch(() => {
+            // Silently fail if file already deleted
+          });
+        } catch (err) {
+          console.error('Error deleting uploaded file:', err);
+        }
+      }
     }
   });
 

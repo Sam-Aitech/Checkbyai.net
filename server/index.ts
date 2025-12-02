@@ -31,6 +31,11 @@ app.use((req, res, next) => {
   // Disable directory listing and powered-by header
   res.header('X-Powered-By', '');
   
+  // Block access to uploads folder (private documents)
+  if (req.url.startsWith('/uploads/')) {
+    return res.status(403).send('Access denied');
+  }
+  
   // Block directory listing attempts
   if (req.url.endsWith('/') && req.url !== '/') {
     return res.status(404).send('Directory listing disabled');
