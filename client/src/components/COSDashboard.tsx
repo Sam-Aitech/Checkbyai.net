@@ -133,8 +133,8 @@ export default function COSDashboard() {
                 </div>
               </div>
               <div className="transform group-hover:translate-x-2 transition-transform duration-300">
-                <h1 className="text-lg sm:text-2xl font-bold text-white drop-shadow-lg">Document Authenticator</h1>
-                <p className="text-xs sm:text-sm text-blue-100 drop-shadow hidden sm:block">Advanced Document Verification</p>
+                <h1 className="text-lg sm:text-2xl font-bold text-white drop-shadow-lg">UK CoS Authenticator</h1>
+                <p className="text-xs sm:text-sm text-blue-100 drop-shadow hidden sm:block">UK Visa Document Verification</p>
               </div>
             </div>
             
@@ -228,11 +228,11 @@ export default function COSDashboard() {
         <div className="container mx-auto px-5 relative z-10">
           <div className="transform hover:scale-105 transition-transform duration-500">
             <h1 className="text-5xl md:text-7xl font-bold mb-6 font-sans bg-gradient-to-r from-white via-blue-100 to-purple-100 bg-clip-text text-transparent drop-shadow-2xl">
-              Advanced Document Verification
+              UK Certificate of Sponsorship Verification
             </h1>
           </div>
           <p className="text-xl md:text-2xl max-w-4xl mx-auto mb-10 text-blue-100 drop-shadow-lg leading-relaxed">
-            Verify the authenticity of your documents using PDF metadata analysis and expert verification
+            Verify your UK CoS document is genuine before applying for your Skilled Worker visa. Free AI-powered verification for British immigration documents.
           </p>
           <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
             <button 
@@ -244,7 +244,7 @@ export default function COSDashboard() {
                 <svg className="w-6 h-6 mr-3 transform group-hover:rotate-12 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                Check Your COS Now
+                Verify UK CoS Now
               </span>
               <div className="absolute inset-0 rounded-full bg-white/20 scale-0 group-hover:scale-100 transition-transform duration-700" />
             </button>
