@@ -80,6 +80,7 @@ export interface IStorage {
   getPaidSubmissionBySessionId(sessionId: string): Promise<PaidSubmission | undefined>;
   updatePaidSubmission(id: number, data: Partial<InsertPaidSubmission>): Promise<PaidSubmission>;
   getPendingPaidSubmissions(): Promise<PaidSubmission[]>;
+  getAllPaidSubmissions(): Promise<PaidSubmission[]>;
   getAssignedSubmissions(adminId: string): Promise<PaidSubmission[]>;
 }
 
@@ -450,6 +451,13 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(paidSubmissions)
       .where(eq(paidSubmissions.reviewStatus, 'pending'))
+      .orderBy(desc(paidSubmissions.priority), desc(paidSubmissions.createdAt));
+  }
+
+  async getAllPaidSubmissions(): Promise<PaidSubmission[]> {
+    return await db
+      .select()
+      .from(paidSubmissions)
       .orderBy(desc(paidSubmissions.priority), desc(paidSubmissions.createdAt));
   }
 

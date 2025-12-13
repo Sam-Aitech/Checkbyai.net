@@ -558,10 +558,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin: Get all pending paid submissions
+  // Admin: Get all paid submissions
   app.get('/api/admin/paid-submissions', isAdmin, async (req, res) => {
     try {
-      const submissions = await storage.getPendingPaidSubmissions();
+      const submissions = await storage.getAllPaidSubmissions();
       res.json(submissions);
     } catch (error: any) {
       console.error('Get submissions error:', error);
@@ -598,6 +598,196 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Update submission error:', error);
       res.status(500).json({ message: error.message || 'Failed to update submission' });
+    }
+  });
+
+  // Admin: Verify employer sponsor licence
+  app.post('/api/admin/paid-submissions/:id/verify-employer', isAdmin, async (req: any, res) => {
+    try {
+      const submissionId = parseInt(req.params.id);
+      const submission = await storage.getPaidSubmission(submissionId);
+      
+      if (!submission) {
+        return res.status(404).json({ message: 'Submission not found' });
+      }
+
+      if (submission.packageType !== 'full') {
+        return res.status(400).json({ message: 'Employer verification is only available for Full Package' });
+      }
+
+      if (!submission.employerName) {
+        return res.status(400).json({ message: 'Employer name is required for verification' });
+      }
+
+      // UK Home Office Sponsor Licence Register check
+      // The register is available at: https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers
+      // We'll simulate checking against this and provide structured results
+      
+      const employerName = submission.employerName.toLowerCase().trim();
+      
+      // This would normally query an external database or API
+      // For now, we provide a structured verification result
+      const verificationResult = {
+        employerName: submission.employerName,
+        verifiedAt: new Date().toISOString(),
+        status: 'manual_review_required',
+        message: 'Employer verification requires manual check against UK Home Office Sponsor Register',
+        recommendedChecks: [
+          'Verify employer exists on gov.uk sponsor licence register',
+          'Check employer trading name matches',
+          'Confirm sponsor licence tier (Skilled Worker)',
+          'Check licence is not suspended or revoked',
+          'Verify Companies House registration if applicable'
+        ],
+        governmentResources: {
+          sponsorRegister: 'https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers',
+          companiesHouse: 'https://find-and-update.company-information.service.gov.uk/'
+        },
+        notes: 'Manual verification against official UK government sources is recommended for highest accuracy.'
+      };
+
+      // Update submission with verification result
+      await storage.updatePaidSubmission(submissionId, {
+        employerVerificationResult: verificationResult,
+      });
+
+      res.json({ 
+        message: 'Employer verification data recorded', 
+        verificationResult 
+      });
+    } catch (error: any) {
+      console.error('Employer verification error:', error);
+      res.status(500).json({ message: error.message || 'Failed to verify employer' });
+    }
+  });
+
+  // Admin: Send report to user via email
+  app.post('/api/admin/paid-submissions/:id/send-report', isAdmin, async (req: any, res) => {
+    try {
+      const submissionId = parseInt(req.params.id);
+      const submission = await storage.getPaidSubmission(submissionId);
+      
+      if (!submission) {
+        return res.status(404).json({ message: 'Submission not found' });
+      }
+
+      if (submission.reviewStatus !== 'completed') {
+        return res.status(400).json({ message: 'Review must be completed before sending report' });
+      }
+
+      if (!submission.email) {
+        return res.status(400).json({ message: 'No email address on file' });
+      }
+
+      // Generate HTML report
+      const verdictColors: Record<string, string> = {
+        genuine: '#22c55e',
+        suspicious: '#f59e0b',
+        fake: '#ef4444',
+        inconclusive: '#6b7280',
+      };
+
+      const verdictColor = verdictColors[submission.expertVerdict || 'inconclusive'] || '#6b7280';
+      
+      const reportHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 700px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #003366 0%, #0066CC 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+            .verdict { background: ${verdictColor}; color: white; padding: 15px 30px; border-radius: 8px; display: inline-block; font-size: 24px; font-weight: bold; text-transform: uppercase; }
+            .confidence { font-size: 18px; margin-top: 10px; }
+            .section { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+            .section h3 { color: #003366; margin-top: 0; border-bottom: 2px solid #0066CC; padding-bottom: 10px; }
+            .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+            .package-badge { background: ${submission.packageType === 'full' ? '#0066CC' : '#6b7280'}; color: white; padding: 5px 15px; border-radius: 20px; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Certificate of Sponsorship Verification Report</h1>
+            <span class="package-badge">${submission.packageType === 'full' ? 'Full Package' : 'Normal Verification'}</span>
+          </div>
+          <div class="content">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <div class="verdict">${submission.expertVerdict || 'Pending'}</div>
+              <div class="confidence">Confidence: ${submission.expertConfidence || 0}%</div>
+            </div>
+
+            <div class="section">
+              <h3>Submission Details</h3>
+              <p><strong>Employer:</strong> ${submission.employerName || 'Not provided'}</p>
+              <p><strong>Job Title:</strong> ${submission.jobTitle || 'Not provided'}</p>
+              <p><strong>CoS Reference:</strong> ${submission.cosReferenceNumber || 'Not provided'}</p>
+              <p><strong>Submission Date:</strong> ${new Date(submission.createdAt!).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            </div>
+
+            <div class="section">
+              <h3>Expert Analysis</h3>
+              <p>${submission.documentAnalysisReport || 'No detailed analysis available.'}</p>
+            </div>
+
+            ${submission.recommendations ? `
+            <div class="section">
+              <h3>Recommendations</h3>
+              <p>${submission.recommendations}</p>
+            </div>
+            ` : ''}
+
+            ${submission.packageType === 'full' && submission.employerVerificationResult ? `
+            <div class="section">
+              <h3>Employer Verification</h3>
+              <p>${JSON.stringify(submission.employerVerificationResult)}</p>
+            </div>
+            ` : ''}
+          </div>
+          <div class="footer">
+            <p>This report was generated by CoS Verify UK</p>
+            <p>For questions, contact support@cosverify.uk</p>
+            <p>Report ID: ${submission.id} | Generated: ${new Date().toISOString()}</p>
+          </div>
+        </body>
+        </html>
+      `;
+
+      // Send email using Resend
+      if (!process.env.RESEND_API_KEY) {
+        return res.status(500).json({ message: 'Email service not configured' });
+      }
+
+      const emailResponse = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: 'CoS Verify UK <reports@cosverify.uk>',
+          to: [submission.email],
+          subject: `Your CoS Verification Report - ${submission.expertVerdict?.toUpperCase() || 'COMPLETE'}`,
+          html: reportHtml,
+        }),
+      });
+
+      if (!emailResponse.ok) {
+        const errorData = await emailResponse.json();
+        console.error('Resend error:', errorData);
+        return res.status(500).json({ message: 'Failed to send email' });
+      }
+
+      // Update submission as report delivered
+      await storage.updatePaidSubmission(submissionId, {
+        reportDelivered: true,
+        reportDeliveredAt: new Date(),
+      });
+
+      res.json({ message: 'Report sent successfully' });
+    } catch (error: any) {
+      console.error('Send report error:', error);
+      res.status(500).json({ message: error.message || 'Failed to send report' });
     }
   });
 

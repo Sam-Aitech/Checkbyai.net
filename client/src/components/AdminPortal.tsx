@@ -63,6 +63,7 @@ export default function AdminPortal() {
     expertConfidence: number | null;
     documentAnalysisReport: string | null;
     recommendations: string | null;
+    reportDelivered: boolean | null;
     createdAt: string;
   }
 
@@ -96,6 +97,62 @@ export default function AdminPortal() {
       toast({
         title: "Review Saved",
         description: "The submission has been updated with your review",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const sendReportMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await fetch(`/api/admin/paid-submissions/${id}/send-report`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to send report');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/paid-submissions'] });
+      toast({
+        title: "Report Sent",
+        description: "The verification report has been emailed to the user",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const verifyEmployerMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await fetch(`/api/admin/paid-submissions/${id}/verify-employer`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to verify employer');
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/paid-submissions'] });
+      toast({
+        title: "Employer Verification",
+        description: "Verification data recorded. Check recommended verification steps.",
       });
     },
     onError: (error: Error) => {
@@ -1105,7 +1162,31 @@ export default function AdminPortal() {
                     />
                   </div>
 
-                  <div className="flex gap-3 pt-4">
+                  {selectedSubmission.packageType === 'full' && (
+                    <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h5 className="font-medium text-blue-900 dark:text-blue-300">Employer Verification</h5>
+                          <p className="text-sm text-blue-700 dark:text-blue-400">
+                            Check sponsor licence status for: {selectedSubmission.employerName || 'No employer specified'}
+                          </p>
+                        </div>
+                        <Button
+                          onClick={() => verifyEmployerMutation.mutate(selectedSubmission.id)}
+                          disabled={verifyEmployerMutation.isPending || !selectedSubmission.employerName}
+                          variant="outline"
+                          className="border-blue-500 text-blue-600 hover:bg-blue-50"
+                        >
+                          {verifyEmployerMutation.isPending ? 'Checking...' : 'Run Verification'}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
+                        Opens verification checklist with links to UK Government sponsor register
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap gap-3 pt-4">
                     <Button
                       onClick={() => {
                         updateSubmissionMutation.mutate({
@@ -1121,6 +1202,14 @@ export default function AdminPortal() {
                     >
                       <Save className="w-4 h-4 mr-2" />
                       Complete Review
+                    </Button>
+                    <Button
+                      onClick={() => sendReportMutation.mutate(selectedSubmission.id)}
+                      disabled={sendReportMutation.isPending || selectedSubmission.reviewStatus !== 'completed'}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      {sendReportMutation.isPending ? 'Sending...' : 'Send Report to User'}
                     </Button>
                     <Button
                       variant="outline"
