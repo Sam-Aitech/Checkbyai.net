@@ -4,6 +4,7 @@ import {
   trustedPatterns,
   verificationResults,
   feedback,
+  paidSubmissions,
   type User,
   type UpsertUser,
   type IpVerification,
@@ -12,6 +13,8 @@ import {
   type VerificationResult,
   type Feedback,
   type InsertFeedback,
+  type PaidSubmission,
+  type InsertPaidSubmission,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, gte, count, avg, sql } from "drizzle-orm";
@@ -70,6 +73,14 @@ export interface IStorage {
     accuracyBreakdown: { correct: number; incorrect: number; unsure: number };
     recentFeedback: Feedback[];
   }>;
+  
+  // Paid submissions operations
+  createPaidSubmission(data: InsertPaidSubmission): Promise<PaidSubmission>;
+  getPaidSubmission(id: number): Promise<PaidSubmission | undefined>;
+  getPaidSubmissionBySessionId(sessionId: string): Promise<PaidSubmission | undefined>;
+  updatePaidSubmission(id: number, data: Partial<InsertPaidSubmission>): Promise<PaidSubmission>;
+  getPendingPaidSubmissions(): Promise<PaidSubmission[]>;
+  getAssignedSubmissions(adminId: string): Promise<PaidSubmission[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -395,6 +406,59 @@ export class DatabaseStorage implements IStorage {
       },
       recentFeedback,
     };
+  }
+
+  // Paid submissions operations
+  async createPaidSubmission(data: InsertPaidSubmission): Promise<PaidSubmission> {
+    const [submission] = await db
+      .insert(paidSubmissions)
+      .values(data)
+      .returning();
+    return submission;
+  }
+
+  async getPaidSubmission(id: number): Promise<PaidSubmission | undefined> {
+    const [submission] = await db
+      .select()
+      .from(paidSubmissions)
+      .where(eq(paidSubmissions.id, id));
+    return submission;
+  }
+
+  async getPaidSubmissionBySessionId(sessionId: string): Promise<PaidSubmission | undefined> {
+    const [submission] = await db
+      .select()
+      .from(paidSubmissions)
+      .where(eq(paidSubmissions.stripeSessionId, sessionId));
+    return submission;
+  }
+
+  async updatePaidSubmission(id: number, data: Partial<InsertPaidSubmission>): Promise<PaidSubmission> {
+    const [submission] = await db
+      .update(paidSubmissions)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(eq(paidSubmissions.id, id))
+      .returning();
+    return submission;
+  }
+
+  async getPendingPaidSubmissions(): Promise<PaidSubmission[]> {
+    return await db
+      .select()
+      .from(paidSubmissions)
+      .where(eq(paidSubmissions.reviewStatus, 'pending'))
+      .orderBy(desc(paidSubmissions.priority), desc(paidSubmissions.createdAt));
+  }
+
+  async getAssignedSubmissions(adminId: string): Promise<PaidSubmission[]> {
+    return await db
+      .select()
+      .from(paidSubmissions)
+      .where(eq(paidSubmissions.assignedTo, adminId))
+      .orderBy(desc(paidSubmissions.createdAt));
   }
 }
 

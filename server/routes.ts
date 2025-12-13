@@ -398,6 +398,209 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Paid verification routes
+  app.post('/api/paid/create-checkout', async (req, res) => {
+    try {
+      const { packageType, priceAmount } = req.body;
+      
+      if (!packageType || !['normal', 'full'].includes(packageType)) {
+        return res.status(400).json({ message: 'Invalid package type' });
+      }
+
+      const prices = {
+        normal: 1999, // £19.99 in pence
+        full: 4999,   // £49.99 in pence
+      };
+
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price_data: {
+              currency: 'gbp',
+              product_data: {
+                name: packageType === 'full' ? 'Full CoS Verification Package' : 'Normal CoS Verification',
+                description: packageType === 'full' 
+                  ? 'Priority review, phone consultation, employer verification, detailed analysis'
+                  : 'AI + expert verification with guaranteed report',
+              },
+              unit_amount: prices[packageType as keyof typeof prices],
+            },
+            quantity: 1,
+          },
+        ],
+        mode: 'payment',
+        success_url: `${req.headers.origin}/submit?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${req.headers.origin}/pricing`,
+        metadata: {
+          packageType,
+        },
+      });
+
+      // Create a pending submission record
+      const submission = await storage.createPaidSubmission({
+        email: '', // Will be updated after payment
+        packageType,
+        paymentStatus: 'pending',
+        stripeSessionId: session.id,
+        priority: packageType === 'full',
+        phoneConsultationRequested: packageType === 'full',
+      });
+
+      res.json({ url: session.url, sessionId: session.id, submissionId: submission.id });
+    } catch (error: any) {
+      console.error('Checkout creation error:', error);
+      res.status(500).json({ message: error.message || 'Failed to create checkout session' });
+    }
+  });
+
+  // Get submission by session ID (for after payment)
+  app.get('/api/paid/submission/:sessionId', async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const submission = await storage.getPaidSubmissionBySessionId(sessionId);
+      
+      if (!submission) {
+        return res.status(404).json({ message: 'Submission not found' });
+      }
+
+      // Check if payment is completed
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      
+      if (session.payment_status === 'paid' && submission.paymentStatus !== 'paid') {
+        // Update submission with payment info and customer email
+        await storage.updatePaidSubmission(submission.id, {
+          paymentStatus: 'paid',
+          email: session.customer_details?.email || '',
+        });
+      }
+
+      const updatedSubmission = await storage.getPaidSubmissionBySessionId(sessionId);
+      res.json(updatedSubmission);
+    } catch (error: any) {
+      console.error('Get submission error:', error);
+      res.status(500).json({ message: error.message || 'Failed to get submission' });
+    }
+  });
+
+  // Submit questionnaire and documents
+  app.post('/api/paid/submit/:submissionId', upload.fields([
+    { name: 'cosDocument', maxCount: 1 },
+    { name: 'supportingDocuments', maxCount: 5 },
+  ]), async (req: any, res) => {
+    try {
+      const submissionId = parseInt(req.params.submissionId);
+      const submission = await storage.getPaidSubmission(submissionId);
+      
+      if (!submission) {
+        return res.status(404).json({ message: 'Submission not found' });
+      }
+
+      if (submission.paymentStatus !== 'paid') {
+        return res.status(400).json({ message: 'Payment not completed' });
+      }
+
+      const {
+        howApplied,
+        emailsReceived,
+        confirmationDetails,
+        employerName,
+        jobTitle,
+        cosReferenceNumber,
+        additionalNotes,
+      } = req.body;
+
+      // Get file paths
+      const cosDocumentPath = req.files?.cosDocument?.[0]?.path || null;
+      const supportingDocumentsPath = req.files?.supportingDocuments?.map((f: any) => f.path) || [];
+
+      await storage.updatePaidSubmission(submissionId, {
+        howApplied,
+        emailsReceived,
+        confirmationDetails,
+        employerName,
+        jobTitle,
+        cosReferenceNumber,
+        additionalNotes,
+        cosDocumentPath,
+        supportingDocumentsPath,
+        reviewStatus: 'pending',
+      });
+
+      res.json({ message: 'Submission received successfully', submissionId });
+    } catch (error: any) {
+      console.error('Submit error:', error);
+      res.status(500).json({ message: error.message || 'Failed to submit' });
+    }
+  });
+
+  // Get submission status
+  app.get('/api/paid/status/:submissionId', async (req, res) => {
+    try {
+      const submissionId = parseInt(req.params.submissionId);
+      const submission = await storage.getPaidSubmission(submissionId);
+      
+      if (!submission) {
+        return res.status(404).json({ message: 'Submission not found' });
+      }
+
+      res.json({
+        id: submission.id,
+        packageType: submission.packageType,
+        reviewStatus: submission.reviewStatus,
+        expertVerdict: submission.expertVerdict,
+        reportDelivered: submission.reportDelivered,
+        createdAt: submission.createdAt,
+      });
+    } catch (error: any) {
+      console.error('Status error:', error);
+      res.status(500).json({ message: error.message || 'Failed to get status' });
+    }
+  });
+
+  // Admin: Get all pending paid submissions
+  app.get('/api/admin/paid-submissions', isAdmin, async (req, res) => {
+    try {
+      const submissions = await storage.getPendingPaidSubmissions();
+      res.json(submissions);
+    } catch (error: any) {
+      console.error('Get submissions error:', error);
+      res.status(500).json({ message: error.message || 'Failed to get submissions' });
+    }
+  });
+
+  // Admin: Update submission with expert review
+  app.patch('/api/admin/paid-submissions/:id', isAdmin, async (req: any, res) => {
+    try {
+      const submissionId = parseInt(req.params.id);
+      const {
+        reviewStatus,
+        expertVerdict,
+        expertConfidence,
+        documentAnalysisReport,
+        alterationsDetected,
+        recommendations,
+        employerVerificationResult,
+      } = req.body;
+
+      const submission = await storage.updatePaidSubmission(submissionId, {
+        reviewStatus,
+        expertVerdict,
+        expertConfidence,
+        documentAnalysisReport,
+        alterationsDetected,
+        recommendations,
+        employerVerificationResult,
+        assignedTo: req.user.id,
+      });
+
+      res.json(submission);
+    } catch (error: any) {
+      console.error('Update submission error:', error);
+      res.status(500).json({ message: error.message || 'Failed to update submission' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

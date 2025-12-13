@@ -92,6 +92,52 @@ export const feedback = pgTable("feedback", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Paid expert submissions table
+export const paidSubmissions = pgTable("paid_submissions", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  email: varchar("email").notNull(),
+  packageType: varchar("package_type").notNull(), // 'normal' (£19.99) or 'full' (£49.99)
+  paymentStatus: varchar("payment_status").default("pending"), // 'pending', 'paid', 'failed', 'refunded'
+  stripePaymentIntentId: varchar("stripe_payment_intent_id"),
+  stripeSessionId: varchar("stripe_session_id"),
+  
+  // Questionnaire responses
+  howApplied: text("how_applied"), // How did you apply for the job?
+  emailsReceived: text("emails_received"), // Description of emails from employer
+  confirmationDetails: text("confirmation_details"), // Any confirmation letters/calls?
+  employerName: varchar("employer_name"),
+  jobTitle: varchar("job_title"),
+  cosReferenceNumber: varchar("cos_reference_number"),
+  additionalNotes: text("additional_notes"),
+  
+  // Document storage (file paths/keys)
+  cosDocumentPath: varchar("cos_document_path"),
+  supportingDocumentsPath: jsonb("supporting_documents_path"), // Array of paths
+  
+  // Review status
+  reviewStatus: varchar("review_status").default("pending"), // 'pending', 'in_progress', 'completed'
+  assignedTo: varchar("assigned_to").references(() => users.id), // Admin who is reviewing
+  priority: boolean("priority").default(false), // Full package gets priority
+  phoneConsultationRequested: boolean("phone_consultation_requested").default(false),
+  phoneConsultationScheduled: timestamp("phone_consultation_scheduled"),
+  
+  // Expert analysis results
+  expertVerdict: varchar("expert_verdict"), // 'genuine', 'suspicious', 'fake', 'inconclusive'
+  expertConfidence: integer("expert_confidence"), // 0-100
+  employerVerificationResult: jsonb("employer_verification_result"), // Sponsor licence check results
+  documentAnalysisReport: text("document_analysis_report"),
+  alterationsDetected: jsonb("alterations_detected"), // List of detected alterations
+  recommendations: text("recommendations"),
+  
+  // Report delivery
+  reportDelivered: boolean("report_delivered").default(false),
+  reportDeliveredAt: timestamp("report_delivered_at"),
+  reportPath: varchar("report_path"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Type exports
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -99,6 +145,7 @@ export type IpVerification = typeof ipVerifications.$inferSelect;
 export type TrustedPattern = typeof trustedPatterns.$inferSelect;
 export type VerificationResult = typeof verificationResults.$inferSelect;
 export type Feedback = typeof feedback.$inferSelect;
+export type PaidSubmission = typeof paidSubmissions.$inferSelect;
 
 // Zod schemas
 export const insertUserSchema = createInsertSchema(users);
@@ -109,9 +156,15 @@ export const insertFeedbackSchema = createInsertSchema(feedback).omit({
   id: true, 
   createdAt: true 
 });
+export const insertPaidSubmissionSchema = createInsertSchema(paidSubmissions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertIpVerification = z.infer<typeof insertIpVerificationSchema>;
 export type InsertTrustedPattern = z.infer<typeof insertTrustedPatternSchema>;
 export type InsertVerificationResult = z.infer<typeof insertVerificationResultSchema>;
 export type InsertFeedback = z.infer<typeof insertFeedbackSchema>;
+export type InsertPaidSubmission = z.infer<typeof insertPaidSubmissionSchema>;

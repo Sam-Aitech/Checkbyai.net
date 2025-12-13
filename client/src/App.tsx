@@ -11,6 +11,8 @@ const LoginPage = lazy(() => import("@/pages/login"));
 const AdminLogin = lazy(() => import("@/pages/AdminLogin"));
 const DashboardPage = lazy(() => import("@/pages/dashboard"));
 const AdminPortal = lazy(() => import("@/components/AdminPortal"));
+const Pricing = lazy(() => import("@/pages/Pricing"));
+const Submit = lazy(() => import("@/pages/Submit"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 // Minimal loading component for route transitions
@@ -34,6 +36,8 @@ function Router() {
         <Route path="/adminlogin" component={AdminLogin} />
         <Route path="/dashboard" component={DashboardPage} />
         <Route path="/admin" component={AdminPortal} />
+        <Route path="/pricing" component={Pricing} />
+        <Route path="/submit" component={Submit} />
         <Route component={NotFound} />
       </Switch>
     </Suspense>

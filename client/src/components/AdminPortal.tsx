@@ -44,6 +44,69 @@ export default function AdminPortal() {
     enabled: isAuthenticated && isAdmin,
   });
 
+  // Paid submissions query
+  interface PaidSubmission {
+    id: number;
+    email: string;
+    packageType: 'normal' | 'full';
+    paymentStatus: string;
+    reviewStatus: string;
+    priority: boolean;
+    employerName: string | null;
+    jobTitle: string | null;
+    cosReferenceNumber: string | null;
+    howApplied: string | null;
+    emailsReceived: string | null;
+    confirmationDetails: string | null;
+    additionalNotes: string | null;
+    expertVerdict: string | null;
+    expertConfidence: number | null;
+    documentAnalysisReport: string | null;
+    recommendations: string | null;
+    createdAt: string;
+  }
+
+  const { data: paidSubmissions = [] } = useQuery<PaidSubmission[]>({
+    queryKey: ['/api/admin/paid-submissions'],
+    enabled: isAuthenticated && isAdmin,
+  });
+
+  const [selectedSubmission, setSelectedSubmission] = useState<PaidSubmission | null>(null);
+  const [reviewForm, setReviewForm] = useState({
+    expertVerdict: '',
+    expertConfidence: 0,
+    documentAnalysisReport: '',
+    recommendations: '',
+  });
+
+  const updateSubmissionMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+      const response = await fetch(`/api/admin/paid-submissions/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to update submission');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/paid-submissions'] });
+      setSelectedSubmission(null);
+      toast({
+        title: "Review Saved",
+        description: "The submission has been updated with your review",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const uploadPatternMutation = useMutation({
     mutationFn: async (file: File) => {
       const formData = new FormData();
@@ -331,6 +394,17 @@ export default function AdminPortal() {
               >
                 <MessageSquare className="w-4 h-4 inline mr-2" />
                 User Feedback
+              </button>
+              <button
+                onClick={() => setActiveTab("paid-reviews")}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === "paid-reviews"
+                    ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                    : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                }`}
+              >
+                <CheckCircle className="w-4 h-4 inline mr-2" />
+                Paid Reviews
               </button>
               <button
                 onClick={() => setActiveTab("settings")}
@@ -920,6 +994,199 @@ export default function AdminPortal() {
             <div className="flex justify-center">
               <PasswordChange />
             </div>
+          </div>
+        )}
+
+        {/* Paid Reviews Tab */}
+        {activeTab === "paid-reviews" && (
+          <div>
+            <div className="text-center mb-8 sm:mb-12">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-3 sm:mb-4">
+                Expert Verification Reviews
+              </h2>
+              <p className="text-sm sm:text-lg text-gray-600 dark:text-gray-400 max-w-3xl mx-auto px-2">
+                Review paid CoS verification submissions and provide expert analysis
+              </p>
+            </div>
+
+            {selectedSubmission ? (
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+                <div className="flex justify-between items-start mb-6">
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                      Submission #{selectedSubmission.id}
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-400">{selectedSubmission.email}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={selectedSubmission.packageType === 'full' ? 'default' : 'secondary'}>
+                      {selectedSubmission.packageType === 'full' ? 'Full Package' : 'Normal'}
+                    </Badge>
+                    {selectedSubmission.priority && (
+                      <Badge className="bg-orange-500">Priority</Badge>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-6 mb-6">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Employer</label>
+                      <p className="text-gray-900 dark:text-white">{selectedSubmission.employerName || 'Not provided'}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Job Title</label>
+                      <p className="text-gray-900 dark:text-white">{selectedSubmission.jobTitle || 'Not provided'}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">CoS Reference</label>
+                      <p className="text-gray-900 dark:text-white font-mono">{selectedSubmission.cosReferenceNumber || 'Not provided'}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">How Applied</label>
+                      <p className="text-gray-900 dark:text-white text-sm">{selectedSubmission.howApplied || 'Not provided'}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Emails Received</label>
+                      <p className="text-gray-900 dark:text-white text-sm">{selectedSubmission.emailsReceived || 'Not provided'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t dark:border-gray-700 pt-6 space-y-4">
+                  <h4 className="font-semibold text-gray-900 dark:text-white">Expert Review</h4>
+                  
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Verdict</label>
+                      <select
+                        className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                        value={reviewForm.expertVerdict}
+                        onChange={(e) => setReviewForm({ ...reviewForm, expertVerdict: e.target.value })}
+                      >
+                        <option value="">Select verdict</option>
+                        <option value="genuine">Genuine</option>
+                        <option value="suspicious">Suspicious</option>
+                        <option value="fake">Fake</option>
+                        <option value="inconclusive">Inconclusive</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Confidence (%)</label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={reviewForm.expertConfidence}
+                        onChange={(e) => setReviewForm({ ...reviewForm, expertConfidence: parseInt(e.target.value) || 0 })}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Analysis Report</label>
+                    <textarea
+                      className="w-full p-3 border rounded-lg min-h-[150px] dark:bg-gray-700 dark:border-gray-600"
+                      placeholder="Detailed analysis of the document..."
+                      value={reviewForm.documentAnalysisReport}
+                      onChange={(e) => setReviewForm({ ...reviewForm, documentAnalysisReport: e.target.value })}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Recommendations</label>
+                    <textarea
+                      className="w-full p-3 border rounded-lg min-h-[80px] dark:bg-gray-700 dark:border-gray-600"
+                      placeholder="Recommendations for the user..."
+                      value={reviewForm.recommendations}
+                      onChange={(e) => setReviewForm({ ...reviewForm, recommendations: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="flex gap-3 pt-4">
+                    <Button
+                      onClick={() => {
+                        updateSubmissionMutation.mutate({
+                          id: selectedSubmission.id,
+                          data: {
+                            ...reviewForm,
+                            reviewStatus: 'completed',
+                          },
+                        });
+                      }}
+                      disabled={updateSubmissionMutation.isPending}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      <Save className="w-4 h-4 mr-2" />
+                      Complete Review
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setSelectedSubmission(null)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {paidSubmissions.length === 0 ? (
+                  <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-xl">
+                    <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white">All caught up!</h3>
+                    <p className="text-gray-600 dark:text-gray-400">No pending submissions to review.</p>
+                  </div>
+                ) : (
+                  paidSubmissions.map((submission: PaidSubmission) => (
+                    <div
+                      key={submission.id}
+                      className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-semibold text-gray-900 dark:text-white">
+                              #{submission.id}
+                            </span>
+                            <Badge variant={submission.packageType === 'full' ? 'default' : 'secondary'}>
+                              {submission.packageType === 'full' ? 'Full' : 'Normal'}
+                            </Badge>
+                            {submission.priority && (
+                              <Badge className="bg-orange-500 text-white">Priority</Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">{submission.email}</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            {submission.employerName} - {submission.jobTitle}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Submitted: {new Date(submission.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            setSelectedSubmission(submission);
+                            setReviewForm({
+                              expertVerdict: submission.expertVerdict || '',
+                              expertConfidence: submission.expertConfidence || 0,
+                              documentAnalysisReport: submission.documentAnalysisReport || '',
+                              recommendations: submission.recommendations || '',
+                            });
+                          }}
+                        >
+                          <Eye className="w-4 h-4 mr-1" />
+                          Review
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
