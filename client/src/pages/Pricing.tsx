@@ -85,7 +85,7 @@ export default function Pricing() {
       if (data.url) {
         window.location.href = data.url;
       } else if (data.sessionId) {
-        setLocation(`/submit/${data.sessionId}`);
+        setLocation(`/submit?session_id=${data.sessionId}`);
       }
     } catch (error: any) {
       toast({
