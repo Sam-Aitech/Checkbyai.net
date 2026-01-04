@@ -34,7 +34,7 @@ The system employs a dual-portal design. An Admin Portal facilitates the upload 
 **Key Features:**
 - **User Portal**: File upload, real-time verification results with confidence scores, forensic analysis breakdown, and detailed check results.
 - **Admin Portal**: Management of trusted COS documents with metadata display, system statistics dashboard, and admin-only routes protected by role check.
-- **Authentication**: Database-backed user authentication with role-based access control (admin/user) and session management. Supports Google OAuth and Email OTP verification via Resend, including daily verification limits.
+- **Authentication**: Database-backed user authentication with role-based access control (admin/user) and session management. Supports Google OAuth and Email OTP verification via Brevo, including daily verification limits.
 
 ## Verification Engine
 
@@ -87,8 +87,18 @@ The system employs a dual-portal design. An Admin Portal facilitates the upload 
 
 **Authentication Routes:**
 - `POST /api/auth/admin-login` - Admin login with env var credential check
+- `POST /api/auth/email/send-otp` - Send OTP code to email via Brevo
+- `POST /api/auth/email/verify-otp` - Verify OTP code and create session
 - `POST /api/auth/logout` - Logout current session
 - `GET /api/auth/user` - Get current authenticated user
+
+## Environment Variables
+- `ADMIN_EMAIL` - Admin email address for forced admin access
+- `ADMIN_PASSWORD` - Admin password for forced admin access
+- `BREVO_API_KEY` - Brevo API key for sending verification emails
+- `GOOGLE_CLIENT_ID` - Google OAuth client ID
+- `GOOGLE_CLIENT_SECRET` - Google OAuth client secret
+- `DATABASE_URL` - PostgreSQL connection string
 
 **Verification Routes:**
 - `POST /api/verify` - Upload and verify a COS document
