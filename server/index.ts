@@ -137,18 +137,6 @@ app.use((req, res, next) => {
     console.error('Server error:', err);
   });
 
-  // Clean URL middleware - serve .html files without extension
-  app.use((req, res, next) => {
-    // Skip if URL already has an extension, is an API route, or is a Vite internal route
-    if (req.path.includes('.') || req.path.startsWith('/api/') || req.path.startsWith('/@') || req.path.startsWith('/src/') || req.path === '/') {
-      return next();
-    }
-    
-    // Try to serve the .html version of the requested path
-    req.url = req.url + '.html';
-    next();
-  });
-
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
