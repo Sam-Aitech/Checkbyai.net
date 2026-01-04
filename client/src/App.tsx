@@ -8,9 +8,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 // Lazy load all routes for better performance
 const Home = lazy(() => import("@/pages/home"));
 const LoginPage = lazy(() => import("@/pages/login"));
-const AdminLogin = lazy(() => import("@/pages/AdminLogin"));
+const SimpleAdmin = lazy(() => import("@/pages/SimpleAdmin"));
 const DashboardPage = lazy(() => import("@/pages/dashboard"));
-const AdminPortal = lazy(() => import("@/components/AdminPortal"));
 const Pricing = lazy(() => import("@/pages/Pricing"));
 const Submit = lazy(() => import("@/pages/Submit"));
 const NotFound = lazy(() => import("@/pages/not-found"));
@@ -33,9 +32,9 @@ function Router() {
       <Switch>
         <Route path="/" component={Home} />
         <Route path="/login" component={LoginPage} />
-        <Route path="/adminlogin" component={AdminLogin} />
+        <Route path="/adminlogin" component={SimpleAdmin} />
         <Route path="/dashboard" component={DashboardPage} />
-        <Route path="/admin" component={AdminPortal} />
+        <Route path="/admin" component={SimpleAdmin} />
         <Route path="/pricing" component={Pricing} />
         <Route path="/submit" component={Submit} />
         <Route component={NotFound} />
