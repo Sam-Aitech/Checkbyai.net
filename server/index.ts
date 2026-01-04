@@ -1,6 +1,38 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { storage } from "./storage";
+import bcrypt from "bcrypt";
+
+async function seedAdminUser() {
+  try {
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    if (!adminPassword) {
+      log("ADMIN_PASSWORD not set, skipping admin user seeding");
+      return;
+    }
+
+    const existingAdmin = await storage.getUserByUsername("admin");
+    if (existingAdmin) {
+      log("Admin user already exists");
+      return;
+    }
+
+    const hashedPassword = await bcrypt.hash(adminPassword, 10);
+    await storage.upsertUser({
+      id: "admin_default",
+      username: "admin",
+      hashedPassword,
+      authProvider: "admin",
+      role: "admin",
+      isVerified: true,
+    });
+    
+    log("Default admin user created successfully");
+  } catch (error) {
+    console.error("Failed to seed admin user:", error);
+  }
+}
 
 const app = express();
 
@@ -134,7 +166,8 @@ app.use((req, res, next) => {
     port,
     host: "0.0.0.0",
     reusePort: true,
-  }, () => {
+  }, async () => {
     log(`serving on port ${port}`);
+    await seedAdminUser();
   });
 })();
