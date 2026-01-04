@@ -265,7 +265,56 @@ export async function setupAuth(app: Express) {
         return res.status(400).json({ error: "Username and password required" });
       }
 
-      // Get user by username or email
+      // Check against ADMIN_EMAIL and ADMIN_PASSWORD environment variables first
+      const envAdminEmail = process.env.ADMIN_EMAIL;
+      const envAdminPassword = process.env.ADMIN_PASSWORD;
+      
+      if (envAdminEmail && envAdminPassword) {
+        // Direct match against env vars - force admin access
+        if ((username === envAdminEmail || username === 'admin') && password === envAdminPassword) {
+          // Get or create admin user
+          let adminUser = await storage.getUserByEmail(envAdminEmail);
+          
+          if (!adminUser) {
+            // Create admin user on-the-fly
+            const hashedPassword = await bcrypt.hash(envAdminPassword, 10);
+            adminUser = await storage.upsertUser({
+              id: "admin_env_" + crypto.randomUUID().slice(0, 8),
+              username: envAdminEmail,
+              email: envAdminEmail,
+              hashedPassword,
+              authProvider: "admin",
+              role: "admin",
+              isVerified: true,
+            });
+          } else if (adminUser.role !== 'admin') {
+            // Force admin role if credentials match env vars
+            adminUser = await storage.upsertUser({
+              ...adminUser,
+              role: "admin",
+            });
+          }
+          
+          const sessionUser = {
+            id: adminUser.id,
+            email: adminUser.email,
+            username: adminUser.username || adminUser.email,
+            firstName: adminUser.firstName,
+            lastName: adminUser.lastName,
+            role: 'admin',
+            authProvider: 'admin',
+          };
+
+          return req.login(sessionUser, (err) => {
+            if (err) {
+              return res.status(500).json({ error: "Failed to create session" });
+            }
+            res.json({ message: "Login successful", user: sessionUser });
+          });
+        }
+      }
+
+      // Fallback: Get user by username or email from database
       let user = await storage.getUserByUsername(username);
       if (!user) {
         user = await storage.getUserByEmail(username);

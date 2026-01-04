@@ -6,50 +6,58 @@ import bcrypt from "bcrypt";
 
 async function seedAdminUser() {
   try {
-    const existingEmailAdmin = await storage.getUserByEmail("ptel437@gmail.com");
-    const hashedPassword = await bcrypt.hash("admin@533178", 10);
+    // Use environment variables for admin credentials
+    const adminEmail = process.env.ADMIN_EMAIL || "ptel437@gmail.com";
+    const adminPassword = process.env.ADMIN_PASSWORD || "admin@533178";
+    
+    const hashedPassword = await bcrypt.hash(adminPassword, 10);
+    
+    // Check if admin exists by email
+    const existingEmailAdmin = await storage.getUserByEmail(adminEmail);
     
     if (!existingEmailAdmin) {
       await storage.upsertUser({
-        id: "admin_email_primary",
-        username: "ptel437@gmail.com",
-        email: "ptel437@gmail.com",
+        id: "admin_primary",
+        username: adminEmail,
+        email: adminEmail,
         hashedPassword,
         authProvider: "admin",
         role: "admin",
         isVerified: true,
       });
-      log("Primary admin user (ptel437@gmail.com) created successfully");
+      log(`Admin user created: ${adminEmail}`);
     } else {
-      // Update existing admin credentials
+      // Force update admin credentials and role
       await storage.upsertUser({
         ...existingEmailAdmin,
         hashedPassword,
         role: "admin",
+        isVerified: true,
       });
-      log("Primary admin user credentials updated");
+      log(`Admin user updated: ${adminEmail}`);
     }
 
-    // Also ensure username-based admin 'admin' has the same password
+    // Also create/update username 'admin' with same credentials
     const existingAdmin = await storage.getUserByUsername("admin");
     if (!existingAdmin) {
       await storage.upsertUser({
         id: "admin_default",
         username: "admin",
-        email: "ptel437@gmail.com",
+        email: adminEmail,
         hashedPassword,
         authProvider: "admin",
         role: "admin",
         isVerified: true,
       });
-      log("Default admin user created successfully");
-    } else {
+      log("Username 'admin' account created");
+    } else if (existingAdmin.id !== "admin_primary") {
       await storage.upsertUser({
         ...existingAdmin,
+        email: adminEmail,
         hashedPassword,
         role: "admin",
       });
-      log("Default admin user credentials updated");
+      log("Username 'admin' account updated");
     }
   } catch (error) {
     console.error("Failed to seed admin user:", error);
