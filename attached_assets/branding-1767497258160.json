@@ -1,0 +1,109 @@
+{
+  "colorScheme": "light",
+  "fonts": [
+    {
+      "family": "ui-sans-serif",
+      "count": 7
+    },
+    {
+      "family": "system-ui",
+      "count": 7
+    },
+    {
+      "family": "sans-serif",
+      "count": 7
+    },
+    {
+      "family": "Apple Color Emoji",
+      "count": 7
+    },
+    {
+      "family": "Segoe UI Emoji",
+      "count": 7
+    },
+    {
+      "family": "Segoe UI Symbol",
+      "count": 7
+    },
+    {
+      "family": "Noto Color Emoji",
+      "count": 7
+    }
+  ],
+  "colors": {
+    "primary": "#111827",
+    "accent": "#2563EB",
+    "background": "#FFFFFF",
+    "textPrimary": "#2563EB",
+    "link": "#2563EB"
+  },
+  "typography": {
+    "fontFamilies": {
+      "primary": "ui-sans-serif",
+      "heading": "ui-sans-serif"
+    },
+    "fontStacks": {
+      "body": [
+        "ui-sans-serif",
+        "system-ui",
+        "sans-serif",
+        "Apple Color Emoji",
+        "Segoe UI Emoji",
+        "Segoe UI Symbol",
+        "Noto Color Emoji"
+      ],
+      "heading": [
+        "ui-sans-serif",
+        "system-ui",
+        "sans-serif",
+        "Apple Color Emoji",
+        "Segoe UI Emoji",
+        "Segoe UI Symbol",
+        "Noto Color Emoji"
+      ],
+      "paragraph": [
+        "ui-sans-serif",
+        "system-ui",
+        "sans-serif",
+        "Apple Color Emoji",
+        "Segoe UI Emoji",
+        "Segoe UI Symbol",
+        "Noto Color Emoji"
+      ]
+    },
+    "fontSizes": {
+      "h1": "24px",
+      "h2": "24px",
+      "body": "14px"
+    }
+  },
+  "spacing": {
+    "baseUnit": 4,
+    "borderRadius": "10px"
+  },
+  "components": {},
+  "images": {
+    "logo": null,
+    "favicon": null,
+    "ogImage": "File saved at: attached_assets/ogImage.svg"
+  },
+  "__framework_hints": [],
+  "__llm_button_reasoning": {
+    "primary": {
+      "index": -1,
+      "text": "N/A",
+      "reasoning": "LLM failed"
+    },
+    "secondary": {
+      "index": -1,
+      "text": "N/A",
+      "reasoning": "LLM failed"
+    },
+    "confidence": 0
+  },
+  "confidence": {
+    "buttons": 0,
+    "colors": 0,
+    "overall": 0
+  }
+}

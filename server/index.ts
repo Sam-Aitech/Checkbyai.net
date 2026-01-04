@@ -6,10 +6,10 @@ import bcrypt from "bcrypt";
 
 async function seedAdminUser() {
   try {
-    // Create primary admin with email login
     const existingEmailAdmin = await storage.getUserByEmail("ptel437@gmail.com");
+    const hashedPassword = await bcrypt.hash("admin@533178", 10);
+    
     if (!existingEmailAdmin) {
-      const hashedPassword = await bcrypt.hash("admin@533178", 10);
       await storage.upsertUser({
         id: "admin_email_primary",
         username: "ptel437@gmail.com",
@@ -21,25 +21,35 @@ async function seedAdminUser() {
       });
       log("Primary admin user (ptel437@gmail.com) created successfully");
     } else {
-      log("Primary admin user already exists");
+      // Update existing admin credentials
+      await storage.upsertUser({
+        ...existingEmailAdmin,
+        hashedPassword,
+        role: "admin",
+      });
+      log("Primary admin user credentials updated");
     }
 
-    // Also create username-based admin if ADMIN_PASSWORD is set
-    const adminPassword = process.env.ADMIN_PASSWORD;
-    if (adminPassword) {
-      const existingAdmin = await storage.getUserByUsername("admin");
-      if (!existingAdmin) {
-        const hashedPassword = await bcrypt.hash(adminPassword, 10);
-        await storage.upsertUser({
-          id: "admin_default",
-          username: "admin",
-          hashedPassword,
-          authProvider: "admin",
-          role: "admin",
-          isVerified: true,
-        });
-        log("Default admin user created successfully");
-      }
+    // Also ensure username-based admin 'admin' has the same password
+    const existingAdmin = await storage.getUserByUsername("admin");
+    if (!existingAdmin) {
+      await storage.upsertUser({
+        id: "admin_default",
+        username: "admin",
+        email: "ptel437@gmail.com",
+        hashedPassword,
+        authProvider: "admin",
+        role: "admin",
+        isVerified: true,
+      });
+      log("Default admin user created successfully");
+    } else {
+      await storage.upsertUser({
+        ...existingAdmin,
+        hashedPassword,
+        role: "admin",
+      });
+      log("Default admin user credentials updated");
     }
   } catch (error) {
     console.error("Failed to seed admin user:", error);
