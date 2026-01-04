@@ -254,7 +254,7 @@ export async function setupAuth(app: Express) {
     }
   });
 
-  // Admin login with username/password
+  // Admin login with username/password (accepts email or username)
   app.post("/api/auth/admin-login", async (req, res) => {
     try {
       const { username, password } = req.body;
@@ -263,8 +263,11 @@ export async function setupAuth(app: Express) {
         return res.status(400).json({ error: "Username and password required" });
       }
 
-      // Get user by username
-      const user = await storage.getUserByUsername(username);
+      // Get user by username or email
+      let user = await storage.getUserByUsername(username);
+      if (!user) {
+        user = await storage.getUserByEmail(username);
+      }
       
       if (!user || !user.hashedPassword) {
         return res.status(401).json({ error: "Invalid credentials" });

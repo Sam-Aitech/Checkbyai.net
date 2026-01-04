@@ -6,29 +6,41 @@ import bcrypt from "bcrypt";
 
 async function seedAdminUser() {
   try {
+    // Create primary admin with email login
+    const existingEmailAdmin = await storage.getUserByEmail("ptel437@gmail.com");
+    if (!existingEmailAdmin) {
+      const hashedPassword = await bcrypt.hash("admin@533178", 10);
+      await storage.upsertUser({
+        id: "admin_email_primary",
+        username: "ptel437@gmail.com",
+        email: "ptel437@gmail.com",
+        hashedPassword,
+        authProvider: "admin",
+        role: "admin",
+        isVerified: true,
+      });
+      log("Primary admin user (ptel437@gmail.com) created successfully");
+    } else {
+      log("Primary admin user already exists");
+    }
+
+    // Also create username-based admin if ADMIN_PASSWORD is set
     const adminPassword = process.env.ADMIN_PASSWORD;
-    if (!adminPassword) {
-      log("ADMIN_PASSWORD not set, skipping admin user seeding");
-      return;
+    if (adminPassword) {
+      const existingAdmin = await storage.getUserByUsername("admin");
+      if (!existingAdmin) {
+        const hashedPassword = await bcrypt.hash(adminPassword, 10);
+        await storage.upsertUser({
+          id: "admin_default",
+          username: "admin",
+          hashedPassword,
+          authProvider: "admin",
+          role: "admin",
+          isVerified: true,
+        });
+        log("Default admin user created successfully");
+      }
     }
-
-    const existingAdmin = await storage.getUserByUsername("admin");
-    if (existingAdmin) {
-      log("Admin user already exists");
-      return;
-    }
-
-    const hashedPassword = await bcrypt.hash(adminPassword, 10);
-    await storage.upsertUser({
-      id: "admin_default",
-      username: "admin",
-      hashedPassword,
-      authProvider: "admin",
-      role: "admin",
-      isVerified: true,
-    });
-    
-    log("Default admin user created successfully");
   } catch (error) {
     console.error("Failed to seed admin user:", error);
   }
