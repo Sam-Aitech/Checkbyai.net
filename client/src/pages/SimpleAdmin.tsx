@@ -19,6 +19,24 @@ interface TrustedPattern {
   id: number;
   filename: string;
   uploadedAt: string;
+  metadata?: {
+    producer?: string;
+    creator?: string;
+    creationDate?: string;
+    modificationDate?: string;
+    pdfVersion?: string;
+    fontCount?: number;
+    fonts?: string[];
+    forensic?: {
+      producer: string;
+      creator: string;
+      created: string;
+      modified: string;
+      softwareAgent: string;
+      fontCount: number;
+      suspiciousIndicators: string[];
+    };
+  };
 }
 
 interface Stats {
@@ -75,7 +93,7 @@ export default function SimpleAdmin() {
     try {
       const [statsRes, patternsRes] = await Promise.all([
         fetch('/api/stats', { credentials: 'include' }),
-        fetch('/api/trusted-patterns', { credentials: 'include' }),
+        fetch('/api/admin/trusted-patterns', { credentials: 'include' }),
       ]);
       
       if (statsRes.ok) {
@@ -140,7 +158,7 @@ export default function SimpleAdmin() {
     formData.append('file', file);
 
     try {
-      const response = await fetch('/api/trusted-patterns', {
+      const response = await fetch('/api/admin/trusted-patterns', {
         method: 'POST',
         body: formData,
         credentials: 'include',
@@ -162,7 +180,7 @@ export default function SimpleAdmin() {
 
   const handleDelete = async (id: number) => {
     try {
-      const response = await fetch(`/api/trusted-patterns/${id}`, {
+      const response = await fetch(`/api/admin/trusted-patterns/${id}`, {
         method: 'DELETE',
         credentials: 'include',
       });
@@ -368,30 +386,61 @@ export default function SimpleAdmin() {
                     <p className="text-sm text-slate-500">Upload genuine COS documents to establish patterns</p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     {patterns.map((pattern) => (
                       <div
                         key={pattern.id}
-                        className="flex items-center justify-between p-4 bg-slate-700/50 rounded-lg"
+                        className="p-4 bg-slate-700/50 rounded-lg"
                       >
-                        <div className="flex items-center gap-3">
-                          <FileText className="w-5 h-5 text-blue-400" />
-                          <div>
-                            <p className="text-white font-medium">{pattern.filename}</p>
-                            <p className="text-sm text-slate-400">
-                              Uploaded: {new Date(pattern.uploadedAt).toLocaleDateString()}
-                            </p>
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <FileText className="w-5 h-5 text-blue-400" />
+                            <div>
+                              <p className="text-white font-medium">{pattern.filename}</p>
+                              <p className="text-sm text-slate-400">
+                                Uploaded: {new Date(pattern.uploadedAt).toLocaleDateString()}
+                              </p>
+                            </div>
                           </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(pattern.id)}
+                            className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                            data-testid={`button-delete-pattern-${pattern.id}`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(pattern.id)}
-                          className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                          data-testid={`button-delete-pattern-${pattern.id}`}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        
+                        {pattern.metadata && (
+                          <div className="mt-3 pt-3 border-t border-slate-600">
+                            <p className="text-xs text-slate-500 uppercase tracking-wide mb-2">Forensic Metadata</p>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                              <div>
+                                <p className="text-slate-400">Producer</p>
+                                <p className="text-slate-200 truncate">{pattern.metadata.forensic?.producer || pattern.metadata.producer || 'Unknown'}</p>
+                              </div>
+                              <div>
+                                <p className="text-slate-400">Creator</p>
+                                <p className="text-slate-200 truncate">{pattern.metadata.forensic?.creator || pattern.metadata.creator || 'Unknown'}</p>
+                              </div>
+                              <div>
+                                <p className="text-slate-400">Created</p>
+                                <p className="text-slate-200 truncate">{pattern.metadata.forensic?.created || pattern.metadata.creationDate || 'Unknown'}</p>
+                              </div>
+                              <div>
+                                <p className="text-slate-400">Fonts</p>
+                                <p className="text-slate-200">{pattern.metadata.forensic?.fontCount || pattern.metadata.fontCount || 0} fonts</p>
+                              </div>
+                            </div>
+                            {pattern.metadata.forensic?.suspiciousIndicators && pattern.metadata.forensic.suspiciousIndicators.length > 0 && (
+                              <div className="mt-2">
+                                <p className="text-xs text-yellow-400">Warnings: {pattern.metadata.forensic.suspiciousIndicators.join(', ')}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

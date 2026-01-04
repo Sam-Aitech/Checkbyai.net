@@ -259,8 +259,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const analysis = await pdfAnalyzer.analyzeAgainstTrustedPatterns(metadata, trustedPatterns);
       
-      const result = analysis.confidence > 90 ? 'genuine' : 
-                    analysis.confidence > 50 ? 'suspicious' : 'fake';
+      // Use the rule-based result from the analyzer
+      const result = analysis.result;
 
       // Store verification result
       const verificationId = await storage.createVerificationResult(
