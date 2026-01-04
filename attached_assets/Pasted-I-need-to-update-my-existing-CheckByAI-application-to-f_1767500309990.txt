@@ -1,0 +1,45 @@
+I need to update my existing "CheckByAI" application to fix admin access issues and significantly upgrade the verification engine's accuracy.
+
+The stack is: React (Vite/TypeScript) frontend, Node.js (Express) backend, and PostgreSQL (Drizzle ORM).
+
+Please implement the following four specific updates:
+
+### 1. Fix Admin Panel & Access Control
+* **Immediate Access:** Implement a robust Admin Authentication Middleware.
+* **Environment Variable:** Read an `ADMIN_EMAIL` and `ADMIN_PASSWORD` from environment variables.
+* **Logic:** If the user logging in matches these credentials, explicitly force their user role to 'admin' in the session and database.
+* **Route Protection:** Ensure `/admin` and all `/api/admin/*` routes strictly require this admin role. If a non-admin tries to access it, redirect to `/login` with a clear "Unauthorized" error.
+* **Dashboard:** Update `SimpleAdmin.tsx` to ensure it successfully loads. It must have a section to "Manage Trusted Samples".
+
+### 2. "Trusted Sample" Management (Admin Only)
+* Create a feature in the Admin Dashboard to upload "Genuine COS Samples".
+* **Backend Storage:** When an admin uploads a sample, store it in a `trusted_patterns` table.
+* **Processing:** Automatically extract and store the metadata (Producer, Creator, Fonts, Layout) of these samples as JSON. The AI will use these "Gold Standards" to compare against user uploads.
+
+### 3. High-Fidelity Metadata Extraction (GroupDocs Level)
+* We need metadata extraction that rivals "GroupDocs". Replace or upgrade the current PDF analyzer.
+* **Library:** Use `pdf-lib` for structure and `fast-xml-parser` for XMP data. If possible on this environment, use `exiftool-vendored` for deep forensic metadata.
+* **Data Points:** You must explicitly extract:
+    * **PDF Producer:** (e.g., "iText", "Adobe Acrobat", "Microsoft Word").
+    * **Creation vs. Mod Date:** exact timestamps down to the second.
+    * **XMP Metadata:** History of modifications.
+    * **Font Data:** List of embedded fonts.
+* **Output:** The backend should normalize this data into a standardized JSON object that looks like: `{ producer: string, created: date, modified: date, software_agent: string, font_count: number }`.
+
+### 4. Custom AI Verification Logic with System Instructions
+* Refactor the `verifyCOS` function to use a new "Rule Engine".
+* **Input:** It must take the User's PDF Metadata + The "Trusted Sample" Metadata + Your "Custom System Instructions".
+* **Logic:**
+    1.  **Strict Match:** If the User PDF's *Producer* does not match the Trusted Sample's *Producer* (e.g., User has "Canva" but Trusted has "Microsoft Word"), immediately flag as **FAKE**.
+    2.  **Date Check:** If *Modification Date* is significantly later than *Creation Date* without a valid reason, flag as **SUSPICIOUS**.
+    3.  **AI Analysis:** Send the extracted text and metadata summary to the AI (OpenAI/Anthropic) with the following System Prompt:
+        > "You are a forensic document analyst. Compare the extracted metadata of this document against the known trusted pattern.
+        > Trusted Pattern Producer: [Insert Trusted Producer]
+        > Document Producer: [Insert Doc Producer]
+        > INSTRUCTION: If the Producer differs, reject immediately. If XMP data shows editing software (Photoshop, Illustrator), reject immediately. Return a JSON object with { status: 'genuine' | 'fake', confidence: 0-100, reason: 'string' }."
+
+### Deliverables
+* Update `server/middleware/auth.ts` for the admin fix.
+* Update `server/services/pdfAnalyzer.ts` for the deep metadata extraction.
+* Update `server/routes.ts` to handle the new verification logic.
+* Ensure the Admin UI (`client/src/pages/SimpleAdmin.tsx`) allows uploading the reference samples.
