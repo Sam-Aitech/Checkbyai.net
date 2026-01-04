@@ -1,13 +1,20 @@
 import { useState } from 'react';
 import { useLocation } from 'wouter';
-import { Check, Shield, Zap, Phone, Building2, FileSearch, Clock, Star, ArrowLeft } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Check, Shield, Zap, Phone, Building2, FileSearch, Clock, Star, ArrowLeft, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, getQueryFn } from '@/lib/queryClient';
 import SEOHead from '@/components/SEOHead';
 import Footer from '@/components/Footer';
+
+interface User {
+  id: string;
+  email: string;
+  role: string;
+}
 
 interface PlanFeature {
   text: string;
@@ -72,7 +79,24 @@ export default function Pricing() {
   const { toast } = useToast();
   const [loading, setLoading] = useState<string | null>(null);
 
+  const { data: user, isLoading: isLoadingUser } = useQuery<User | null>({
+    queryKey: ['/api/auth/user'],
+    queryFn: getQueryFn({ on401: 'returnNull' }),
+    retry: false,
+  });
+
+  const isLoggedIn = !!user?.id;
+
   const handleSelectPlan = async (plan: PricingPlan) => {
+    if (!isLoggedIn) {
+      toast({
+        title: 'Login Required',
+        description: 'Please log in or create an account to purchase this package.',
+      });
+      setLocation('/login');
+      return;
+    }
+
     setLoading(plan.packageType);
     try {
       const response = await apiRequest('POST', '/api/paid/create-checkout', {
@@ -127,6 +151,20 @@ export default function Pricing() {
             <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
               Get peace of mind with our expert verification service. Our specialists manually review your Certificate of Sponsorship alongside advanced AI analysis.
             </p>
+            
+            {!isLoadingUser && !isLoggedIn && (
+              <div className="mt-6 inline-flex items-center gap-2 bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 px-4 py-2 rounded-lg">
+                <LogIn className="w-4 h-4" />
+                <span>Please <button onClick={() => setLocation('/login')} className="underline font-semibold hover:no-underline" data-testid="link-login-prompt">log in</button> to purchase a verification package</span>
+              </div>
+            )}
+            
+            {!isLoadingUser && isLoggedIn && user?.email && (
+              <div className="mt-6 inline-flex items-center gap-2 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 px-4 py-2 rounded-lg">
+                <Check className="w-4 h-4" />
+                <span>Logged in as <strong>{user.email}</strong></span>
+              </div>
+            )}
           </div>
 
           <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto mb-16">
@@ -209,6 +247,11 @@ export default function Pricing() {
                       <span className="flex items-center gap-2">
                         <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                         Processing...
+                      </span>
+                    ) : !isLoggedIn ? (
+                      <span className="flex items-center gap-2">
+                        <LogIn className="w-5 h-5" />
+                        Login to Select
                       </span>
                     ) : (
                       `Select ${plan.name}`
