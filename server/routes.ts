@@ -277,7 +277,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         id: verificationId,
         result,
         confidence: analysis.confidence,
-        details: analysis,
+        details: analysis.details,
+        checks: analysis.checks || [],
+        forensicAnalysis: analysis.details?.forensicAnalysis || null,
+        metadata: {
+          producer: metadata.producer,
+          creator: metadata.creator,
+          created: metadata.creationDate,
+          modified: metadata.modificationDate,
+          fontCount: metadata.fontCount,
+        },
         timestamp: new Date().toISOString()
       });
 

@@ -139,7 +139,10 @@ export default function SimpleAdmin() {
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/logout', { credentials: 'include' });
+      await fetch('/api/auth/logout', { 
+        method: 'POST',
+        credentials: 'include' 
+      });
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -218,7 +221,7 @@ export default function SimpleAdmin() {
               </div>
             </div>
             <h1 className="text-3xl font-bold text-white mb-2">Admin Portal</h1>
-            <p className="text-slate-400">Admin Login: ptel437@gmail.com / admin@533178</p>
+            <p className="text-slate-400">Enter your administrator credentials</p>
           </div>
 
           <Card className="border-slate-700 bg-slate-800/50">

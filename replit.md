@@ -6,8 +6,14 @@ This project is an AI-powered Certificate of Sponsorship (COS) verification syst
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
+## Admin Access
+- Admin portal accessible at `/admin`
+- Admin credentials controlled via environment variables: `ADMIN_EMAIL` and `ADMIN_PASSWORD`
+- When credentials match env vars, user is automatically granted admin role
+- Default admin: ptel437@gmail.com
+
 ## System Architecture
-The system employs a dual-portal design. An Admin Portal facilitates the upload of genuine COS documents to a Trusted Patterns Database, while a User Portal allows users to upload COS documents for AI verification. Verification results are classified as Genuine, Edited, or Fake, accompanied by a confidence score.
+The system employs a dual-portal design. An Admin Portal facilitates the upload of genuine COS documents to a Trusted Patterns Database, while a User Portal allows users to upload COS documents for AI verification. Verification results are classified as Genuine, Suspicious, or Fake, accompanied by a confidence score.
 
 **Frontend:**
 - **Framework**: React with TypeScript
@@ -19,16 +25,45 @@ The system employs a dual-portal design. An Admin Portal facilitates the upload 
 - **UI/UX Decisions**: Professional color scheme, adaptive color-changing result badges with gradient backgrounds and animations, mobile optimization with responsive design.
 
 **Backend:**
-- **Runtime**: FastAPI with async support.
-- **Database**: DuckDB for in-memory storage of trusted patterns and verification results, supporting `users`, `trusted_cos_patterns`, `submitted_cos`, and `verification_results` tables.
-- **PDF Processing**: PyMuPDF for comprehensive metadata extraction (including XMP metadata).
-- **AI Engine**: COSVerifier, utilizing SentenceTransformers for vector similarity.
-- **Comparison Methods**: Rule-based exact matching, vector similarity (TF-IDF/SentenceTransformers), and ML model inference (ONNX Runtime ready).
+- **Runtime**: Node.js with Express
+- **Database**: PostgreSQL with Drizzle ORM
+- **PDF Processing**: Custom PDFAnalyzer with GroupDocs-level metadata extraction
+- **Verification Engine**: Rule-based with forensic analysis
+- **Comparison Methods**: Producer matching, date consistency checks, XMP history analysis, suspicious software detection
 
 **Key Features:**
-- **User Portal**: File upload, real-time verification results with confidence scores, and analysis breakdown.
-- **Admin Portal**: Management of trusted COS documents, system statistics dashboard, and detailed document analysis with XMP metadata display and admin decision tools.
+- **User Portal**: File upload, real-time verification results with confidence scores, forensic analysis breakdown, and detailed check results.
+- **Admin Portal**: Management of trusted COS documents with metadata display, system statistics dashboard, and admin-only routes protected by role check.
 - **Authentication**: Database-backed user authentication with role-based access control (admin/user) and session management. Supports Google OAuth and Email OTP verification via Resend, including daily verification limits.
+
+## Verification Engine
+
+**Rule-Based Checks:**
+1. **Editing Software Detection**: Immediately flags documents created with Photoshop, Illustrator, GIMP, Inkscape, Canva, etc.
+2. **Producer Matching**: Compares document producer against trusted sample producers
+3. **Date Consistency**: Checks if modification date is before creation date (impossible) or significantly later
+4. **XMP History Analysis**: Scans modification history for suspicious editing tools
+5. **Known Producer Check**: Validates producer against known genuine software (Microsoft Word, Adobe Acrobat, LibreOffice, gov.uk, Home Office)
+
+**Forensic Metadata Extraction:**
+- PDF Producer (e.g., "iText", "Adobe Acrobat", "Microsoft Word")
+- Creation vs Modification Date with second-level precision
+- XMP Metadata including modification history
+- Font data with embedded font list
+- Digital signature detection
+- Encryption status
+
+**Verification Result Structure:**
+```json
+{
+  "status": "genuine" | "suspicious" | "fake",
+  "confidence": 0-100,
+  "reason": "string",
+  "checks": [
+    { "name": "string", "passed": boolean, "severity": "critical|warning|info", "message": "string" }
+  ]
+}
+```
 
 ## External Dependencies
 - **@neondatabase/serverless**: Serverless PostgreSQL connection.
@@ -36,9 +71,24 @@ The system employs a dual-portal design. An Admin Portal facilitates the upload 
 - **@tanstack/react-query**: Server state management.
 - **multer**: File upload handling.
 - **@radix-ui/react-***: Accessible UI components.
-- **PyMuPDF**: PDF metadata extraction.
-- **scikit-learn**: TF-IDF vectorization and cosine similarity.
-- **SentenceTransformers**: Vector similarity analysis.
-- **ONNX Runtime**: ML model inference.
+- **fast-xml-parser**: XMP metadata parsing.
 - **Stripe**: Payment processing and subscription upgrades.
 - **passport-google-oauth20**: Google OAuth authentication.
+- **bcrypt**: Password hashing.
+
+## API Routes
+
+**Admin Routes (require admin role):**
+- `GET /api/admin/trusted-patterns` - List all trusted patterns with metadata
+- `POST /api/admin/trusted-patterns` - Upload new trusted sample
+- `DELETE /api/admin/trusted-patterns/:id` - Remove trusted pattern
+- `GET /api/admin/recent-activity` - Get recent verification activity
+- `GET /api/admin/paid-submissions` - List all paid expert review submissions
+
+**Authentication Routes:**
+- `POST /api/auth/admin-login` - Admin login with env var credential check
+- `POST /api/auth/logout` - Logout current session
+- `GET /api/auth/user` - Get current authenticated user
+
+**Verification Routes:**
+- `POST /api/verify` - Upload and verify a COS document
