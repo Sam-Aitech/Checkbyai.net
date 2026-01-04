@@ -40,25 +40,28 @@ export function generateOTP(): string {
   return crypto.randomInt(100000, 999999).toString();
 }
 
-// Send OTP via Resend email
+// Send OTP via Brevo email
 export async function sendEmailOTP(email: string, code: string): Promise<boolean> {
   try {
-    if (!process.env.RESEND_API_KEY) {
-      console.error("RESEND_API_KEY not configured");
+    if (!process.env.BREVO_API_KEY) {
+      console.error("BREVO_API_KEY not configured");
       return false;
     }
 
-    const response = await fetch("https://api.resend.com/emails", {
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        "api-key": process.env.BREVO_API_KEY,
       },
       body: JSON.stringify({
-        from: "Check By AI <noreply@checkbyai.net>",
-        to: email,
+        sender: {
+          name: "Check By AI",
+          email: "noreply@checkbyai.net"
+        },
+        to: [{ email }],
         subject: "Your verification code for Check By AI",
-        html: `
+        htmlContent: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2 style="color: #003366;">Verify Your Email</h2>
             <p>Your verification code is:</p>
@@ -74,7 +77,7 @@ export async function sendEmailOTP(email: string, code: string): Promise<boolean
 
     if (!response.ok) {
       const error = await response.text();
-      console.error("Resend API error:", error);
+      console.error("Brevo API error:", error);
       return false;
     }
 
