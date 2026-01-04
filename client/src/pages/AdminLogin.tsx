@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useLocation } from 'wouter';
 import { Shield, Lock, User, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function AdminLogin() {
-  const [, setLocation] = useLocation();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -35,7 +33,8 @@ export default function AdminLogin() {
         throw new Error(data.error || 'Login failed');
       }
 
-      setLocation('/admin');
+      // Use full page navigation to ensure session cookie is properly established
+      window.location.href = '/admin';
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed. Please try again.');
     } finally {
