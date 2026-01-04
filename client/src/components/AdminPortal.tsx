@@ -199,7 +199,7 @@ export default function AdminPortal() {
           variant: "destructive",
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          window.location.href = "/adminlogin";
         }, 500);
         return;
       }
@@ -262,7 +262,7 @@ export default function AdminPortal() {
         variant: "destructive",
       });
       setTimeout(() => {
-        window.location.href = "/api/login";
+        window.location.href = "/adminlogin";
       }, 1000);
       return;
     }
