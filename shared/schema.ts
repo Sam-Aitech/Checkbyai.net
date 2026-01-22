@@ -64,8 +64,21 @@ export const trustedPatterns = pgTable("trusted_patterns", {
   filename: varchar("filename").notNull(),
   metadata: jsonb("metadata").notNull(),
   patterns: jsonb("patterns").notNull(),
+  aiInstructions: text("ai_instructions"),
   uploadedAt: timestamp("uploaded_at").defaultNow(),
+  lastUpdated: timestamp("last_updated").defaultNow(),
   status: varchar("status").default("active"),
+});
+
+// Global AI rules table for instructions that apply to all documents
+export const globalAiRules = pgTable("global_ai_rules", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  category: varchar("category").notNull(),
+  ruleText: text("rule_text").notNull(),
+  priority: integer("priority").default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // Verification results table
@@ -154,6 +167,7 @@ export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
 export type IpVerification = typeof ipVerifications.$inferSelect;
 export type TrustedPattern = typeof trustedPatterns.$inferSelect;
+export type GlobalAiRule = typeof globalAiRules.$inferSelect;
 export type VerificationResult = typeof verificationResults.$inferSelect;
 export type Feedback = typeof feedback.$inferSelect;
 export type PaidSubmission = typeof paidSubmissions.$inferSelect;
@@ -162,6 +176,11 @@ export type PaidSubmission = typeof paidSubmissions.$inferSelect;
 export const insertUserSchema = createInsertSchema(users);
 export const insertIpVerificationSchema = createInsertSchema(ipVerifications);
 export const insertTrustedPatternSchema = createInsertSchema(trustedPatterns);
+export const insertGlobalAiRuleSchema = createInsertSchema(globalAiRules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
 export const insertVerificationResultSchema = createInsertSchema(verificationResults);
 export const insertFeedbackSchema = createInsertSchema(feedback).omit({ 
   id: true, 
@@ -176,6 +195,7 @@ export const insertPaidSubmissionSchema = createInsertSchema(paidSubmissions).om
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertIpVerification = z.infer<typeof insertIpVerificationSchema>;
 export type InsertTrustedPattern = z.infer<typeof insertTrustedPatternSchema>;
+export type InsertGlobalAiRule = z.infer<typeof insertGlobalAiRuleSchema>;
 export type InsertVerificationResult = z.infer<typeof insertVerificationResultSchema>;
 export type InsertFeedback = z.infer<typeof insertFeedbackSchema>;
 export type InsertPaidSubmission = z.infer<typeof insertPaidSubmissionSchema>;
