@@ -2,6 +2,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import Stripe from "stripe";
 import { storage } from "./storage";
+import { db } from "./db";
+import { sql } from "drizzle-orm";
 import { setupAuth, isAuthenticated, isAdmin } from "./auth";
 import { checkIpRateLimit, recordIpVerification, getClientIp, hashIpAddress } from "./ipRateLimit";
 import { insertVerificationResultSchema, insertFeedbackSchema } from "@shared/schema";
@@ -373,6 +375,242 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching recent activity:", error);
       res.status(500).json({ message: "Failed to fetch recent activity" });
+    }
+  });
+
+  // Paginated verification logs with filtering
+  app.get('/api/admin/verification-logs', isAdmin, async (req, res) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+      const status = req.query.status as string | undefined;
+      const startDate = req.query.startDate as string | undefined;
+      const endDate = req.query.endDate as string | undefined;
+      const search = req.query.search as string | undefined;
+      
+      const result = await storage.getPaginatedVerificationLogs({
+        page,
+        limit,
+        status,
+        startDate,
+        endDate,
+        search
+      });
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching verification logs:", error);
+      res.status(500).json({ message: "Failed to fetch verification logs" });
+    }
+  });
+
+  // AI forensic analysis of a verification result
+  app.post('/api/admin/analyze-reasoning/:id', isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const verification = await storage.getVerificationById(id);
+      
+      if (!verification) {
+        return res.status(404).json({ message: "Verification not found" });
+      }
+
+      // Set up SSE for streaming
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+
+      const OpenAI = (await import('openai')).default;
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      const prompt = `You are a forensic document analyst specializing in UK Certificate of Sponsorship (COS) documents. Analyze the following verification result and provide expert insights.
+
+Verification Result:
+- Status: ${verification.result}
+- Confidence: ${verification.confidence}%
+- Filename: ${verification.filename}
+
+Metadata:
+${JSON.stringify(verification.metadata, null, 2)}
+
+Analysis Details:
+${JSON.stringify(verification.analysisDetails, null, 2)}
+
+Provide a detailed forensic analysis covering:
+1. **Summary**: Brief overview of the document's authenticity assessment
+2. **Key Findings**: Most significant indicators that influenced the verdict
+3. **Red Flags**: Any suspicious patterns or anomalies detected
+4. **Legitimate Indicators**: Evidence supporting authenticity
+5. **Recommendations**: Next steps for the admin or user
+6. **Confidence Assessment**: Explain why the confidence level is ${verification.confidence}%
+
+Format your response in clear, professional markdown.`;
+
+      const stream = await openai.chat.completions.create({
+        model: 'gpt-4.1-mini',
+        messages: [{ role: 'user', content: prompt }],
+        stream: true,
+        max_tokens: 2000,
+      });
+
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content || '';
+        if (content) {
+          res.write(`data: ${JSON.stringify({ content })}\n\n`);
+        }
+      }
+
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      res.end();
+    } catch (error) {
+      console.error("Error in AI analysis:", error);
+      if (!res.headersSent) {
+        res.status(500).json({ message: "Failed to analyze verification" });
+      } else {
+        res.write(`data: ${JSON.stringify({ error: "Analysis failed" })}\n\n`);
+        res.end();
+      }
+    }
+  });
+
+  // System health endpoint
+  app.get('/api/admin/system-health', isAdmin, async (req, res) => {
+    try {
+      const memUsage = process.memoryUsage();
+      const uptime = process.uptime();
+      
+      // Get database connection status
+      let dbStatus = 'healthy';
+      let dbConnectionCount = 0;
+      try {
+        const result = await db.execute(sql`SELECT count(*) as count FROM pg_stat_activity WHERE datname = current_database()`);
+        dbConnectionCount = Number((result.rows[0] as any)?.count || 0);
+      } catch (e) {
+        dbStatus = 'error';
+      }
+
+      // Get verification stats for last 24 hours
+      const stats = await storage.getStats();
+
+      res.json({
+        memory: {
+          heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024),
+          heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024),
+          rss: Math.round(memUsage.rss / 1024 / 1024),
+        },
+        uptime: Math.round(uptime),
+        database: {
+          status: dbStatus,
+          connections: dbConnectionCount,
+        },
+        stats,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error("Error fetching system health:", error);
+      res.status(500).json({ message: "Failed to fetch system health" });
+    }
+  });
+
+  // Trust producer from verification - Pattern Override
+  app.post('/api/admin/trust-producer', isAdmin, async (req: any, res) => {
+    try {
+      const { producer, verificationId } = req.body;
+      
+      if (!producer) {
+        return res.status(400).json({ message: 'Producer name is required' });
+      }
+
+      // Get the verification to extract metadata
+      const verification = await storage.getVerificationById(verificationId);
+      
+      // Create a trusted pattern from this producer
+      const patternId = await storage.createTrustedPattern(
+        `trusted-producer-${producer.replace(/\s+/g, '-').toLowerCase()}`,
+        { 
+          producer,
+          source: 'pattern-override',
+          trustedAt: new Date().toISOString(),
+          sourceVerificationId: verificationId,
+        },
+        { trustedProducers: [producer] }
+      );
+
+      res.json({ 
+        message: `Producer "${producer}" is now trusted`,
+        patternId
+      });
+    } catch (error) {
+      console.error("Error trusting producer:", error);
+      res.status(500).json({ message: "Failed to trust producer" });
+    }
+  });
+
+  // User management - list users with stats
+  app.get('/api/admin/users', isAdmin, async (req, res) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+      const search = req.query.search as string | undefined;
+      
+      const result = await storage.getPaginatedUsers({ page, limit, search });
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  // Restrict/unrestrict user
+  app.post('/api/admin/users/:id/restrict', isAdmin, async (req: any, res) => {
+    try {
+      const userId = req.params.id;
+      const { restricted, reason } = req.body;
+      
+      await storage.updateUserRestriction(userId, restricted, reason);
+      
+      res.json({ 
+        message: restricted ? 'User has been restricted' : 'User restriction removed',
+        userId,
+        restricted
+      });
+    } catch (error) {
+      console.error("Error updating user restriction:", error);
+      res.status(500).json({ message: "Failed to update user restriction" });
+    }
+  });
+
+  // Export verification as PDF report
+  app.get('/api/admin/export-report/:id', isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const verification = await storage.getVerificationById(id);
+      
+      if (!verification) {
+        return res.status(404).json({ message: 'Verification not found' });
+      }
+
+      // Generate simple text-based report (PDFKit integration would be next step)
+      const report = {
+        title: 'COS Verification Forensic Report',
+        generatedAt: new Date().toISOString(),
+        verification: {
+          id: verification.id,
+          filename: verification.filename,
+          result: verification.result,
+          confidence: verification.confidence,
+          verifiedAt: verification.verifiedAt,
+        },
+        metadata: verification.metadata,
+        analysisDetails: verification.analysisDetails,
+      };
+
+      res.json(report);
+    } catch (error) {
+      console.error("Error exporting report:", error);
+      res.status(500).json({ message: "Failed to export report" });
     }
   });
 

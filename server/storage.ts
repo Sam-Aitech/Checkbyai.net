@@ -56,6 +56,21 @@ export interface IStorage {
     userId?: string
   ): Promise<number>;
   getRecentActivity(limit?: number): Promise<VerificationResult[]>;
+  getVerificationById(id: number): Promise<VerificationResult | undefined>;
+  getPaginatedVerificationLogs(options: {
+    page: number;
+    limit: number;
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+    search?: string;
+  }): Promise<{
+    data: VerificationResult[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }>;
   getStats(): Promise<{
     trustedPatterns: number;
     verificationsToday: number;
@@ -82,6 +97,20 @@ export interface IStorage {
   getPendingPaidSubmissions(): Promise<PaidSubmission[]>;
   getAllPaidSubmissions(): Promise<PaidSubmission[]>;
   getAssignedSubmissions(adminId: string): Promise<PaidSubmission[]>;
+  
+  // User management operations
+  getPaginatedUsers(options: {
+    page: number;
+    limit: number;
+    search?: string;
+  }): Promise<{
+    data: User[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }>;
+  updateUserRestriction(userId: string, restricted: boolean, reason?: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -303,6 +332,80 @@ export class DatabaseStorage implements IStorage {
       .limit(limit);
   }
 
+  async getVerificationById(id: number): Promise<VerificationResult | undefined> {
+    const [result] = await db
+      .select()
+      .from(verificationResults)
+      .where(eq(verificationResults.id, id));
+    return result;
+  }
+
+  async getPaginatedVerificationLogs(options: {
+    page: number;
+    limit: number;
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+    search?: string;
+  }): Promise<{
+    data: VerificationResult[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const { page, limit, status, startDate, endDate, search } = options;
+    const offset = (page - 1) * limit;
+
+    // Build where conditions
+    const conditions = [];
+    
+    if (status && status !== 'all') {
+      conditions.push(eq(verificationResults.result, status));
+    }
+    
+    if (startDate) {
+      conditions.push(gte(verificationResults.verifiedAt, new Date(startDate)));
+    }
+    
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      conditions.push(sql`${verificationResults.verifiedAt} <= ${end}`);
+    }
+    
+    if (search) {
+      conditions.push(sql`${verificationResults.filename} ILIKE ${'%' + search + '%'}`);
+    }
+
+    const whereClause = conditions.length > 0 ? sql`${sql.join(conditions, sql` AND `)}` : undefined;
+
+    // Get total count
+    const [countResult] = await db
+      .select({ count: count() })
+      .from(verificationResults)
+      .where(whereClause);
+    
+    const total = Number(countResult?.count || 0);
+
+    // Get paginated data
+    const data = await db
+      .select()
+      .from(verificationResults)
+      .where(whereClause)
+      .orderBy(desc(verificationResults.verifiedAt))
+      .limit(limit)
+      .offset(offset);
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
   async getStats(): Promise<{
     trustedPatterns: number;
     verificationsToday: number;
@@ -467,6 +570,59 @@ export class DatabaseStorage implements IStorage {
       .from(paidSubmissions)
       .where(eq(paidSubmissions.assignedTo, adminId))
       .orderBy(desc(paidSubmissions.createdAt));
+  }
+
+  async getPaginatedUsers(options: {
+    page: number;
+    limit: number;
+    search?: string;
+  }): Promise<{
+    data: User[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const { page, limit, search } = options;
+    const offset = (page - 1) * limit;
+
+    const whereClause = search
+      ? sql`${users.email} ILIKE ${'%' + search + '%'} OR ${users.username} ILIKE ${'%' + search + '%'}`
+      : undefined;
+
+    const [countResult] = await db
+      .select({ count: count() })
+      .from(users)
+      .where(whereClause);
+
+    const total = Number(countResult?.count || 0);
+
+    const data = await db
+      .select()
+      .from(users)
+      .where(whereClause)
+      .orderBy(desc(users.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async updateUserRestriction(userId: string, restricted: boolean, reason?: string): Promise<void> {
+    await db
+      .update(users)
+      .set({
+        isRestricted: restricted,
+        restrictionReason: reason || null,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
   }
 }
 

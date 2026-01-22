@@ -1,5 +1,9 @@
-import { useState, useEffect } from 'react';
-import { Shield, Upload, FileText, CheckCircle, AlertTriangle, XCircle, LogOut, Trash2, Eye } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { 
+  Shield, Upload, FileText, CheckCircle, AlertTriangle, XCircle, LogOut, Trash2, Eye, 
+  RefreshCw, Search, Filter, ChevronLeft, ChevronRight, Activity, Database, Clock,
+  Sparkles, X, Download, ChevronDown, Users, TrendingUp, Cpu, HardDrive
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,6 +11,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useToast } from '@/hooks/use-toast';
 
 interface AdminUser {
@@ -39,11 +46,58 @@ interface TrustedPattern {
   };
 }
 
+interface VerificationLog {
+  id: number;
+  userId?: string;
+  filename: string;
+  result: 'genuine' | 'suspicious' | 'fake';
+  confidence: number;
+  metadata: any;
+  analysisDetails: any;
+  ipAddress?: string;
+  verifiedAt: string;
+}
+
 interface Stats {
   trustedPatterns: number;
   verificationsToday: number;
   suspiciousDetected: number;
   genuineVerified: number;
+}
+
+interface SystemHealth {
+  memory: { heapUsed: number; heapTotal: number; rss: number };
+  uptime: number;
+  database: { status: string; connections: number };
+  stats: { trustedPatterns: number; verificationsToday: number; totalUsers: number; proUsers: number };
+  timestamp: string;
+}
+
+interface PaginatedLogs {
+  data: VerificationLog[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+interface UserRecord {
+  id: string;
+  email?: string;
+  role: string;
+  subscriptionStatus: string;
+  isRestricted?: boolean;
+  restrictionReason?: string;
+  createdAt: string;
+  dailyVerificationsUsed?: number;
+}
+
+interface PaginatedUsers {
+  data: UserRecord[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 export default function SimpleAdmin() {
@@ -58,6 +112,33 @@ export default function SimpleAdmin() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [patterns, setPatterns] = useState<TrustedPattern[]>([]);
   const [uploading, setUploading] = useState(false);
+  
+  // Verification logs state
+  const [logs, setLogs] = useState<PaginatedLogs | null>(null);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsPage, setLogsPage] = useState(1);
+  const [logsFilter, setLogsFilter] = useState<'all' | 'genuine' | 'suspicious' | 'fake'>('all');
+  const [logsSearch, setLogsSearch] = useState('');
+  const [logsStartDate, setLogsStartDate] = useState('');
+  const [logsEndDate, setLogsEndDate] = useState('');
+  const [selectedLog, setSelectedLog] = useState<VerificationLog | null>(null);
+  
+  // AI Analysis state
+  const [aiAnalysis, setAiAnalysis] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  
+  // System health state
+  const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null);
+  
+  // User management state
+  const [users, setUsers] = useState<PaginatedUsers | null>(null);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersPage, setUsersPage] = useState(1);
+  const [usersSearch, setUsersSearch] = useState('');
+  
+  // Tab state for triggering data loads
+  const [activeTab, setActiveTab] = useState('logs');
   
   const { toast } = useToast();
 
@@ -76,6 +157,7 @@ export default function SimpleAdmin() {
           setUser(userData);
           setIsAuthenticated(true);
           loadData();
+          loadSystemHealth();
         } else {
           setIsAuthenticated(false);
         }
@@ -107,6 +189,80 @@ export default function SimpleAdmin() {
     }
   };
 
+  const loadLogs = useCallback(async () => {
+    setLogsLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: logsPage.toString(),
+        limit: '25',
+        status: logsFilter,
+        search: logsSearch,
+      });
+      
+      if (logsStartDate) params.set('startDate', logsStartDate);
+      if (logsEndDate) params.set('endDate', logsEndDate);
+      
+      const res = await fetch(`/api/admin/verification-logs?${params}`, {
+        credentials: 'include',
+      });
+      
+      if (res.ok) {
+        setLogs(await res.json());
+      }
+    } catch (error) {
+      console.error('Failed to load logs:', error);
+    } finally {
+      setLogsLoading(false);
+    }
+  }, [logsPage, logsFilter, logsSearch, logsStartDate, logsEndDate]);
+
+  useEffect(() => {
+    if (isAuthenticated && activeTab === 'logs') {
+      loadLogs();
+    }
+  }, [isAuthenticated, loadLogs, activeTab]);
+
+  const loadUsers = useCallback(async () => {
+    setUsersLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: usersPage.toString(),
+        limit: '25',
+        search: usersSearch,
+      });
+      
+      const res = await fetch(`/api/admin/users?${params}`, {
+        credentials: 'include',
+      });
+      
+      if (res.ok) {
+        setUsers(await res.json());
+      }
+    } catch (error) {
+      console.error('Failed to load users:', error);
+    } finally {
+      setUsersLoading(false);
+    }
+  }, [usersPage, usersSearch]);
+
+  // Load users when Users tab is selected
+  useEffect(() => {
+    if (isAuthenticated && activeTab === 'users') {
+      loadUsers();
+    }
+  }, [isAuthenticated, activeTab, loadUsers]);
+
+  const loadSystemHealth = async () => {
+    try {
+      const res = await fetch('/api/admin/system-health', { credentials: 'include' });
+      if (res.ok) {
+        setSystemHealth(await res.json());
+      }
+    } catch (error) {
+      console.error('Failed to load system health:', error);
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
@@ -129,6 +285,7 @@ export default function SimpleAdmin() {
       setUser(data.user);
       setIsAuthenticated(true);
       loadData();
+      loadSystemHealth();
       toast({ title: 'Login successful', description: 'Welcome to the admin portal' });
     } catch (err) {
       setLoginError(err instanceof Error ? err.message : 'Login failed');
@@ -150,6 +307,7 @@ export default function SimpleAdmin() {
     setUser(null);
     setStats(null);
     setPatterns([]);
+    setLogs(null);
   };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -199,6 +357,123 @@ export default function SimpleAdmin() {
     }
   };
 
+  const trustProducer = async (producer: string, verificationId: number) => {
+    try {
+      const response = await fetch('/api/admin/trust-producer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ producer, verificationId }),
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to trust producer');
+      }
+
+      toast({ title: 'Producer Trusted', description: `"${producer}" is now a trusted producer` });
+      loadData();
+    } catch (error) {
+      toast({ title: 'Error', description: 'Could not trust producer', variant: 'destructive' });
+    }
+  };
+
+  const toggleUserRestriction = async (userId: string, restricted: boolean, reason?: string) => {
+    try {
+      const response = await fetch(`/api/admin/users/${userId}/restrict`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restricted, reason }),
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update user');
+      }
+
+      toast({ 
+        title: restricted ? 'User Restricted' : 'Restriction Removed',
+        description: restricted ? 'User can no longer verify documents' : 'User access has been restored'
+      });
+      loadUsers();
+    } catch (error) {
+      toast({ title: 'Error', description: 'Could not update user', variant: 'destructive' });
+    }
+  };
+
+  const runAiAnalysis = async (log: VerificationLog) => {
+    setSelectedLog(log);
+    setAiPanelOpen(true);
+    setAiAnalysis('');
+    setAiLoading(true);
+
+    try {
+      const response = await fetch(`/api/admin/analyze-reasoning/${log.id}`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Analysis failed');
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error('No response body');
+      }
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.content) {
+                setAiAnalysis(prev => prev + data.content);
+              }
+              if (data.done) {
+                setAiLoading(false);
+              }
+            } catch (e) {
+              // Ignore parse errors
+            }
+          }
+        }
+      }
+    } catch (error) {
+      toast({ title: 'Analysis failed', description: 'Could not analyze verification', variant: 'destructive' });
+      setAiLoading(false);
+    }
+  };
+
+  const getStatusBadge = (result: string, confidence: number) => {
+    switch (result) {
+      case 'genuine':
+        return <Badge className="bg-green-500/20 text-green-400 border-green-500/50"><CheckCircle className="w-3 h-3 mr-1" /> Genuine ({confidence}%)</Badge>;
+      case 'suspicious':
+        return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/50"><AlertTriangle className="w-3 h-3 mr-1" /> Suspicious ({confidence}%)</Badge>;
+      case 'fake':
+        return <Badge className="bg-red-500/20 text-red-400 border-red-500/50"><XCircle className="w-3 h-3 mr-1" /> Fake ({confidence}%)</Badge>;
+      default:
+        return <Badge variant="outline">{result}</Badge>;
+    }
+  };
+
+  const formatUptime = (seconds: number) => {
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    if (days > 0) return `${days}d ${hours}h`;
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
@@ -220,15 +495,15 @@ export default function SimpleAdmin() {
                 <Shield className="w-12 h-12 text-red-500" />
               </div>
             </div>
-            <h1 className="text-3xl font-bold text-white mb-2">Admin Portal</h1>
+            <h1 className="text-3xl font-bold text-white mb-2">Forensic Command Center</h1>
             <p className="text-slate-400">Enter your administrator credentials</p>
           </div>
 
           <Card className="border-slate-700 bg-slate-800/50">
             <CardHeader>
-              <CardTitle className="text-white">Sign In</CardTitle>
+              <CardTitle className="text-white">Admin Sign In</CardTitle>
               <CardDescription className="text-slate-400">
-                Enter your admin credentials
+                Protected access for COS verification admins
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -285,18 +560,46 @@ export default function SimpleAdmin() {
 
   return (
     <div className="min-h-screen bg-slate-900">
-      <header className="bg-slate-800 border-b border-slate-700 px-6 py-4">
-        <div className="flex justify-between items-center max-w-7xl mx-auto">
+      {/* System Health Header */}
+      <header className="bg-slate-800 border-b border-slate-700 px-6 py-3">
+        <div className="flex justify-between items-center max-w-[1800px] mx-auto">
           <div className="flex items-center gap-3">
             <Shield className="w-8 h-8 text-red-500" />
             <div>
-              <h1 className="text-xl font-bold text-white">Admin Portal</h1>
+              <h1 className="text-xl font-bold text-white">Forensic Command Center</h1>
               <p className="text-sm text-slate-400">COS Verification Management</p>
             </div>
           </div>
+          
+          {/* System Health Stats */}
+          {systemHealth && (
+            <div className="hidden lg:flex items-center gap-6 text-sm">
+              <div className="flex items-center gap-2">
+                <Activity className={`w-4 h-4 ${systemHealth.database.status === 'healthy' ? 'text-green-400' : 'text-red-400'}`} />
+                <span className="text-slate-400">DB:</span>
+                <span className="text-slate-200">{systemHealth.database.connections} conn</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Cpu className="w-4 h-4 text-blue-400" />
+                <span className="text-slate-400">Memory:</span>
+                <span className="text-slate-200">{systemHealth.memory.heapUsed}MB / {systemHealth.memory.heapTotal}MB</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-purple-400" />
+                <span className="text-slate-400">Uptime:</span>
+                <span className="text-slate-200">{formatUptime(systemHealth.uptime)}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-cyan-400" />
+                <span className="text-slate-400">Users:</span>
+                <span className="text-slate-200">{systemHealth.stats.totalUsers} ({systemHealth.stats.proUsers} pro)</span>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center gap-4">
-            <span className="text-slate-300">{user?.email}</span>
-            <Button variant="outline" size="sm" onClick={handleLogout} data-testid="button-logout">
+            <span className="text-slate-300 hidden sm:inline">{user?.email}</span>
+            <Button variant="outline" size="sm" onClick={handleLogout} className="border-slate-600 text-slate-300 hover:bg-slate-700" data-testid="button-logout">
               <LogOut className="w-4 h-4 mr-2" />
               Logout
             </Button>
@@ -304,8 +607,9 @@ export default function SimpleAdmin() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto p-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+      <main className="max-w-[1800px] mx-auto p-6">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <Card className="bg-slate-800 border-slate-700">
             <CardContent className="pt-6">
               <div className="flex items-center gap-4">
@@ -352,10 +656,10 @@ export default function SimpleAdmin() {
             <CardContent className="pt-6">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-purple-500/10 rounded-lg">
-                  <Eye className="w-6 h-6 text-purple-500" />
+                  <TrendingUp className="w-6 h-6 text-purple-500" />
                 </div>
                 <div>
-                  <p className="text-sm text-slate-400">Verifications Today</p>
+                  <p className="text-sm text-slate-400">Total Today</p>
                   <p className="text-2xl font-bold text-white">{stats?.verificationsToday || 0}</p>
                 </div>
               </div>
@@ -363,16 +667,329 @@ export default function SimpleAdmin() {
           </Card>
         </div>
 
-        <Tabs defaultValue="patterns" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="bg-slate-800 border-slate-700">
+            <TabsTrigger value="logs" className="data-[state=active]:bg-slate-700">
+              <Eye className="w-4 h-4 mr-2" />
+              Verification Logs
+            </TabsTrigger>
+            <TabsTrigger value="users" className="data-[state=active]:bg-slate-700">
+              <Users className="w-4 h-4 mr-2" />
+              Users
+            </TabsTrigger>
             <TabsTrigger value="patterns" className="data-[state=active]:bg-slate-700">
+              <FileText className="w-4 h-4 mr-2" />
               Trusted Patterns
             </TabsTrigger>
             <TabsTrigger value="upload" className="data-[state=active]:bg-slate-700">
-              Upload Document
+              <Upload className="w-4 h-4 mr-2" />
+              Upload Pattern
             </TabsTrigger>
           </TabsList>
 
+          {/* Verification Logs Tab */}
+          <TabsContent value="logs">
+            <Card className="bg-slate-800 border-slate-700">
+              <CardHeader>
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col sm:flex-row justify-between gap-4">
+                    <div>
+                      <CardTitle className="text-white">Verification Logs</CardTitle>
+                      <CardDescription className="text-slate-400">
+                        {logs?.total || 0} total verifications
+                      </CardDescription>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="relative">
+                        <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
+                        <Input
+                          placeholder="Search filename..."
+                          value={logsSearch}
+                          onChange={(e) => { setLogsSearch(e.target.value); setLogsPage(1); }}
+                          className="pl-9 w-48 bg-slate-700/50 border-slate-600 text-white"
+                        />
+                      </div>
+                      <Select value={logsFilter} onValueChange={(v) => { setLogsFilter(v as any); setLogsPage(1); }}>
+                        <SelectTrigger className="w-32 bg-slate-700/50 border-slate-600 text-white">
+                          <Filter className="w-4 h-4 mr-2" />
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-800 border-slate-700">
+                          <SelectItem value="all">All</SelectItem>
+                          <SelectItem value="genuine">Genuine</SelectItem>
+                          <SelectItem value="suspicious">Suspicious</SelectItem>
+                          <SelectItem value="fake">Fake</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button 
+                        variant="outline" 
+                        size="icon" 
+                        onClick={loadLogs}
+                        disabled={logsLoading}
+                        className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                      >
+                        <RefreshCw className={`w-4 h-4 ${logsLoading ? 'animate-spin' : ''}`} />
+                      </Button>
+                    </div>
+                  </div>
+                  {/* Date Range Filters */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Label className="text-slate-400 text-sm">From:</Label>
+                    <Input
+                      type="date"
+                      value={logsStartDate}
+                      onChange={(e) => { setLogsStartDate(e.target.value); setLogsPage(1); }}
+                      className="w-40 bg-slate-700/50 border-slate-600 text-white"
+                    />
+                    <Label className="text-slate-400 text-sm">To:</Label>
+                    <Input
+                      type="date"
+                      value={logsEndDate}
+                      onChange={(e) => { setLogsEndDate(e.target.value); setLogsPage(1); }}
+                      className="w-40 bg-slate-700/50 border-slate-600 text-white"
+                    />
+                    {(logsStartDate || logsEndDate) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => { setLogsStartDate(''); setLogsEndDate(''); setLogsPage(1); }}
+                        className="text-slate-400 hover:text-white"
+                      >
+                        Clear Dates
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {logsLoading && !logs ? (
+                  <div className="flex justify-center py-12">
+                    <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                  </div>
+                ) : logs?.data.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Eye className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+                    <p className="text-slate-400">No verification logs found</p>
+                    <p className="text-sm text-slate-500">Adjust your filters or wait for verifications</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-slate-700">
+                            <th className="text-left py-3 px-4 text-slate-400 font-medium">Time</th>
+                            <th className="text-left py-3 px-4 text-slate-400 font-medium">Filename</th>
+                            <th className="text-left py-3 px-4 text-slate-400 font-medium">Status</th>
+                            <th className="text-left py-3 px-4 text-slate-400 font-medium">Producer</th>
+                            <th className="text-left py-3 px-4 text-slate-400 font-medium">IP</th>
+                            <th className="text-right py-3 px-4 text-slate-400 font-medium">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {logs?.data.map((log) => (
+                            <tr 
+                              key={log.id} 
+                              className="border-b border-slate-700/50 hover:bg-slate-700/30 cursor-pointer"
+                              onClick={() => setSelectedLog(log)}
+                            >
+                              <td className="py-3 px-4 text-slate-300 text-sm">
+                                {new Date(log.verifiedAt).toLocaleString()}
+                              </td>
+                              <td className="py-3 px-4 text-white font-medium max-w-[200px] truncate">
+                                {log.filename}
+                              </td>
+                              <td className="py-3 px-4">
+                                {getStatusBadge(log.result, log.confidence)}
+                              </td>
+                              <td className="py-3 px-4 text-slate-300 text-sm max-w-[150px] truncate">
+                                {log.metadata?.producer || 'Unknown'}
+                              </td>
+                              <td className="py-3 px-4 text-slate-400 text-sm font-mono">
+                                {log.ipAddress?.substring(0, 12) || 'N/A'}...
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={(e) => { e.stopPropagation(); runAiAnalysis(log); }}
+                                  className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                                >
+                                  <Sparkles className="w-4 h-4 mr-1" />
+                                  Analyze
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    
+                    {/* Pagination */}
+                    {logs && logs.totalPages > 1 && (
+                      <div className="flex justify-between items-center mt-4 pt-4 border-t border-slate-700">
+                        <p className="text-sm text-slate-400">
+                          Page {logs.page} of {logs.totalPages}
+                        </p>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setLogsPage(p => Math.max(1, p - 1))}
+                            disabled={logs.page === 1}
+                            className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setLogsPage(p => Math.min(logs.totalPages, p + 1))}
+                            disabled={logs.page === logs.totalPages}
+                            className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Users Tab */}
+          <TabsContent value="users">
+            <Card className="bg-slate-800 border-slate-700">
+              <CardHeader>
+                <div className="flex flex-col sm:flex-row justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-white">User Management</CardTitle>
+                    <CardDescription className="text-slate-400">
+                      {users?.total || 0} registered users
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
+                      <Input
+                        placeholder="Search users..."
+                        value={usersSearch}
+                        onChange={(e) => { setUsersSearch(e.target.value); setUsersPage(1); }}
+                        className="pl-9 w-48 bg-slate-700/50 border-slate-600 text-white"
+                      />
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      onClick={loadUsers}
+                      disabled={usersLoading}
+                      className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${usersLoading ? 'animate-spin' : ''}`} />
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {usersLoading && !users ? (
+                  <div className="flex justify-center py-12">
+                    <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                  </div>
+                ) : users?.data.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Users className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+                    <p className="text-slate-400">No users found</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-slate-700">
+                            <th className="text-left py-3 px-4 text-slate-400 font-medium">Email</th>
+                            <th className="text-left py-3 px-4 text-slate-400 font-medium">Role</th>
+                            <th className="text-left py-3 px-4 text-slate-400 font-medium">Status</th>
+                            <th className="text-left py-3 px-4 text-slate-400 font-medium">Joined</th>
+                            <th className="text-right py-3 px-4 text-slate-400 font-medium">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {users?.data.map((u) => (
+                            <tr key={u.id} className="border-b border-slate-700/50 hover:bg-slate-700/30">
+                              <td className="py-3 px-4 text-white font-medium">
+                                {u.email || 'N/A'}
+                              </td>
+                              <td className="py-3 px-4">
+                                <Badge className={u.role === 'admin' ? 'bg-purple-500/20 text-purple-400' : 'bg-slate-500/20 text-slate-400'}>
+                                  {u.role}
+                                </Badge>
+                              </td>
+                              <td className="py-3 px-4">
+                                {u.isRestricted ? (
+                                  <Badge className="bg-red-500/20 text-red-400">Restricted</Badge>
+                                ) : u.subscriptionStatus === 'pro' ? (
+                                  <Badge className="bg-green-500/20 text-green-400">Pro</Badge>
+                                ) : (
+                                  <Badge className="bg-blue-500/20 text-blue-400">Free</Badge>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-slate-400 text-sm">
+                                {new Date(u.createdAt).toLocaleDateString()}
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                {u.role !== 'admin' && (
+                                  <Button
+                                    size="sm"
+                                    variant={u.isRestricted ? 'outline' : 'destructive'}
+                                    onClick={() => toggleUserRestriction(u.id, !u.isRestricted, 'Admin restriction')}
+                                    className={u.isRestricted ? 'border-green-600 text-green-400 hover:bg-green-500/10' : ''}
+                                  >
+                                    {u.isRestricted ? 'Unrestrict' : 'Restrict'}
+                                  </Button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    
+                    {users && users.totalPages > 1 && (
+                      <div className="flex justify-between items-center mt-4 pt-4 border-t border-slate-700">
+                        <p className="text-sm text-slate-400">
+                          Page {users.page} of {users.totalPages}
+                        </p>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setUsersPage(p => Math.max(1, p - 1))}
+                            disabled={users.page === 1}
+                            className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setUsersPage(p => Math.min(users.totalPages, p + 1))}
+                            disabled={users.page === users.totalPages}
+                            className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Trusted Patterns Tab */}
           <TabsContent value="patterns">
             <Card className="bg-slate-800 border-slate-700">
               <CardHeader>
@@ -452,6 +1069,7 @@ export default function SimpleAdmin() {
             </Card>
           </TabsContent>
 
+          {/* Upload Tab */}
           <TabsContent value="upload">
             <Card className="bg-slate-800 border-slate-700">
               <CardHeader>
@@ -485,6 +1103,150 @@ export default function SimpleAdmin() {
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* AI Analysis Side Panel */}
+      <Sheet open={aiPanelOpen} onOpenChange={setAiPanelOpen}>
+        <SheetContent className="w-full sm:max-w-xl bg-slate-800 border-slate-700 text-white overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="text-white flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-purple-400" />
+              AI Forensic Analysis
+            </SheetTitle>
+            <SheetDescription className="text-slate-400">
+              {selectedLog?.filename} - {selectedLog?.result} ({selectedLog?.confidence}%)
+            </SheetDescription>
+          </SheetHeader>
+          
+          <div className="mt-6">
+            {aiLoading && !aiAnalysis && (
+              <div className="flex items-center gap-3 text-slate-400">
+                <div className="w-5 h-5 border-2 border-purple-400 border-t-transparent rounded-full animate-spin"></div>
+                <span>Analyzing document...</span>
+              </div>
+            )}
+            
+            {aiAnalysis && (
+              <div className="prose prose-invert prose-sm max-w-none">
+                <div className="whitespace-pre-wrap text-slate-300 leading-relaxed">
+                  {aiAnalysis}
+                  {aiLoading && <span className="animate-pulse">|</span>}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {selectedLog && (
+            <div className="mt-8 pt-6 border-t border-slate-700">
+              <h4 className="text-sm font-medium text-slate-400 mb-3 flex items-center gap-2">
+                <Database className="w-4 h-4" />
+                Raw Metadata
+              </h4>
+              <ScrollArea className="h-64 rounded bg-slate-900 p-3">
+                <pre className="text-xs text-slate-400 whitespace-pre-wrap">
+                  {JSON.stringify(selectedLog.metadata, null, 2)}
+                </pre>
+              </ScrollArea>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* Detail Modal for Log */}
+      <Sheet open={selectedLog !== null && !aiPanelOpen} onOpenChange={(open) => !open && setSelectedLog(null)}>
+        <SheetContent className="w-full sm:max-w-lg bg-slate-800 border-slate-700 text-white overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="text-white">Verification Details</SheetTitle>
+            <SheetDescription className="text-slate-400">
+              {selectedLog?.filename}
+            </SheetDescription>
+          </SheetHeader>
+          
+          {selectedLog && (
+            <div className="mt-6 space-y-6">
+              <div className="flex flex-wrap justify-between items-center gap-2">
+                {getStatusBadge(selectedLog.result, selectedLog.confidence)}
+                <div className="flex gap-2">
+                  {selectedLog.metadata?.producer && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => { 
+                        trustProducer(selectedLog.metadata.producer, selectedLog.id);
+                        setSelectedLog(null);
+                      }}
+                      className="border-green-600 text-green-400 hover:bg-green-500/10"
+                    >
+                      <CheckCircle className="w-4 h-4 mr-1" />
+                      Trust Producer
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    onClick={() => runAiAnalysis(selectedLog)}
+                    className="bg-purple-600 hover:bg-purple-700"
+                  >
+                    <Sparkles className="w-4 h-4 mr-1" />
+                    AI Analysis
+                  </Button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-slate-400">Verified At</p>
+                  <p className="text-slate-200">{new Date(selectedLog.verifiedAt).toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-slate-400">IP Address</p>
+                  <p className="text-slate-200 font-mono text-sm">{selectedLog.ipAddress || 'N/A'}</p>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-medium text-slate-400 mb-2">Analysis Details</h4>
+                <div className="space-y-2">
+                  {selectedLog.analysisDetails?.checks?.map((check: any, idx: number) => (
+                    <div 
+                      key={idx} 
+                      className={`p-2 rounded text-sm ${
+                        check.passed 
+                          ? 'bg-green-500/10 border border-green-500/30' 
+                          : check.severity === 'critical' 
+                            ? 'bg-red-500/10 border border-red-500/30'
+                            : 'bg-yellow-500/10 border border-yellow-500/30'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        {check.passed ? (
+                          <CheckCircle className="w-4 h-4 text-green-400" />
+                        ) : check.severity === 'critical' ? (
+                          <XCircle className="w-4 h-4 text-red-400" />
+                        ) : (
+                          <AlertTriangle className="w-4 h-4 text-yellow-400" />
+                        )}
+                        <span className="text-slate-200 font-medium">{check.name}</span>
+                      </div>
+                      <p className="text-slate-400 mt-1 ml-6">{check.message}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-medium text-slate-400 mb-2 flex items-center gap-2">
+                  <Database className="w-4 h-4" />
+                  Raw Metadata
+                </h4>
+                <ScrollArea className="h-48 rounded bg-slate-900 p-3">
+                  <pre className="text-xs text-slate-400 whitespace-pre-wrap">
+                    {JSON.stringify(selectedLog.metadata, null, 2)}
+                  </pre>
+                </ScrollArea>
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

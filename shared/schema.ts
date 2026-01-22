@@ -43,6 +43,8 @@ export const users = pgTable("users", {
   stripeSubscriptionId: varchar("stripe_subscription_id"),
   dailyVerificationsUsed: integer("daily_verifications_used").default(0),
   lastVerificationDate: varchar("last_verification_date"), // YYYY-MM-DD format
+  isRestricted: boolean("is_restricted").default(false),
+  restrictionReason: text("restriction_reason"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -67,17 +69,26 @@ export const trustedPatterns = pgTable("trusted_patterns", {
 });
 
 // Verification results table
-export const verificationResults = pgTable("verification_results", {
-  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  userId: varchar("user_id").references(() => users.id),
-  filename: varchar("filename").notNull(),
-  result: varchar("result").notNull(), // 'genuine', 'suspicious', 'fake'
-  confidence: integer("confidence").notNull(), // 0-100
-  metadata: jsonb("metadata").notNull(),
-  analysisDetails: jsonb("analysis_details").notNull(),
-  ipAddress: varchar("ip_address"),
-  verifiedAt: timestamp("verified_at").defaultNow(),
-});
+export const verificationResults = pgTable(
+  "verification_results",
+  {
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+    userId: varchar("user_id").references(() => users.id),
+    filename: varchar("filename").notNull(),
+    result: varchar("result").notNull(), // 'genuine', 'suspicious', 'fake'
+    confidence: integer("confidence").notNull(), // 0-100
+    metadata: jsonb("metadata").notNull(),
+    analysisDetails: jsonb("analysis_details").notNull(),
+    ipAddress: varchar("ip_address"),
+    verifiedAt: timestamp("verified_at").defaultNow(),
+  },
+  (table) => [
+    index("idx_verification_verified_at").on(table.verifiedAt),
+    index("idx_verification_result").on(table.result),
+    index("idx_verification_user_id").on(table.userId),
+    index("idx_verification_result_date").on(table.result, table.verifiedAt),
+  ]
+);
 
 // Feedback table for continuous improvement
 export const feedback = pgTable("feedback", {
