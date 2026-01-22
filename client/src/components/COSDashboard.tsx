@@ -548,13 +548,13 @@ export default function COSDashboard() {
         }}
       />
 
-      {/* Did You Know Section */}
+      {/* Did You Know Section - Official Gov.uk Information */}
       <section className="py-16 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
         <div className="container mx-auto px-5">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Did You Know?</h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Fascinating facts about document security and UK immigration
+              Important facts about UK Certificate of Sponsorship and Skilled Worker visas
             </p>
           </div>
           
@@ -563,12 +563,13 @@ export default function COSDashboard() {
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
                   <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-2">PDF Metadata Never Lies</h3>
-                  <p className="text-gray-600 text-sm">Every PDF contains hidden metadata including creation date, software used, and modification history. Forgers often forget to clean this data, making detection possible.</p>
+                  <h3 className="font-semibold text-gray-900 mb-2">CoS is Not a Visa</h3>
+                  <p className="text-gray-600 text-sm">A Certificate of Sponsorship is an electronic record, not a physical document. It contains a unique reference number you need for your visa application.</p>
+                  <a href="https://www.gov.uk/uk-visa-sponsorship-employers/certificates-of-sponsorship" target="_blank" rel="noopener noreferrer" className="text-blue-600 text-xs hover:underline mt-2 inline-block">Source: Gov.uk</a>
                 </div>
               </div>
             </div>
@@ -581,8 +582,9 @@ export default function COSDashboard() {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-2">Sunday Documents Are Rare</h3>
-                  <p className="text-gray-600 text-sm">Official UK government documents are almost never created on Sundays. If a Certificate of Sponsorship shows a Sunday creation date, it's a major red flag.</p>
+                  <h3 className="font-semibold text-gray-900 mb-2">3-Month Validity</h3>
+                  <p className="text-gray-600 text-sm">You must apply for your visa within 3 months of your CoS being assigned. After this period, the CoS expires and cannot be used.</p>
+                  <a href="https://www.gov.uk/skilled-worker-visa/your-job" target="_blank" rel="noopener noreferrer" className="text-blue-600 text-xs hover:underline mt-2 inline-block">Source: Gov.uk</a>
                 </div>
               </div>
             </div>
@@ -595,8 +597,9 @@ export default function COSDashboard() {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-2">Over 50,000 Sponsors</h3>
-                  <p className="text-gray-600 text-sm">The UK Home Office maintains a register of over 50,000 licensed sponsors. Each has a unique licence number that can be verified against the official register.</p>
+                  <h3 className="font-semibold text-gray-900 mb-2">Sponsor Register</h3>
+                  <p className="text-gray-600 text-sm">You can check if an employer is a licensed sponsor on the official register of licensed sponsors published by the Home Office.</p>
+                  <a href="https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers" target="_blank" rel="noopener noreferrer" className="text-blue-600 text-xs hover:underline mt-2 inline-block">Source: Gov.uk</a>
                 </div>
               </div>
             </div>
@@ -605,12 +608,13 @@ export default function COSDashboard() {
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
                   <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-2">Photoshop Leaves Traces</h3>
-                  <p className="text-gray-600 text-sm">When a document is edited in Adobe Photoshop or similar software, the PDF producer field changes. Genuine COS documents are never created with image editing software.</p>
+                  <h3 className="font-semibold text-gray-900 mb-2">Salary Requirements</h3>
+                  <p className="text-gray-600 text-sm">The minimum salary for most Skilled Worker visa jobs is currently £38,700 per year, or the 'going rate' for your job type, whichever is higher.</p>
+                  <a href="https://www.gov.uk/skilled-worker-visa/your-job" target="_blank" rel="noopener noreferrer" className="text-blue-600 text-xs hover:underline mt-2 inline-block">Source: Gov.uk</a>
                 </div>
               </div>
             </div>
@@ -619,12 +623,13 @@ export default function COSDashboard() {
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
                   <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-2">10-Year Visa Bans</h3>
-                  <p className="text-gray-600 text-sm">Using a fake Certificate of Sponsorship can result in a 10-year ban from entering the UK, criminal prosecution, and permanent damage to your immigration record.</p>
+                  <h3 className="font-semibold text-gray-900 mb-2">Fraud Consequences</h3>
+                  <p className="text-gray-600 text-sm">Using deception in a visa application can result in a 10-year re-entry ban to the UK and potential criminal prosecution under the Immigration Act.</p>
+                  <a href="https://www.gov.uk/government/publications/general-grounds-for-refusal-considering-deception" target="_blank" rel="noopener noreferrer" className="text-blue-600 text-xs hover:underline mt-2 inline-block">Source: Gov.uk</a>
                 </div>
               </div>
             </div>
@@ -633,15 +638,23 @@ export default function COSDashboard() {
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
                   <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-2">AI Detects Patterns</h3>
-                  <p className="text-gray-600 text-sm">Our AI has analysed thousands of genuine and fake documents to learn subtle patterns that are invisible to the human eye but reveal document authenticity.</p>
+                  <h3 className="font-semibold text-gray-900 mb-2">Path to Settlement</h3>
+                  <p className="text-gray-600 text-sm">After 5 years on a Skilled Worker visa, you may be eligible to apply for Indefinite Leave to Remain (settlement) in the UK.</p>
+                  <a href="https://www.gov.uk/indefinite-leave-to-remain-tier-2-t2-skilled-worker-visa" target="_blank" rel="noopener noreferrer" className="text-blue-600 text-xs hover:underline mt-2 inline-block">Source: Gov.uk</a>
                 </div>
               </div>
             </div>
+          </div>
+
+          <div className="text-center mt-8">
+            <p className="text-sm text-gray-500">
+              Information sourced from official UK Government guidance. Always check 
+              <a href="https://www.gov.uk/skilled-worker-visa" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline ml-1">Gov.uk</a> for the latest requirements.
+            </p>
           </div>
         </div>
       </section>
