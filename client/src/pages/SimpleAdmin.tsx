@@ -381,6 +381,14 @@ export default function SimpleAdmin() {
           description: 'This pattern has been added to the knowledge base' 
         });
         setTeachAiInput('');
+        loadGlobalRules(); // Refresh rules list
+      } else {
+        const error = await res.json();
+        toast({ 
+          title: 'Failed to teach AI', 
+          description: error.message || 'Please check your rule text',
+          variant: 'destructive' 
+        });
       }
     } catch (error) {
       toast({ title: 'Failed to teach AI', variant: 'destructive' });

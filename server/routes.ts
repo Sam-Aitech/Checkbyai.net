@@ -673,18 +673,25 @@ Format your response in clear, professional markdown.`;
     }
   });
 
+  const globalRuleSchema = z.object({
+    category: z.enum(['date_check', 'producer_check', 'metadata_check', 'pattern_check', 'red_flag', 'trusted_marker']),
+    ruleText: z.string().min(5).max(1000),
+    priority: z.number().min(0).max(100).optional().default(0),
+  });
+
   app.post('/api/admin/global-rules', isAdmin, async (req: any, res) => {
     try {
-      const { category, ruleText, priority } = req.body;
-      
-      if (!category || !ruleText) {
-        return res.status(400).json({ message: 'Category and rule text are required' });
+      const parsed = globalRuleSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: parsed.error.errors.map(e => e.message).join(', ') });
       }
+
+      const { category, ruleText, priority } = parsed.data;
 
       const rule = await storage.createGlobalAiRule({
         category,
         ruleText,
-        priority: priority || 0,
+        priority,
       });
 
       res.json(rule);
@@ -738,13 +745,21 @@ Format your response in clear, professional markdown.`;
   });
 
   // Teach AI from verification - creates global rule from forgery markers
+  const teachAiSchema = z.object({
+    verificationId: z.number().optional(),
+    category: z.enum(['date_check', 'producer_check', 'metadata_check', 'pattern_check', 'red_flag', 'trusted_marker']).default('red_flag'),
+    ruleText: z.string().min(5).max(1000),
+    priority: z.number().min(0).max(100).default(10),
+  });
+
   app.post('/api/admin/teach-ai', isAdmin, async (req: any, res) => {
     try {
-      const { verificationId, category, ruleText, priority } = req.body;
-      
-      if (!ruleText) {
-        return res.status(400).json({ message: 'Rule text is required' });
+      const parsed = teachAiSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: parsed.error.errors.map(e => e.message).join(', ') });
       }
+
+      const { verificationId, category, ruleText, priority } = parsed.data;
 
       // If verificationId provided, we're learning from a specific verification
       let enrichedRuleText = ruleText;
@@ -756,9 +771,9 @@ Format your response in clear, professional markdown.`;
       }
 
       const rule = await storage.createGlobalAiRule({
-        category: category || 'red_flag',
+        category,
         ruleText: enrichedRuleText,
-        priority: priority || 10,
+        priority,
       });
 
       res.json({ 

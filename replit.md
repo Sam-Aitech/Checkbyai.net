@@ -35,6 +35,7 @@ The system employs a dual-portal design. An Admin Portal facilitates the upload 
 - **User Portal**: File upload, real-time verification results with confidence scores, forensic analysis breakdown, and detailed check results.
 - **Admin Portal**: Management of trusted COS documents with metadata display, system statistics dashboard, and admin-only routes protected by role check.
 - **Authentication**: Database-backed user authentication with role-based access control (admin/user) and session management. Supports Google OAuth and Email OTP verification via Brevo, including daily verification limits.
+- **Dynamic AI Knowledge Engine**: Trainable AI system that allows admins to add custom forensic rules and pattern-specific instructions. Global rules apply to all verifications; pattern-specific instructions apply when producer matches. AI explicitly cites admin rules in analysis output (e.g., "Per Admin Rule #3...").
 
 ## Verification Engine
 
@@ -80,17 +81,23 @@ The system employs a dual-portal design. An Admin Portal facilitates the upload 
 
 **Admin Routes (require admin role):**
 - `GET /api/admin/trusted-patterns` - List all trusted patterns with metadata
-- `POST /api/admin/trusted-patterns` - Upload new trusted sample
+- `POST /api/admin/trusted-patterns` - Upload new trusted sample with optional AI instructions
 - `DELETE /api/admin/trusted-patterns/:id` - Remove trusted pattern
+- `PATCH /api/admin/trusted-patterns/:id/instructions` - Update AI instructions for a pattern
 - `GET /api/admin/recent-activity` - Get recent verification activity
 - `GET /api/admin/paid-submissions` - List all paid expert review submissions
 - `GET /api/admin/verification-logs` - Paginated logs with filters (status, search, date range)
-- `GET /api/admin/analyze-reasoning/:id` - AI forensic analysis with SSE streaming
+- `POST /api/admin/analyze-reasoning/:id` - AI forensic analysis with SSE streaming (injects knowledge context)
 - `GET /api/admin/system-health` - System health stats (memory, uptime, connections)
 - `POST /api/admin/trust-producer` - Add producer to trusted patterns from log entry
 - `GET /api/admin/users` - Paginated user list with search
 - `POST /api/admin/users/:id/restrict` - Restrict/unrestrict user access
 - `GET /api/admin/export-report/:id` - Export forensic evidence JSON report
+- `GET /api/admin/global-rules` - List all global AI rules
+- `POST /api/admin/global-rules` - Create new global AI rule
+- `DELETE /api/admin/global-rules/:id` - Delete global AI rule
+- `PATCH /api/admin/global-rules/:id/toggle` - Enable/disable a global AI rule
+- `POST /api/admin/teach-ai` - Create rule from verification log forgery markers
 
 **Authentication Routes:**
 - `POST /api/auth/admin-login` - Admin login with env var credential check
