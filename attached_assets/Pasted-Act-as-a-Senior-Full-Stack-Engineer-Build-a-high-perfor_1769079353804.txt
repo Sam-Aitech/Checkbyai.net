@@ -1,0 +1,26 @@
+Act as a Senior Full Stack Engineer. Build a high-performance "Forensic Admin Command Center" for the COS Verification System.
+
+### 1. High-Performance Log Engine
+- Implement a 'Logs' view using @tanstack/react-virtual and @tanstack/react-query.
+- Features: Infinite scrolling, server-side filtering (by Status, Email, or Date), and sub-second search.
+- Backend: Use PostgreSQL indexes on 'created_at', 'status', and 'user_id' to ensure fast lookups.
+
+### 2. AI Forensic Interpretation (The "Why")
+- Create an API endpoint `/api/admin/analyze-reasoning/:id`.
+- Logic: Fetch the 'metadata_snapshot' from the DB. Send this JSON to an LLM with a prompt: "You are a Digital Forensics Expert. Analyze this PDF metadata for a UK COS. Highlight why these specific flags (Producer mismatch, XMP history, Date inconsistencies) indicate a forgery. Provide a 'Confidence Score' and a plain-English explanation for a non-technical admin."
+- UI: Show this in an "AI Insight" side-panel with a typing animation (streaming response).
+
+### 3. "Real Tools" Admin Suite
+- Metadata Explorer: A JSON tree view (using 'react-json-view') to see the raw XMP/PDF internal structure.
+- Pattern Override: A tool to "Trust this Producer" directly from a log entry, instantly updating the 'trusted_patterns' table.
+- User Management: One-click 'Restrict User' button for accounts uploading high volumes of 'Fake' documents.
+- Export Center: Generate a "Forensic Evidence PDF" containing the analysis logs, AI reasoning, and metadata for legal use.
+
+### 4. Real-time Monitoring
+- Use WebSockets (socket.io) to push "New Submission" alerts to the Admin Panel in real-time.
+- Add a "System Health" header showing Replit CPU/Memory usage and active database connections.
+
+### 5. Frontend Polish
+- Use 'shadcn/ui' Data-Tables for the log layout.
+- Use 'Lucide-React' for status icons (CheckCircle for Genuine, AlertTriangle for Suspicious, Ban for Fake).
+- Implement "Bulk Actions" (e.g., Mark 50 entries as 'Reviewed').
