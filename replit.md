@@ -84,6 +84,13 @@ The system employs a dual-portal design. An Admin Portal facilitates the upload 
 - `DELETE /api/admin/trusted-patterns/:id` - Remove trusted pattern
 - `GET /api/admin/recent-activity` - Get recent verification activity
 - `GET /api/admin/paid-submissions` - List all paid expert review submissions
+- `GET /api/admin/verification-logs` - Paginated logs with filters (status, search, date range)
+- `GET /api/admin/analyze-reasoning/:id` - AI forensic analysis with SSE streaming
+- `GET /api/admin/system-health` - System health stats (memory, uptime, connections)
+- `POST /api/admin/trust-producer` - Add producer to trusted patterns from log entry
+- `GET /api/admin/users` - Paginated user list with search
+- `POST /api/admin/users/:id/restrict` - Restrict/unrestrict user access
+- `GET /api/admin/export-report/:id` - Export forensic evidence JSON report
 
 **Authentication Routes:**
 - `POST /api/auth/admin-login` - Admin login with env var credential check
