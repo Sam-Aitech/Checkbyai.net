@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Shield, Upload, FileText, CheckCircle, AlertTriangle, XCircle, LogOut, Trash2, Eye, 
   RefreshCw, Search, Filter, ChevronLeft, ChevronRight, Activity, Database, Clock,
-  Sparkles, X, Download, ChevronDown, Users, TrendingUp, Cpu, HardDrive
+  Sparkles, X, Download, ChevronDown, Users, TrendingUp, Cpu, HardDrive, Brain, Plus, Power
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -100,6 +100,21 @@ interface PaginatedUsers {
   totalPages: number;
 }
 
+interface GlobalAiRule {
+  id: number;
+  category: string;
+  ruleText: string;
+  priority: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface UploadPreview {
+  file: File;
+  metadata: any;
+}
+
 export default function SimpleAdmin() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -139,6 +154,23 @@ export default function SimpleAdmin() {
   
   // Tab state for triggering data loads
   const [activeTab, setActiveTab] = useState('logs');
+  
+  // Global AI rules state
+  const [globalRules, setGlobalRules] = useState<GlobalAiRule[]>([]);
+  const [rulesLoading, setRulesLoading] = useState(false);
+  const [newRuleCategory, setNewRuleCategory] = useState('');
+  const [newRuleText, setNewRuleText] = useState('');
+  const [newRulePriority, setNewRulePriority] = useState(0);
+  
+  // Upload preview state (two-step upload with AI instructions)
+  const [uploadPreview, setUploadPreview] = useState<UploadPreview | null>(null);
+  const [aiInstructions, setAiInstructions] = useState('');
+  const [previewLoading, setPreviewLoading] = useState(false);
+  
+  // Teach AI state
+  const [teachAiInput, setTeachAiInput] = useState('');
+  const [teachAiCategory, setTeachAiCategory] = useState('red_flag');
+  const [teachingAi, setTeachingAi] = useState(false);
   
   const { toast } = useToast();
 
@@ -252,6 +284,111 @@ export default function SimpleAdmin() {
     }
   }, [isAuthenticated, activeTab, loadUsers]);
 
+  // Load global rules when Knowledge tab is selected
+  const loadGlobalRules = useCallback(async () => {
+    setRulesLoading(true);
+    try {
+      const res = await fetch('/api/admin/global-rules', { credentials: 'include' });
+      if (res.ok) {
+        setGlobalRules(await res.json());
+      }
+    } catch (error) {
+      console.error('Failed to load global rules:', error);
+    } finally {
+      setRulesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isAuthenticated && activeTab === 'knowledge') {
+      loadGlobalRules();
+    }
+  }, [isAuthenticated, activeTab, loadGlobalRules]);
+
+  const createGlobalRule = async () => {
+    if (!newRuleCategory || !newRuleText) {
+      toast({ title: 'Missing fields', description: 'Category and rule text are required', variant: 'destructive' });
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/admin/global-rules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category: newRuleCategory, ruleText: newRuleText, priority: newRulePriority }),
+        credentials: 'include',
+      });
+
+      if (res.ok) {
+        toast({ title: 'Rule created', description: 'AI will now follow this rule during analysis' });
+        setNewRuleCategory('');
+        setNewRuleText('');
+        setNewRulePriority(0);
+        loadGlobalRules();
+      }
+    } catch (error) {
+      toast({ title: 'Failed to create rule', variant: 'destructive' });
+    }
+  };
+
+  const toggleRule = async (id: number, isActive: boolean) => {
+    try {
+      await fetch(`/api/admin/global-rules/${id}/toggle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive }),
+        credentials: 'include',
+      });
+      loadGlobalRules();
+    } catch (error) {
+      toast({ title: 'Failed to toggle rule', variant: 'destructive' });
+    }
+  };
+
+  const deleteRule = async (id: number) => {
+    try {
+      await fetch(`/api/admin/global-rules/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      toast({ title: 'Rule deleted' });
+      loadGlobalRules();
+    } catch (error) {
+      toast({ title: 'Failed to delete rule', variant: 'destructive' });
+    }
+  };
+
+  const teachAi = async () => {
+    if (!teachAiInput || !selectedLog) return;
+    
+    setTeachingAi(true);
+    try {
+      const res = await fetch('/api/admin/teach-ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          verificationId: selectedLog.id,
+          category: teachAiCategory,
+          ruleText: teachAiInput,
+          priority: 10,
+        }),
+        credentials: 'include',
+      });
+
+      if (res.ok) {
+        toast({ 
+          title: 'AI trained successfully', 
+          description: 'This pattern has been added to the knowledge base' 
+        });
+        setTeachAiInput('');
+      }
+    } catch (error) {
+      toast({ title: 'Failed to teach AI', variant: 'destructive' });
+    } finally {
+      setTeachingAi(false);
+    }
+  };
+
   const loadSystemHealth = async () => {
     try {
       const res = await fetch('/api/admin/system-health', { credentials: 'include' });
@@ -310,13 +447,49 @@ export default function SimpleAdmin() {
     setLogs(null);
   };
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setPreviewLoading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/verify', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setUploadPreview({
+          file,
+          metadata: data.metadata || data.forensicAnalysis?.metadata || {},
+        });
+        setAiInstructions('');
+      } else {
+        toast({ title: 'Failed to extract metadata', variant: 'destructive' });
+      }
+    } catch (error) {
+      toast({ title: 'Failed to preview file', variant: 'destructive' });
+    } finally {
+      setPreviewLoading(false);
+      e.target.value = '';
+    }
+  };
+
+  const confirmUpload = async () => {
+    if (!uploadPreview) return;
+
     setUploading(true);
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', uploadPreview.file);
+    if (aiInstructions) {
+      formData.append('aiInstructions', aiInstructions);
+    }
 
     try {
       const response = await fetch('/api/admin/trusted-patterns', {
@@ -329,14 +502,20 @@ export default function SimpleAdmin() {
         throw new Error('Upload failed');
       }
 
-      toast({ title: 'Upload successful', description: 'Document added to trusted patterns' });
+      toast({ title: 'Upload successful', description: 'Document added to trusted patterns with AI instructions' });
+      setUploadPreview(null);
+      setAiInstructions('');
       loadData();
     } catch (error) {
       toast({ title: 'Upload failed', description: 'Could not upload document', variant: 'destructive' });
     } finally {
       setUploading(false);
-      e.target.value = '';
     }
+  };
+
+  const cancelUpload = () => {
+    setUploadPreview(null);
+    setAiInstructions('');
   };
 
   const handleDelete = async (id: number) => {
@@ -684,6 +863,10 @@ export default function SimpleAdmin() {
             <TabsTrigger value="upload" className="data-[state=active]:bg-slate-700">
               <Upload className="w-4 h-4 mr-2" />
               Upload Pattern
+            </TabsTrigger>
+            <TabsTrigger value="knowledge" className="data-[state=active]:bg-slate-700">
+              <Brain className="w-4 h-4 mr-2" />
+              AI Knowledge
             </TabsTrigger>
           </TabsList>
 
@@ -1075,31 +1258,214 @@ export default function SimpleAdmin() {
               <CardHeader>
                 <CardTitle className="text-white">Upload Genuine COS Document</CardTitle>
                 <CardDescription className="text-slate-400">
-                  Upload a genuine Certificate of Sponsorship to use as reference pattern
+                  Upload a genuine Certificate of Sponsorship with optional AI instructions
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="border-2 border-dashed border-slate-600 rounded-lg p-8 text-center">
-                  <Upload className="w-12 h-12 text-slate-500 mx-auto mb-4" />
-                  <p className="text-white mb-2">Drop a PDF file here or click to browse</p>
-                  <p className="text-sm text-slate-400 mb-4">Only PDF files are accepted</p>
-                  <input
-                    type="file"
-                    accept=".pdf"
-                    onChange={handleUpload}
-                    disabled={uploading}
-                    className="hidden"
-                    id="file-upload"
-                    data-testid="input-file-upload"
-                  />
-                  <Button asChild disabled={uploading}>
-                    <label htmlFor="file-upload" className="cursor-pointer">
-                      {uploading ? 'Uploading...' : 'Select File'}
-                    </label>
-                  </Button>
-                </div>
+                {!uploadPreview ? (
+                  <div className="border-2 border-dashed border-slate-600 rounded-lg p-8 text-center">
+                    <Upload className="w-12 h-12 text-slate-500 mx-auto mb-4" />
+                    <p className="text-white mb-2">Drop a PDF file here or click to browse</p>
+                    <p className="text-sm text-slate-400 mb-4">Only PDF files are accepted</p>
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      onChange={handleFileSelect}
+                      disabled={previewLoading}
+                      className="hidden"
+                      id="file-upload"
+                      data-testid="input-file-upload"
+                    />
+                    <Button asChild disabled={previewLoading}>
+                      <label htmlFor="file-upload" className="cursor-pointer">
+                        {previewLoading ? 'Extracting metadata...' : 'Select File'}
+                      </label>
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-white font-medium">{uploadPreview.file.name}</h3>
+                        <p className="text-sm text-slate-400">{(uploadPreview.file.size / 1024).toFixed(1)} KB</p>
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={cancelUpload}>
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+
+                    <div className="bg-slate-900 rounded-lg p-4">
+                      <h4 className="text-sm font-medium text-slate-400 mb-2 flex items-center gap-2">
+                        <Database className="w-4 h-4" />
+                        Extracted Metadata
+                      </h4>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <span className="text-slate-500">Producer:</span>
+                          <span className="ml-2 text-white">{uploadPreview.metadata?.producer || 'Unknown'}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Creator:</span>
+                          <span className="ml-2 text-white">{uploadPreview.metadata?.creator || 'Unknown'}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Created:</span>
+                          <span className="ml-2 text-white">{uploadPreview.metadata?.creationDate || 'Unknown'}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Modified:</span>
+                          <span className="ml-2 text-white">{uploadPreview.metadata?.modificationDate || 'Unknown'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label className="text-white mb-2 flex items-center gap-2">
+                        <Brain className="w-4 h-4 text-purple-400" />
+                        Forensic Instructions for AI (Optional)
+                      </Label>
+                      <textarea
+                        value={aiInstructions}
+                        onChange={(e) => setAiInstructions(e.target.value)}
+                        placeholder="Add specific notes about this document pattern. E.g., 'This department always uses Microsoft Word 365 as the producer' or 'Documents from this employer are always created on weekdays only.'"
+                        className="w-full h-32 p-3 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 resize-none"
+                      />
+                      <p className="text-xs text-slate-500 mt-1">
+                        These instructions will be used by AI during document analysis to detect forgeries more accurately.
+                      </p>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <Button onClick={confirmUpload} disabled={uploading} className="flex-1">
+                        {uploading ? 'Uploading...' : 'Confirm & Add to Trusted Patterns'}
+                      </Button>
+                      <Button variant="outline" onClick={cancelUpload} className="border-slate-600">
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* AI Knowledge Tab */}
+          <TabsContent value="knowledge">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card className="bg-slate-800 border-slate-700">
+                <CardHeader>
+                  <CardTitle className="text-white flex items-center gap-2">
+                    <Plus className="w-5 h-5 text-green-400" />
+                    Add Global AI Rule
+                  </CardTitle>
+                  <CardDescription className="text-slate-400">
+                    Create rules that apply to ALL document verifications
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label className="text-white">Category</Label>
+                    <Select value={newRuleCategory} onValueChange={setNewRuleCategory}>
+                      <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-slate-800 border-slate-700">
+                        <SelectItem value="date_check">Date Check</SelectItem>
+                        <SelectItem value="producer_check">Producer Check</SelectItem>
+                        <SelectItem value="metadata_check">Metadata Check</SelectItem>
+                        <SelectItem value="pattern_check">Pattern Check</SelectItem>
+                        <SelectItem value="red_flag">Red Flag</SelectItem>
+                        <SelectItem value="trusted_marker">Trusted Marker</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label className="text-white">Rule Text</Label>
+                    <textarea
+                      value={newRuleText}
+                      onChange={(e) => setNewRuleText(e.target.value)}
+                      placeholder="E.g., 'Always flag any document where the ModDate is on a Sunday as suspicious' or 'Trust documents with producer containing gov.uk'"
+                      className="w-full h-24 p-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 resize-none"
+                    />
+                  </div>
+
+                  <div>
+                    <Label className="text-white">Priority (higher = more important)</Label>
+                    <Input
+                      type="number"
+                      value={newRulePriority}
+                      onChange={(e) => setNewRulePriority(parseInt(e.target.value) || 0)}
+                      className="bg-slate-700 border-slate-600 text-white"
+                    />
+                  </div>
+
+                  <Button onClick={createGlobalRule} className="w-full">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Rule
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-slate-800 border-slate-700">
+                <CardHeader>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <CardTitle className="text-white flex items-center gap-2">
+                        <Brain className="w-5 h-5 text-purple-400" />
+                        Active Rules
+                      </CardTitle>
+                      <CardDescription className="text-slate-400">
+                        {globalRules.length} rules configured
+                      </CardDescription>
+                    </div>
+                    <Button variant="outline" size="icon" onClick={loadGlobalRules} disabled={rulesLoading} className="border-slate-600">
+                      <RefreshCw className={`w-4 h-4 ${rulesLoading ? 'animate-spin' : ''}`} />
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <ScrollArea className="h-96">
+                    {globalRules.length === 0 ? (
+                      <div className="text-center py-8 text-slate-400">
+                        <Brain className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                        <p>No global rules configured yet</p>
+                        <p className="text-sm">Add rules to train the AI</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {globalRules.map((rule) => (
+                          <div key={rule.id} className={`p-3 rounded-lg border ${rule.isActive ? 'bg-slate-700/50 border-slate-600' : 'bg-slate-900/50 border-slate-700 opacity-60'}`}>
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <Badge variant="outline" className="text-xs">{rule.category}</Badge>
+                                  <span className="text-xs text-slate-500">Priority: {rule.priority}</span>
+                                </div>
+                                <p className="text-sm text-white">{rule.ruleText}</p>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  onClick={() => toggleRule(rule.id, !rule.isActive)}
+                                  className={rule.isActive ? 'text-green-400' : 'text-slate-500'}
+                                >
+                                  <Power className="w-4 h-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => deleteRule(rule.id)} className="text-red-400 hover:text-red-300">
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </main>
@@ -1136,17 +1502,58 @@ export default function SimpleAdmin() {
           </div>
 
           {selectedLog && (
-            <div className="mt-8 pt-6 border-t border-slate-700">
-              <h4 className="text-sm font-medium text-slate-400 mb-3 flex items-center gap-2">
-                <Database className="w-4 h-4" />
-                Raw Metadata
-              </h4>
-              <ScrollArea className="h-64 rounded bg-slate-900 p-3">
-                <pre className="text-xs text-slate-400 whitespace-pre-wrap">
-                  {JSON.stringify(selectedLog.metadata, null, 2)}
-                </pre>
-              </ScrollArea>
-            </div>
+            <>
+              <div className="mt-8 pt-6 border-t border-slate-700">
+                <h4 className="text-sm font-medium text-slate-400 mb-3 flex items-center gap-2">
+                  <Database className="w-4 h-4" />
+                  Raw Metadata
+                </h4>
+                <ScrollArea className="h-48 rounded bg-slate-900 p-3">
+                  <pre className="text-xs text-slate-400 whitespace-pre-wrap">
+                    {JSON.stringify(selectedLog.metadata, null, 2)}
+                  </pre>
+                </ScrollArea>
+              </div>
+
+              {/* Teach AI Section */}
+              <div className="mt-6 pt-6 border-t border-slate-700">
+                <h4 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
+                  <Brain className="w-4 h-4 text-purple-400" />
+                  Teach AI from This Document
+                </h4>
+                <p className="text-xs text-slate-400 mb-3">
+                  Create a rule from this {selectedLog.result} document to help AI detect similar patterns.
+                </p>
+                <div className="space-y-3">
+                  <Select value={teachAiCategory} onValueChange={setTeachAiCategory}>
+                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                      <SelectValue placeholder="Rule category" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-800 border-slate-700">
+                      <SelectItem value="red_flag">Red Flag</SelectItem>
+                      <SelectItem value="date_check">Date Check</SelectItem>
+                      <SelectItem value="producer_check">Producer Check</SelectItem>
+                      <SelectItem value="metadata_check">Metadata Check</SelectItem>
+                      <SelectItem value="trusted_marker">Trusted Marker</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <textarea
+                    value={teachAiInput}
+                    onChange={(e) => setTeachAiInput(e.target.value)}
+                    placeholder={`E.g., "Flag documents where producer is '${selectedLog.metadata?.producer || 'unknown'}' as ${selectedLog.result}"`}
+                    className="w-full h-20 p-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 resize-none"
+                  />
+                  <Button 
+                    onClick={teachAi} 
+                    disabled={!teachAiInput || teachingAi}
+                    className="w-full bg-purple-600 hover:bg-purple-700"
+                  >
+                    <Brain className="w-4 h-4 mr-2" />
+                    {teachingAi ? 'Teaching...' : 'Teach AI This Pattern'}
+                  </Button>
+                </div>
+              </div>
+            </>
           )}
         </SheetContent>
       </Sheet>

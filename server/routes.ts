@@ -344,13 +344,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // For trusted patterns, we'll store the metadata as the pattern
       const patterns = { metadata, documentType: 'trusted_cos' };
       
+      // Get optional AI instructions from request body
+      const aiInstructions = req.body?.aiInstructions || null;
+      
       const patternId = await storage.createTrustedPattern(
         req.file.originalname,
         metadata,
-        patterns
+        patterns,
+        aiInstructions
       );
 
-      res.json({ id: patternId, message: 'Trusted pattern created successfully' });
+      res.json({ id: patternId, message: 'Trusted pattern created successfully', aiInstructions: !!aiInstructions });
     } catch (error) {
       console.error("Error creating trusted pattern:", error);
       res.status(500).json({ message: "Failed to create trusted pattern" });
@@ -414,6 +418,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Verification not found" });
       }
 
+      // Fetch global AI rules and trusted patterns for knowledge context
+      const globalRules = await storage.getActiveGlobalAiRules();
+      const trustedPatterns = await storage.getTrustedPatterns();
+      
+      // Build knowledge context
+      let knowledgeContext = '';
+      
+      if (globalRules.length > 0) {
+        knowledgeContext += '\n<admin_global_rules>\n';
+        globalRules.forEach((rule, idx) => {
+          knowledgeContext += `Rule #${idx + 1} [${rule.category}] (Priority: ${rule.priority}): ${rule.ruleText}\n`;
+        });
+        knowledgeContext += '</admin_global_rules>\n';
+      }
+      
+      // Find matching pattern instructions based on producer
+      const docProducer = verification.metadata?.producer || '';
+      const matchingPatterns = trustedPatterns.filter(p => {
+        const patternProducer = p.metadata?.producer || '';
+        return patternProducer && docProducer.toLowerCase().includes(patternProducer.toLowerCase().split(' ')[0]);
+      });
+      
+      if (matchingPatterns.length > 0) {
+        knowledgeContext += '\n<pattern_specific_instructions>\n';
+        matchingPatterns.forEach(p => {
+          if (p.aiInstructions) {
+            knowledgeContext += `Pattern "${p.filename}": ${p.aiInstructions}\n`;
+          }
+        });
+        knowledgeContext += '</pattern_specific_instructions>\n';
+      }
+
       // Set up SSE for streaming
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
@@ -425,7 +461,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
       });
 
-      const prompt = `You are a forensic document analyst specializing in UK Certificate of Sponsorship (COS) documents. Analyze the following verification result and provide expert insights.
+      const systemPrompt = `You are a forensic document analyst specializing in UK Certificate of Sponsorship (COS) documents. 
+Analyze documents based on metadata AND the specific forensic knowledge base provided below.
+
+${knowledgeContext ? `<knowledge_base>\n${knowledgeContext}\n</knowledge_base>` : ''}
+
+IMPORTANT: When making your analysis, you MUST explicitly state if you are following any specific Admin Rules from the knowledge base. 
+For example: "Per Admin Rule #3 regarding Sunday modifications, this document is flagged as suspicious."`;
+
+      const prompt = `Analyze the following verification result and provide expert insights.
 
 Verification Result:
 - Status: ${verification.result}
@@ -441,16 +485,20 @@ ${JSON.stringify(verification.analysisDetails, null, 2)}
 Provide a detailed forensic analysis covering:
 1. **Summary**: Brief overview of the document's authenticity assessment
 2. **Key Findings**: Most significant indicators that influenced the verdict
-3. **Red Flags**: Any suspicious patterns or anomalies detected
-4. **Legitimate Indicators**: Evidence supporting authenticity
-5. **Recommendations**: Next steps for the admin or user
-6. **Confidence Assessment**: Explain why the confidence level is ${verification.confidence}%
+3. **Admin Rules Applied**: List any admin rules from the knowledge base that influenced this analysis
+4. **Red Flags**: Any suspicious patterns or anomalies detected
+5. **Legitimate Indicators**: Evidence supporting authenticity
+6. **Recommendations**: Next steps for the admin or user
+7. **Confidence Assessment**: Explain why the confidence level is ${verification.confidence}%
 
 Format your response in clear, professional markdown.`;
 
       const stream = await openai.chat.completions.create({
         model: 'gpt-4.1-mini',
-        messages: [{ role: 'user', content: prompt }],
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: prompt }
+        ],
         stream: true,
         max_tokens: 2000,
       });
@@ -686,6 +734,40 @@ Format your response in clear, professional markdown.`;
     } catch (error) {
       console.error("Error toggling global rule:", error);
       res.status(500).json({ message: "Failed to toggle global rule" });
+    }
+  });
+
+  // Teach AI from verification - creates global rule from forgery markers
+  app.post('/api/admin/teach-ai', isAdmin, async (req: any, res) => {
+    try {
+      const { verificationId, category, ruleText, priority } = req.body;
+      
+      if (!ruleText) {
+        return res.status(400).json({ message: 'Rule text is required' });
+      }
+
+      // If verificationId provided, we're learning from a specific verification
+      let enrichedRuleText = ruleText;
+      if (verificationId) {
+        const verification = await storage.getVerificationById(verificationId);
+        if (verification) {
+          enrichedRuleText = `[Learned from verification #${verificationId} - ${verification.result}] ${ruleText}`;
+        }
+      }
+
+      const rule = await storage.createGlobalAiRule({
+        category: category || 'red_flag',
+        ruleText: enrichedRuleText,
+        priority: priority || 10,
+      });
+
+      res.json({ 
+        message: 'AI has learned this pattern',
+        rule 
+      });
+    } catch (error) {
+      console.error("Error teaching AI:", error);
+      res.status(500).json({ message: "Failed to teach AI" });
     }
   });
 
