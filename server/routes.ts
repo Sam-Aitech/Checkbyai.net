@@ -434,9 +434,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Find matching pattern instructions based on producer
-      const docProducer = verification.metadata?.producer || '';
+      const docProducer = (verification.metadata as any)?.producer || '';
       const matchingPatterns = trustedPatterns.filter(p => {
-        const patternProducer = p.metadata?.producer || '';
+        const patternProducer = (p.metadata as any)?.producer || '';
         return patternProducer && docProducer.toLowerCase().includes(patternProducer.toLowerCase().split(' ')[0]);
       });
       
@@ -455,11 +455,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
 
-      const OpenAI = (await import('openai')).default;
-      const openai = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-      });
+      const { createChatCompletionWithFallback, getAvailableProviders } = await import('./services/aiService');
 
       const systemPrompt = `You are a forensic document analyst specializing in UK Certificate of Sponsorship (COS) documents. 
 Analyze documents based on metadata AND the specific forensic knowledge base provided below.
@@ -493,15 +489,13 @@ Provide a detailed forensic analysis covering:
 
 Format your response in clear, professional markdown.`;
 
-      const stream = await openai.chat.completions.create({
-        model: 'gpt-4.1-mini',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: prompt }
-        ],
-        stream: true,
-        max_tokens: 2000,
-      });
+      // Use fallback AI service (OpenAI -> Claude -> DeepSeek)
+      const { stream, provider } = await createChatCompletionWithFallback([
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: prompt }
+      ], { maxTokens: 2000 });
+
+      res.write(`data: ${JSON.stringify({ provider, availableProviders: getAvailableProviders() })}\n\n`);
 
       for await (const chunk of stream) {
         const content = chunk.choices[0]?.delta?.content || '';

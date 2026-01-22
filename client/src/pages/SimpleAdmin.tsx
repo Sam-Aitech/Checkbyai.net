@@ -621,6 +621,9 @@ export default function SimpleAdmin() {
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.slice(6));
+              if (data.provider) {
+                setAiAnalysis(prev => prev + `*Using ${data.provider} AI*\n\n`);
+              }
               if (data.content) {
                 setAiAnalysis(prev => prev + data.content);
               }
