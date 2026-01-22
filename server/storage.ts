@@ -2,6 +2,7 @@ import {
   users,
   ipVerifications,
   trustedPatterns,
+  globalAiRules,
   verificationResults,
   feedback,
   paidSubmissions,
@@ -10,6 +11,8 @@ import {
   type IpVerification,
   type InsertIpVerification,
   type TrustedPattern,
+  type GlobalAiRule,
+  type InsertGlobalAiRule,
   type VerificationResult,
   type Feedback,
   type InsertFeedback,
@@ -42,8 +45,17 @@ export interface IStorage {
   
   // Trusted patterns operations
   getTrustedPatterns(): Promise<TrustedPattern[]>;
-  createTrustedPattern(filename: string, metadata: any, patterns: any): Promise<number>;
+  createTrustedPattern(filename: string, metadata: any, patterns: any, aiInstructions?: string): Promise<number>;
+  updateTrustedPatternInstructions(id: number, aiInstructions: string): Promise<void>;
   deleteTrustedPattern(id: number): Promise<void>;
+  
+  // Global AI rules operations
+  getGlobalAiRules(): Promise<GlobalAiRule[]>;
+  getActiveGlobalAiRules(): Promise<GlobalAiRule[]>;
+  createGlobalAiRule(data: InsertGlobalAiRule): Promise<GlobalAiRule>;
+  updateGlobalAiRule(id: number, data: Partial<InsertGlobalAiRule>): Promise<GlobalAiRule>;
+  deleteGlobalAiRule(id: number): Promise<void>;
+  toggleGlobalAiRule(id: number, isActive: boolean): Promise<void>;
   
   // Verification operations
   createVerificationResult(
@@ -283,20 +295,69 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(trustedPatterns).where(eq(trustedPatterns.status, 'active'));
   }
 
-  async createTrustedPattern(filename: string, metadata: any, patterns: any): Promise<number> {
+  async createTrustedPattern(filename: string, metadata: any, patterns: any, aiInstructions?: string): Promise<number> {
     const [pattern] = await db
       .insert(trustedPatterns)
       .values({
         filename,
         metadata,
         patterns,
+        aiInstructions,
       })
       .returning();
     return pattern.id;
   }
 
+  async updateTrustedPatternInstructions(id: number, aiInstructions: string): Promise<void> {
+    await db
+      .update(trustedPatterns)
+      .set({ aiInstructions, lastUpdated: new Date() })
+      .where(eq(trustedPatterns.id, id));
+  }
+
   async deleteTrustedPattern(id: number): Promise<void> {
     await db.update(trustedPatterns).set({ status: 'deleted' }).where(eq(trustedPatterns.id, id));
+  }
+
+  // Global AI rules operations
+  async getGlobalAiRules(): Promise<GlobalAiRule[]> {
+    return await db.select().from(globalAiRules).orderBy(desc(globalAiRules.priority));
+  }
+
+  async getActiveGlobalAiRules(): Promise<GlobalAiRule[]> {
+    return await db
+      .select()
+      .from(globalAiRules)
+      .where(eq(globalAiRules.isActive, true))
+      .orderBy(desc(globalAiRules.priority));
+  }
+
+  async createGlobalAiRule(data: InsertGlobalAiRule): Promise<GlobalAiRule> {
+    const [rule] = await db
+      .insert(globalAiRules)
+      .values(data)
+      .returning();
+    return rule;
+  }
+
+  async updateGlobalAiRule(id: number, data: Partial<InsertGlobalAiRule>): Promise<GlobalAiRule> {
+    const [rule] = await db
+      .update(globalAiRules)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(globalAiRules.id, id))
+      .returning();
+    return rule;
+  }
+
+  async deleteGlobalAiRule(id: number): Promise<void> {
+    await db.delete(globalAiRules).where(eq(globalAiRules.id, id));
+  }
+
+  async toggleGlobalAiRule(id: number, isActive: boolean): Promise<void> {
+    await db
+      .update(globalAiRules)
+      .set({ isActive, updatedAt: new Date() })
+      .where(eq(globalAiRules.id, id));
   }
 
   // Verification operations

@@ -614,6 +614,95 @@ Format your response in clear, professional markdown.`;
     }
   });
 
+  // Global AI Rules CRUD endpoints
+  app.get('/api/admin/global-rules', isAdmin, async (req, res) => {
+    try {
+      const rules = await storage.getGlobalAiRules();
+      res.json(rules);
+    } catch (error) {
+      console.error("Error fetching global rules:", error);
+      res.status(500).json({ message: "Failed to fetch global rules" });
+    }
+  });
+
+  app.post('/api/admin/global-rules', isAdmin, async (req: any, res) => {
+    try {
+      const { category, ruleText, priority } = req.body;
+      
+      if (!category || !ruleText) {
+        return res.status(400).json({ message: 'Category and rule text are required' });
+      }
+
+      const rule = await storage.createGlobalAiRule({
+        category,
+        ruleText,
+        priority: priority || 0,
+      });
+
+      res.json(rule);
+    } catch (error) {
+      console.error("Error creating global rule:", error);
+      res.status(500).json({ message: "Failed to create global rule" });
+    }
+  });
+
+  app.patch('/api/admin/global-rules/:id', isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { category, ruleText, priority, isActive } = req.body;
+
+      const rule = await storage.updateGlobalAiRule(id, {
+        ...(category && { category }),
+        ...(ruleText && { ruleText }),
+        ...(priority !== undefined && { priority }),
+        ...(isActive !== undefined && { isActive }),
+      });
+
+      res.json(rule);
+    } catch (error) {
+      console.error("Error updating global rule:", error);
+      res.status(500).json({ message: "Failed to update global rule" });
+    }
+  });
+
+  app.delete('/api/admin/global-rules/:id', isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteGlobalAiRule(id);
+      res.json({ message: 'Rule deleted successfully' });
+    } catch (error) {
+      console.error("Error deleting global rule:", error);
+      res.status(500).json({ message: "Failed to delete global rule" });
+    }
+  });
+
+  app.post('/api/admin/global-rules/:id/toggle', isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { isActive } = req.body;
+      
+      await storage.toggleGlobalAiRule(id, isActive);
+      res.json({ message: `Rule ${isActive ? 'activated' : 'deactivated'}` });
+    } catch (error) {
+      console.error("Error toggling global rule:", error);
+      res.status(500).json({ message: "Failed to toggle global rule" });
+    }
+  });
+
+  // Update trusted pattern AI instructions
+  app.patch('/api/admin/trusted-patterns/:id/instructions', isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { aiInstructions } = req.body;
+      
+      await storage.updateTrustedPatternInstructions(id, aiInstructions);
+      res.json({ message: 'Pattern instructions updated' });
+    } catch (error) {
+      console.error("Error updating pattern instructions:", error);
+      res.status(500).json({ message: "Failed to update pattern instructions" });
+    }
+  });
+
   // Feedback routes
   app.post('/api/feedback', async (req: any, res) => {
     try {
