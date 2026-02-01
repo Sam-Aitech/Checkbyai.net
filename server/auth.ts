@@ -40,36 +40,41 @@ export function generateOTP(): string {
   return crypto.randomInt(100000, 999999).toString();
 }
 
-// Send OTP via Brevo email (for regular users)
+// Send OTP via Resend email (for regular users)
 export async function sendEmailOTP(email: string, code: string): Promise<boolean> {
   try {
-    if (!process.env.BREVO_API_KEY) {
-      console.error("BREVO_API_KEY not configured");
+    if (!process.env.RESEND_API_KEY) {
+      console.error("RESEND_API_KEY not configured");
       return false;
     }
 
-    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+    const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "api-key": process.env.BREVO_API_KEY,
+        "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        sender: {
-          name: "Check By AI",
-          email: "noreply@checkbyai.net"
-        },
-        to: [{ email }],
+        from: "Check By AI <noreply@checkbyai.net>",
+        to: [email],
         subject: "Your verification code for Check By AI",
-        htmlContent: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #003366;">Verify Your Email</h2>
-            <p>Your verification code is:</p>
-            <div style="background: #f5f5f5; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 8px; margin: 20px 0;">
-              ${code}
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background: linear-gradient(135deg, #003366 0%, #0066cc 100%); padding: 30px; border-radius: 10px 10px 0 0;">
+              <h1 style="color: #ffffff; margin: 0; text-align: center;">Verify Your Email</h1>
             </div>
-            <p>This code will expire in 10 minutes.</p>
-            <p style="color: #666; font-size: 12px;">If you didn't request this code, please ignore this email.</p>
+            <div style="background: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
+              <p style="color: #333; font-size: 16px;">Your verification code is:</p>
+              <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 25px; text-align: center; font-size: 36px; font-weight: bold; letter-spacing: 10px; margin: 20px 0; border-radius: 8px; color: #003366; border: 2px dashed #003366;">
+                ${code}
+              </div>
+              <p style="color: #666; font-size: 14px;">This code will expire in <strong>10 minutes</strong>.</p>
+              <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
+              <p style="color: #999; font-size: 12px; text-align: center;">
+                If you didn't request this code, please ignore this email.<br>
+                This is an automated message from Check By AI.
+              </p>
+            </div>
           </div>
         `,
       }),
@@ -77,7 +82,7 @@ export async function sendEmailOTP(email: string, code: string): Promise<boolean
 
     if (!response.ok) {
       const error = await response.text();
-      console.error("Brevo API error:", error);
+      console.error("Resend API error:", error);
       return false;
     }
 
