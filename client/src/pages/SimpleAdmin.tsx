@@ -14,6 +14,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 
 interface AdminUser {
@@ -173,6 +175,12 @@ export default function SimpleAdmin() {
   const [teachAiInput, setTeachAiInput] = useState('');
   const [teachAiCategory, setTeachAiCategory] = useState('red_flag');
   const [teachingAi, setTeachingAi] = useState(false);
+  
+  // HITL (Human-in-the-Loop) feedback state
+  const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
+  const [feedbackLog, setFeedbackLog] = useState<VerificationLog | null>(null);
+  const [feedbackReasoning, setFeedbackReasoning] = useState('');
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
   
   const { toast } = useToast();
 
@@ -397,6 +405,105 @@ export default function SimpleAdmin() {
     } finally {
       setTeachingAi(false);
     }
+  };
+
+  // HITL: Approve a verification log
+  const handleApproveLog = async (log: VerificationLog) => {
+    setFeedbackLoading(true);
+    try {
+      const res = await fetch(`/api/logs/${log.id}/feedback`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminStatus: 'approved' }),
+        credentials: 'include',
+      });
+
+      if (res.ok) {
+        toast({ title: 'Verification approved', description: 'The AI result has been confirmed' });
+        loadLogs(); // Refresh logs
+      } else {
+        const error = await res.json();
+        toast({ title: 'Failed to approve', description: error.message, variant: 'destructive' });
+      }
+    } catch (error) {
+      toast({ title: 'Failed to approve', variant: 'destructive' });
+    } finally {
+      setFeedbackLoading(false);
+    }
+  };
+
+  // HITL: Open feedback modal for marking as fake
+  const handleOpenFeedbackModal = (log: VerificationLog) => {
+    setFeedbackLog(log);
+    setFeedbackReasoning('');
+    setFeedbackModalOpen(true);
+  };
+
+  // HITL: Submit fake feedback with reasoning
+  const handleSubmitFakeFeedback = async () => {
+    if (!feedbackLog || !feedbackReasoning.trim()) {
+      toast({ title: 'Please provide reasoning', description: 'Explain why you believe this document is fake', variant: 'destructive' });
+      return;
+    }
+
+    setFeedbackLoading(true);
+    try {
+      const res = await fetch(`/api/logs/${feedbackLog.id}/feedback`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminStatus: 'fake',
+          adminFeedback: feedbackReasoning,
+        }),
+        credentials: 'include',
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.isConflict) {
+          toast({ 
+            title: 'Conflict recorded', 
+            description: 'AI said Genuine, but you marked as Fake. This will train the AI.', 
+          });
+        } else {
+          toast({ title: 'Marked as fake', description: 'Your feedback has been recorded' });
+        }
+        setFeedbackModalOpen(false);
+        loadLogs(); // Refresh logs
+      } else {
+        const error = await res.json();
+        toast({ title: 'Failed to submit feedback', description: error.message, variant: 'destructive' });
+      }
+    } catch (error) {
+      toast({ title: 'Failed to submit feedback', variant: 'destructive' });
+    } finally {
+      setFeedbackLoading(false);
+    }
+  };
+
+  // Get admin status badge with conflict detection
+  const getAdminStatusBadge = (log: VerificationLog) => {
+    const adminStatus = (log as any).adminStatus || 'pending';
+    const aiResult = log.result;
+    const isConflict = adminStatus === 'fake' && aiResult === 'genuine';
+
+    if (adminStatus === 'pending') {
+      return <Badge variant="outline" className="bg-slate-700 text-slate-300 border-slate-600">Pending Review</Badge>;
+    }
+    if (isConflict) {
+      return (
+        <Badge className="bg-red-500/20 text-red-400 border-2 border-red-500 animate-pulse">
+          Admin Overridden
+        </Badge>
+      );
+    }
+    if (adminStatus === 'approved') {
+      return <Badge className="bg-green-500/20 text-green-400 border-green-500">Approved</Badge>;
+    }
+    if (adminStatus === 'fake') {
+      return <Badge className="bg-red-500/20 text-red-400 border-red-500">Marked Fake</Badge>;
+    }
+    return null;
   };
 
   const loadSystemHealth = async () => {
@@ -1093,9 +1200,9 @@ export default function SimpleAdmin() {
                           <tr className="border-b border-slate-700">
                             <th className="text-left py-3 px-4 text-slate-400 font-medium">Time</th>
                             <th className="text-left py-3 px-4 text-slate-400 font-medium">Filename</th>
-                            <th className="text-left py-3 px-4 text-slate-400 font-medium">Status</th>
+                            <th className="text-left py-3 px-4 text-slate-400 font-medium">AI Status</th>
+                            <th className="text-left py-3 px-4 text-slate-400 font-medium">Admin Review</th>
                             <th className="text-left py-3 px-4 text-slate-400 font-medium">Producer</th>
-                            <th className="text-left py-3 px-4 text-slate-400 font-medium">IP</th>
                             <th className="text-right py-3 px-4 text-slate-400 font-medium">Actions</th>
                           </tr>
                         </thead>
@@ -1103,7 +1210,11 @@ export default function SimpleAdmin() {
                           {logs?.data.map((log) => (
                             <tr 
                               key={log.id} 
-                              className="border-b border-slate-700/50 hover:bg-slate-700/30 cursor-pointer"
+                              className={`border-b border-slate-700/50 hover:bg-slate-700/30 cursor-pointer ${
+                                (log as any).adminStatus === 'fake' && log.result === 'genuine' 
+                                  ? 'ring-2 ring-red-500/50 bg-red-900/10' 
+                                  : ''
+                              }`}
                               onClick={() => setSelectedLog(log)}
                             >
                               <td className="py-3 px-4 text-slate-300 text-sm">
@@ -1115,22 +1226,48 @@ export default function SimpleAdmin() {
                               <td className="py-3 px-4">
                                 {getStatusBadge(log.result, log.confidence)}
                               </td>
+                              <td className="py-3 px-4">
+                                {getAdminStatusBadge(log)}
+                              </td>
                               <td className="py-3 px-4 text-slate-300 text-sm max-w-[150px] truncate">
                                 {log.metadata?.producer || 'Unknown'}
                               </td>
-                              <td className="py-3 px-4 text-slate-400 text-sm font-mono">
-                                {log.ipAddress?.substring(0, 12) || 'N/A'}...
-                              </td>
                               <td className="py-3 px-4 text-right">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={(e) => { e.stopPropagation(); runAiAnalysis(log); }}
-                                  className="border-slate-600 text-slate-300 hover:bg-slate-700"
-                                >
-                                  <Sparkles className="w-4 h-4 mr-1" />
-                                  Analyze
-                                </Button>
+                                <div className="flex items-center justify-end gap-1">
+                                  {(log as any).adminStatus === 'pending' && (
+                                    <>
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={(e) => { e.stopPropagation(); handleApproveLog(log); }}
+                                        disabled={feedbackLoading}
+                                        className="text-green-400 hover:bg-green-500/20 hover:text-green-300"
+                                        title="Approve AI result"
+                                      >
+                                        <CheckCircle className="w-4 h-4" />
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={(e) => { e.stopPropagation(); handleOpenFeedbackModal(log); }}
+                                        disabled={feedbackLoading}
+                                        className="text-red-400 hover:bg-red-500/20 hover:text-red-300"
+                                        title="Mark as fake"
+                                      >
+                                        <XCircle className="w-4 h-4" />
+                                      </Button>
+                                    </>
+                                  )}
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={(e) => { e.stopPropagation(); runAiAnalysis(log); }}
+                                    className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                                  >
+                                    <Sparkles className="w-4 h-4 mr-1" />
+                                    Analyze
+                                  </Button>
+                                </div>
                               </td>
                             </tr>
                           ))}
@@ -1784,6 +1921,67 @@ export default function SimpleAdmin() {
           )}
         </SheetContent>
       </Sheet>
+
+      {/* HITL Feedback Modal */}
+      <Dialog open={feedbackModalOpen} onOpenChange={setFeedbackModalOpen}>
+        <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-400">
+              <XCircle className="w-5 h-5" />
+              Mark as Fake
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              You're overriding the AI's assessment. Please provide detailed reasoning so the AI can learn from this correction.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {feedbackLog && (
+            <div className="space-y-4">
+              <div className="p-3 bg-slate-700/50 rounded-lg">
+                <p className="text-sm text-slate-400">Document</p>
+                <p className="text-white font-medium">{feedbackLog.filename}</p>
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-sm text-slate-400">AI said:</span>
+                  {getStatusBadge(feedbackLog.result, feedbackLog.confidence)}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="reasoning" className="text-slate-200">
+                  Reasoning Points <span className="text-red-400">*</span>
+                </Label>
+                <Textarea
+                  id="reasoning"
+                  placeholder="e.g., The font style on the header doesn't match official CoS templates. The producer field shows evidence of PDF editing software..."
+                  value={feedbackReasoning}
+                  onChange={(e) => setFeedbackReasoning(e.target.value)}
+                  className="min-h-[120px] bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500"
+                />
+                <p className="text-xs text-slate-500">
+                  Your feedback will be used to train the AI and prevent future false positives.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setFeedbackModalOpen(false)}
+              className="border-slate-600 text-slate-300 hover:bg-slate-700"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmitFakeFeedback}
+              disabled={feedbackLoading || !feedbackReasoning.trim()}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {feedbackLoading ? 'Submitting...' : 'Confirm as Fake'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
