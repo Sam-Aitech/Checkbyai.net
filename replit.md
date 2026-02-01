@@ -37,6 +37,7 @@ The system employs a dual-portal design. An Admin Portal facilitates the upload 
 - **Admin Portal**: Management of trusted COS documents with metadata display, system statistics dashboard, and admin-only routes protected by role check.
 - **Authentication**: Database-backed user authentication with role-based access control (admin/user) and session management. Supports Google OAuth and Email OTP verification via Brevo, including daily verification limits.
 - **Dynamic AI Knowledge Engine**: Trainable AI system that allows admins to add custom forensic rules and pattern-specific instructions. Global rules apply to all verifications; pattern-specific instructions apply when producer matches. AI explicitly cites admin rules in analysis output (e.g., "Per Admin Rule #3...").
+- **Human-in-the-Loop (HITL) Feedback**: Admins can override AI results by approving or marking documents as fake. When marking as fake, admins must provide reasoning. This feedback is injected into future AI analyses as "human expert corrections" to train the AI and prevent repeated mistakes. Visual "Admin Overridden" badges appear when admins disagree with AI.
 - **Multi-AI Fallback System**: Automatic failover between AI providers (OpenAI → Claude → DeepSeek) for reliable document analysis even if one provider is down.
 
 ## Verification Engine
@@ -100,6 +101,8 @@ The system employs a dual-portal design. An Admin Portal facilitates the upload 
 - `DELETE /api/admin/global-rules/:id` - Delete global AI rule
 - `PATCH /api/admin/global-rules/:id/toggle` - Enable/disable a global AI rule
 - `POST /api/admin/teach-ai` - Create rule from verification log forgery markers
+- `PATCH /api/logs/:id/feedback` - HITL: Update admin status (approved/fake) with reasoning
+- `GET /api/knowledge-base` - Get aggregated admin feedback for AI knowledge injection
 
 **Authentication Routes:**
 - `POST /api/auth/admin-login` - Admin login with env var credential check
