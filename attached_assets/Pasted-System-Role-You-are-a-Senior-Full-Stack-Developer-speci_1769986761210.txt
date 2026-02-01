@@ -1,0 +1,41 @@
+System Role: You are a Senior Full Stack Developer specializing in the Replit/Node/PostgreSQL stack.
+
+Objective: Implement a "Human-in-the-Loop" (HITL) feedback system for the Verification Logs. This system allows Admins to override AI results and uses that feedback as "Knowledge" for future AI analyses.
+
+1. Database & Schema (Drizzle ORM): - Update the verification logs schema to include: adminStatus (enum: 'pending', 'approved', 'fake'), adminFeedback (text), and accuracyScore (integer). 
+
+Ensure these fields are accessible via the existing Drizzle setup.
+
+2. Frontend Enhancements (React + shadcn/ui):
+
+Action Buttons: In the "Verification Logs" table, add two primary actions:
+
+Approve (Checkmark): Sets adminStatus to 'approved'.
+
+Mark as Fake / Dislike (X or Thumbs Down): Opens a shadcn/ui Dialog/Modal.
+
+Feedback Modal: The modal must require the admin to write "Reasoning Points" (e.g., "The font style on the header doesn't match official CoS templates").
+
+Visual Feedback: If an admin marks a file as "Fake" that the AI called "Genuine," change the row's status badge to a "Conflict" state (e.g., Red border with "Admin Overridden").
+
+3. Knowledge Injection (The "AI Brain"):
+
+Modify the PDFAnalyzer service. Before sending the file data to OpenRouter (OpenAI/Claude/DeepSeek), perform a database lookup for all previous logs marked as 'Fake' by an admin.
+
+Create a "Knowledge Context" string: "In previous checks, files with [X characteristics] were flagged as FAKES by humans because: [Admin Notes]. Do not repeat the mistake of marking similar patterns as Genuine." - Inject this string into the System Prompt of the Multi-AI Fallback engine. 
+
+4. API Routes:
+
+PATCH /api/logs/:id/feedback: To update the admin status and notes.
+
+GET /api/knowledge-base: To aggregate all admin "Fake" notes for the AI's reference.
+
+3. Implementation Tips
+
+Drizzle Migrations: Since you are on Replit with PostgreSQL, remember to run your push/migration command (npx drizzle-kit push) after updating the schema to ensure the new feedback columns exist. 
++1
+
+OpenRouter Context Window: Don't dump every piece of feedback into the AI prompt. Only pull the last 10-15 "Marked as Fake" entries to keep the prompt concise and relevant to avoid high token costs on OpenRouter. 
+
+
+The "Confidence" Fix: In your AI system prompt, explicitly tell the AI: "Your previous outputs have been overconfident. You must now prioritize 'Forensic Metadata' over visual appearance.
