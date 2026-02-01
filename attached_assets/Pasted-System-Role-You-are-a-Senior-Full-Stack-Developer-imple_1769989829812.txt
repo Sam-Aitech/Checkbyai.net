@@ -1,0 +1,57 @@
+System Role: You are a Senior Full Stack Developer implementing a Stripe-based monetization system for a document verification platform on Replit.
+
+
+Objective: Set up a multi-tier credit and subscription system using Node.js, PostgreSQL (Drizzle), and Stripe.
++1
+
+1. Database Schema (Drizzle ORM):
+
+Update users table: Add credits (default 0), subscriptionStatus (default 'none'), and stripeCustomerId.
+
+Create expert_requests table: To store "Master Package" orders. Fields: userId, fileUrl, status (pending/completed), expertComments, and createdAt.
+
+2. Stripe Integration:
+
+Implement four products in Stripe:
+
+Starter: 50 credits (One-time, £24.99)
+
+Pro: 100 credits (One-time, £39.99)
+
+Monthly Unlimited: (£99.99/mo subscription)
+
+Master Package: (£99.99 one-time expert service)
+
+Create a /api/stripe/webhook endpoint to listen for checkout.session.completed.
+
+Logic: If it's a credit purchase, increment user.credits. If it's "Unlimited," update subscriptionStatus.
+
+3. Usage Gatekeeping (Backend):
+
+Modify the /api/verify endpoint. Before running the PDFAnalyzer:
+
+Check if user.subscriptionStatus === 'unlimited'. If yes, proceed.
+
+Else if user.credits > 0, proceed and deduct 1 credit upon successful analysis.
+
+Otherwise, return a 403 Payment Required status.
+
+4. Master Package UI & Logic:
+
+Add a special "Expert Verification" button. When clicked, it initiates a Stripe Checkout for the Master Package. - Post-payment, trigger an email notification via Resend to the Admin team  notifying them of a "Manual Expert Review Required" with a 24-hour deadline.
+
+5. Frontend UI (React + Tailwind): - Create a Pricing.tsx page with four responsive cards using shadcn/ui.
++1
+
+Highlight the "Monthly Unlimited" and "Master Package" as the premium options.
+
+Add a "Credit Counter" to the Sidebar/Header so users see their remaining balance.
+
+3. Implementation Tips
+Stripe Webhooks on Replit: You will need to use the Stripe CLI or a tool like localtunnel for local testing, but on Replit, simply provide your Replit deployment URL to the Stripe Dashboard Webhook settings.
+
+Idempotency: When processing webhooks, ensure you check the Stripe event_id so you don't accidentally give a user 100 credits twice for a single payment.
+
+Master Package SLA: In your expert_requests table, use a timestamp. You can create a simple cron job in Node.js (using node-cron) that alerts you via Resend if a Master Package request is nearing the 20-hour mark without a report.
+
+Currency Safety: Since you specified GBP, ensure your Stripe session creation explicitly sets the currency to gbp to avoid automatic conversion issues.
