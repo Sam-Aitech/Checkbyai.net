@@ -94,12 +94,19 @@ export const verificationResults = pgTable(
     analysisDetails: jsonb("analysis_details").notNull(),
     ipAddress: varchar("ip_address"),
     verifiedAt: timestamp("verified_at").defaultNow(),
+    // HITL (Human-in-the-Loop) feedback fields
+    adminStatus: varchar("admin_status").default("pending"), // 'pending', 'approved', 'fake'
+    adminFeedback: text("admin_feedback"), // Admin reasoning when marking as fake
+    adminReviewedBy: varchar("admin_reviewed_by").references(() => users.id),
+    adminReviewedAt: timestamp("admin_reviewed_at"),
+    accuracyScore: integer("accuracy_score"), // AI accuracy rating after human review
   },
   (table) => [
     index("idx_verification_verified_at").on(table.verifiedAt),
     index("idx_verification_result").on(table.result),
     index("idx_verification_user_id").on(table.userId),
     index("idx_verification_result_date").on(table.result, table.verifiedAt),
+    index("idx_verification_admin_status").on(table.adminStatus),
   ]
 );
 

@@ -123,6 +123,23 @@ export interface IStorage {
     totalPages: number;
   }>;
   updateUserRestriction(userId: string, restricted: boolean, reason?: string): Promise<void>;
+  
+  // HITL (Human-in-the-Loop) operations
+  updateVerificationFeedback(id: number, data: {
+    adminStatus: string;
+    adminFeedback?: string | null;
+    adminReviewedBy: string;
+    adminReviewedAt: Date;
+    accuracyScore?: number | null;
+  }): Promise<VerificationResult>;
+  getAdminFakeKnowledge(limit?: number): Promise<VerificationResult[]>;
+  getVerificationLogsWithHITL(page: number, limit: number, adminStatus?: string): Promise<{
+    data: VerificationResult[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -684,6 +701,74 @@ export class DatabaseStorage implements IStorage {
         updatedAt: new Date(),
       })
       .where(eq(users.id, userId));
+  }
+
+  // HITL (Human-in-the-Loop) operations
+  async updateVerificationFeedback(id: number, data: {
+    adminStatus: string;
+    adminFeedback?: string | null;
+    adminReviewedBy: string;
+    adminReviewedAt: Date;
+    accuracyScore?: number | null;
+  }): Promise<VerificationResult> {
+    const [result] = await db
+      .update(verificationResults)
+      .set({
+        adminStatus: data.adminStatus,
+        adminFeedback: data.adminFeedback,
+        adminReviewedBy: data.adminReviewedBy,
+        adminReviewedAt: data.adminReviewedAt,
+        accuracyScore: data.accuracyScore,
+      })
+      .where(eq(verificationResults.id, id))
+      .returning();
+    return result;
+  }
+
+  async getAdminFakeKnowledge(limit: number = 15): Promise<VerificationResult[]> {
+    return await db
+      .select()
+      .from(verificationResults)
+      .where(eq(verificationResults.adminStatus, 'fake'))
+      .orderBy(desc(verificationResults.adminReviewedAt))
+      .limit(limit);
+  }
+
+  async getVerificationLogsWithHITL(page: number, limit: number, adminStatus?: string): Promise<{
+    data: VerificationResult[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const offset = (page - 1) * limit;
+
+    const whereClause = adminStatus && adminStatus !== 'all'
+      ? eq(verificationResults.adminStatus, adminStatus)
+      : undefined;
+
+    const [countResult] = await db
+      .select({ count: count() })
+      .from(verificationResults)
+      .where(whereClause);
+
+    const total = Number(countResult?.count || 0);
+
+    const data = await db
+      .select()
+      .from(verificationResults)
+      .where(whereClause)
+      .orderBy(desc(verificationResults.verifiedAt))
+      .limit(limit)
+      .offset(offset);
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 }
 

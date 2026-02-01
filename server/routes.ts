@@ -1218,6 +1218,101 @@ Format your response in clear, professional markdown.`;
     }
   });
 
+  // ========================================
+  // HITL (Human-in-the-Loop) Feedback Routes
+  // ========================================
+
+  // Update verification log with admin feedback
+  app.patch('/api/logs/:id/feedback', isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { adminStatus, adminFeedback, accuracyScore } = req.body;
+
+      if (!['pending', 'approved', 'fake'].includes(adminStatus)) {
+        return res.status(400).json({ message: 'Invalid admin status' });
+      }
+
+      const verification = await storage.getVerificationById(id);
+      if (!verification) {
+        return res.status(404).json({ message: 'Verification log not found' });
+      }
+
+      // Update the verification with admin feedback
+      const updated = await storage.updateVerificationFeedback(id, {
+        adminStatus,
+        adminFeedback: adminFeedback || null,
+        adminReviewedBy: req.user.id,
+        adminReviewedAt: new Date(),
+        accuracyScore: accuracyScore || null,
+      });
+
+      // If admin marked as fake but AI said genuine, log the conflict
+      const aiResult = verification.result;
+      const isConflict = adminStatus === 'fake' && aiResult === 'genuine';
+
+      res.json({ 
+        message: 'Feedback recorded',
+        verification: updated,
+        isConflict,
+        conflictType: isConflict ? 'AI marked genuine, admin marked fake' : null
+      });
+    } catch (error) {
+      console.error('Error updating verification feedback:', error);
+      res.status(500).json({ message: 'Failed to update feedback' });
+    }
+  });
+
+  // Get knowledge base - aggregated admin "Fake" feedback for AI context injection
+  app.get('/api/knowledge-base', isAdmin, async (req: any, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 15;
+      const knowledge = await storage.getAdminFakeKnowledge(limit);
+      
+      // Build knowledge context string for AI prompt injection
+      let knowledgeContext = '';
+      if (knowledge.length > 0) {
+        knowledgeContext = 'IMPORTANT HUMAN FEEDBACK CONTEXT:\n';
+        knowledgeContext += 'In previous verifications, human experts have flagged the following patterns as FAKE:\n\n';
+        
+        knowledge.forEach((entry, idx) => {
+          const metadata = entry.metadata as any;
+          knowledgeContext += `[Case ${idx + 1}] File: ${entry.filename}\n`;
+          knowledgeContext += `Producer: ${metadata?.producer || 'Unknown'}\n`;
+          knowledgeContext += `AI said: ${entry.result} (${entry.confidence}% confidence)\n`;
+          knowledgeContext += `Admin override: FAKE\n`;
+          knowledgeContext += `Admin reasoning: ${entry.adminFeedback || 'No details provided'}\n\n`;
+        });
+
+        knowledgeContext += 'DO NOT repeat the mistake of marking similar patterns as Genuine.\n';
+        knowledgeContext += 'Prioritize forensic metadata analysis over visual appearance.\n';
+      }
+
+      res.json({
+        entries: knowledge,
+        count: knowledge.length,
+        knowledgeContext,
+      });
+    } catch (error) {
+      console.error('Error fetching knowledge base:', error);
+      res.status(500).json({ message: 'Failed to fetch knowledge base' });
+    }
+  });
+
+  // Get verification logs with HITL status for admin review
+  app.get('/api/admin/verification-logs-hitl', isAdmin, async (req: any, res) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 20;
+      const adminStatus = req.query.adminStatus as string;
+      
+      const logs = await storage.getVerificationLogsWithHITL(page, limit, adminStatus);
+      res.json(logs);
+    } catch (error) {
+      console.error('Error fetching HITL logs:', error);
+      res.status(500).json({ message: 'Failed to fetch logs' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
