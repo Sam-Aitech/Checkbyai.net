@@ -120,8 +120,10 @@ export default function SimpleAdmin() {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<AdminUser | null>(null);
   const [loginEmail, setLoginEmail] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
+  const [loginOtp, setLoginOtp] = useState('');
+  const [loginStep, setLoginStep] = useState<'email' | 'verify'>('email');
   const [loginError, setLoginError] = useState('');
+  const [loginSuccess, setLoginSuccess] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
   
   const [stats, setStats] = useState<Stats | null>(null);
@@ -408,23 +410,53 @@ export default function SimpleAdmin() {
     }
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
+    setLoginSuccess('');
     setLoginLoading(true);
 
     try {
-      const response = await fetch('/api/auth/admin-login', {
+      const response = await fetch('/api/auth/admin/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: loginEmail, password: loginPassword }),
+        body: JSON.stringify({ email: loginEmail }),
         credentials: 'include',
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || data.message || 'Login failed');
+        throw new Error(data.error || data.message || 'Failed to send code');
+      }
+
+      setLoginSuccess('Verification code sent to your email');
+      setLoginStep('verify');
+    } catch (err) {
+      setLoginError(err instanceof Error ? err.message : 'Failed to send verification code');
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError('');
+    setLoginSuccess('');
+    setLoginLoading(true);
+
+    try {
+      const response = await fetch('/api/auth/admin/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: loginEmail, code: loginOtp }),
+        credentials: 'include',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || data.message || 'Verification failed');
       }
 
       setUser(data.user);
@@ -433,7 +465,34 @@ export default function SimpleAdmin() {
       loadSystemHealth();
       toast({ title: 'Login successful', description: 'Welcome to the admin portal' });
     } catch (err) {
-      setLoginError(err instanceof Error ? err.message : 'Login failed');
+      setLoginError(err instanceof Error ? err.message : 'Verification failed');
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setLoginError('');
+    setLoginSuccess('');
+    setLoginLoading(true);
+
+    try {
+      const response = await fetch('/api/auth/admin/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: loginEmail }),
+        credentials: 'include',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to resend code');
+      }
+
+      setLoginSuccess('New verification code sent');
+    } catch (err) {
+      setLoginError(err instanceof Error ? err.message : 'Failed to resend code');
     } finally {
       setLoginLoading(false);
     }
@@ -686,63 +745,123 @@ export default function SimpleAdmin() {
               </div>
             </div>
             <h1 className="text-3xl font-bold text-white mb-2">Forensic Command Center</h1>
-            <p className="text-slate-400">Enter your administrator credentials</p>
+            <p className="text-slate-400">Secure OTP login for administrators</p>
           </div>
 
           <Card className="border-slate-700 bg-slate-800/50">
             <CardHeader>
-              <CardTitle className="text-white">Admin Sign In</CardTitle>
+              <CardTitle className="text-white">
+                {loginStep === 'email' ? 'Admin Sign In' : 'Verify Your Identity'}
+              </CardTitle>
               <CardDescription className="text-slate-400">
-                Protected access for COS verification admins
+                {loginStep === 'email' 
+                  ? 'Enter your admin email to receive a verification code'
+                  : `Enter the 6-digit code sent to ${loginEmail}`
+                }
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleLogin} className="space-y-4">
-                {loginError && (
-                  <Alert variant="destructive" className="bg-red-500/10 border-red-500/50">
-                    <AlertDescription>{loginError}</AlertDescription>
-                  </Alert>
-                )}
+              {loginStep === 'email' ? (
+                <form onSubmit={handleSendOtp} className="space-y-4">
+                  {loginError && (
+                    <Alert variant="destructive" className="bg-red-500/10 border-red-500/50">
+                      <AlertDescription>{loginError}</AlertDescription>
+                    </Alert>
+                  )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-slate-200">Email</Label>
-                  <Input
-                    id="email"
-                    type="text"
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    placeholder="admin@example.com"
-                    required
-                    className="bg-slate-700/50 border-slate-600 text-white"
-                    data-testid="input-admin-email"
-                  />
-                </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="text-slate-200">Admin Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={loginEmail}
+                      onChange={(e) => setLoginEmail(e.target.value)}
+                      placeholder="Enter admin email address"
+                      required
+                      className="bg-slate-700/50 border-slate-600 text-white"
+                      data-testid="input-admin-email"
+                      autoComplete="email"
+                    />
+                  </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="password" className="text-slate-200">Password</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="Enter password"
-                    required
-                    className="bg-slate-700/50 border-slate-600 text-white"
-                    data-testid="input-admin-password"
-                  />
-                </div>
+                  <Button
+                    type="submit"
+                    disabled={loginLoading}
+                    className="w-full bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700"
+                    data-testid="button-send-otp"
+                  >
+                    {loginLoading ? 'Sending...' : 'Send Verification Code'}
+                  </Button>
+                </form>
+              ) : (
+                <form onSubmit={handleVerifyOtp} className="space-y-4">
+                  {loginError && (
+                    <Alert variant="destructive" className="bg-red-500/10 border-red-500/50">
+                      <AlertDescription>{loginError}</AlertDescription>
+                    </Alert>
+                  )}
+                  
+                  {loginSuccess && (
+                    <Alert className="bg-green-500/10 border-green-500/50">
+                      <AlertDescription className="text-green-400">{loginSuccess}</AlertDescription>
+                    </Alert>
+                  )}
 
-                <Button
-                  type="submit"
-                  disabled={loginLoading}
-                  className="w-full bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700"
-                  data-testid="button-admin-login"
-                >
-                  {loginLoading ? 'Signing in...' : 'Sign In'}
-                </Button>
-              </form>
+                  <div className="space-y-2">
+                    <Label htmlFor="otp" className="text-slate-200">Verification Code</Label>
+                    <Input
+                      id="otp"
+                      type="text"
+                      value={loginOtp}
+                      onChange={(e) => setLoginOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      placeholder="Enter 6-digit code"
+                      required
+                      maxLength={6}
+                      className="bg-slate-700/50 border-slate-600 text-white text-center text-xl tracking-widest"
+                      data-testid="input-otp-code"
+                      autoComplete="one-time-code"
+                    />
+                  </div>
+
+                  <Button
+                    type="submit"
+                    disabled={loginLoading || loginOtp.length !== 6}
+                    className="w-full bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700"
+                    data-testid="button-verify-otp"
+                  >
+                    {loginLoading ? 'Verifying...' : 'Verify & Sign In'}
+                  </Button>
+
+                  <div className="flex items-center justify-between pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLoginStep('email');
+                        setLoginOtp('');
+                        setLoginError('');
+                        setLoginSuccess('');
+                      }}
+                      className="text-sm text-slate-400 hover:text-white transition-colors"
+                    >
+                      Change email
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleResendOtp}
+                      disabled={loginLoading}
+                      className="text-sm text-red-400 hover:text-red-300 transition-colors"
+                    >
+                      Resend code
+                    </button>
+                  </div>
+                </form>
+              )}
             </CardContent>
           </Card>
+          
+          <p className="text-center text-slate-500 text-sm mt-6">
+            Authorized personnel only. Unauthorized access is prohibited.
+          </p>
         </div>
       </div>
     );
