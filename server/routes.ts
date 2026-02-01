@@ -418,9 +418,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Verification not found" });
       }
 
-      // Fetch global AI rules and trusted patterns for knowledge context
+      // Fetch global AI rules, trusted patterns, and HITL knowledge for context
       const globalRules = await storage.getActiveGlobalAiRules();
       const trustedPatterns = await storage.getTrustedPatterns();
+      const hitlKnowledge = await storage.getAdminFakeKnowledge(15); // Last 15 admin-flagged fakes
       
       // Build knowledge context
       let knowledgeContext = '';
@@ -431,6 +432,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           knowledgeContext += `Rule #${idx + 1} [${rule.category}] (Priority: ${rule.priority}): ${rule.ruleText}\n`;
         });
         knowledgeContext += '</admin_global_rules>\n';
+      }
+      
+      // HITL Knowledge: Human expert feedback on previously flagged fakes
+      if (hitlKnowledge.length > 0) {
+        knowledgeContext += '\n<human_expert_corrections>\n';
+        knowledgeContext += 'CRITICAL: The following documents were marked as FAKE by human experts after the AI called them genuine or suspicious.\n';
+        knowledgeContext += 'Learn from these corrections and DO NOT repeat the same mistakes.\n\n';
+        hitlKnowledge.forEach((entry, idx) => {
+          const metadata = entry.metadata as any;
+          knowledgeContext += `[Case ${idx + 1}]\n`;
+          knowledgeContext += `  File: ${entry.filename}\n`;
+          knowledgeContext += `  Producer: ${metadata?.producer || 'Unknown'}\n`;
+          knowledgeContext += `  AI said: ${entry.result} (${entry.confidence}% confidence)\n`;
+          knowledgeContext += `  Human verdict: FAKE\n`;
+          knowledgeContext += `  Expert reasoning: ${entry.adminFeedback || 'No details'}\n\n`;
+        });
+        knowledgeContext += '</human_expert_corrections>\n';
       }
       
       // Find matching pattern instructions based on producer
@@ -462,8 +480,13 @@ Analyze documents based on metadata AND the specific forensic knowledge base pro
 
 ${knowledgeContext ? `<knowledge_base>\n${knowledgeContext}\n</knowledge_base>` : ''}
 
-IMPORTANT: When making your analysis, you MUST explicitly state if you are following any specific Admin Rules from the knowledge base. 
-For example: "Per Admin Rule #3 regarding Sunday modifications, this document is flagged as suspicious."`;
+CRITICAL INSTRUCTIONS:
+1. Your previous outputs have been OVERCONFIDENT. You must now PRIORITIZE 'Forensic Metadata' over visual appearance.
+2. When making your analysis, you MUST explicitly state if you are following any specific Admin Rules or Human Expert Corrections from the knowledge base.
+3. If human experts have previously flagged similar patterns as FAKE, lower your confidence and flag the document accordingly.
+4. For example: "Per Admin Rule #3 regarding Sunday modifications, this document is flagged as suspicious."
+5. Or: "Per Human Expert Correction Case #2, this producer pattern was previously identified as fake."
+6. Be conservative - it is better to flag a genuine document as suspicious than to miss a fake.`;
 
       const prompt = `Analyze the following verification result and provide expert insights.
 
