@@ -8,8 +8,9 @@ Preferred communication style: Simple, everyday language.
 
 ## Admin Access
 - Admin portal accessible at `/admin`
-- Admin credentials controlled via environment variables: `ADMIN_EMAIL` and `ADMIN_PASSWORD`
-- When credentials match env vars, user is automatically granted admin role
+- Admin login via email OTP only (no password)
+- OTP sent via Resend to the configured `ADMIN_EMAIL`
+- Only the email matching `ADMIN_EMAIL` can receive admin OTP codes
 - Default admin: ptel437@gmail.com
 
 ## System Architecture
