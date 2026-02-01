@@ -43,6 +43,8 @@ export const users = pgTable("users", {
   stripeSubscriptionId: varchar("stripe_subscription_id"),
   dailyVerificationsUsed: integer("daily_verifications_used").default(0),
   lastVerificationDate: varchar("last_verification_date"), // YYYY-MM-DD format
+  verificationLimit: integer("verification_limit"), // null=default (1/day), -1=unlimited, positive=custom limit
+  totalVerificationsUsed: integer("total_verifications_used").default(0), // for tracking custom limits
   isRestricted: boolean("is_restricted").default(false),
   restrictionReason: text("restriction_reason"),
   createdAt: timestamp("created_at").defaultNow(),
