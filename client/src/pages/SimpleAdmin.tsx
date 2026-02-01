@@ -631,7 +631,7 @@ export default function SimpleAdmin() {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('/api/verify', {
+      const response = await fetch('/api/admin/extract-metadata', {
         method: 'POST',
         body: formData,
         credentials: 'include',
@@ -641,7 +641,7 @@ export default function SimpleAdmin() {
         const data = await response.json();
         setUploadPreview({
           file,
-          metadata: data.metadata || data.forensicAnalysis?.metadata || {},
+          metadata: data.metadata || {},
         });
         setAiInstructions('');
       } else {

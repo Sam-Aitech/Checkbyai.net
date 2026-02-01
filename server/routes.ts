@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import * as fs from "fs";
 import Stripe from "stripe";
 import { storage } from "./storage";
 import { db } from "./db";
@@ -369,6 +370,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting trusted pattern:", error);
       res.status(500).json({ message: "Failed to delete trusted pattern" });
+    }
+  });
+
+  // Admin-only metadata extraction (no rate limiting, no verification record)
+  app.post('/api/admin/extract-metadata', isAdmin, upload.single('file'), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: 'No file uploaded' });
+      }
+
+      const pdfAnalyzer = new PDFAnalyzer();
+      const metadata = await pdfAnalyzer.extractMetadata(req.file.path);
+
+      res.json({
+        metadata: {
+          producer: metadata.producer,
+          creator: metadata.creator,
+          created: metadata.creationDate,
+          modified: metadata.modificationDate,
+          fontCount: metadata.fontCount,
+          fonts: metadata.fonts,
+          pdfVersion: metadata.pdfVersion,
+          isEncrypted: metadata.isEncrypted,
+          hasDigitalSignature: metadata.hasDigitalSignature,
+        },
+        forensic: metadata.forensic,
+      });
+    } catch (error) {
+      console.error("Error extracting metadata:", error);
+      res.status(500).json({ message: "Failed to extract metadata" });
+    } finally {
+      // Clean up uploaded file
+      if (req.file?.path) {
+        try {
+          await fs.promises.unlink(req.file.path);
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+      }
     }
   });
 
