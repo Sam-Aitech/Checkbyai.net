@@ -65,16 +65,15 @@ export default function Home() {
             </div>
             
             <div className="flex items-center space-x-2 sm:space-x-4">
-              <Link href="/dashboard">
-                <Button 
-                  variant="default" 
-                  size="sm"
-                  className="text-xs sm:text-sm px-3 sm:px-4 py-2"
-                >
-                  <span className="hidden sm:inline">Verify Document</span>
-                  <span className="sm:hidden">Verify</span>
-                </Button>
-              </Link>
+              <Button 
+                variant="default" 
+                size="sm"
+                className="text-xs sm:text-sm px-3 sm:px-4 py-2"
+                onClick={() => setShowVerificationModal(true)}
+              >
+                <span className="hidden sm:inline">Verify Document</span>
+                <span className="sm:hidden">Verify</span>
+              </Button>
               
               <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
                 <Database className="w-4 h-4" />
