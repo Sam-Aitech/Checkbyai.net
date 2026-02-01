@@ -17,8 +17,8 @@ import bcrypt from "bcrypt";
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
 }
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2025-08-27.basil",
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: "2025-11-17.clover" as any,
 });
 
 // Configure multer for file uploads
@@ -326,23 +326,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (session.payment_status === 'paid') {
         const packageType = session.metadata?.packageType;
-        const userId = session.metadata?.userId;
+        const sessionUserId = session.metadata?.userId;
         
-        if (userId === req.user.id) {
+        if (sessionUserId && sessionUserId === req.user.id) {
           if (packageType === 'starter') {
-            await storage.addCredits(userId, 50);
+            await storage.addCredits(sessionUserId, 50);
           } else if (packageType === 'pro') {
-            await storage.addCredits(userId, 100);
+            await storage.addCredits(sessionUserId, 100);
           } else if (packageType === 'unlimited') {
-            await storage.updateUserSubscription(userId, {
+            await storage.updateUserSubscription(sessionUserId, {
               subscriptionStatus: 'pro',
               stripeSubscriptionId: session.subscription as string,
               stripeCustomerId: session.customer as string,
             });
           }
           
-          const credits = await storage.getCredits(userId);
-          const user = await storage.getUser(userId);
+          const credits = await storage.getCredits(sessionUserId);
+          const user = await storage.getUser(sessionUserId);
           
           res.json({ 
             success: true, 
@@ -389,17 +389,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Authenticated users: check user-based limits
         userId = req.user.id;
         if (userId) {
-          const canVerify = await storage.checkDailyLimit(userId);
+          const user = await storage.getUser(userId);
           
-          if (!canVerify) {
-            return res.status(429).json({ 
-              message: 'Daily verification limit reached. Upgrade to Pro for unlimited verifications.',
-              upgradeRequired: true 
-            });
+          if (!user) {
+            return res.status(404).json({ message: 'User not found' });
           }
           
-          // Update usage count for authenticated users
-          await storage.updateDailyVerificationUsage(userId);
+          // Priority 1: Unlimited subscription (pro status or verificationLimit -1)
+          const hasUnlimited = user.subscriptionStatus === 'pro' || user.verificationLimit === -1;
+          
+          if (!hasUnlimited) {
+            // Priority 2: Check purchased credits
+            const credits = user.credits || 0;
+            
+            if (credits > 0) {
+              // Deduct one credit
+              await storage.deductCredits(userId, 1);
+            } else {
+              // Priority 3: Check daily free limit
+              const canVerify = await storage.checkDailyLimit(userId);
+              
+              if (!canVerify) {
+                return res.status(429).json({ 
+                  message: 'Daily verification limit reached. Purchase credits or upgrade for unlimited verifications.',
+                  upgradeRequired: true,
+                  credits: 0
+                });
+              }
+              
+              // Update daily usage count for free tier users
+              await storage.updateDailyVerificationUsage(userId);
+            }
+          }
         }
       } else {
         // Anonymous users: check IP-based rate limit (7 days)
