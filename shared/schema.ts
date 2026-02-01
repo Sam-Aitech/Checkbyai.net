@@ -41,6 +41,7 @@ export const users = pgTable("users", {
   subscriptionStatus: varchar("subscription_status").default("free"), // 'free', 'pro'
   stripeCustomerId: varchar("stripe_customer_id"),
   stripeSubscriptionId: varchar("stripe_subscription_id"),
+  credits: integer("credits").default(0), // Purchased verification credits
   dailyVerificationsUsed: integer("daily_verifications_used").default(0),
   lastVerificationDate: varchar("last_verification_date"), // YYYY-MM-DD format
   verificationLimit: integer("verification_limit"), // null=default (1/day), -1=unlimited, positive=custom limit
@@ -171,6 +172,23 @@ export const paidSubmissions = pgTable("paid_submissions", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Expert requests table for Master Package orders
+export const expertRequests = pgTable("expert_requests", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  fileUrl: varchar("file_url").notNull(),
+  filename: varchar("filename"),
+  status: varchar("status").default("pending"), // 'pending', 'in_progress', 'completed'
+  expertComments: text("expert_comments"),
+  expertVerdict: varchar("expert_verdict"), // 'genuine', 'suspicious', 'fake'
+  stripeSessionId: varchar("stripe_session_id"),
+  priority: boolean("priority").default(true), // Master package gets priority
+  deadline: timestamp("deadline"), // 24 hour SLA
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Type exports
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -180,6 +198,7 @@ export type GlobalAiRule = typeof globalAiRules.$inferSelect;
 export type VerificationResult = typeof verificationResults.$inferSelect;
 export type Feedback = typeof feedback.$inferSelect;
 export type PaidSubmission = typeof paidSubmissions.$inferSelect;
+export type ExpertRequest = typeof expertRequests.$inferSelect;
 
 // Zod schemas
 export const insertUserSchema = createInsertSchema(users);
@@ -208,3 +227,9 @@ export type InsertGlobalAiRule = z.infer<typeof insertGlobalAiRuleSchema>;
 export type InsertVerificationResult = z.infer<typeof insertVerificationResultSchema>;
 export type InsertFeedback = z.infer<typeof insertFeedbackSchema>;
 export type InsertPaidSubmission = z.infer<typeof insertPaidSubmissionSchema>;
+export const insertExpertRequestSchema = createInsertSchema(expertRequests).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+export type InsertExpertRequest = z.infer<typeof insertExpertRequestSchema>;
