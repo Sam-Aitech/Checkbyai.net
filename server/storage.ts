@@ -35,7 +35,12 @@ export interface IStorage {
   updateUserPassword(userId: string, hashedPassword: string): Promise<void>;
   verifyUser(identifier: string): Promise<User | undefined>;
   updateUserStripeInfo(userId: string, customerId: string, subscriptionId?: string): Promise<User>;
-  updateUserSubscription(userId: string, status: 'free' | 'pro'): Promise<User>;
+  updateUserSubscription(userId: string, data: { subscriptionStatus: string; stripeSubscriptionId?: string | null; stripeCustomerId?: string }): Promise<User>;
+  updateUserStripeCustomer(userId: string, customerId: string): Promise<User>;
+  getUserByStripeCustomerId(customerId: string): Promise<User | undefined>;
+  addCredits(userId: string, amount: number): Promise<User>;
+  deductCredits(userId: string, amount: number): Promise<User>;
+  getCredits(userId: string): Promise<number>;
   updateDailyVerificationUsage(userId: string): Promise<User>;
   checkDailyLimit(userId: string): Promise<boolean>;
   updateUserVerificationLimit(userId: string, limit: number | null): Promise<User | undefined>;
@@ -234,16 +239,69 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async updateUserSubscription(userId: string, status: 'free' | 'pro'): Promise<User> {
+  async updateUserSubscription(userId: string, data: { subscriptionStatus: string; stripeSubscriptionId?: string | null; stripeCustomerId?: string }): Promise<User> {
+    const updateData: any = {
+      subscriptionStatus: data.subscriptionStatus,
+      updatedAt: new Date(),
+    };
+    if (data.stripeSubscriptionId !== undefined) {
+      updateData.stripeSubscriptionId = data.stripeSubscriptionId;
+    }
+    if (data.stripeCustomerId) {
+      updateData.stripeCustomerId = data.stripeCustomerId;
+    }
+    const [user] = await db
+      .update(users)
+      .set(updateData)
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
+  }
+
+  async updateUserStripeCustomer(userId: string, customerId: string): Promise<User> {
     const [user] = await db
       .update(users)
       .set({
-        subscriptionStatus: status,
+        stripeCustomerId: customerId,
         updatedAt: new Date(),
       })
       .where(eq(users.id, userId))
       .returning();
     return user;
+  }
+
+  async getUserByStripeCustomerId(customerId: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.stripeCustomerId, customerId));
+    return user;
+  }
+
+  async addCredits(userId: string, amount: number): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({
+        credits: sql`COALESCE(${users.credits}, 0) + ${amount}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
+  }
+
+  async deductCredits(userId: string, amount: number): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({
+        credits: sql`GREATEST(COALESCE(${users.credits}, 0) - ${amount}, 0)`,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
+  }
+
+  async getCredits(userId: string): Promise<number> {
+    const user = await this.getUser(userId);
+    return user?.credits || 0;
   }
 
   async updateDailyVerificationUsage(userId: string): Promise<User> {

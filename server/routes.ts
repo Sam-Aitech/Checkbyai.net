@@ -198,6 +198,182 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ received: true });
   });
 
+  // Get available credit packages/products
+  app.get('/api/packages', async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT 
+          p.id as product_id,
+          p.name as product_name,
+          p.description as product_description,
+          p.metadata as product_metadata,
+          pr.id as price_id,
+          pr.unit_amount,
+          pr.currency,
+          pr.recurring,
+          pr.metadata as price_metadata
+        FROM stripe.products p
+        LEFT JOIN stripe.prices pr ON pr.product = p.id AND pr.active = true
+        WHERE p.active = true
+        ORDER BY pr.unit_amount ASC
+      `);
+      
+      const productsMap = new Map();
+      for (const row of result.rows as any[]) {
+        if (!productsMap.has(row.product_id)) {
+          productsMap.set(row.product_id, {
+            id: row.product_id,
+            name: row.product_name,
+            description: row.product_description,
+            metadata: row.product_metadata,
+            prices: []
+          });
+        }
+        if (row.price_id) {
+          productsMap.get(row.product_id).prices.push({
+            id: row.price_id,
+            unit_amount: row.unit_amount,
+            currency: row.currency,
+            recurring: row.recurring,
+            metadata: row.price_metadata,
+          });
+        }
+      }
+      
+      res.json({ packages: Array.from(productsMap.values()) });
+    } catch (error: any) {
+      console.error('Error fetching packages:', error);
+      res.status(500).json({ message: 'Failed to fetch packages' });
+    }
+  });
+
+  // Create checkout session for credit packages
+  app.post('/api/checkout/credits', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { priceId, packageType } = req.body;
+      
+      if (!priceId || !packageType) {
+        return res.status(400).json({ message: 'Missing priceId or packageType' });
+      }
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      
+      if (!user.email) {
+        return res.status(400).json({ message: 'Email required for checkout' });
+      }
+      
+      let customerId = user.stripeCustomerId;
+      if (!customerId) {
+        const customer = await stripe.customers.create({
+          email: user.email,
+          name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || undefined,
+          metadata: { userId },
+        });
+        await storage.updateUserStripeCustomer(userId, customer.id);
+        customerId = customer.id;
+      }
+      
+      const isSubscription = packageType === 'unlimited';
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      
+      const session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        payment_method_types: ['card'],
+        line_items: [{ price: priceId, quantity: 1 }],
+        mode: isSubscription ? 'subscription' : 'payment',
+        success_url: `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${baseUrl}/pricing`,
+        metadata: {
+          userId,
+          packageType,
+        },
+      });
+      
+      res.json({ url: session.url, sessionId: session.id });
+    } catch (error: any) {
+      console.error('Checkout error:', error);
+      res.status(500).json({ message: error.message || 'Failed to create checkout session' });
+    }
+  });
+
+  // Get user's current credits
+  app.get('/api/credits', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const credits = await storage.getCredits(userId);
+      const user = await storage.getUser(userId);
+      
+      res.json({ 
+        credits, 
+        subscriptionStatus: user?.subscriptionStatus || 'free',
+        isUnlimited: user?.subscriptionStatus === 'pro' || user?.verificationLimit === -1
+      });
+    } catch (error: any) {
+      console.error('Error fetching credits:', error);
+      res.status(500).json({ message: 'Failed to fetch credits' });
+    }
+  });
+
+  // Verify checkout session completion
+  app.get('/api/checkout/verify/:sessionId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { sessionId } = req.params;
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      
+      if (session.payment_status === 'paid') {
+        const packageType = session.metadata?.packageType;
+        const userId = session.metadata?.userId;
+        
+        if (userId === req.user.id) {
+          if (packageType === 'starter') {
+            await storage.addCredits(userId, 50);
+          } else if (packageType === 'pro') {
+            await storage.addCredits(userId, 100);
+          } else if (packageType === 'unlimited') {
+            await storage.updateUserSubscription(userId, {
+              subscriptionStatus: 'pro',
+              stripeSubscriptionId: session.subscription as string,
+              stripeCustomerId: session.customer as string,
+            });
+          }
+          
+          const credits = await storage.getCredits(userId);
+          const user = await storage.getUser(userId);
+          
+          res.json({ 
+            success: true, 
+            packageType,
+            credits,
+            subscriptionStatus: user?.subscriptionStatus 
+          });
+        } else {
+          res.status(403).json({ message: 'Session does not belong to this user' });
+        }
+      } else {
+        res.json({ success: false, status: session.payment_status });
+      }
+    } catch (error: any) {
+      console.error('Verify checkout error:', error);
+      res.status(500).json({ message: 'Failed to verify checkout' });
+    }
+  });
+
+  // Stripe publishable key endpoint
+  app.get('/api/stripe/publishable-key', async (req, res) => {
+    try {
+      const { getStripePublishableKey } = await import('./stripeClient');
+      const key = await getStripePublishableKey();
+      res.json({ publishableKey: key });
+    } catch (error: any) {
+      console.error('Error getting publishable key:', error);
+      res.status(500).json({ message: 'Failed to get Stripe key' });
+    }
+  });
+
   // Document verification route (supports both authenticated and anonymous users)
   app.post('/api/verify', upload.single('file'), async (req: any, res) => {
     try {
