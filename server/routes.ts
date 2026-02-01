@@ -687,6 +687,33 @@ Format your response in clear, professional markdown.`;
     }
   });
 
+  // Set user verification limit (admin only)
+  app.patch('/api/admin/users/:id/limit', isAdmin, async (req: any, res) => {
+    try {
+      const userId = req.params.id;
+      const { limit } = req.body; // null=default, -1=unlimited, positive=custom limit
+      
+      const updatedUser = await storage.updateUserVerificationLimit(userId, limit);
+      
+      if (!updatedUser) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      
+      let limitDescription = 'Default (1/day)';
+      if (limit === -1) limitDescription = 'Unlimited';
+      else if (limit !== null && limit > 0) limitDescription = `${limit} verifications`;
+      
+      res.json({ 
+        message: `Verification limit set to: ${limitDescription}`,
+        userId,
+        verificationLimit: limit
+      });
+    } catch (error) {
+      console.error("Error updating user verification limit:", error);
+      res.status(500).json({ message: "Failed to update verification limit" });
+    }
+  });
+
   // Export verification as PDF report
   app.get('/api/admin/export-report/:id', isAdmin, async (req: any, res) => {
     try {

@@ -38,6 +38,7 @@ export interface IStorage {
   updateUserSubscription(userId: string, status: 'free' | 'pro'): Promise<User>;
   updateDailyVerificationUsage(userId: string): Promise<User>;
   checkDailyLimit(userId: string): Promise<boolean>;
+  updateUserVerificationLimit(userId: string, limit: number | null): Promise<User | undefined>;
   
   // IP verification operations (for anonymous users)
   getIpVerification(hashedIp: string): Promise<IpVerification | undefined>;
@@ -274,6 +275,15 @@ export class DatabaseStorage implements IStorage {
     // Pro users have unlimited access
     if (user.subscriptionStatus === 'pro') return true;
     
+    // Admin-assigned unlimited access (verificationLimit = -1)
+    if (user.verificationLimit === -1) return true;
+    
+    // Admin-assigned custom limit (total verifications)
+    if (user.verificationLimit !== null && user.verificationLimit > 0) {
+      return (user.totalVerificationsUsed || 0) < user.verificationLimit;
+    }
+    
+    // Default: 1 verification per day for free users
     const today = new Date().toISOString().split('T')[0];
     
     // If last verification was not today, they can verify
@@ -281,6 +291,19 @@ export class DatabaseStorage implements IStorage {
     
     // Free users get 1 verification per day
     return (user.dailyVerificationsUsed || 0) < 1;
+  }
+
+  async updateUserVerificationLimit(userId: string, limit: number | null): Promise<User | undefined> {
+    const [updatedUser] = await db
+      .update(users)
+      .set({
+        verificationLimit: limit,
+        totalVerificationsUsed: 0, // Reset usage when limit changes
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return updatedUser;
   }
 
   // IP verification operations (for anonymous users)

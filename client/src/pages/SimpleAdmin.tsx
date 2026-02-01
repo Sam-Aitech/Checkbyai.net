@@ -1361,6 +1361,7 @@ export default function SimpleAdmin() {
                             <th className="text-left py-3 px-4 text-slate-400 font-medium">Email</th>
                             <th className="text-left py-3 px-4 text-slate-400 font-medium">Role</th>
                             <th className="text-left py-3 px-4 text-slate-400 font-medium">Status</th>
+                            <th className="text-left py-3 px-4 text-slate-400 font-medium">Limit</th>
                             <th className="text-left py-3 px-4 text-slate-400 font-medium">Joined</th>
                             <th className="text-right py-3 px-4 text-slate-400 font-medium">Actions</th>
                           </tr>
@@ -1384,6 +1385,35 @@ export default function SimpleAdmin() {
                                 ) : (
                                   <Badge className="bg-blue-500/20 text-blue-400">Free</Badge>
                                 )}
+                              </td>
+                              <td className="py-3 px-4">
+                                <select
+                                  className="bg-slate-700 border border-slate-600 text-white text-sm rounded px-2 py-1"
+                                  value={u.verificationLimit === null ? 'default' : u.verificationLimit === -1 ? 'unlimited' : String(u.verificationLimit)}
+                                  onChange={async (e) => {
+                                    const val = e.target.value;
+                                    const limit = val === 'default' ? null : val === 'unlimited' ? -1 : parseInt(val);
+                                    try {
+                                      await fetch(`/api/admin/users/${u.id}/limit`, {
+                                        method: 'PATCH',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ limit }),
+                                        credentials: 'include'
+                                      });
+                                      toast({ title: 'Limit updated', description: val === 'unlimited' ? 'User has unlimited verifications' : val === 'default' ? 'User has default limit (1/day)' : `User has ${val} verifications` });
+                                      loadUsers();
+                                    } catch {
+                                      toast({ title: 'Failed to update limit', variant: 'destructive' });
+                                    }
+                                  }}
+                                >
+                                  <option value="default">Default (1/day)</option>
+                                  <option value="unlimited">Unlimited</option>
+                                  <option value="10">10 total</option>
+                                  <option value="25">25 total</option>
+                                  <option value="50">50 total</option>
+                                  <option value="100">100 total</option>
+                                </select>
                               </td>
                               <td className="py-3 px-4 text-slate-400 text-sm">
                                 {new Date(u.createdAt).toLocaleDateString()}
