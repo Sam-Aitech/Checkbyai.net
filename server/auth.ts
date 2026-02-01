@@ -40,7 +40,7 @@ export function generateOTP(): string {
   return crypto.randomInt(100000, 999999).toString();
 }
 
-// Send OTP via Brevo email
+// Send OTP via Brevo email (for regular users)
 export async function sendEmailOTP(email: string, code: string): Promise<boolean> {
   try {
     if (!process.env.BREVO_API_KEY) {
@@ -84,6 +84,59 @@ export async function sendEmailOTP(email: string, code: string): Promise<boolean
     return true;
   } catch (error) {
     console.error("Error sending email OTP:", error);
+    return false;
+  }
+}
+
+// Send Admin OTP via Resend email
+export async function sendAdminOTPViaResend(email: string, code: string): Promise<boolean> {
+  try {
+    if (!process.env.RESEND_API_KEY) {
+      console.error("RESEND_API_KEY not configured");
+      return false;
+    }
+
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: "Check By AI <noreply@checkbyai.net>",
+        to: [email],
+        subject: "Admin Login - Your Verification Code",
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background: linear-gradient(135deg, #003366 0%, #0066cc 100%); padding: 30px; border-radius: 10px 10px 0 0;">
+              <h1 style="color: #ffffff; margin: 0; text-align: center;">Admin Login</h1>
+            </div>
+            <div style="background: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
+              <p style="color: #333; font-size: 16px;">Your admin verification code is:</p>
+              <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 25px; text-align: center; font-size: 36px; font-weight: bold; letter-spacing: 10px; margin: 20px 0; border-radius: 8px; color: #003366; border: 2px dashed #003366;">
+                ${code}
+              </div>
+              <p style="color: #666; font-size: 14px;">This code will expire in <strong>10 minutes</strong>.</p>
+              <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
+              <p style="color: #999; font-size: 12px; text-align: center;">
+                If you didn't request this code, please ignore this email.<br>
+                This is an automated message from Check By AI Admin Portal.
+              </p>
+            </div>
+          </div>
+        `,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error("Resend API error:", error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Error sending admin OTP via Resend:", error);
     return false;
   }
 }
@@ -259,94 +312,103 @@ export async function setupAuth(app: Express) {
     }
   });
 
-  // Admin login with username/password (accepts email or username)
-  app.post("/api/auth/admin-login", async (req, res) => {
+  // Admin OTP: Send verification code via Resend
+  app.post("/api/auth/admin/send-otp", async (req, res) => {
     try {
-      const { username, password } = req.body;
+      const { email } = req.body;
       
-      if (!username || !password) {
-        return res.status(400).json({ error: "Username and password required" });
+      if (!email || !email.includes("@")) {
+        return res.status(400).json({ error: "Valid email required" });
       }
 
-      // Check against ADMIN_EMAIL and ADMIN_PASSWORD environment variables first
+      // Check if email matches ADMIN_EMAIL
       const envAdminEmail = process.env.ADMIN_EMAIL;
-      const envAdminPassword = process.env.ADMIN_PASSWORD;
       
-      if (envAdminEmail && envAdminPassword) {
-        // Direct match against env vars - force admin access
-        if ((username === envAdminEmail || username === 'admin') && password === envAdminPassword) {
-          // Get or create admin user
-          let adminUser = await storage.getUserByEmail(envAdminEmail);
-          
-          if (!adminUser) {
-            // Create admin user on-the-fly
-            const hashedPassword = await bcrypt.hash(envAdminPassword, 10);
-            adminUser = await storage.upsertUser({
-              id: "admin_env_" + crypto.randomUUID().slice(0, 8),
-              username: envAdminEmail,
-              email: envAdminEmail,
-              hashedPassword,
-              authProvider: "admin",
-              role: "admin",
-              isVerified: true,
-            });
-          } else if (adminUser.role !== 'admin') {
-            // Force admin role if credentials match env vars
-            adminUser = await storage.upsertUser({
-              ...adminUser,
-              role: "admin",
-            });
-          }
-          
-          const sessionUser = {
-            id: adminUser.id,
-            email: adminUser.email,
-            username: adminUser.username || adminUser.email,
-            firstName: adminUser.firstName,
-            lastName: adminUser.lastName,
-            role: 'admin',
-            authProvider: 'admin',
-          };
-
-          return req.login(sessionUser, (err) => {
-            if (err) {
-              return res.status(500).json({ error: "Failed to create session" });
-            }
-            res.json({ message: "Login successful", user: sessionUser });
-          });
-        }
+      if (!envAdminEmail || email.toLowerCase() !== envAdminEmail.toLowerCase()) {
+        return res.status(403).json({ error: "This email is not authorized for admin access" });
       }
 
-      // Fallback: Get user by username or email from database
-      let user = await storage.getUserByUsername(username);
+      // Generate OTP and set expiry (10 minutes)
+      const code = generateOTP();
+      const expiry = new Date(Date.now() + 10 * 60 * 1000);
+
+      // Get or create admin user
+      let adminUser = await storage.getUserByEmail(email);
+      
+      if (!adminUser) {
+        adminUser = await storage.upsertUser({
+          id: "admin_" + crypto.randomUUID().slice(0, 8),
+          email: email,
+          authProvider: "admin",
+          role: "admin",
+          isVerified: true,
+        });
+      }
+
+      // Store OTP code
+      await storage.updateUserVerificationCode(email, code, expiry);
+
+      // Send email via Resend
+      const sent = await sendAdminOTPViaResend(email, code);
+      
+      if (!sent) {
+        return res.status(500).json({ error: "Failed to send verification email. Please check Resend API configuration." });
+      }
+
+      res.json({ message: "Verification code sent to your email" });
+    } catch (error) {
+      console.error("Error sending admin OTP:", error);
+      res.status(500).json({ error: "Failed to send verification code" });
+    }
+  });
+
+  // Admin OTP: Verify code and login
+  app.post("/api/auth/admin/verify-otp", async (req, res) => {
+    try {
+      const { email, code } = req.body;
+      
+      if (!email || !code) {
+        return res.status(400).json({ error: "Email and code required" });
+      }
+
+      // Check if email matches ADMIN_EMAIL
+      const envAdminEmail = process.env.ADMIN_EMAIL;
+      
+      if (!envAdminEmail || email.toLowerCase() !== envAdminEmail.toLowerCase()) {
+        return res.status(403).json({ error: "This email is not authorized for admin access" });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      
       if (!user) {
-        user = await storage.getUserByEmail(username);
-      }
-      
-      if (!user || !user.hashedPassword) {
-        return res.status(401).json({ error: "Invalid credentials" });
+        return res.status(404).json({ error: "User not found" });
       }
 
-      // Verify admin role
-      if (user.role !== 'admin') {
-        return res.status(403).json({ error: "Admin access required" });
+      // Check code and expiry
+      if (user.verificationCode !== code) {
+        return res.status(400).json({ error: "Invalid verification code" });
       }
 
-      // Verify password
-      const isPasswordValid = await bcrypt.compare(password, user.hashedPassword);
-      
-      if (!isPasswordValid) {
-        return res.status(401).json({ error: "Invalid credentials" });
+      if (!user.codeExpiry || new Date() > user.codeExpiry) {
+        return res.status(400).json({ error: "Verification code expired" });
       }
+
+      // Clear verification code and ensure admin role
+      const updatedUser = await storage.upsertUser({
+        ...user,
+        role: "admin",
+        verificationCode: null,
+        codeExpiry: null,
+      });
 
       // Create session
       const sessionUser = {
-        id: user.id,
-        email: user.email,
-        username: user.username,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
+        id: updatedUser.id,
+        email: updatedUser.email,
+        username: updatedUser.username || updatedUser.email,
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        role: 'admin',
         authProvider: 'admin',
       };
 
@@ -357,8 +419,8 @@ export async function setupAuth(app: Express) {
         res.json({ message: "Login successful", user: sessionUser });
       });
     } catch (error) {
-      console.error("Error in admin login:", error);
-      res.status(500).json({ error: "Login failed" });
+      console.error("Error verifying admin OTP:", error);
+      res.status(500).json({ error: "Failed to verify code" });
     }
   });
 
