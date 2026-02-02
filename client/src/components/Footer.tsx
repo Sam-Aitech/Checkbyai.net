@@ -46,12 +46,12 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <a href="/cos-check-ai.html" className="text-blue-100 hover:text-white transition-colors font-medium">
+                <a href="/ai-guide" className="text-blue-100 hover:text-white transition-colors font-medium">
                   How It Works
                 </a>
               </li>
               <li>
-                <a href="/about.html" className="text-blue-100 hover:text-white transition-colors font-medium">
+                <a href="/cos-guide" className="text-blue-100 hover:text-white transition-colors font-medium">
                   About
                 </a>
               </li>
@@ -63,23 +63,23 @@ export default function Footer() {
             <h4 className="text-lg font-semibold mb-6 text-white">Resources</h4>
             <ul className="space-y-3">
               <li>
-                <a href="/guides/how-to-check-cos-genuine.html" className="text-blue-100 hover:text-white transition-colors font-medium">
+                <a href="/cos-guide" className="text-blue-100 hover:text-white transition-colors font-medium">
                   Verification Guide
                 </a>
               </li>
               <li>
-                <a href="/guides/cos-scams-red-flags.html" className="text-blue-100 hover:text-white transition-colors font-medium">
-                  Scam Red Flags
+                <a href="/ai-guide" className="text-blue-100 hover:text-white transition-colors font-medium">
+                  AI Technology
                 </a>
               </li>
               <li>
-                <a href="/privacy.html" className="text-blue-100 hover:text-white transition-colors font-medium">
-                  Privacy Policy
+                <a href="/pricing" className="text-blue-100 hover:text-white transition-colors font-medium">
+                  Pricing
                 </a>
               </li>
               <li>
-                <a href="/data-security.html" className="text-blue-100 hover:text-white transition-colors font-medium">
-                  Data Security
+                <a href="/dashboard" className="text-blue-100 hover:text-white transition-colors font-medium">
+                  Get Started
                 </a>
               </li>
             </ul>

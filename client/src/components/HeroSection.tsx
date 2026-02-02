@@ -238,7 +238,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
               Why UK Visa Applicants Trust Check By AI
             </h2>
             <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-              The UK's most trusted <a href="/cos-guide.html" className="text-blue-600 hover:text-blue-700 underline">Certificate of Sponsorship verification platform</a> for Skilled Worker visas. Our AI verifies your CoS meets <a href="/dashboard" className="text-blue-600 hover:text-blue-700 underline">Home Office standards</a> before you apply.
+              The UK's most trusted <a href="/cos-guide" className="text-blue-600 hover:text-blue-700 underline">Certificate of Sponsorship verification platform</a> for Skilled Worker visas. Our AI verifies your CoS meets <a href="/dashboard" className="text-blue-600 hover:text-blue-700 underline">Home Office standards</a> before you apply.
             </p>
           </div>
           
@@ -246,7 +246,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
             <FeatureCard
               icon={<Shield className="w-8 h-8 text-blue-600" />}
               title="UK Home Office Compliance"
-              description="Our AI analyzes your Certificate of Sponsorship against official UK Home Office document patterns. <a href='/cos-check-ai.html' class='text-blue-600 hover:text-blue-700 underline'>Detect fake CoS documents</a> before submitting your Skilled Worker visa application."
+              description="Our AI analyzes your Certificate of Sponsorship against official UK Home Office document patterns. <a href='/ai-guide' class='text-blue-600 hover:text-blue-700 underline'>Detect fake CoS documents</a> before submitting your Skilled Worker visa application."
               delay={0}
             />
             
@@ -260,7 +260,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
             <FeatureCard
               icon={<Lock className="w-8 h-8 text-red-600" />}
               title="UK Data Protection Standards"
-              description="Your <a href='/cos-guide.html' class='text-blue-600 hover:text-blue-700 underline'>Certificate of Sponsorship</a> is processed securely with UK data protection compliance. Documents are deleted immediately after verification - no storage, no exposure."
+              description="Your <a href='/cos-guide' class='text-blue-600 hover:text-blue-700 underline'>Certificate of Sponsorship</a> is processed securely with UK data protection compliance. Documents are deleted immediately after verification - no storage, no exposure."
               delay={400}
             />
           </div>
@@ -296,7 +296,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
               UK CoS Verification Resources
             </h2>
             <p className="text-lg text-gray-600 dark:text-gray-300">
-              Explore our <a href="/cos-check-ai.html" className="text-blue-600 hover:text-blue-700 underline">UK visa verification tools</a> and <a href="/cos-guide.html" className="text-blue-600 hover:text-blue-700 underline">Home Office compliance guides</a> for Certificate of Sponsorship
+              Explore our <a href="/ai-guide" className="text-blue-600 hover:text-blue-700 underline">UK visa verification tools</a> and <a href="/cos-guide" className="text-blue-600 hover:text-blue-700 underline">Home Office compliance guides</a> for Certificate of Sponsorship
             </p>
           </div>
           <NavigationLinks className="max-w-4xl mx-auto" />
