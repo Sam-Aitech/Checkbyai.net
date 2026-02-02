@@ -1,11 +1,13 @@
 import { useState, useEffect, Suspense, lazy } from 'react'
 import { useSpring, animated } from '@react-spring/web'
 import { useInView } from 'react-intersection-observer'
-import { Shield, Zap, Lock, Award, ArrowRight, Play, User } from 'lucide-react'
+import { Shield, Zap, Lock, Award, ArrowRight, Play, User, CreditCard } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Link } from 'wouter'
 import GoogleLoginButton from '@/components/GoogleLoginButton'
 import NavigationLinks from '@/components/NavigationLinks'
+import CreditCounter from '@/components/CreditCounter'
 import Footer from '@/components/Footer'
 
 // Lazy load the 3D scene for better performance with fallback
@@ -184,6 +186,19 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                   <Play className="mr-2 w-5 h-5" />
                   Watch Demo
                 </Button>
+
+                <CreditCounter />
+
+                <Link href="/pricing">
+                  <Button 
+                    variant="outline" 
+                    size="lg"
+                    className="border-2 border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-600 dark:text-blue-400 dark:hover:bg-blue-900/30 px-6 py-3 rounded-lg font-semibold transition-all duration-300"
+                  >
+                    <CreditCard className="mr-2 w-5 h-5" />
+                    Get Credits
+                  </Button>
+                </Link>
 
                 <Dialog>
                   <DialogTrigger asChild>

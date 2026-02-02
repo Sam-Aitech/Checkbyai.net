@@ -11,6 +11,7 @@ const LoginPage = lazy(() => import("@/pages/login"));
 const SimpleAdmin = lazy(() => import("@/pages/SimpleAdmin"));
 const DashboardPage = lazy(() => import("@/pages/dashboard"));
 const Pricing = lazy(() => import("@/pages/Pricing"));
+const CheckoutSuccess = lazy(() => import("@/pages/CheckoutSuccess"));
 const Submit = lazy(() => import("@/pages/Submit"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
@@ -34,6 +35,7 @@ function Router() {
         <Route path="/login" component={LoginPage} />
         <Route path="/admin" component={SimpleAdmin} />
         <Route path="/pricing" component={Pricing} />
+        <Route path="/checkout/success" component={CheckoutSuccess} />
         <Route path="/submit" component={Submit} />
         <Route component={NotFound} />
       </Switch>

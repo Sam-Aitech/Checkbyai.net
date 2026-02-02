@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
-import { Check, Shield, Zap, Phone, Building2, FileSearch, Clock, Star, ArrowLeft, LogIn } from 'lucide-react';
+import { Check, X, Shield, Zap, Clock, Star, ArrowLeft, LogIn, CreditCard, Infinity, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,62 +14,104 @@ interface User {
   id: string;
   email: string;
   role: string;
-}
-
-interface PlanFeature {
-  text: string;
-  included: boolean;
-  highlight?: boolean;
+  credits?: number;
+  subscriptionStatus?: string;
 }
 
 interface PricingPlan {
   name: string;
   price: string;
   priceValue: number;
+  period?: string;
   description: string;
-  features: PlanFeature[];
+  features: string[];
+  notIncluded?: string[];
   popular?: boolean;
-  packageType: 'normal' | 'full';
+  packageType: 'starter' | 'pro' | 'unlimited' | 'master';
+  credits?: number;
+  icon: typeof CreditCard;
+  gradient: string;
 }
 
 const plans: PricingPlan[] = [
   {
-    name: 'Normal Verification',
-    price: '£19.99',
-    priceValue: 1999,
-    description: 'Comprehensive AI + expert verification of your Certificate of Sponsorship',
-    packageType: 'normal',
+    name: 'Starter Package',
+    price: '£24.99',
+    priceValue: 2499,
+    description: '50 verification credits for occasional use',
+    packageType: 'starter',
+    credits: 50,
+    icon: CreditCard,
+    gradient: 'from-emerald-500 to-teal-600',
     features: [
-      { text: 'Deep AI document analysis', included: true },
-      { text: 'Manual expert verification', included: true },
-      { text: 'Detailed questionnaire review', included: true },
-      { text: 'CoS document upload & analysis', included: true },
-      { text: 'Guaranteed written report', included: true },
-      { text: 'Email delivery within 48 hours', included: true },
-      { text: 'Priority review', included: false },
-      { text: 'Phone consultation', included: false },
-      { text: 'Employer sponsor licence check', included: false },
-      { text: 'Detailed alteration analysis', included: false },
+      '50 verification credits',
+      'AI-powered document analysis',
+      'Forensic metadata extraction',
+      'Instant results',
+      'Credits never expire',
+    ],
+    notIncluded: [
+      'Priority support',
+      'Expert human review',
     ],
   },
   {
-    name: 'Full Package',
-    price: '£49.99',
-    priceValue: 4999,
-    description: 'Complete verification with priority handling and employer verification',
-    packageType: 'full',
+    name: 'Pro Package',
+    price: '£39.99',
+    priceValue: 3999,
+    description: '100 verification credits - best value',
+    packageType: 'pro',
+    credits: 100,
     popular: true,
+    icon: Zap,
+    gradient: 'from-blue-500 to-indigo-600',
     features: [
-      { text: 'Deep AI document analysis', included: true },
-      { text: 'Manual expert verification', included: true },
-      { text: 'Detailed questionnaire review', included: true },
-      { text: 'CoS document upload & analysis', included: true },
-      { text: 'Guaranteed written report', included: true },
-      { text: 'Priority review - faster turnaround', included: true, highlight: true },
-      { text: 'Phone consultation available', included: true, highlight: true },
-      { text: 'Employer sponsor licence verification', included: true, highlight: true },
-      { text: 'Detailed alteration analysis', included: true, highlight: true },
-      { text: 'Recommendations & next steps', included: true, highlight: true },
+      '100 verification credits',
+      'AI-powered document analysis',
+      'Forensic metadata extraction',
+      'Instant results',
+      'Credits never expire',
+      '20% savings vs Starter',
+    ],
+    notIncluded: [
+      'Expert human review',
+    ],
+  },
+  {
+    name: 'Unlimited Monthly',
+    price: '£99.99',
+    priceValue: 9999,
+    period: '/month',
+    description: 'Unlimited verifications for businesses',
+    packageType: 'unlimited',
+    icon: Infinity,
+    gradient: 'from-purple-500 to-violet-600',
+    features: [
+      'Unlimited verifications',
+      'AI-powered document analysis',
+      'Forensic metadata extraction',
+      'Instant results',
+      'Priority support',
+      'Perfect for high volume',
+      'Cancel anytime',
+    ],
+  },
+  {
+    name: 'Master Package',
+    price: '£99.99',
+    priceValue: 9999,
+    description: 'Priority expert human review with 24-hour SLA',
+    packageType: 'master',
+    icon: UserCheck,
+    gradient: 'from-amber-500 to-orange-600',
+    features: [
+      'Expert human review',
+      '24-hour turnaround guarantee',
+      'Detailed analysis report',
+      'Document authenticity assessment',
+      'Employer verification check',
+      'Recommendations & next steps',
+      'Email report delivery',
     ],
   },
 ];
@@ -82,6 +124,17 @@ export default function Pricing() {
   const { data: user, isLoading: isLoadingUser } = useQuery<User | null>({
     queryKey: ['/api/auth/user'],
     queryFn: getQueryFn({ on401: 'returnNull' }),
+    retry: false,
+  });
+
+  const { data: creditsData } = useQuery<{ credits: number; subscriptionStatus: string; isUnlimited: boolean }>({
+    queryKey: ['/api/credits'],
+    queryFn: getQueryFn({ on401: 'returnNull' }),
+    enabled: !!user,
+  });
+
+  const { data: packagesData } = useQuery<{ packages: any[] }>({
+    queryKey: ['/api/packages'],
     retry: false,
   });
 
@@ -99,17 +152,26 @@ export default function Pricing() {
 
     setLoading(plan.packageType);
     try {
-      const response = await apiRequest('POST', '/api/paid/create-checkout', {
+      const packages = packagesData?.packages || [];
+      const stripeProduct = packages.find((p: any) => 
+        p.metadata?.packageType === plan.packageType
+      );
+      
+      const priceId = stripeProduct?.prices?.[0]?.id;
+      
+      if (!priceId) {
+        throw new Error('Package not available. Please try again later.');
+      }
+
+      const response = await apiRequest('POST', '/api/checkout/credits', {
+        priceId,
         packageType: plan.packageType,
-        priceAmount: plan.priceValue,
       });
 
       const data = await response.json();
 
       if (data.url) {
         window.location.href = data.url;
-      } else if (data.sessionId) {
-        setLocation(`/submit?session_id=${data.sessionId}`);
       }
     } catch (error: any) {
       toast({
@@ -125,8 +187,8 @@ export default function Pricing() {
   return (
     <>
       <SEOHead
-        title="Expert COS Verification Pricing | UK Immigration Document Check"
-        description="Choose your Certificate of Sponsorship verification package. From £19.99 for AI + expert analysis, or £49.99 for full verification including employer sponsor licence checks."
+        title="Pricing - CoS Verification Credits | UK Immigration Document Check"
+        description="Purchase verification credits for your Certificate of Sponsorship documents. From £24.99 for 50 credits, unlimited plans for businesses, and expert human review packages."
       />
       
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
@@ -135,7 +197,6 @@ export default function Pricing() {
             variant="ghost"
             onClick={() => setLocation('/')}
             className="mb-8 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
-            data-testid="button-back-home"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Home
@@ -143,118 +204,118 @@ export default function Pricing() {
 
           <div className="text-center mb-12">
             <Badge className="mb-4 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-              Expert Verification
+              Verification Credits
             </Badge>
             <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
-              Professional CoS Verification
+              Choose Your Plan
             </h1>
             <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-              Get peace of mind with our expert verification service. Our specialists manually review your Certificate of Sponsorship alongside advanced AI analysis.
+              Purchase verification credits or subscribe for unlimited access. Credits never expire and can be used anytime.
             </p>
             
             {!isLoadingUser && !isLoggedIn && (
               <div className="mt-6 inline-flex items-center gap-2 bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 px-4 py-2 rounded-lg">
                 <LogIn className="w-4 h-4" />
-                <span>Please <button onClick={() => setLocation('/login')} className="underline font-semibold hover:no-underline" data-testid="link-login-prompt">log in</button> to purchase a verification package</span>
+                <span>Please <button onClick={() => setLocation('/login')} className="underline font-semibold hover:no-underline">log in</button> to purchase credits</span>
               </div>
             )}
             
-            {!isLoadingUser && isLoggedIn && user?.email && (
-              <div className="mt-6 inline-flex items-center gap-2 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 px-4 py-2 rounded-lg">
-                <Check className="w-4 h-4" />
-                <span>Logged in as <strong>{user.email}</strong></span>
+            {!isLoadingUser && isLoggedIn && (
+              <div className="mt-6 flex flex-wrap justify-center gap-4">
+                <div className="inline-flex items-center gap-2 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 px-4 py-2 rounded-lg">
+                  <Check className="w-4 h-4" />
+                  <span>Logged in as <strong>{user?.email}</strong></span>
+                </div>
+                {creditsData && (
+                  <div className="inline-flex items-center gap-2 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 px-4 py-2 rounded-lg">
+                    <CreditCard className="w-4 h-4" />
+                    <span>
+                      {creditsData.isUnlimited ? (
+                        <><Infinity className="w-4 h-4 inline" /> Unlimited verifications</>
+                      ) : (
+                        <><strong>{creditsData.credits}</strong> credits remaining</>
+                      )}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto mb-16">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto mb-16">
             {plans.map((plan) => (
               <Card
                 key={plan.packageType}
-                className={`relative overflow-hidden transition-all duration-300 hover:shadow-2xl ${
+                className={`relative overflow-hidden transition-all duration-300 hover:shadow-2xl flex flex-col ${
                   plan.popular
-                    ? 'border-2 border-blue-500 dark:border-blue-400 shadow-xl scale-105'
+                    ? 'border-2 border-blue-500 dark:border-blue-400 shadow-xl lg:scale-105 z-10'
                     : 'border border-gray-200 dark:border-gray-700 hover:border-blue-300'
                 }`}
-                data-testid={`card-plan-${plan.packageType}`}
               >
                 {plan.popular && (
-                  <div className="absolute top-0 right-0 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 py-1 text-sm font-semibold rounded-bl-lg">
-                    <Star className="w-4 h-4 inline mr-1" />
-                    Most Popular
+                  <div className="absolute top-0 right-0 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-3 py-1 text-xs font-semibold rounded-bl-lg">
+                    <Star className="w-3 h-3 inline mr-1" />
+                    Best Value
                   </div>
                 )}
                 
                 <CardHeader className="pb-4">
-                  <CardTitle className="text-2xl font-bold text-gray-900 dark:text-white">
+                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${plan.gradient} flex items-center justify-center mb-3`}>
+                    <plan.icon className="w-6 h-6 text-white" />
+                  </div>
+                  <CardTitle className="text-xl font-bold text-gray-900 dark:text-white">
                     {plan.name}
                   </CardTitle>
-                  <CardDescription className="text-gray-600 dark:text-gray-400">
+                  <CardDescription className="text-gray-600 dark:text-gray-400 text-sm">
                     {plan.description}
                   </CardDescription>
                 </CardHeader>
 
-                <CardContent className="pb-6">
+                <CardContent className="pb-6 flex-grow">
                   <div className="mb-6">
-                    <span className="text-5xl font-bold text-gray-900 dark:text-white">
+                    <span className="text-4xl font-bold text-gray-900 dark:text-white">
                       {plan.price}
                     </span>
-                    <span className="text-gray-500 dark:text-gray-400 ml-2">one-time</span>
+                    <span className="text-gray-500 dark:text-gray-400 text-sm">
+                      {plan.period || ' one-time'}
+                    </span>
                   </div>
 
-                  <ul className="space-y-3">
+                  <ul className="space-y-2">
                     {plan.features.map((feature, idx) => (
-                      <li
-                        key={idx}
-                        className={`flex items-start gap-3 ${
-                          feature.included
-                            ? feature.highlight
-                              ? 'text-blue-700 dark:text-blue-400 font-medium'
-                              : 'text-gray-700 dark:text-gray-300'
-                            : 'text-gray-400 dark:text-gray-500'
-                        }`}
-                      >
-                        <Check
-                          className={`w-5 h-5 mt-0.5 flex-shrink-0 ${
-                            feature.included
-                              ? feature.highlight
-                                ? 'text-blue-600 dark:text-blue-400'
-                                : 'text-green-600 dark:text-green-400'
-                              : 'text-gray-300 dark:text-gray-600'
-                          }`}
-                        />
-                        <span className={!feature.included ? 'line-through' : ''}>
-                          {feature.text}
-                        </span>
+                      <li key={idx} className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+                        <Check className="w-4 h-4 mt-0.5 flex-shrink-0 text-green-600 dark:text-green-400" />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                    {plan.notIncluded?.map((feature, idx) => (
+                      <li key={`not-${idx}`} className="flex items-start gap-2 text-sm text-gray-400 dark:text-gray-500">
+                        <X className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                        <span className="line-through">{feature}</span>
                       </li>
                     ))}
                   </ul>
                 </CardContent>
 
-                <CardFooter>
+                <CardFooter className="mt-auto">
                   <Button
-                    className={`w-full py-6 text-lg font-semibold ${
-                      plan.popular
-                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'
-                        : ''
-                    }`}
+                    className={`w-full py-5 font-semibold bg-gradient-to-r ${plan.gradient} hover:opacity-90 text-white`}
                     size="lg"
                     onClick={() => handleSelectPlan(plan)}
                     disabled={loading !== null}
-                    data-testid={`button-select-${plan.packageType}`}
                   >
                     {loading === plan.packageType ? (
                       <span className="flex items-center gap-2">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                         Processing...
                       </span>
                     ) : !isLoggedIn ? (
                       <span className="flex items-center gap-2">
-                        <LogIn className="w-5 h-5" />
-                        Login to Select
+                        <LogIn className="w-4 h-4" />
+                        Login to Purchase
                       </span>
                     ) : (
-                      `Select ${plan.name}`
+                      `Get ${plan.name}`
                     )}
                   </Button>
                 </CardFooter>
@@ -264,7 +325,7 @@ export default function Pricing() {
 
           <div className="max-w-4xl mx-auto">
             <h2 className="text-2xl font-bold text-center text-gray-900 dark:text-white mb-8">
-              What's Included in Every Package
+              Why Choose Our Verification Service?
             </h2>
             
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -274,17 +335,17 @@ export default function Pricing() {
                 </div>
                 <h3 className="font-semibold text-gray-900 dark:text-white mb-2">AI Analysis</h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Advanced document authenticity detection
+                  Advanced forensic document analysis
                 </p>
               </div>
 
               <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md text-center">
                 <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <FileSearch className="w-6 h-6 text-green-600 dark:text-green-400" />
+                  <Zap className="w-6 h-6 text-green-600 dark:text-green-400" />
                 </div>
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Expert Review</h3>
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Instant Results</h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Manual verification by specialists
+                  Get verification in seconds
                 </p>
               </div>
 
@@ -292,52 +353,20 @@ export default function Pricing() {
                 <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Clock className="w-6 h-6 text-purple-600 dark:text-purple-400" />
                 </div>
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Fast Turnaround</h3>
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Never Expire</h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Results within 24-48 hours
+                  Credits stay valid forever
                 </p>
               </div>
 
               <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md text-center">
                 <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Zap className="w-6 h-6 text-orange-600 dark:text-orange-400" />
+                  <UserCheck className="w-6 h-6 text-orange-600 dark:text-orange-400" />
                 </div>
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Written Report</h3>
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Expert Review</h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Detailed findings delivered to you
+                  Human experts for complex cases
                 </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-16 bg-white dark:bg-gray-800 rounded-2xl p-8 max-w-3xl mx-auto shadow-lg">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4 text-center">
-              Full Package Exclusive Features
-            </h2>
-            
-            <div className="grid md:grid-cols-2 gap-6">
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Phone className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 dark:text-white">Phone Consultation</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Speak directly with our verification experts to discuss your case
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Building2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 dark:text-white">Employer Verification</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    We check the employer's sponsor licence status with UK authorities
-                  </p>
-                </div>
               </div>
             </div>
           </div>
