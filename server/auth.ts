@@ -146,6 +146,111 @@ export async function sendAdminOTPViaResend(email: string, code: string): Promis
   }
 }
 
+export async function sendMasterPackageNotification(userEmail: string, userId: string): Promise<boolean> {
+  try {
+    if (!process.env.RESEND_API_KEY) {
+      console.error("RESEND_API_KEY not configured");
+      return false;
+    }
+
+    const adminEmail = process.env.ADMIN_EMAIL || "admin@checkbyai.net";
+
+    const adminResponse = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: "Check By AI <noreply@checkbyai.net>",
+        to: [adminEmail],
+        subject: "New Master Package Purchase - Expert Review Required",
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); padding: 30px; border-radius: 10px 10px 0 0;">
+              <h1 style="color: #ffffff; margin: 0; text-align: center;">New Expert Review Request</h1>
+            </div>
+            <div style="background: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
+              <p style="color: #333333; font-size: 16px; line-height: 1.6;">
+                A new Master Package has been purchased requiring expert document review.
+              </p>
+              <div style="background: #f8f4ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <p style="margin: 5px 0;"><strong>Customer Email:</strong> ${userEmail}</p>
+                <p style="margin: 5px 0;"><strong>User ID:</strong> ${userId}</p>
+                <p style="margin: 5px 0;"><strong>SLA:</strong> 24-hour response required</p>
+              </div>
+              <p style="color: #666666; font-size: 14px;">
+                Please log in to the admin portal to review pending expert requests.
+              </p>
+              <div style="text-align: center; margin-top: 25px;">
+                <a href="https://checkbyai.net/admin" style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+                  Go to Admin Portal
+                </a>
+              </div>
+            </div>
+          </div>
+        `,
+      }),
+    });
+
+    if (!adminResponse.ok) {
+      console.error("Failed to send admin notification:", await adminResponse.text());
+    }
+
+    const userResponse = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: "Check By AI <noreply@checkbyai.net>",
+        to: [userEmail],
+        subject: "Master Package Purchase Confirmed - Expert Review",
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); padding: 30px; border-radius: 10px 10px 0 0;">
+              <h1 style="color: #ffffff; margin: 0; text-align: center;">Master Package Confirmed</h1>
+            </div>
+            <div style="background: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
+              <p style="color: #333333; font-size: 16px; line-height: 1.6;">
+                Thank you for purchasing our Master Package with priority expert review!
+              </p>
+              <div style="background: #f8f4ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <h3 style="color: #7c3aed; margin-top: 0;">What's Next?</h3>
+                <ul style="color: #333333; padding-left: 20px;">
+                  <li>Upload your document in the dashboard</li>
+                  <li>Our expert team will review it within 24 hours</li>
+                  <li>You'll receive a detailed analysis report via email</li>
+                </ul>
+              </div>
+              <p style="color: #666666; font-size: 14px;">
+                If you have any questions, please contact our support team.
+              </p>
+              <div style="text-align: center; margin-top: 25px;">
+                <a href="https://checkbyai.net/dashboard" style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+                  Upload Your Document
+                </a>
+              </div>
+            </div>
+          </div>
+        `,
+      }),
+    });
+
+    if (!userResponse.ok) {
+      console.error("Failed to send user confirmation:", await userResponse.text());
+      return false;
+    }
+
+    console.log(`Master Package notification emails sent for user ${userId}`);
+    return true;
+  } catch (error) {
+    console.error("Error sending Master Package notifications:", error);
+    return false;
+  }
+}
+
 export async function setupAuth(app: Express) {
   app.set("trust proxy", 1);
   app.use(getSession());

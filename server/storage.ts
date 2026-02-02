@@ -6,6 +6,7 @@ import {
   verificationResults,
   feedback,
   paidSubmissions,
+  expertRequests,
   type User,
   type UpsertUser,
   type IpVerification,
@@ -18,6 +19,7 @@ import {
   type InsertFeedback,
   type PaidSubmission,
   type InsertPaidSubmission,
+  type ExpertRequest,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, gte, count, avg, sql } from "drizzle-orm";
@@ -44,6 +46,9 @@ export interface IStorage {
   updateDailyVerificationUsage(userId: string): Promise<User>;
   checkDailyLimit(userId: string): Promise<boolean>;
   updateUserVerificationLimit(userId: string, limit: number | null): Promise<User | undefined>;
+  
+  // Expert requests operations
+  createExpertRequest(userId: string, stripeSessionId?: string): Promise<number>;
   
   // IP verification operations (for anonymous users)
   getIpVerification(hashedIp: string): Promise<IpVerification | undefined>;
@@ -362,6 +367,25 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId))
       .returning();
     return updatedUser;
+  }
+
+  // Expert requests operations
+  async createExpertRequest(userId: string, stripeSessionId?: string): Promise<number> {
+    const deadline = new Date();
+    deadline.setHours(deadline.getHours() + 24); // 24-hour SLA
+    
+    const [request] = await db
+      .insert(expertRequests)
+      .values({
+        userId,
+        fileUrl: '', // Will be updated when user uploads document
+        status: 'pending',
+        priority: true,
+        stripeSessionId: stripeSessionId || null,
+        deadline,
+      })
+      .returning();
+    return request.id;
   }
 
   // IP verification operations (for anonymous users)

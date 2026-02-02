@@ -1,5 +1,6 @@
 import { getStripeSync, getUncachableStripeClient } from './stripeClient';
 import { storage } from './storage';
+import { sendMasterPackageNotification } from './auth';
 
 export class WebhookHandlers {
   static async processWebhook(payload: Buffer, signature: string): Promise<void> {
@@ -51,6 +52,11 @@ export class WebhookHandlers {
         break;
       case 'master':
         console.log(`Master package purchased by user ${userId} - creating expert request`);
+        const requestId = await storage.createExpertRequest(userId, session.id);
+        console.log(`Created expert request #${requestId} for user ${userId}`);
+        if (user.email) {
+          await sendMasterPackageNotification(user.email, userId);
+        }
         break;
     }
 
