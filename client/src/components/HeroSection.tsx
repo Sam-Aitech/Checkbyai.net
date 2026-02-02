@@ -200,34 +200,6 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                   </Button>
                 </Link>
 
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button 
-                      variant="outline" 
-                      size="lg"
-                      className="border-2 border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800 px-8 py-3 rounded-lg font-semibold transition-all duration-300"
-                    >
-                      <User className="mr-2 w-5 h-5" />
-                      Sign In
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>Sign in to your account</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 pt-4">
-                      <GoogleLoginButton size="lg" className="w-full" />
-                      <Button
-                        variant="outline"
-                        size="lg"
-                        className="w-full"
-                        onClick={() => window.location.href = "/api/login"}
-                      >
-                        Continue with Replit
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
               </div>
               
 
