@@ -1,7 +1,51 @@
 import { Link } from "wouter";
-import { Shield, Brain, Zap, Lock, CheckCircle, ArrowLeft, FileSearch, AlertTriangle, Award } from "lucide-react";
+import { Shield, Brain, Zap, Lock, CheckCircle, ArrowLeft, FileSearch, AlertTriangle, Award, MessageCircle, Briefcase, Users, PoundSterling, CreditCard, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
+interface RedFlagCardProps {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  severity: "critical" | "high";
+}
+
+function RedFlagCard({ icon, title, description, severity }: RedFlagCardProps) {
+  return (
+    <div className={`relative overflow-hidden rounded-xl border-2 ${
+      severity === "critical" 
+        ? "border-red-500 bg-red-50 dark:bg-red-950/30" 
+        : "border-orange-500 bg-orange-50 dark:bg-orange-950/30"
+    } p-5 transition-all hover:shadow-lg`}>
+      <div className="absolute top-0 right-0 w-20 h-20 opacity-10">
+        <XCircle className="w-full h-full text-red-500" />
+      </div>
+      <div className="flex items-start gap-4">
+        <div className={`p-3 rounded-full ${
+          severity === "critical" 
+            ? "bg-red-500 text-white" 
+            : "bg-orange-500 text-white"
+        }`}>
+          {icon}
+        </div>
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-2">
+            <h3 className="font-bold text-gray-900 dark:text-white">{title}</h3>
+            <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${
+              severity === "critical" 
+                ? "bg-red-500 text-white" 
+                : "bg-orange-500 text-white"
+            }`}>
+              {severity === "critical" ? "HIGH RISK" : "WARNING"}
+            </span>
+          </div>
+          <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed">{description}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function AIGuide() {
   return (
@@ -17,13 +61,91 @@ export default function AIGuide() {
         <div className="text-center mb-12">
           <div className="inline-flex items-center px-4 py-2 bg-blue-100 dark:bg-blue-900 rounded-full text-blue-800 dark:text-blue-200 text-sm font-medium mb-4">
             <Brain className="w-4 h-4 mr-2" />
-            AI-Powered Technology
+            AI-Powered Protection
           </div>
           <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
-            How Our AI Verification Works
+            Protect Yourself from CoS Fraud
           </h1>
           <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-            Advanced machine learning technology to detect fake or edited UK Certificate of Sponsorship documents
+            Learn how to identify warning signs before uploading your Certificate of Sponsorship for verification
+          </p>
+        </div>
+
+        {/* PRE-CHECK RED FLAGS SECTION */}
+        <div className="mb-12">
+          <Alert className="mb-6 border-red-500 bg-red-100 dark:bg-red-950/50">
+            <AlertTriangle className="h-5 w-5 text-red-600" />
+            <AlertTitle className="text-red-800 dark:text-red-200 font-bold text-lg">
+              Before You Verify - Check These Red Flags First
+            </AlertTitle>
+            <AlertDescription className="text-red-700 dark:text-red-300 mt-2">
+              If you notice ANY of the following warning signs, your CoS may be fraudulent. 
+              Do NOT proceed with your visa application until you have verified the authenticity of your documents.
+            </AlertDescription>
+          </Alert>
+
+          <div className="grid gap-4 mb-6">
+            <RedFlagCard
+              icon={<MessageCircle className="w-5 h-5" />}
+              title="Received CoS Documents via WhatsApp"
+              description="Legitimate UK sponsors send official documents through secure email or employer portals. If your Certificate of Sponsorship arrived via WhatsApp, Telegram, or other messaging apps, this is a major warning sign. Official sponsors never share sensitive immigration documents through social media or messaging platforms."
+              severity="critical"
+            />
+            
+            <RedFlagCard
+              icon={<Briefcase className="w-5 h-5" />}
+              title="Unsolicited Offer Letter from Unknown Company"
+              description="If you received a job offer and CoS from a company you never applied to or interviewed with, be extremely cautious. Fraudsters often pose as legitimate UK employers to scam visa applicants. Always verify the company exists on the official Home Office register of licensed sponsors."
+              severity="critical"
+            />
+            
+            <RedFlagCard
+              icon={<Users className="w-5 h-5" />}
+              title="No Proper Interview Process"
+              description="Genuine UK employers conduct thorough interviews before sponsoring a worker. If you were offered a Skilled Worker visa without any interview, or only had a brief informal chat, this is highly suspicious. Real sponsorship requires proper recruitment processes."
+              severity="high"
+            />
+            
+            <RedFlagCard
+              icon={<PoundSterling className="w-5 h-5" />}
+              title="Company Asking You for Money"
+              description="UK employers should NEVER ask applicants to pay for their own sponsorship. If the company is requesting payment for the CoS, sponsor licence fees, or 'processing fees', this is fraud. Legitimate sponsors cover these costs as part of the employment process."
+              severity="critical"
+            />
+            
+            <RedFlagCard
+              icon={<CreditCard className="w-5 h-5" />}
+              title="Asked to Pay Immigration Skills Charge (ISC)"
+              description="The Immigration Skills Charge is paid by the sponsor, NOT the worker. If anyone asks you to pay the ISC (which can be thousands of pounds), you are likely dealing with scammers. This charge is legally the employer's responsibility and cannot be passed to the employee."
+              severity="critical"
+            />
+          </div>
+
+          <div className="bg-amber-100 dark:bg-amber-950/50 border-2 border-amber-500 rounded-xl p-6 text-center">
+            <AlertTriangle className="w-12 h-12 text-amber-600 mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-amber-800 dark:text-amber-200 mb-2">
+              Spotted a Red Flag?
+            </h3>
+            <p className="text-amber-700 dark:text-amber-300 mb-4 max-w-xl mx-auto">
+              If any of the above applies to your situation, do NOT proceed with your visa application. 
+              Upload your document for verification, or seek advice from a registered immigration adviser before taking any action.
+            </p>
+            <Link href="/dashboard">
+              <Button className="bg-amber-600 hover:bg-amber-700 text-white">
+                <Shield className="w-4 h-4 mr-2" />
+                Verify Your Document Now
+              </Button>
+            </Link>
+          </div>
+        </div>
+
+        {/* HOW OUR AI WORKS - Generalized to prevent pattern copying */}
+        <div className="text-center mb-8">
+          <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            How Our AI Protects You
+          </h2>
+          <p className="text-gray-600 dark:text-gray-300">
+            Our proprietary verification technology analyses documents using methods developed with UK immigration experts
           </p>
         </div>
 
@@ -32,29 +154,29 @@ export default function AIGuide() {
             <CardHeader>
               <CardTitle className="flex items-center gap-3">
                 <FileSearch className="w-6 h-6 text-blue-600" />
-                Document Forensic Analysis
+                Advanced Document Analysis
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-gray-600 dark:text-gray-300">
-                Our AI performs deep forensic analysis on every uploaded document, examining:
+                Our AI examines your document using proprietary methods to determine authenticity:
               </p>
               <ul className="space-y-2">
                 <li className="flex items-start gap-2">
                   <CheckCircle className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span><strong>PDF Metadata:</strong> Producer software, creation dates, modification history</span>
+                  <span>Compares against verified genuine document patterns</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <CheckCircle className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span><strong>XMP History:</strong> Tracks every edit made to the document</span>
+                  <span>Identifies inconsistencies that indicate tampering</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <CheckCircle className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span><strong>Font Analysis:</strong> Detects inconsistent or embedded fonts</span>
+                  <span>Analyses document structure and formatting</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <CheckCircle className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span><strong>Digital Signatures:</strong> Verifies document authenticity</span>
+                  <span>Cross-references with known fraud indicators</span>
                 </li>
               </ul>
             </CardContent>
@@ -64,29 +186,29 @@ export default function AIGuide() {
             <CardHeader>
               <CardTitle className="flex items-center gap-3">
                 <AlertTriangle className="w-6 h-6 text-orange-600" />
-                Editing Software Detection
+                Fraud Detection Capabilities
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-gray-600 dark:text-gray-300">
-                We immediately flag documents that show signs of manipulation using:
+                Our system is trained to detect various types of document fraud:
               </p>
               <ul className="space-y-2">
                 <li className="flex items-start gap-2">
                   <span className="w-2 h-2 bg-red-500 rounded-full mt-2 flex-shrink-0"></span>
-                  <span>Adobe Photoshop, Illustrator, or InDesign</span>
+                  <span>Documents that have been digitally altered or edited</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="w-2 h-2 bg-red-500 rounded-full mt-2 flex-shrink-0"></span>
-                  <span>GIMP, Inkscape, or other image editors</span>
+                  <span>Fake CoS documents created from scratch</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="w-2 h-2 bg-red-500 rounded-full mt-2 flex-shrink-0"></span>
-                  <span>Online PDF editors like Canva or Smallpdf</span>
+                  <span>Documents with modified personal or employer details</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="w-2 h-2 bg-red-500 rounded-full mt-2 flex-shrink-0"></span>
-                  <span>Any software not typically used by UK Home Office</span>
+                  <span>Inconsistencies that don't match official formats</span>
                 </li>
               </ul>
             </CardContent>
@@ -96,25 +218,25 @@ export default function AIGuide() {
             <CardHeader>
               <CardTitle className="flex items-center gap-3">
                 <Brain className="w-6 h-6 text-purple-600" />
-                Multi-AI Provider System
+                Continuous Learning System
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-gray-600 dark:text-gray-300">
-                Our verification uses multiple AI providers for maximum reliability:
+                Our AI continuously improves through expert feedback:
               </p>
               <div className="grid md:grid-cols-3 gap-4">
                 <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg text-center">
-                  <p className="font-semibold text-green-700 dark:text-green-400">OpenAI GPT-4</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Primary Analysis</p>
+                  <p className="font-semibold text-green-700 dark:text-green-400">Expert Review</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Human oversight</p>
                 </div>
                 <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-center">
-                  <p className="font-semibold text-blue-700 dark:text-blue-400">Claude</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Fallback Provider</p>
+                  <p className="font-semibold text-blue-700 dark:text-blue-400">Pattern Updates</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Regular improvements</p>
                 </div>
                 <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg text-center">
-                  <p className="font-semibold text-purple-700 dark:text-purple-400">DeepSeek</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Tertiary Backup</p>
+                  <p className="font-semibold text-purple-700 dark:text-purple-400">New Fraud Detection</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Emerging threats</p>
                 </div>
               </div>
             </CardContent>
