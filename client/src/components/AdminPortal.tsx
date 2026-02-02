@@ -290,7 +290,10 @@ export default function AdminPortal() {
           <span>Current Role: {user?.role || 'User'}</span>
         </div>
         <Button 
-          onClick={() => window.location.href = "/api/logout"}
+          onClick={async () => {
+            await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+            window.location.href = '/';
+          }}
           variant="outline"
         >
           Logout

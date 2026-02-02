@@ -25,9 +25,7 @@ export default function UserProfile() {
 
   const handleLogout = async () => {
     try {
-      await apiRequest("/api/auth/logout", {
-        method: "POST",
-      });
+      await apiRequest("POST", "/api/auth/logout");
       toast({
         title: "Logged out",
         description: "You have been successfully logged out.",

@@ -619,6 +619,7 @@ export default function SimpleAdmin() {
     setStats(null);
     setPatterns([]);
     setLogs(null);
+    window.location.href = '/';
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
