@@ -20,6 +20,8 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import PageLayout from "@/components/PageLayout";
+import SEOHead from "@/components/SEOHead";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 function CodeBlock({ children, language }: { children: string; language?: string }) {
@@ -215,16 +217,16 @@ export default function ApiDocs() {
   const [activeTab, setActiveTab] = useState<"javascript" | "python" | "curl">("javascript");
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-      <div className="max-w-4xl mx-auto px-4 py-12">
-        <Link href="/">
-          <Button variant="ghost" className="mb-6">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Home
-          </Button>
-        </Link>
-
-        <div className="text-center mb-12">
+    <PageLayout>
+      <SEOHead
+        title="API Documentation | B2B Integration | Check By AI"
+        description="Integrate CoS verification into your immigration consultancy or HR platform. RESTful API with real-time document analysis, webhooks, and enterprise features."
+        keywords="CoS verification API, document verification integration, immigration API, HR document check API, B2B verification service"
+        canonicalUrl="https://checkbyai.net/api-docs"
+      />
+      <div className="bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+        <div className="max-w-4xl mx-auto px-4 py-12">
+          <div className="text-center mb-12">
           <div className="inline-flex items-center px-4 py-2 bg-blue-100 dark:bg-blue-900 rounded-full text-blue-800 dark:text-blue-200 text-sm font-medium mb-4">
             <Code className="w-4 h-4 mr-2" />
             Developer API
@@ -606,15 +608,16 @@ export default function ApiDocs() {
           </Card>
         </div>
 
-        <div className="text-center">
-          <Link href="/dashboard">
-            <Button size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-              <Shield className="w-5 h-5 mr-2" />
-              Try Verification Now
-            </Button>
-          </Link>
+          <div className="text-center">
+            <Link href="/dashboard">
+              <Button size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                <Shield className="w-5 h-5 mr-2" />
+                Try Verification Now
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
-    </div>
+    </PageLayout>
   );
 }

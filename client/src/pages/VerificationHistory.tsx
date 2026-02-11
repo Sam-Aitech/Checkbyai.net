@@ -17,6 +17,8 @@ import {
   BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import PageLayout from "@/components/PageLayout";
+import SEOHead from "@/components/SEOHead";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -231,57 +233,73 @@ export default function VerificationHistory() {
 
   if (userLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-        <div className="max-w-4xl mx-auto px-4 py-12">
-          <Skeleton className="h-10 w-48 mb-6" />
-          <Skeleton className="h-8 w-64 mb-2" />
-          <Skeleton className="h-5 w-80 mb-8" />
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            {[...Array(4)].map((_, i) => (
-              <Skeleton key={i} className="h-24 rounded-xl" />
+      <PageLayout>
+        <SEOHead
+          title="Verification History | Your Audit Trail | Check By AI"
+          description="View your past Certificate of Sponsorship verifications. Access receipts, confidence scores, and forensic analysis details for every document you've checked."
+          keywords="verification history, CoS audit trail, document verification records, verification receipts"
+          canonicalUrl="https://checkbyai.net/history"
+        />
+        <div className="bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+          <div className="max-w-4xl mx-auto px-4 py-12">
+            <Skeleton className="h-10 w-48 mb-6" />
+            <Skeleton className="h-8 w-64 mb-2" />
+            <Skeleton className="h-5 w-80 mb-8" />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+              {[...Array(4)].map((_, i) => (
+                <Skeleton key={i} className="h-24 rounded-xl" />
+              ))}
+            </div>
+            {[...Array(3)].map((_, i) => (
+              <SkeletonCard key={i} />
             ))}
           </div>
-          {[...Array(3)].map((_, i) => (
-            <SkeletonCard key={i} />
-          ))}
         </div>
-      </div>
+      </PageLayout>
     );
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center">
-        <Card className="max-w-md mx-4 border border-gray-200 dark:border-gray-700">
-          <CardContent className="p-8 text-center">
-            <LogIn className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Login Required</h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
-              Please log in to view your verification history and audit trail.
-            </p>
-            <Link href="/login">
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-                <LogIn className="w-4 h-4 mr-2" />
-                Log In
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
+      <PageLayout>
+        <SEOHead
+          title="Verification History | Your Audit Trail | Check By AI"
+          description="View your past Certificate of Sponsorship verifications. Access receipts, confidence scores, and forensic analysis details for every document you've checked."
+          keywords="verification history, CoS audit trail, document verification records, verification receipts"
+          canonicalUrl="https://checkbyai.net/history"
+        />
+        <div className="bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center">
+          <Card className="max-w-md mx-4 border border-gray-200 dark:border-gray-700">
+            <CardContent className="p-8 text-center">
+              <LogIn className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Login Required</h2>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">
+                Please log in to view your verification history and audit trail.
+              </p>
+              <Link href="/login">
+                <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                  <LogIn className="w-4 h-4 mr-2" />
+                  Log In
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
+      </PageLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-      <div className="max-w-4xl mx-auto px-4 py-12">
-        <Link href="/">
-          <Button variant="ghost" className="mb-6">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Home
-          </Button>
-        </Link>
-
-        <div className="mb-8">
+    <PageLayout>
+      <SEOHead
+        title="Verification History | Your Audit Trail | Check By AI"
+        description="View your past Certificate of Sponsorship verifications. Access receipts, confidence scores, and forensic analysis details for every document you've checked."
+        keywords="verification history, CoS audit trail, document verification records, verification receipts"
+        canonicalUrl="https://checkbyai.net/history"
+      />
+      <div className="bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+        <div className="max-w-4xl mx-auto px-4 py-12">
+          <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
             <History className="w-8 h-8 text-blue-600 dark:text-blue-400" />
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Verification History</h1>
@@ -353,8 +371,9 @@ export default function VerificationHistory() {
               </Link>
             </CardContent>
           </Card>
-        )}
+          )}
+        </div>
       </div>
-    </div>
+    </PageLayout>
   );
 }

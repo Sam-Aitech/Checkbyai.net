@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
-import { Check, X, Shield, Zap, Clock, Star, ArrowLeft, LogIn, CreditCard, Infinity, UserCheck } from 'lucide-react';
+import { Check, X, Shield, Zap, Clock, Star, LogIn, CreditCard, Infinity, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, getQueryFn } from '@/lib/queryClient';
 import SEOHead from '@/components/SEOHead';
-import Footer from '@/components/Footer';
+import PageLayout from '@/components/PageLayout';
 
 interface User {
   id: string;
@@ -185,23 +185,100 @@ export default function Pricing() {
   };
 
   return (
-    <>
+    <PageLayout>
       <SEOHead
         title="Pricing - CoS Verification Credits | UK Immigration Document Check"
         description="Purchase verification credits for your Certificate of Sponsorship documents. From £24.99 for 50 credits, unlimited plans for businesses, and expert human review packages."
+        structuredData={{
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "BreadcrumbList",
+              "itemListElement": [
+                {
+                  "@type": "ListItem",
+                  "position": 1,
+                  "name": "Home",
+                  "item": "https://checkbyai.net"
+                },
+                {
+                  "@type": "ListItem",
+                  "position": 2,
+                  "name": "Pricing",
+                  "item": "https://checkbyai.net/pricing"
+                }
+              ]
+            },
+            {
+              "@type": "Product",
+              "name": "Starter Package",
+              "description": "50 verification credits for occasional use",
+              "brand": {
+                "@type": "Brand",
+                "name": "Check By AI"
+              },
+              "offers": {
+                "@type": "Offer",
+                "price": "24.99",
+                "priceCurrency": "GBP",
+                "availability": "https://schema.org/InStock",
+                "url": "https://checkbyai.net/pricing"
+              }
+            },
+            {
+              "@type": "Product",
+              "name": "Pro Package",
+              "description": "100 verification credits - best value",
+              "brand": {
+                "@type": "Brand",
+                "name": "Check By AI"
+              },
+              "offers": {
+                "@type": "Offer",
+                "price": "39.99",
+                "priceCurrency": "GBP",
+                "availability": "https://schema.org/InStock",
+                "url": "https://checkbyai.net/pricing"
+              }
+            },
+            {
+              "@type": "Product",
+              "name": "Unlimited Monthly",
+              "description": "Unlimited verifications for businesses",
+              "brand": {
+                "@type": "Brand",
+                "name": "Check By AI"
+              },
+              "offers": {
+                "@type": "Offer",
+                "price": "99.99",
+                "priceCurrency": "GBP",
+                "availability": "https://schema.org/InStock",
+                "url": "https://checkbyai.net/pricing"
+              }
+            },
+            {
+              "@type": "Product",
+              "name": "Master Package",
+              "description": "Priority expert human review with 24-hour SLA",
+              "brand": {
+                "@type": "Brand",
+                "name": "Check By AI"
+              },
+              "offers": {
+                "@type": "Offer",
+                "price": "99.99",
+                "priceCurrency": "GBP",
+                "availability": "https://schema.org/InStock",
+                "url": "https://checkbyai.net/pricing"
+              }
+            }
+          ]
+        }}
       />
       
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+      <div className="bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
         <div className="container mx-auto px-4 py-12">
-          <Button
-            variant="ghost"
-            onClick={() => setLocation('/')}
-            className="mb-8 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Home
-          </Button>
-
           <div className="text-center mb-12">
             <Badge className="mb-4 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
               Verification Credits
@@ -381,8 +458,7 @@ export default function Pricing() {
           </div>
         </div>
 
-        <Footer />
       </div>
-    </>
+    </PageLayout>
   );
 }

@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'wouter';
 import FileUploadSimple from './FileUploadSimple';
 import Enhanced3DDemo from './Enhanced3DDemo';
-import Footer from './Footer';
 
 interface VerificationResult {
   type: 'genuine' | 'suspicious' | 'fake';
@@ -88,9 +86,9 @@ export default function COSDashboard() {
   };
 
   return (
-    <div className="bg-gray-50 min-h-screen">
+    <div className="bg-gray-50 dark:bg-gray-900 min-h-screen">
       {/* Mobile-Optimized 3D Dashboard Header */}
-      <header className="relative bg-gradient-to-r from-blue-600 via-blue-700 to-purple-700 shadow-2xl sticky top-0 z-40 overflow-hidden">
+      <header className="relative bg-gradient-to-r from-blue-600 via-blue-700 to-purple-700 shadow-2xl overflow-hidden">
         {/* Animated Background Dots */}
         <div 
           className="absolute inset-0 opacity-20"
@@ -112,7 +110,7 @@ export default function COSDashboard() {
           {[...Array(20)].map((_, i) => (
             <div
               key={i}
-              className="floating-dot absolute w-2 h-2 bg-white rounded-full animate-pulse transition-transform duration-700 ease-out"
+              className="floating-dot absolute w-2 h-2 bg-white dark:bg-gray-800 rounded-full animate-pulse transition-transform duration-700 ease-out"
               style={{
                 left: `${Math.random() * 100}%`,
                 top: `${Math.random() * 100}%`,
@@ -125,7 +123,7 @@ export default function COSDashboard() {
         {/* 3D Geometric Shapes */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-4 left-1/4 w-8 h-8 border-2 border-white/20 rotate-45 animate-spin" style={{ animationDuration: '8s' }} />
-          <div className="absolute bottom-4 right-1/3 w-6 h-6 bg-white/10 rounded-full animate-bounce" style={{ animationDelay: '2s' }} />
+          <div className="absolute bottom-4 right-1/3 w-6 h-6 bg-white dark:bg-gray-800/10 rounded-full animate-bounce" style={{ animationDelay: '2s' }} />
           <div className="absolute top-1/2 right-1/4 w-10 h-10 border border-white/15 rounded-full animate-ping" style={{ animationDelay: '1s' }} />
         </div>
 
@@ -133,7 +131,7 @@ export default function COSDashboard() {
           <div className="flex justify-between items-center h-16 sm:h-20">
             <div className="flex items-center space-x-2 sm:space-x-4 group">
               <div className="relative">
-                <div className="absolute inset-0 bg-white/20 rounded-full blur-xl group-hover:blur-2xl transition-all duration-500" />
+                <div className="absolute inset-0 bg-white dark:bg-gray-800/20 rounded-full blur-xl group-hover:blur-2xl transition-all duration-500" />
                 <div className="relative w-12 h-12 bg-gradient-to-br from-white to-blue-100 rounded-full flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-all duration-300">
                   <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -149,21 +147,6 @@ export default function COSDashboard() {
             <div className="flex items-center space-x-2 sm:space-x-4">
 
 
-              <Link href="/">
-                <button 
-                  className="group relative inline-flex items-center px-3 sm:px-6 py-2 sm:py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg sm:rounded-xl text-white font-medium hover:bg-white/20 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl touch-manipulation"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
-                  <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2 transform group-hover:-translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16l-4-4m0 0l4-4m-4 4h18" />
-                  </svg>
-                  <span className="relative z-10 text-sm sm:text-base">
-                    <span className="hidden sm:inline">Back to Home</span>
-                    <span className="sm:hidden">Back</span>
-                  </span>
-                </button>
-              </Link>
-              
               <button 
                 onClick={() => setShowFreeCheck(true)}
                 className="group relative inline-flex items-center px-3 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg sm:rounded-xl text-white font-semibold shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 hover:scale-105 touch-manipulation"
@@ -176,7 +159,7 @@ export default function COSDashboard() {
                   <span className="hidden sm:inline">Try Free Check</span>
                   <span className="sm:hidden">Try Free</span>
                 </span>
-                <div className="absolute inset-0 rounded-lg sm:rounded-xl bg-white/20 scale-0 group-hover:scale-100 transition-transform duration-500" />
+                <div className="absolute inset-0 rounded-lg sm:rounded-xl bg-white dark:bg-gray-800/20 scale-0 group-hover:scale-100 transition-transform duration-500" />
               </button>
             </div>
           </div>
@@ -216,7 +199,7 @@ export default function COSDashboard() {
             
             // Create trailing effect
             const trail = document.createElement('div');
-            trail.className = 'absolute w-3 h-3 bg-white/30 rounded-full pointer-events-none animate-ping';
+            trail.className = 'absolute w-3 h-3 bg-white dark:bg-gray-800/30 rounded-full pointer-events-none animate-ping';
             trail.style.left = x + 'px';
             trail.style.top = y + 'px';
             trail.style.transform = 'translate(-50%, -50%)';
@@ -230,7 +213,7 @@ export default function COSDashboard() {
         <div className="absolute inset-0 opacity-20">
           <div className="absolute top-20 left-20 w-32 h-32 border border-white/30 rounded-full animate-spin-slow" />
           <div className="absolute bottom-20 right-20 w-24 h-24 border-2 border-white/20 rotate-45 animate-pulse" />
-          <div className="absolute top-1/2 left-1/4 w-16 h-16 bg-white/10 transform rotate-12 animate-bounce" style={{ animationDelay: '1s' }} />
+          <div className="absolute top-1/2 left-1/4 w-16 h-16 bg-white dark:bg-gray-800/10 transform rotate-12 animate-bounce" style={{ animationDelay: '1s' }} />
         </div>
 
         <div className="container mx-auto px-5 relative z-10">
@@ -254,7 +237,7 @@ export default function COSDashboard() {
                 </svg>
                 Verify UK CoS Now
               </span>
-              <div className="absolute inset-0 rounded-full bg-white/20 scale-0 group-hover:scale-100 transition-transform duration-700" />
+              <div className="absolute inset-0 rounded-full bg-white dark:bg-gray-800/20 scale-0 group-hover:scale-100 transition-transform duration-700" />
             </button>
 
             <button 
@@ -268,19 +251,19 @@ export default function COSDashboard() {
                 </svg>
                 Watch Demo
               </span>
-              <div className="absolute inset-0 rounded-full bg-white/20 scale-0 group-hover:scale-100 transition-transform duration-700" />
+              <div className="absolute inset-0 rounded-full bg-white dark:bg-gray-800/20 scale-0 group-hover:scale-100 transition-transform duration-700" />
             </button>
           </div>
         </div>
       </section>
 
       {/* Verification Highlight */}
-      <section className="py-20 bg-white">
+      <section className="py-20 bg-white dark:bg-gray-800">
         <div className="container mx-auto px-5 text-center">
-          <h2 className="text-4xl font-bold text-gray-900 mb-12">How Document Verification Works</h2>
+          <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-12">How Document Verification Works</h2>
           
           <div className="flex flex-wrap justify-center gap-8">
-            <div className="w-[300px] bg-white rounded-2xl overflow-hidden shadow-lg transition-all duration-300 hover:transform hover:-translate-y-3 hover:shadow-xl">
+            <div className="w-[300px] bg-white dark:bg-gray-800 rounded-2xl overflow-hidden shadow-lg transition-all duration-300 hover:transform hover:-translate-y-3 hover:shadow-xl">
               <div className="bg-green-500 text-white text-center py-8">
                 <div className="text-5xl mb-5">
                   <svg className="w-12 h-12 mx-auto" fill="currentColor" viewBox="0 0 20 20">
@@ -290,37 +273,37 @@ export default function COSDashboard() {
                 <h3 className="text-2xl font-semibold">Genuine Document</h3>
               </div>
               <div className="p-8">
-                <p className="text-gray-600 mb-5">Document matches verified templates with no alterations detected.</p>
+                <p className="text-gray-600 dark:text-gray-300 mb-5">Document matches verified templates with no alterations detected.</p>
                 <ul className="space-y-2">
                   <li className="flex items-center gap-3">
                     <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
-                    <span className="text-gray-700">Metadata matches genuine pattern</span>
+                    <span className="text-gray-700 dark:text-gray-200">Metadata matches genuine pattern</span>
                   </li>
                   <li className="flex items-center gap-3">
                     <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
-                    <span className="text-gray-700">No tampering detected</span>
+                    <span className="text-gray-700 dark:text-gray-200">No tampering detected</span>
                   </li>
                   <li className="flex items-center gap-3">
                     <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
-                    <span className="text-gray-700">Digital signature valid</span>
+                    <span className="text-gray-700 dark:text-gray-200">Digital signature valid</span>
                   </li>
                   <li className="flex items-center gap-3">
                     <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
-                    <span className="text-gray-700">Creation date consistent</span>
+                    <span className="text-gray-700 dark:text-gray-200">Creation date consistent</span>
                   </li>
                 </ul>
               </div>
             </div>
             
-            <div className="w-[300px] bg-white rounded-2xl overflow-hidden shadow-lg transition-all duration-300 hover:transform hover:-translate-y-3 hover:shadow-xl">
+            <div className="w-[300px] bg-white dark:bg-gray-800 rounded-2xl overflow-hidden shadow-lg transition-all duration-300 hover:transform hover:-translate-y-3 hover:shadow-xl">
               <div className="bg-yellow-500 text-white text-center py-8">
                 <div className="text-5xl mb-5">
                   <svg className="w-12 h-12 mx-auto" fill="currentColor" viewBox="0 0 20 20">
@@ -330,37 +313,37 @@ export default function COSDashboard() {
                 <h3 className="text-2xl font-semibold">Edited COS</h3>
               </div>
               <div className="p-8">
-                <p className="text-gray-600 mb-5">Document shows signs of alteration after original creation.</p>
+                <p className="text-gray-600 dark:text-gray-300 mb-5">Document shows signs of alteration after original creation.</p>
                 <ul className="space-y-2">
                   <li className="flex items-center gap-3">
                     <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
-                    <span className="text-gray-700">Metadata inconsistencies</span>
+                    <span className="text-gray-700 dark:text-gray-200">Metadata inconsistencies</span>
                   </li>
                   <li className="flex items-center gap-3">
                     <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
-                    <span className="text-gray-700">Modification dates detected</span>
+                    <span className="text-gray-700 dark:text-gray-200">Modification dates detected</span>
                   </li>
                   <li className="flex items-center gap-3">
                     <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
-                    <span className="text-gray-700">Content alterations found</span>
+                    <span className="text-gray-700 dark:text-gray-200">Content alterations found</span>
                   </li>
                   <li className="flex items-center gap-3">
                     <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
-                    <span className="text-gray-700">Signature validation failed</span>
+                    <span className="text-gray-700 dark:text-gray-200">Signature validation failed</span>
                   </li>
                 </ul>
               </div>
             </div>
             
-            <div className="w-[300px] bg-white rounded-2xl overflow-hidden shadow-lg transition-all duration-300 hover:transform hover:-translate-y-3 hover:shadow-xl">
+            <div className="w-[300px] bg-white dark:bg-gray-800 rounded-2xl overflow-hidden shadow-lg transition-all duration-300 hover:transform hover:-translate-y-3 hover:shadow-xl">
               <div className="bg-red-500 text-white text-center py-8">
                 <div className="text-5xl mb-5">
                   <svg className="w-12 h-12 mx-auto" fill="currentColor" viewBox="0 0 20 20">
@@ -370,31 +353,31 @@ export default function COSDashboard() {
                 <h3 className="text-2xl font-semibold">Fake COS</h3>
               </div>
               <div className="p-8">
-                <p className="text-gray-600 mb-5">Document is completely fabricated or doesn't match any genuine patterns.</p>
+                <p className="text-gray-600 dark:text-gray-300 mb-5">Document is completely fabricated or doesn't match any genuine patterns.</p>
                 <ul className="space-y-2">
                   <li className="flex items-center gap-3">
                     <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
-                    <span className="text-gray-700">No metadata match found</span>
+                    <span className="text-gray-700 dark:text-gray-200">No metadata match found</span>
                   </li>
                   <li className="flex items-center gap-3">
                     <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
-                    <span className="text-gray-700">Fraudulent creation patterns</span>
+                    <span className="text-gray-700 dark:text-gray-200">Fraudulent creation patterns</span>
                   </li>
                   <li className="flex items-center gap-3">
                     <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
-                    <span className="text-gray-700">Invalid security features</span>
+                    <span className="text-gray-700 dark:text-gray-200">Invalid security features</span>
                   </li>
                   <li className="flex items-center gap-3">
                     <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
-                    <span className="text-gray-700">Format violations detected</span>
+                    <span className="text-gray-700 dark:text-gray-200">Format violations detected</span>
                   </li>
                 </ul>
               </div>
@@ -406,16 +389,16 @@ export default function COSDashboard() {
       {/* Free Check Modal */}
       {showFreeCheck && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white p-6 border-b border-gray-200 flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-gray-900">Free COS Verification</h2>
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white dark:bg-gray-800 p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Free COS Verification</h2>
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => {
                     setShowFreeCheck(false);
                     setVerificationResult(null);
                   }}
-                  className="text-gray-400 hover:text-gray-600 text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100"
+                  className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:text-gray-300 text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:bg-gray-700"
                 >
                   ×
                 </button>
@@ -455,10 +438,10 @@ export default function COSDashboard() {
                           <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                         </svg>
                       </div>
-                      <h3 className="text-xl font-bold text-gray-900 mb-2">Free Check Used</h3>
-                      <p className="text-gray-600 mb-6">You've already used your free verification for today. Upgrade to Pro for unlimited checks.</p>
+                      <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Free Check Used</h3>
+                      <p className="text-gray-600 dark:text-gray-300 mb-6">You've already used your free verification for today. Upgrade to Pro for unlimited checks.</p>
                       
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+                      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 rounded-lg p-6 mb-6">
                         <h4 className="font-semibold text-blue-900 mb-3">🚀 Upgrade to Pro Service</h4>
                         <ul className="text-left text-blue-800 space-y-2 mb-4">
                           <li className="flex items-center gap-2">
@@ -491,7 +474,7 @@ export default function COSDashboard() {
                         </button>
                       </div>
                       
-                      <p className="text-sm text-gray-500">Your free check will reset tomorrow. Come back then for another free verification!</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 dark:text-gray-500">Your free check will reset tomorrow. Come back then for another free verification!</p>
                     </div>
                   )}
                 </div>
@@ -503,8 +486,8 @@ export default function COSDashboard() {
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                       </svg>
                     </div>
-                    <h3 className="text-xl font-bold text-gray-900 mb-2">Verification Complete!</h3>
-                    <p className="text-gray-600">Your document has been analyzed</p>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Verification Complete!</h3>
+                    <p className="text-gray-600 dark:text-gray-300">Your document has been analyzed</p>
                   </div>
 
                   <div className="mb-6">
@@ -531,7 +514,7 @@ export default function COSDashboard() {
                     </button>
                   </div>
 
-                  <div className="text-sm text-gray-500 bg-gray-50 p-4 rounded-lg">
+                  <div className="text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg">
                     <p className="font-medium mb-1">✨ Want more detailed analysis?</p>
                     <p>Upgrade to our Pro service for advanced metadata analysis, batch verification, and detailed reporting.</p>
                   </div>
@@ -557,17 +540,17 @@ export default function COSDashboard() {
       />
 
       {/* Did You Know Section - Official Gov.uk Information */}
-      <section className="py-16 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+      <section className="py-16 bg-gradient-to-br from-blue-50 dark:from-blue-900/20 via-indigo-50 dark:via-indigo-900/20 to-purple-50 dark:to-purple-900/20">
         <div className="container mx-auto px-5">
           <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Did You Know?</h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">Did You Know?</h2>
+            <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
               Important facts about UK Certificate of Sponsorship and Skilled Worker visas
             </p>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300 border-l-4 border-blue-500">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300 border-l-4 border-blue-500">
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
                   <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -575,14 +558,14 @@ export default function COSDashboard() {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-2">CoS is Not a Visa</h3>
-                  <p className="text-gray-600 text-sm">A Certificate of Sponsorship is an electronic record, not a physical document. It contains a unique reference number you need for your visa application.</p>
+                  <h3 className="font-semibold text-gray-900 dark:text-white mb-2">CoS is Not a Visa</h3>
+                  <p className="text-gray-600 dark:text-gray-300 text-sm">A Certificate of Sponsorship is an electronic record, not a physical document. It contains a unique reference number you need for your visa application.</p>
                   <a href="https://www.gov.uk/uk-visa-sponsorship-employers/certificates-of-sponsorship" target="_blank" rel="noopener noreferrer" className="text-blue-600 text-xs hover:underline mt-2 inline-block">Source: Gov.uk</a>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300 border-l-4 border-purple-500">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300 border-l-4 border-purple-500">
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
                   <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -590,14 +573,14 @@ export default function COSDashboard() {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-2">3-Month Validity</h3>
-                  <p className="text-gray-600 text-sm">You must apply for your visa within 3 months of your CoS being assigned. After this period, the CoS expires and cannot be used.</p>
+                  <h3 className="font-semibold text-gray-900 dark:text-white mb-2">3-Month Validity</h3>
+                  <p className="text-gray-600 dark:text-gray-300 text-sm">You must apply for your visa within 3 months of your CoS being assigned. After this period, the CoS expires and cannot be used.</p>
                   <a href="https://www.gov.uk/skilled-worker-visa/your-job" target="_blank" rel="noopener noreferrer" className="text-blue-600 text-xs hover:underline mt-2 inline-block">Source: Gov.uk</a>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300 border-l-4 border-green-500">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300 border-l-4 border-green-500">
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
                   <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -605,14 +588,14 @@ export default function COSDashboard() {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-2">Sponsor Register</h3>
-                  <p className="text-gray-600 text-sm">You can check if an employer is a licensed sponsor on the official register of licensed sponsors published by the Home Office.</p>
+                  <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Sponsor Register</h3>
+                  <p className="text-gray-600 dark:text-gray-300 text-sm">You can check if an employer is a licensed sponsor on the official register of licensed sponsors published by the Home Office.</p>
                   <a href="https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers" target="_blank" rel="noopener noreferrer" className="text-blue-600 text-xs hover:underline mt-2 inline-block">Source: Gov.uk</a>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300 border-l-4 border-orange-500">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300 border-l-4 border-orange-500">
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
                   <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -620,14 +603,14 @@ export default function COSDashboard() {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-2">Salary Requirements</h3>
-                  <p className="text-gray-600 text-sm">The minimum salary for most Skilled Worker visa jobs is currently £38,700 per year, or the 'going rate' for your job type, whichever is higher.</p>
+                  <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Salary Requirements</h3>
+                  <p className="text-gray-600 dark:text-gray-300 text-sm">The minimum salary for most Skilled Worker visa jobs is currently £38,700 per year, or the 'going rate' for your job type, whichever is higher.</p>
                   <a href="https://www.gov.uk/skilled-worker-visa/your-job" target="_blank" rel="noopener noreferrer" className="text-blue-600 text-xs hover:underline mt-2 inline-block">Source: Gov.uk</a>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300 border-l-4 border-red-500">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300 border-l-4 border-red-500">
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
                   <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -635,14 +618,14 @@ export default function COSDashboard() {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-2">Fraud Consequences</h3>
-                  <p className="text-gray-600 text-sm">Using deception in a visa application can result in a 10-year re-entry ban to the UK and potential criminal prosecution under the Immigration Act.</p>
+                  <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Fraud Consequences</h3>
+                  <p className="text-gray-600 dark:text-gray-300 text-sm">Using deception in a visa application can result in a 10-year re-entry ban to the UK and potential criminal prosecution under the Immigration Act.</p>
                   <a href="https://www.gov.uk/government/publications/general-grounds-for-refusal-considering-deception" target="_blank" rel="noopener noreferrer" className="text-blue-600 text-xs hover:underline mt-2 inline-block">Source: Gov.uk</a>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300 border-l-4 border-indigo-500">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300 border-l-4 border-indigo-500">
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
                   <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -650,8 +633,8 @@ export default function COSDashboard() {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-2">Path to Settlement</h3>
-                  <p className="text-gray-600 text-sm">After 5 years on a Skilled Worker visa, you may be eligible to apply for Indefinite Leave to Remain (settlement) in the UK.</p>
+                  <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Path to Settlement</h3>
+                  <p className="text-gray-600 dark:text-gray-300 text-sm">After 5 years on a Skilled Worker visa, you may be eligible to apply for Indefinite Leave to Remain (settlement) in the UK.</p>
                   <a href="https://www.gov.uk/indefinite-leave-to-remain-tier-2-t2-skilled-worker-visa" target="_blank" rel="noopener noreferrer" className="text-blue-600 text-xs hover:underline mt-2 inline-block">Source: Gov.uk</a>
                 </div>
               </div>
@@ -659,7 +642,7 @@ export default function COSDashboard() {
           </div>
 
           <div className="text-center mt-8">
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-500 dark:text-gray-400 dark:text-gray-500">
               Information sourced from official UK Government guidance. Always check 
               <a href="https://www.gov.uk/skilled-worker-visa" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline ml-1">Gov.uk</a> for the latest requirements.
             </p>
@@ -667,8 +650,6 @@ export default function COSDashboard() {
         </div>
       </section>
       
-      {/* Footer */}
-      <Footer />
     </div>
   );
 }

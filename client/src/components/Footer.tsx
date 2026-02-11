@@ -7,7 +7,6 @@ export default function Footer() {
     <footer className="bg-gradient-to-r from-[#003366] to-[#0066CC] text-white py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          {/* Brand Section */}
           <div className="md:col-span-2">
             <div className="flex items-center space-x-3 mb-4">
               <div className="p-2 bg-white/20 rounded-lg">
@@ -31,7 +30,6 @@ export default function Footer() {
             </a>
           </div>
 
-          {/* Quick Links */}
           <div>
             <h4 className="text-lg font-semibold mb-6 text-white">Quick Links</h4>
             <ul className="space-y-3">
@@ -46,50 +44,48 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <a href="/ai-guide" className="text-blue-100 hover:text-white transition-colors font-medium">
-                  How It Works
-                </a>
+                <Link href="/pricing" className="text-blue-100 hover:text-white transition-colors font-medium">
+                  Pricing
+                </Link>
               </li>
               <li>
-                <a href="/cos-guide" className="text-blue-100 hover:text-white transition-colors font-medium">
-                  About
-                </a>
+                <Link href="/history" className="text-blue-100 hover:text-white transition-colors font-medium">
+                  Verification History
+                </Link>
               </li>
             </ul>
           </div>
 
-          {/* Resources */}
           <div>
             <h4 className="text-lg font-semibold mb-6 text-white">Resources</h4>
             <ul className="space-y-3">
               <li>
-                <a href="/cos-guide" className="text-blue-100 hover:text-white transition-colors font-medium">
-                  Verification Guide
-                </a>
+                <Link href="/ai-guide" className="text-blue-100 hover:text-white transition-colors font-medium">
+                  AI Guide
+                </Link>
               </li>
               <li>
-                <a href="/technology" className="text-blue-100 hover:text-white transition-colors font-medium">
+                <Link href="/cos-guide" className="text-blue-100 hover:text-white transition-colors font-medium">
+                  CoS Guide
+                </Link>
+              </li>
+              <li>
+                <Link href="/technology" className="text-blue-100 hover:text-white transition-colors font-medium">
                   Our Technology
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/api-docs" className="text-blue-100 hover:text-white transition-colors font-medium">
+                <Link href="/api-docs" className="text-blue-100 hover:text-white transition-colors font-medium">
                   API Documentation
-                </a>
-              </li>
-              <li>
-                <a href="/pricing" className="text-blue-100 hover:text-white transition-colors font-medium">
-                  Pricing
-                </a>
+                </Link>
               </li>
             </ul>
           </div>
         </div>
 
-        {/* Bottom Bar */}
         <div className="border-t border-white/20 mt-8 pt-8 text-center">
           <p className="text-blue-100 text-sm font-medium">
-            © {new Date().getFullYear()} Check By AI. All rights reserved.
+            &copy; {new Date().getFullYear()} Check By AI. All rights reserved.
           </p>
           <p className="text-blue-100/80 text-xs mt-2">
             This tool provides technical analysis only and does not constitute legal or immigration advice.

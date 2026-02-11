@@ -1,21 +1,82 @@
 import { Link } from "wouter";
 import { Shield, FileText, CheckCircle, ArrowLeft, AlertCircle, Info, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import PageLayout from "@/components/PageLayout";
+import SEOHead from "@/components/SEOHead";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 export default function COSGuide() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-      <div className="max-w-4xl mx-auto px-4 py-12">
-        <Link href="/">
-          <Button variant="ghost" className="mb-6">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Home
-          </Button>
-        </Link>
-
-        <div className="text-center mb-12">
+    <PageLayout>
+      <SEOHead
+        title="Certificate of Sponsorship Guide | UK Skilled Worker Visa | Check By AI"
+        description="Complete guide to UK Certificate of Sponsorship documents. Learn what a CoS is, how to verify it, and what to check before applying for your Skilled Worker visa."
+        keywords="certificate of sponsorship guide, UK CoS explained, skilled worker visa CoS, UK sponsor licence, CoS reference number"
+        canonicalUrl="https://checkbyai.net/cos-guide"
+        structuredData={{
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "BreadcrumbList",
+              "itemListElement": [
+                {
+                  "@type": "ListItem",
+                  "position": 1,
+                  "name": "Home",
+                  "item": "https://checkbyai.net"
+                },
+                {
+                  "@type": "ListItem",
+                  "position": 2,
+                  "name": "CoS Guide",
+                  "item": "https://checkbyai.net/cos-guide"
+                }
+              ]
+            },
+            {
+              "@type": "FAQPage",
+              "mainEntity": [
+                {
+                  "@type": "Question",
+                  "name": "How long is a CoS valid?",
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "A Certificate of Sponsorship is valid for 3 months from the date it's assigned. You must submit your visa application within this period."
+                  }
+                },
+                {
+                  "@type": "Question",
+                  "name": "Can I verify my CoS reference number?",
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "The Home Office verifies the CoS reference number during your visa application. However, you can check if your sponsor is a licensed sponsor on the official UK government website."
+                  }
+                },
+                {
+                  "@type": "Question",
+                  "name": "What if my CoS has errors?",
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "If there are errors on your CoS, contact your employer immediately. They may need to withdraw the incorrect CoS and issue a new one with the correct information."
+                  }
+                },
+                {
+                  "@type": "Question",
+                  "name": "Why should I verify my CoS document?",
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Verifying your CoS helps ensure the document you received hasn't been tampered with. Submitting a fraudulent CoS can result in visa refusal and a ban from future UK applications."
+                  }
+                }
+              ]
+            }
+          ]
+        }}
+      />
+      <div className="bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+        <div className="max-w-4xl mx-auto px-4 py-12">
+          <div className="text-center mb-12">
           <div className="inline-flex items-center px-4 py-2 bg-blue-100 dark:bg-blue-900 rounded-full text-blue-800 dark:text-blue-200 text-sm font-medium mb-4">
             <FileText className="w-4 h-4 mr-2" />
             UK Immigration Guide
@@ -167,15 +228,16 @@ export default function COSGuide() {
           </Card>
         </div>
 
-        <div className="text-center">
-          <Link href="/dashboard">
-            <Button size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-              <Shield className="w-5 h-5 mr-2" />
-              Verify Your CoS Now
-            </Button>
-          </Link>
+          <div className="text-center">
+            <Link href="/dashboard">
+              <Button size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                <Shield className="w-5 h-5 mr-2" />
+                Verify Your CoS Now
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
-    </div>
+    </PageLayout>
   );
 }

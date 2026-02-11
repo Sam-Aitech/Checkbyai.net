@@ -18,6 +18,8 @@ import {
   FileCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import PageLayout from "@/components/PageLayout";
+import SEOHead from "@/components/SEOHead";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const pipelineStages = [
@@ -64,16 +66,54 @@ const colorMap: Record<string, { bg: string; text: string; ring: string; darkBg:
 
 export default function Technology() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-      <div className="max-w-4xl mx-auto px-4 py-12">
-        <Link href="/">
-          <Button variant="ghost" className="mb-6">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Home
-          </Button>
-        </Link>
-
-        <div className="text-center mb-12">
+    <PageLayout>
+      <SEOHead
+        title="Verification Technology | AI Document Forensics | Check By AI"
+        description="Discover how Check By AI uses advanced forensic analysis, machine learning, and multi-layer verification to detect fake Certificate of Sponsorship documents."
+        keywords="document forensics technology, AI verification, PDF metadata analysis, document authenticity detection, forensic document analysis"
+        canonicalUrl="https://checkbyai.net/technology"
+        structuredData={{
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "BreadcrumbList",
+              "itemListElement": [
+                {
+                  "@type": "ListItem",
+                  "position": 1,
+                  "name": "Home",
+                  "item": "https://checkbyai.net"
+                },
+                {
+                  "@type": "ListItem",
+                  "position": 2,
+                  "name": "Technology",
+                  "item": "https://checkbyai.net/technology"
+                }
+              ]
+            },
+            {
+              "@type": "TechArticle",
+              "name": "Verification Technology | AI Document Forensics",
+              "description": "Discover how Check By AI uses advanced forensic analysis, machine learning, and multi-layer verification to detect fake Certificate of Sponsorship documents.",
+              "author": {
+                "@type": "Organization",
+                "name": "Check By AI",
+                "url": "https://checkbyai.net"
+              },
+              "datePublished": "2025-01-01",
+              "publisher": {
+                "@type": "Organization",
+                "name": "Check By AI",
+                "url": "https://checkbyai.net"
+              }
+            }
+          ]
+        }}
+      />
+      <div className="bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+        <div className="max-w-4xl mx-auto px-4 py-12">
+          <div className="text-center mb-12">
           <div className="inline-flex items-center px-4 py-2 bg-blue-100 dark:bg-blue-900 rounded-full text-blue-800 dark:text-blue-200 text-sm font-medium mb-4">
             <Shield className="w-4 h-4 mr-2" />
             Enterprise-Grade Document Forensics
@@ -353,15 +393,16 @@ export default function Technology() {
           </Card>
         </div>
 
-        <div className="text-center">
-          <Link href="/dashboard">
-            <Button size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-              <Shield className="w-5 h-5 mr-2" />
-              Verify Your Document Now
-            </Button>
-          </Link>
+          <div className="text-center">
+            <Link href="/dashboard">
+              <Button size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                <Shield className="w-5 h-5 mr-2" />
+                Verify Your Document Now
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
-    </div>
+    </PageLayout>
   );
 }

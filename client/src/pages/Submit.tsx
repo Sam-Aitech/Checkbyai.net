@@ -4,7 +4,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { ArrowLeft, Upload, CheckCircle, Loader2, FileText, AlertCircle } from 'lucide-react';
+import { Upload, CheckCircle, Loader2, FileText, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import SEOHead from '@/components/SEOHead';
-import Footer from '@/components/Footer';
+import PageLayout from '@/components/PageLayout';
 
 const questionnaireSchema = z.object({
   howApplied: z.string().min(10, 'Please describe how you applied for the job'),
@@ -158,69 +158,75 @@ export default function Submit() {
 
   if (!sessionId) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-900 dark:to-gray-800">
-        <Card className="max-w-md">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-red-600">
-              <AlertCircle className="w-6 h-6" />
-              Invalid Session
-            </CardTitle>
-            <CardDescription>
-              No payment session found. Please complete your purchase first.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={() => setLocation('/pricing')} className="w-full">
-              Go to Pricing
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <PageLayout>
+        <div className="flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-900 dark:to-gray-800">
+          <Card className="max-w-md">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-red-600">
+                <AlertCircle className="w-6 h-6" />
+                Invalid Session
+              </CardTitle>
+              <CardDescription>
+                No payment session found. Please complete your purchase first.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button onClick={() => setLocation('/pricing')} className="w-full">
+                Go to Pricing
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </PageLayout>
     );
   }
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-900 dark:to-gray-800">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">Loading your submission...</p>
+      <PageLayout>
+        <div className="flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-900 dark:to-gray-800">
+          <div className="text-center">
+            <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
+            <p className="text-gray-600 dark:text-gray-400">Loading your submission...</p>
+          </div>
         </div>
-      </div>
+      </PageLayout>
     );
   }
 
   if (error || !submission) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-900 dark:to-gray-800">
-        <Card className="max-w-md">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-red-600">
-              <AlertCircle className="w-6 h-6" />
-              Error Loading Submission
-            </CardTitle>
-            <CardDescription>
-              We couldn't find your submission. Please try again or contact support.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={() => setLocation('/pricing')} className="w-full">
-              Go to Pricing
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <PageLayout>
+        <div className="flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-900 dark:to-gray-800">
+          <Card className="max-w-md">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-red-600">
+                <AlertCircle className="w-6 h-6" />
+                Error Loading Submission
+              </CardTitle>
+              <CardDescription>
+                We couldn't find your submission. Please try again or contact support.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button onClick={() => setLocation('/pricing')} className="w-full">
+                Go to Pricing
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </PageLayout>
     );
   }
 
   if (submitted) {
     return (
-      <>
+      <PageLayout>
         <SEOHead
           title="Submission Complete | COS Verification"
           description="Your Certificate of Sponsorship has been submitted for expert review."
         />
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-900 dark:to-gray-800 p-4">
+        <div className="flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-900 dark:to-gray-800 p-4">
           <Card className="max-w-lg text-center">
             <CardHeader>
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -254,29 +260,19 @@ export default function Submit() {
             </CardContent>
           </Card>
         </div>
-      </>
+      </PageLayout>
     );
   }
 
   return (
-    <>
+    <PageLayout>
       <SEOHead
         title="Submit Your CoS for Verification | Expert Review"
         description="Complete your Certificate of Sponsorship submission for expert verification."
       />
       
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+      <div className="bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
         <div className="container mx-auto px-4 py-8 max-w-3xl">
-          <Button
-            variant="ghost"
-            onClick={() => setLocation('/')}
-            className="mb-6 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
-            data-testid="button-back-home"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Home
-          </Button>
-
           <Card className="mb-6">
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -583,8 +579,7 @@ export default function Submit() {
           </Form>
         </div>
 
-        <Footer />
       </div>
-    </>
+    </PageLayout>
   );
 }

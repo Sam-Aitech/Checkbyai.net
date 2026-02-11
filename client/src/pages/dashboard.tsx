@@ -1,5 +1,6 @@
 import COSDashboard from "@/components/COSDashboard";
 import SEOHead from "@/components/SEOHead";
+import PageLayout from "@/components/PageLayout";
 
 export default function DashboardPage() {
   const dashboardSEO = {
@@ -97,9 +98,9 @@ export default function DashboardPage() {
   };
 
   return (
-    <>
+    <PageLayout>
       <SEOHead {...dashboardSEO} />
       <COSDashboard />
-    </>
+    </PageLayout>
   );
 }

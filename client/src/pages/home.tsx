@@ -1,16 +1,10 @@
 import { useState, Suspense, lazy } from "react";
-import { Link } from "wouter";
-import { Shield, Database, LayoutDashboard, LogIn, X } from "lucide-react";
+import { Shield, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useQuery } from "@tanstack/react-query";
-import UserProfile from "@/components/UserProfile";
 import FileUploadSimple from "@/components/FileUploadSimple";
-import GoogleLoginButton from "@/components/GoogleLoginButton";
 import SEOHead from "@/components/SEOHead";
+import PageLayout from "@/components/PageLayout";
 
-// Lazy load heavy components for better performance
-const UserPortal = lazy(() => import("@/components/UserPortal"));
-const AdminPortal = lazy(() => import("@/components/AdminPortal"));
 const HeroSection = lazy(() => import("@/components/HeroSection"));
 
 function LoadingSpinner() {
@@ -22,17 +16,12 @@ function LoadingSpinner() {
 }
 
 export default function Home() {
-  const [showPortals, setShowPortals] = useState(false);
-  const [activeMode, setActiveMode] = useState<'user' | 'admin'>('user');
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [verificationResult, setVerificationResult] = useState<{type: 'genuine' | 'suspicious' | 'fake', confidence: number} | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  // Temporarily disable auth to prevent infinite loops
-  // const { isAuthenticated, isAdmin, user, isLoading } = useAuth();
 
   const handleFileUpload = async (file: File) => {
     setIsLoading(true);
-    // This will be handled by FileUploadSimple component
   };
 
   const handleVerificationResult = (result: {type: 'genuine' | 'suspicious' | 'fake', confidence: number}) => {
@@ -44,126 +33,6 @@ export default function Home() {
     console.error('Verification error:', error);
     setIsLoading(false);
   };
-
-  const { data: stats } = useQuery({
-    queryKey: ['/api/stats'],
-  });
-
-  // Show landing page first, then portals on user action
-  const mainContent = !showPortals ? (
-    <div className="min-h-screen">
-      {/* Mobile-Optimized Navigation Header */}
-      <nav className="fixed top-0 w-full z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-14 sm:h-16">
-            <div className="flex items-center space-x-2 sm:space-x-3">
-              <Shield className="text-blue-600 text-xl sm:text-2xl" />
-              <div>
-                <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">Document Authenticator</h1>
-                <p className="text-xs text-gray-500 dark:text-gray-400 hidden sm:block">AI-Powered Document Authentication</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-2 sm:space-x-4">
-              <Button 
-                variant="default" 
-                size="sm"
-                className="text-xs sm:text-sm px-3 sm:px-4 py-2"
-                onClick={() => setShowVerificationModal(true)}
-              >
-                <span className="hidden sm:inline">Verify Document</span>
-                <span className="sm:hidden">Verify</span>
-              </Button>
-              
-              <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
-                <Database className="w-4 h-4" />
-                <span>{(stats as any)?.trustedPatterns || 0}</span>
-              </div>
-
-              <UserProfile />
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      {/* Hero Section */}
-      <Suspense fallback={<LoadingSpinner />}>
-        <HeroSection onStartVerification={() => setShowVerificationModal(true)} />
-      </Suspense>
-    </div>
-  ) : (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-3">
-              <Shield className="text-blue-600 text-2xl" />
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Document Authenticator</h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Advanced AI-Powered Document Verification</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              {/* Login button */}
-              <Link href="/login">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                >
-                  <LogIn className="mr-2 w-4 h-4" />
-                  Sign In
-                </Button>
-              </Link>
-              
-              <Link href="/dashboard">
-                <Button variant="outline" size="sm">
-                  <LayoutDashboard className="mr-2 w-4 h-4" />
-                  Dashboard
-                </Button>
-              </Link>
-              
-              <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
-                <button
-                  onClick={() => setActiveMode('user')}
-                  className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
-                    activeMode === 'user'
-                      ? 'bg-white dark:bg-gray-800 text-blue-600 shadow-sm'
-                      : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-                >
-                  User Portal
-                </button>
-                <button
-                  onClick={() => setActiveMode('admin')}
-                  className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
-                    activeMode === 'admin'
-                      ? 'bg-white dark:bg-gray-800 text-blue-600 shadow-sm'
-                      : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-                >
-                  Admin Portal
-                </button>
-              </div>
-              
-              <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
-                <Database className="w-4 h-4" />
-                <span>{(stats as any)?.trustedPatterns || 0}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Suspense fallback={<LoadingSpinner />}>
-          {activeMode === 'user' ? <UserPortal /> : <AdminPortal />}
-        </Suspense>
-      </main>
-    </div>
-  );
 
   // SEO data for home page
   const homePageSEO = {
@@ -200,14 +69,13 @@ export default function Home() {
     }
   };
 
-  // Return JSX with verification modal
   return (
-    <>
+    <PageLayout hideFooter>
       <SEOHead {...homePageSEO} />
-      {/* Main Page Content */}
-      {mainContent}
-      
-      {/* Verification Modal */}
+      <Suspense fallback={<LoadingSpinner />}>
+        <HeroSection onStartVerification={() => setShowVerificationModal(true)} />
+      </Suspense>
+
       {showVerificationModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
@@ -281,6 +149,6 @@ export default function Home() {
           </div>
         </div>
       )}
-    </>
+    </PageLayout>
   );
 }
