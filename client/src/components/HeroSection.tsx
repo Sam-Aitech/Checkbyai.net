@@ -49,7 +49,8 @@ function FeatureCard({ icon, title, description, delay }: FeatureCardProps) {
           {title}
         </h3>
       </div>
-      <p className="text-gray-600 dark:text-gray-300 leading-relaxed" dangerouslySetInnerHTML={{ __html: description }}>
+      <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+        {description}
       </p>
     </animated.div>
   )
@@ -246,21 +247,21 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
             <FeatureCard
               icon={<Shield className="w-8 h-8 text-blue-600" />}
               title="UK Home Office Compliance"
-              description="Our AI analyzes your Certificate of Sponsorship against official UK Home Office document patterns. <a href='/ai-guide' class='text-blue-600 hover:text-blue-700 underline'>Detect fake CoS documents</a> before submitting your Skilled Worker visa application."
+              description="Our AI analyzes your Certificate of Sponsorship against official UK Home Office document patterns. Detect fake CoS documents before submitting your Skilled Worker visa application."
               delay={0}
             />
             
             <FeatureCard
               icon={<Zap className="w-8 h-8 text-green-600" />}
               title="Instant UK CoS Verification"
-              description="Get <a href='/dashboard' class='text-blue-600 hover:text-blue-700 underline'>verification results</a> in seconds. Perfect for UK employers checking sponsor licence documents or visa applicants verifying their Certificate of Sponsorship authenticity."
+              description="Get verification results in seconds. Perfect for UK employers checking sponsor licence documents or visa applicants verifying their Certificate of Sponsorship authenticity."
               delay={200}
             />
             
             <FeatureCard
               icon={<Lock className="w-8 h-8 text-red-600" />}
               title="UK Data Protection Standards"
-              description="Your <a href='/cos-guide' class='text-blue-600 hover:text-blue-700 underline'>Certificate of Sponsorship</a> is processed securely with UK data protection compliance. Documents are deleted immediately after verification - no storage, no exposure."
+              description="Your Certificate of Sponsorship is processed securely under UK GDPR and the Data Protection Act 2018. We process metadata only, and documents are deleted immediately after verification."
               delay={400}
             />
           </div>

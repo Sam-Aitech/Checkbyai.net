@@ -445,7 +445,7 @@ export default function ApiDocs() {
                 <div>
                   <div className="flex items-center gap-2 mb-2">
                     <Terminal className="w-4 h-4 text-orange-600" />
-                    <p className="text-sm text-gray-600 dark:text-gray-400">No installation required — use from any terminal</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">No installation required, use from any terminal</p>
                   </div>
                   <CodeBlock language="bash">{curlExample}</CodeBlock>
                 </div>

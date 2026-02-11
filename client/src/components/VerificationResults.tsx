@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CheckCircle, XCircle, AlertTriangle, Info, Shield, Copy, ChevronDown, ChevronUp } from "lucide-react";
+import { CheckCircle, XCircle, AlertTriangle, Info, Shield, Copy, ChevronDown, ChevronUp, Lock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -131,7 +131,7 @@ export default function VerificationResults({ result, verificationId }: Verifica
                   </h3>
                 </div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  AI confidence: {confidencePercent}% — {totalChecks > 0 ? `${passedCount} of ${totalChecks} checks passed` : "Analysis complete"}
+                  AI confidence: {confidencePercent}%, {totalChecks > 0 ? `${passedCount} of ${totalChecks} checks passed` : "Analysis complete"}
                 </p>
               </div>
 
@@ -300,6 +300,14 @@ export default function VerificationResults({ result, verificationId }: Verifica
           </p>
         </CardContent>
       </Card>
+
+      {/* Data Protection Notice */}
+      <div className="px-3 py-2 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+        <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
+          <Lock className="w-3 h-3 inline mr-1" />
+          UK GDPR and Data Protection Act 2018: Your original document has been permanently deleted from our servers. Only metadata was processed. Free users: these results will not be saved. Paid account holders: only the verification result is retained for your records.
+        </p>
+      </div>
 
       {/* Feedback Section */}
       <Card className="border border-gray-200 dark:border-gray-700">

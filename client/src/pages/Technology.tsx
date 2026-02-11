@@ -191,14 +191,14 @@ export default function Technology() {
                     <FileCheck className="w-5 h-5 text-blue-600" />
                     <h4 className="font-semibold text-gray-900 dark:text-white">Zero-Storage Policy</h4>
                   </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Documents are permanently deleted from our servers immediately after processing. We retain only the verification result — never the original document.</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Documents are permanently deleted from our servers immediately after processing. We retain only the verification result, never the original document.</p>
                 </div>
                 <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
                   <div className="flex items-center gap-2 mb-2">
                     <CheckCircle className="w-5 h-5 text-purple-600" />
-                    <h4 className="font-semibold text-gray-900 dark:text-white">GDPR Compliant</h4>
+                    <h4 className="font-semibold text-gray-900 dark:text-white">UK GDPR and Data Protection Act 2018</h4>
                   </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Fully compliant with UK GDPR and Data Protection Act 2018. You have full control over your data with the right to erasure at any time.</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Fully compliant with UK GDPR and the Data Protection Act 2018. We process document metadata only, never the full document content. Free users: results are removed when you leave the site, with a 24 hour cooldown. Paid account holders: only verification results are saved, never original documents. You have full control over your data with the right to erasure at any time.</p>
                 </div>
                 <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
                   <div className="flex items-center gap-2 mb-2">
@@ -220,7 +220,7 @@ export default function Technology() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-gray-600 dark:text-gray-300">
-                What sets our platform apart is the continuous feedback loop between AI and human expertise. This is not a static model — it learns and improves with every verification.
+                What sets our platform apart is the continuous feedback loop between AI and human expertise. This is not a static model: it learns and improves with every verification.
               </p>
               <div className="bg-purple-50 dark:bg-purple-900/20 rounded-xl p-6">
                 <div className="grid md:grid-cols-3 gap-6 text-center">
@@ -282,7 +282,7 @@ export default function Technology() {
               </div>
               <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
                 <p className="text-2xl font-bold text-green-600">99.99%</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Uptime Guarantee — no single point of failure</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Uptime Guarantee, no single point of failure</p>
               </div>
             </CardContent>
           </Card>

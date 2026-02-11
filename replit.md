@@ -138,3 +138,27 @@ Each verification now generates:
 - **Document Hash**: SHA-256 hash of the uploaded document for tamper-proof verification
 - **Integrity Hash**: Cryptographic proof combining receipt ID, document hash, result, confidence, and timestamp
 Documents are still deleted immediately after processing - only the hash and receipt are retained
+
+## Security Hardening (Feb 2026)
+- Admin credentials: env var only (ADMIN_EMAIL, ADMIN_PASSWORD required, no fallback)
+- File uploads: 10MB max, PDF only (multer fileFilter + limits)
+- CORS: same-origin only (no wildcard)
+- Session cookies: secure flag enabled in production
+- Error responses: all client-facing errors use generic messages (internal details logged server-side only)
+- Body parsing: 10MB limit (reduced from 50MB)
+- Idempotency: checkout session deduplication uses bounded Map with 24hr TTL and max 1000 entries
+- Security headers: X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy
+- Upload cleanup: files deleted immediately in finally block after verification
+
+## Data Protection Policy (UK GDPR, Data Protection Act 2018)
+- We process document metadata only, never full document content
+- Original documents are permanently deleted immediately after verification
+- Free users: verification results are not retained after session ends, 24 hour cooldown between free checks
+- Paid account holders (with basic account): only verification results are saved, never original documents
+- Users have the right to request erasure of their data at any time
+- Lawful basis: Article 6(1)(f) UK GDPR (legitimate interests for fraud prevention)
+- Compliance notices displayed in: Footer, FileUpload dropzone, VerificationResults page, Technology page
+
+## Content Style Rules
+- No em dashes, long dashes, or horizontal separators between words in titles and headings
+- Use plain spacing or punctuation like colons or commas instead

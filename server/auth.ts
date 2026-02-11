@@ -28,7 +28,7 @@ export function getSession() {
     proxy: true,
     cookie: {
       httpOnly: true,
-      secure: false,
+      secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: sessionTtl,
     },

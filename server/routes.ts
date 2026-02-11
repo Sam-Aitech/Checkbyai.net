@@ -33,10 +33,53 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-11-17.clover" as any,
 });
 
-// Configure multer for file uploads
-const upload = multer({ dest: 'uploads/' });
+// Configure multer for file uploads with security limits
+const upload = multer({
+  dest: 'uploads/',
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB max file size
+    files: 1,
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF files are accepted'));
+    }
+  },
+});
 
-const processedCheckoutSessions = new Set<string>();
+const processedCheckoutSessions = new Map<string, number>();
+const IDEMPOTENCY_MAX_SIZE = 1000;
+const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+function markSessionProcessed(sessionId: string) {
+  if (processedCheckoutSessions.size >= IDEMPOTENCY_MAX_SIZE) {
+    const now = Date.now();
+    const keysToDelete: string[] = [];
+    processedCheckoutSessions.forEach((timestamp, key) => {
+      if (now - timestamp > IDEMPOTENCY_TTL_MS) {
+        keysToDelete.push(key);
+      }
+    });
+    keysToDelete.forEach(k => processedCheckoutSessions.delete(k));
+    if (processedCheckoutSessions.size >= IDEMPOTENCY_MAX_SIZE) {
+      const oldest = processedCheckoutSessions.keys().next().value;
+      if (oldest) processedCheckoutSessions.delete(oldest);
+    }
+  }
+  processedCheckoutSessions.set(sessionId, Date.now());
+}
+
+function isSessionProcessed(sessionId: string): boolean {
+  const timestamp = processedCheckoutSessions.get(sessionId);
+  if (!timestamp) return false;
+  if (Date.now() - timestamp > IDEMPOTENCY_TTL_MS) {
+    processedCheckoutSessions.delete(sessionId);
+    return false;
+  }
+  return true;
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -173,7 +216,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ url: session.url, status: 'redirect' });
     } catch (error: any) {
       console.error("Subscription creation error:", error);
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: 'Failed to create subscription' });
     }
   });
 
@@ -185,8 +228,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       event = stripe.webhooks.constructEvent(req.body, sig!, process.env.STRIPE_WEBHOOK_SECRET!);
     } catch (err: any) {
-      console.log(`Webhook signature verification failed.`, err.message);
-      return res.status(400).send(`Webhook Error: ${err.message}`);
+      console.error('Webhook signature verification failed:', err.message);
+      return res.status(400).send('Webhook signature verification failed');
     }
 
     switch (event.type) {
@@ -249,8 +292,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const userId = session.metadata?.userId;
         const packageType = session.metadata?.packageType;
         
-        if (userId && packageType && session.payment_status === 'paid' && !processedCheckoutSessions.has(session.id)) {
-          processedCheckoutSessions.add(session.id);
+        if (userId && packageType && session.payment_status === 'paid' && !isSessionProcessed(session.id)) {
+          markSessionProcessed(session.id);
           if (packageType === 'starter') {
             await storage.addCredits(userId, 50);
           } else if (packageType === 'pro') {
@@ -364,7 +407,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ url: session.url, sessionId: session.id });
     } catch (error: any) {
       console.error('Checkout error:', error);
-      res.status(500).json({ message: error.message || 'Failed to create checkout session' });
+      res.status(500).json({ message: 'Failed to create checkout session' });
     }
   });
 
@@ -397,8 +440,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const sessionUserId = session.metadata?.userId;
         
         if (sessionUserId && sessionUserId === req.user.id) {
-          if (!processedCheckoutSessions.has(sessionId)) {
-            processedCheckoutSessions.add(sessionId);
+          if (!isSessionProcessed(sessionId)) {
+            markSessionProcessed(sessionId);
             if (packageType === 'starter') {
               await storage.addCredits(sessionUserId, 50);
             } else if (packageType === 'pro') {
@@ -1306,7 +1349,7 @@ Format your response in clear, professional markdown.`;
       res.json({ url: session.url, sessionId: session.id, submissionId: submission.id });
     } catch (error: any) {
       console.error('Checkout creation error:', error);
-      res.status(500).json({ message: error.message || 'Failed to create checkout session' });
+      res.status(500).json({ message: 'Failed to create checkout session' });
     }
   });
 
@@ -1335,7 +1378,7 @@ Format your response in clear, professional markdown.`;
       res.json(updatedSubmission);
     } catch (error: any) {
       console.error('Get submission error:', error);
-      res.status(500).json({ message: error.message || 'Failed to get submission' });
+      res.status(500).json({ message: 'Failed to get submission' });
     }
   });
 
@@ -1386,7 +1429,7 @@ Format your response in clear, professional markdown.`;
       res.json({ message: 'Submission received successfully', submissionId });
     } catch (error: any) {
       console.error('Submit error:', error);
-      res.status(500).json({ message: error.message || 'Failed to submit' });
+      res.status(500).json({ message: 'Failed to submit' });
     }
   });
 
@@ -1410,7 +1453,7 @@ Format your response in clear, professional markdown.`;
       });
     } catch (error: any) {
       console.error('Status error:', error);
-      res.status(500).json({ message: error.message || 'Failed to get status' });
+      res.status(500).json({ message: 'Failed to get status' });
     }
   });
 
@@ -1421,7 +1464,7 @@ Format your response in clear, professional markdown.`;
       res.json(submissions);
     } catch (error: any) {
       console.error('Get submissions error:', error);
-      res.status(500).json({ message: error.message || 'Failed to get submissions' });
+      res.status(500).json({ message: 'Failed to get submissions' });
     }
   });
 
@@ -1453,7 +1496,7 @@ Format your response in clear, professional markdown.`;
       res.json(submission);
     } catch (error: any) {
       console.error('Update submission error:', error);
-      res.status(500).json({ message: error.message || 'Failed to update submission' });
+      res.status(500).json({ message: 'Failed to update submission' });
     }
   });
 
@@ -1513,7 +1556,7 @@ Format your response in clear, professional markdown.`;
       });
     } catch (error: any) {
       console.error('Employer verification error:', error);
-      res.status(500).json({ message: error.message || 'Failed to verify employer' });
+      res.status(500).json({ message: 'Failed to verify employer' });
     }
   });
 
@@ -1643,7 +1686,7 @@ Format your response in clear, professional markdown.`;
       res.json({ message: 'Report sent successfully' });
     } catch (error: any) {
       console.error('Send report error:', error);
-      res.status(500).json({ message: error.message || 'Failed to send report' });
+      res.status(500).json({ message: 'Failed to send report' });
     }
   });
 

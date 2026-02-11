@@ -158,7 +158,7 @@ export function usePerformanceObserver() {
       const observer = new PerformanceObserver((list) => {
         for (const entry of list.getEntries()) {
           // Log performance entries for monitoring
-          if (process.env.NODE_ENV === 'development') {
+          if (import.meta.env.DEV) {
             console.log(`Performance: ${entry.name} - ${entry.duration}ms`)
           }
         }

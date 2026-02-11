@@ -14,12 +14,6 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
   const [localResult, setLocalResult] = useState<any>(null);
   const [localLoading, setLocalLoading] = useState(false);
 
-  console.log('FileUpload component props:');
-  console.log('  onFileUpload:', !!onFileUpload);
-  console.log('  onVerificationResult:', !!onVerificationResult);
-  console.log('  onLoading:', !!onLoading);
-  console.log('  onError:', !!onError);
-
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -56,13 +50,6 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
   };
 
   const processFile = (selectedFile: File) => {
-    console.log('=== FILEUPLOAD COMPONENT DEBUG ===');
-    console.log('Processing file:', selectedFile);
-    console.log('File name:', selectedFile?.name);
-    console.log('File type:', selectedFile?.type);
-    console.log('File size:', selectedFile?.size);
-    console.log('onFileUpload callback:', !!onFileUpload);
-    
     if (selectedFile.type !== 'application/pdf') {
       setError('Please upload a valid PDF file.');
       return;
@@ -81,8 +68,6 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
   };
 
   const uploadAndVerify = async (selectedFile: File) => {
-    console.log('=== DIRECT VERIFICATION UPLOAD ===');
-    
     // Set loading state both locally and via callback
     setLocalLoading(true);
     setLocalResult(null);
@@ -96,21 +81,13 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
         throw new Error('Invalid file selected');
       }
       
-      console.log('Uploading file:', selectedFile.name, 'Size:', selectedFile.size);
-      
-      // Create form data
       const formData = new FormData();
       formData.append('file', selectedFile, selectedFile.name);
       
-      console.log('FormData created, has file:', formData.has('file'));
-      
-      // Upload to backend
       const response = await fetch('/api/verify', {
         method: 'POST',
         body: formData
       });
-      
-      console.log('Response status:', response.status);
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -118,7 +95,6 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
       }
       
       const data = await response.json();
-      console.log('Verification response:', data);
       
       // Transform backend response
       const typeMapping: Record<string, 'genuine' | 'suspicious' | 'fake'> = {
@@ -137,8 +113,6 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
       setLocalResult(transformedResult);
       if (onVerificationResult) {
         onVerificationResult(transformedResult);
-      } else {
-        console.log('Verification completed successfully:', transformedResult);
       }
       
     } catch (err) {
@@ -195,6 +169,10 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
         >
           Select PDF File
         </label>
+        
+        <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
+          PDF only, max 10MB. Compliant with UK GDPR and the Data Protection Act 2018. We process metadata only. Your document is permanently deleted immediately after verification.
+        </p>
       </div>
       
       {file && (

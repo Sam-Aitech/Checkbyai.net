@@ -83,13 +83,31 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="border-t border-white/20 mt-8 pt-8 text-center">
-          <p className="text-blue-100 text-sm font-medium">
-            &copy; {new Date().getFullYear()} Check By AI. All rights reserved.
-          </p>
-          <p className="text-blue-100/80 text-xs mt-2">
-            This tool provides technical analysis only and does not constitute legal or immigration advice.
-          </p>
+        <div className="border-t border-white/20 mt-8 pt-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div className="text-left">
+              <h5 className="text-sm font-semibold text-white mb-2">Data Protection</h5>
+              <p className="text-blue-100/80 text-xs leading-relaxed">
+                Compliant with UK GDPR and the Data Protection Act 2018. We process document metadata only. 
+                Original documents are deleted immediately after verification. Free users: results are removed 
+                when you leave the site. Paid account holders: only verification results are retained, never 
+                original documents. You have the right to request erasure of your data at any time.
+              </p>
+            </div>
+            <div className="text-left md:text-right">
+              <h5 className="text-sm font-semibold text-white mb-2">Legal</h5>
+              <p className="text-blue-100/80 text-xs leading-relaxed">
+                This tool provides technical analysis only and does not constitute legal or immigration advice.
+                Processing is carried out under Article 6(1)(f) UK GDPR (legitimate interests) for fraud 
+                prevention purposes. For data subject requests, contact us via the admin portal.
+              </p>
+            </div>
+          </div>
+          <div className="text-center">
+            <p className="text-blue-100 text-sm font-medium">
+              &copy; {new Date().getFullYear()} Check By AI. All rights reserved.
+            </p>
+          </div>
         </div>
       </div>
     </footer>
