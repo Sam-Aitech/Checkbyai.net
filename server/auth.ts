@@ -5,7 +5,7 @@ import type { Express, RequestHandler } from "express";
 import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
 import crypto from "crypto";
-import bcrypt from "bcrypt";
+
 
 if (!process.env.REPLIT_DOMAINS) {
   throw new Error("Environment variable REPLIT_DOMAINS not provided");
@@ -531,50 +531,6 @@ export async function setupAuth(app: Express) {
     } catch (error) {
       console.error("Error verifying admin OTP:", error);
       res.status(500).json({ error: "Failed to verify code" });
-    }
-  });
-
-  // Change password (authenticated users only)
-  app.post("/api/auth/change-password", isAuthenticated, async (req, res) => {
-    try {
-      const { currentPassword, newPassword } = req.body;
-      
-      if (!currentPassword || !newPassword) {
-        return res.status(400).json({ error: "Current password and new password required" });
-      }
-
-      if (newPassword.length < 8) {
-        return res.status(400).json({ error: "New password must be at least 8 characters" });
-      }
-
-      const user = req.user as any;
-      const userId = user.id;
-
-      // Get user from database
-      const dbUser = await storage.getUser(userId);
-      
-      if (!dbUser || !dbUser.hashedPassword) {
-        return res.status(400).json({ error: "Password change not available for this account" });
-      }
-
-      // Verify current password
-      const isPasswordValid = await bcrypt.compare(currentPassword, dbUser.hashedPassword);
-      
-      if (!isPasswordValid) {
-        return res.status(401).json({ error: "Current password is incorrect" });
-      }
-
-      // Hash new password
-      const saltRounds = 10;
-      const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
-
-      // Update password
-      await storage.updateUserPassword(userId, hashedPassword);
-
-      res.json({ message: "Password changed successfully" });
-    } catch (error) {
-      console.error("Error changing password:", error);
-      res.status(500).json({ error: "Failed to change password" });
     }
   });
 

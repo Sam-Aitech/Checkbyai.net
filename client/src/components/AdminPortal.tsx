@@ -13,7 +13,6 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import FeedbackAnalytics from "./FeedbackAnalytics";
-import PasswordChange from "./PasswordChange";
 
 export default function AdminPortal() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -1062,7 +1061,21 @@ export default function AdminPortal() {
             </div>
             
             <div className="flex justify-center">
-              <PasswordChange />
+              <Card className="max-w-md">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    Admin Authentication
+                  </CardTitle>
+                  <CardDescription>
+                    Admin login is secured via email OTP verification only. No password is required.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">
+                    To sign in, enter your admin email address and verify with the one-time code sent to your inbox.
+                  </p>
+                </CardContent>
+              </Card>
             </div>
           </div>
         )}

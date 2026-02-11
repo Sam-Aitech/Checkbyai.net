@@ -8,9 +8,10 @@ Preferred communication style: Simple, everyday language.
 
 ## Admin Access
 - Admin portal accessible at `/admin`
-- Admin login via email OTP only (no password)
+- Admin login via email OTP only, no password authentication
 - OTP sent via Resend to the configured `ADMIN_EMAIL`
 - Only the email matching `ADMIN_EMAIL` can receive admin OTP codes
+- `ADMIN_PASSWORD` env var is no longer used or required
 - Default admin: ptel437@gmail.com
 
 ## System Architecture
@@ -37,7 +38,7 @@ The system employs a dual-portal design. An Admin Portal facilitates the upload 
 **Key Features:**
 - **User Portal**: File upload, real-time verification results with confidence scores, forensic analysis breakdown, and detailed check results.
 - **Admin Portal**: Management of trusted COS documents with metadata display, system statistics dashboard, and admin-only routes protected by role check.
-- **Authentication**: Database-backed user authentication with role-based access control (admin/user) and session management. Supports Google OAuth and Email OTP verification via Brevo, including daily verification limits.
+- **Authentication**: Database-backed user authentication with role-based access control (admin/user) and session management. Supports Google OAuth and Email OTP verification via Resend. Admin login is OTP-only (no password).
 - **Dynamic AI Knowledge Engine**: Trainable AI system that allows admins to add custom forensic rules and pattern-specific instructions. Global rules apply to all verifications; pattern-specific instructions apply when producer matches. AI explicitly cites admin rules in analysis output (e.g., "Per Admin Rule #3...").
 - **Human-in-the-Loop (HITL) Feedback**: Admins can override AI results by approving or marking documents as fake. When marking as fake, admins must provide reasoning. This feedback is injected into future AI analyses as "human expert corrections" to train the AI and prevent repeated mistakes. Visual "Admin Overridden" badges appear when admins disagree with AI.
 - **Multi-AI Fallback System**: Automatic failover between AI providers (OpenAI → Claude → DeepSeek) for reliable document analysis even if one provider is down.
@@ -114,8 +115,7 @@ The system employs a dual-portal design. An Admin Portal facilitates the upload 
 - `GET /api/auth/user` - Get current authenticated user
 
 ## Environment Variables
-- `ADMIN_EMAIL` - Admin email address for forced admin access
-- `ADMIN_PASSWORD` - Admin password for forced admin access
+- `ADMIN_EMAIL` - Admin email address for OTP-based admin access
 - `BREVO_API_KEY` - Brevo API key for sending verification emails
 - `GOOGLE_CLIENT_ID` - Google OAuth client ID
 - `GOOGLE_CLIENT_SECRET` - Google OAuth client secret
@@ -140,7 +140,7 @@ Each verification now generates:
 Documents are still deleted immediately after processing - only the hash and receipt are retained
 
 ## Security Hardening (Feb 2026)
-- Admin credentials: env var only (ADMIN_EMAIL, ADMIN_PASSWORD required, no fallback)
+- Admin credentials: env var only (ADMIN_EMAIL required, OTP-only login, no password)
 - File uploads: 10MB max, PDF only (multer fileFilter + limits)
 - CORS: same-origin only (no wildcard)
 - Session cookies: secure flag enabled in production
