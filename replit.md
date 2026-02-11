@@ -24,6 +24,8 @@ The system employs a dual-portal design. An Admin Portal facilitates the upload 
 - **Build Tool**: Vite with SWC
 - **3D Graphics**: Three.js with @react-three/fiber for an animated landing page.
 - **UI/UX Decisions**: Professional color scheme, adaptive color-changing result badges with gradient backgrounds and animations, mobile optimization with responsive design.
+- **PageLayout Component**: Shared layout wrapper (`client/src/components/PageLayout.tsx`) providing sticky top navigation (logo, 6 nav links with active state, UserProfile, mobile hamburger menu) and Footer across all 12 pages. Home page uses `hideFooter` prop since HeroSection has its own footer.
+- **SEO**: Every page has unique SEOHead with title, description, canonical URL, OG tags. Rich structured data: WebApplication (Home), FAQPage (COSGuide), Product/Offer (Pricing), TechArticle (Technology), BreadcrumbList on key pages.
 
 **Backend:**
 - **Runtime**: Node.js with Express
