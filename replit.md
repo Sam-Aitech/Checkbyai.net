@@ -120,4 +120,19 @@ The system employs a dual-portal design. An Admin Portal facilitates the upload 
 - `DATABASE_URL` - PostgreSQL connection string
 
 **Verification Routes:**
-- `POST /api/verify` - Upload and verify a COS document
+- `POST /api/verify` - Upload and verify a COS document (returns receiptId, documentHash, checks[])
+- `GET /api/receipt/:receiptId` - Get cryptographic verification receipt
+- `GET /api/my-verifications` - User's verification history (authenticated)
+
+## New Pages (Feb 2026)
+- `/technology` - Detailed verification methodology page (pattern-protected)
+- `/api-docs` - B2B API documentation for immigration consultancies and HR platforms
+- `/history` - User verification history with audit trail
+- `/ai-guide` - AI Guide with pre-check red flags warning section
+
+## Verification Receipt System
+Each verification now generates:
+- **Receipt ID**: Unique identifier (e.g., CBA-XXXX-XXXX) for audit trail reference
+- **Document Hash**: SHA-256 hash of the uploaded document for tamper-proof verification
+- **Integrity Hash**: Cryptographic proof combining receipt ID, document hash, result, confidence, and timestamp
+Documents are still deleted immediately after processing - only the hash and receipt are retained

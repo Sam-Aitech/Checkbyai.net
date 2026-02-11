@@ -68,18 +68,18 @@ export default function Footer() {
                 </a>
               </li>
               <li>
-                <a href="/ai-guide" className="text-blue-100 hover:text-white transition-colors font-medium">
-                  AI Technology
+                <a href="/technology" className="text-blue-100 hover:text-white transition-colors font-medium">
+                  Our Technology
+                </a>
+              </li>
+              <li>
+                <a href="/api-docs" className="text-blue-100 hover:text-white transition-colors font-medium">
+                  API Documentation
                 </a>
               </li>
               <li>
                 <a href="/pricing" className="text-blue-100 hover:text-white transition-colors font-medium">
                   Pricing
-                </a>
-              </li>
-              <li>
-                <a href="/dashboard" className="text-blue-100 hover:text-white transition-colors font-medium">
-                  Get Started
                 </a>
               </li>
             </ul>

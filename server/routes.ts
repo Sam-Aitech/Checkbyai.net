@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import * as fs from "fs";
+import * as crypto from "crypto";
 import Stripe from "stripe";
 import { storage } from "./storage";
 import { db } from "./db";
@@ -12,6 +13,17 @@ import multer from "multer";
 import { z } from "zod";
 import { PDFAnalyzer } from "./services/pdfAnalyzer";
 import bcrypt from "bcrypt";
+
+function generateReceiptId(): string {
+  const random1 = crypto.randomBytes(4).toString('hex').toUpperCase();
+  const random2 = crypto.randomBytes(4).toString('hex').toUpperCase();
+  return `CBA-${random1}-${random2}`;
+}
+
+function generateDocumentHash(filePath: string): string {
+  const fileBuffer = fs.readFileSync(filePath);
+  return crypto.createHash('sha256').update(fileBuffer).digest('hex');
+}
 
 // Initialize Stripe
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -452,6 +464,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await recordIpVerification(hashedIp);
       }
 
+      // Generate document hash for audit trail
+      const documentHash = generateDocumentHash(req.file.path);
+      const receiptId = generateReceiptId();
+
       // Use Node.js PDF analyzer instead of Python
       const pdfAnalyzer = new PDFAnalyzer();
       const metadata = await pdfAnalyzer.extractMetadata(req.file.path);
@@ -462,7 +478,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Use the rule-based result from the analyzer
       const result = analysis.result;
 
-      // Store verification result
+      // Store verification result with receipt and hash
       const verificationId = await storage.createVerificationResult(
         req.file.originalname,
         result,
@@ -470,11 +486,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         metadata,
         analysis,
         req.ip,
-        userId
+        userId,
+        receiptId,
+        documentHash
       );
 
       res.json({
         id: verificationId,
+        receiptId,
+        documentHash,
         result,
         confidence: analysis.confidence,
         details: analysis.details,
@@ -505,6 +525,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.error('Error deleting uploaded file:', err);
         }
       }
+    }
+  });
+
+  // Verification receipt endpoint
+  app.get('/api/receipt/:receiptId', async (req, res) => {
+    try {
+      const { receiptId } = req.params;
+      const verification = await storage.getVerificationByReceiptId(receiptId);
+      
+      if (!verification) {
+        return res.status(404).json({ message: 'Receipt not found' });
+      }
+
+      const receiptData = {
+        receiptId: verification.receiptId,
+        documentHash: verification.documentHash,
+        result: verification.result,
+        confidence: verification.confidence,
+        verifiedAt: verification.verifiedAt,
+        checksPerformed: (verification.analysisDetails as any)?.checks?.length || 0,
+        integrityHash: crypto.createHash('sha256')
+          .update(`${verification.receiptId}:${verification.documentHash}:${verification.result}:${verification.confidence}:${verification.verifiedAt}`)
+          .digest('hex')
+      };
+
+      res.json(receiptData);
+    } catch (error) {
+      console.error("Error fetching receipt:", error);
+      res.status(500).json({ message: "Failed to fetch receipt" });
+    }
+  });
+
+  // User verification history
+  app.get('/api/my-verifications', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const verifications = await storage.getVerificationsByUserId(userId);
+      
+      const history = verifications.map(v => ({
+        id: v.id,
+        receiptId: v.receiptId,
+        documentHash: v.documentHash,
+        filename: v.filename,
+        result: v.result,
+        confidence: v.confidence,
+        verifiedAt: v.verifiedAt,
+        adminStatus: v.adminStatus,
+        checks: (v.analysisDetails as any)?.checks || [],
+      }));
+      
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching verification history:", error);
+      res.status(500).json({ message: "Failed to fetch verification history" });
     }
   });
 

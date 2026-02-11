@@ -76,8 +76,12 @@ export interface IStorage {
     metadata: any,
     analysisDetails: any,
     ipAddress?: string,
-    userId?: string
+    userId?: string,
+    receiptId?: string,
+    documentHash?: string
   ): Promise<number>;
+  getVerificationsByUserId(userId: string, limit?: number): Promise<VerificationResult[]>;
+  getVerificationByReceiptId(receiptId: string): Promise<VerificationResult | undefined>;
   getRecentActivity(limit?: number): Promise<VerificationResult[]>;
   getVerificationById(id: number): Promise<VerificationResult | undefined>;
   getPaginatedVerificationLogs(options: {
@@ -490,7 +494,9 @@ export class DatabaseStorage implements IStorage {
     metadata: any,
     analysisDetails: any,
     ipAddress?: string,
-    userId?: string
+    userId?: string,
+    receiptId?: string,
+    documentHash?: string
   ): Promise<number> {
     const [verification] = await db
       .insert(verificationResults)
@@ -502,9 +508,28 @@ export class DatabaseStorage implements IStorage {
         metadata,
         analysisDetails,
         ipAddress,
+        receiptId,
+        documentHash,
       })
       .returning();
     return verification.id;
+  }
+
+  async getVerificationsByUserId(userId: string, limit: number = 50): Promise<VerificationResult[]> {
+    return await db
+      .select()
+      .from(verificationResults)
+      .where(eq(verificationResults.userId, userId))
+      .orderBy(desc(verificationResults.verifiedAt))
+      .limit(limit);
+  }
+
+  async getVerificationByReceiptId(receiptId: string): Promise<VerificationResult | undefined> {
+    const [result] = await db
+      .select()
+      .from(verificationResults)
+      .where(eq(verificationResults.receiptId, receiptId));
+    return result;
   }
 
   async getRecentActivity(limit: number = 20): Promise<VerificationResult[]> {

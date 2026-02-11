@@ -15,6 +15,9 @@ const CheckoutSuccess = lazy(() => import("@/pages/CheckoutSuccess"));
 const Submit = lazy(() => import("@/pages/Submit"));
 const AIGuide = lazy(() => import("@/pages/AIGuide"));
 const COSGuide = lazy(() => import("@/pages/COSGuide"));
+const Technology = lazy(() => import("@/pages/Technology"));
+const ApiDocs = lazy(() => import("@/pages/ApiDocs"));
+const VerificationHistory = lazy(() => import("@/pages/VerificationHistory"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 // Minimal loading component for route transitions
@@ -42,6 +45,9 @@ function Router() {
         <Route path="/submit" component={Submit} />
         <Route path="/ai-guide" component={AIGuide} />
         <Route path="/cos-guide" component={COSGuide} />
+        <Route path="/technology" component={Technology} />
+        <Route path="/api-docs" component={ApiDocs} />
+        <Route path="/history" component={VerificationHistory} />
         <Route component={NotFound} />
       </Switch>
     </Suspense>

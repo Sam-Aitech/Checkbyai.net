@@ -96,6 +96,8 @@ export const verificationResults = pgTable(
     metadata: jsonb("metadata").notNull(),
     analysisDetails: jsonb("analysis_details").notNull(),
     ipAddress: varchar("ip_address"),
+    receiptId: varchar("receipt_id").unique(),
+    documentHash: varchar("document_hash"),
     verifiedAt: timestamp("verified_at").defaultNow(),
     // HITL (Human-in-the-Loop) feedback fields
     adminStatus: varchar("admin_status").default("pending"), // 'pending', 'approved', 'fake'

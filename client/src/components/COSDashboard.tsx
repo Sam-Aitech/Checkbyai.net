@@ -8,6 +8,14 @@ interface VerificationResult {
   type: 'genuine' | 'suspicious' | 'fake';
   confidence: number;
   mismatchedFields?: string[];
+  checks?: Array<{
+    name: string;
+    passed: boolean;
+    severity: 'critical' | 'warning' | 'info';
+    message: string;
+  }>;
+  receiptId?: string;
+  documentHash?: string;
 }
 
 export default function COSDashboard() {

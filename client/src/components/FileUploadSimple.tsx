@@ -6,6 +6,14 @@ interface VerificationResult {
   type: 'genuine' | 'suspicious' | 'fake';
   confidence: number;
   mismatchedFields?: string[];
+  checks?: Array<{
+    name: string;
+    passed: boolean;
+    severity: 'critical' | 'warning' | 'info';
+    message: string;
+  }>;
+  receiptId?: string;
+  documentHash?: string;
 }
 
 interface FileUploadSimpleProps {
@@ -152,7 +160,10 @@ export default function FileUploadSimple({
       const transformedResult: VerificationResult = {
         type: typeMapping[data.result] || 'fake',
         confidence: data.confidence || 0,
-        mismatchedFields: data.mismatchedFields || []
+        mismatchedFields: data.mismatchedFields || [],
+        checks: data.checks || [],
+        receiptId: data.receiptId,
+        documentHash: data.documentHash
       };
 
       setResult(transformedResult);

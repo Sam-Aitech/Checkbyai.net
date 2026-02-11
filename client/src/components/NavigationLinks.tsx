@@ -10,11 +10,13 @@ export default function NavigationLinks({ className = "" }: NavigationLinksProps
     { href: "/dashboard", label: "COS Check", description: "Upload and verify your Certificate of Sponsorship" },
     { href: "/ai-guide", label: "AI Guide", description: "Learn about check by AI technology" },
     { href: "/cos-guide", label: "COS Guide", description: "Certificate of Sponsorship verification guide" },
+    { href: "/technology", label: "Technology", description: "How our AI verification technology works" },
+    { href: "/api-docs", label: "API Docs", description: "Integration documentation for developers" },
   ];
 
   return (
     <nav className={className} aria-label="Main navigation">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {links.map((link) => (
           <Link key={link.href} href={link.href}>
             <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600">
