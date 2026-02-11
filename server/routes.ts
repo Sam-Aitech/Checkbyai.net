@@ -36,6 +36,8 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 // Configure multer for file uploads
 const upload = multer({ dest: 'uploads/' });
 
+const processedCheckoutSessions = new Set<string>();
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
@@ -110,7 +112,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Subscription management routes
+  // Subscription management routes - redirects to checkout flow
   app.post('/api/create-subscription', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
@@ -120,13 +122,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
-      // Check if user already has an active subscription
       if (user.stripeSubscriptionId) {
         const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
         if (subscription.status === 'active') {
           return res.json({
             subscriptionId: subscription.id,
-            clientSecret: null, // Will be handled by frontend
             status: 'active'
           });
         }
@@ -136,43 +136,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'No user email on file' });
       }
 
-      // Create or retrieve Stripe customer
-      let customer;
-      if (user.stripeCustomerId) {
-        customer = await stripe.customers.retrieve(user.stripeCustomerId);
-      } else {
-        customer = await stripe.customers.create({
+      let customerId = user.stripeCustomerId;
+      if (!customerId) {
+        const customer = await stripe.customers.create({
           email: user.email,
           name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
         });
         await storage.updateUserStripeInfo(userId, customer.id);
+        customerId = customer.id;
       }
 
-      // Create subscription (you'll need to create a price in Stripe dashboard)
-      const subscription = await stripe.subscriptions.create({
-        customer: customer.id,
-        items: [{
-          price: 'price_1234567890', // Replace with your actual price ID from Stripe
-        }],
-        payment_behavior: 'default_incomplete',
-        payment_settings: { save_default_payment_method: 'on_subscription' },
-        expand: ['latest_invoice.payment_intent'],
+      const allPrices = await stripe.prices.list({ active: true, limit: 50, expand: ['data.product'] });
+      const unlimitedPrice = allPrices.data.find(p => {
+        const prod = p.product as any;
+        return prod?.metadata?.packageType === 'unlimited' && p.recurring;
       });
 
-      // Update user with subscription info
-      await storage.updateUserStripeInfo(userId, customer.id, subscription.id);
+      if (!unlimitedPrice) {
+        return res.status(400).json({ 
+          message: 'Unlimited subscription plan not configured in Stripe. Please use the checkout flow instead.',
+          redirect: '/pricing'
+        });
+      }
 
-      const paymentIntent = subscription.latest_invoice && 
-                            typeof subscription.latest_invoice === 'object' && 
-                            (subscription.latest_invoice as any).payment_intent;
-      
-      res.json({
-        subscriptionId: subscription.id,
-        clientSecret: paymentIntent && typeof paymentIntent === 'object' 
-                      ? (paymentIntent as any).client_secret 
-                      : null,
-        status: subscription.status
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        payment_method_types: ['card'],
+        line_items: [{ price: unlimitedPrice.id, quantity: 1 }],
+        mode: 'subscription',
+        success_url: `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${baseUrl}/pricing`,
+        metadata: { userId, packageType: 'unlimited' },
       });
+
+      res.json({ url: session.url, status: 'redirect' });
     } catch (error: any) {
       console.error("Subscription creation error:", error);
       res.status(500).json({ message: error.message });
@@ -191,63 +189,121 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    // Handle subscription events
     switch (event.type) {
       case 'customer.subscription.updated':
-      case 'customer.subscription.deleted':
-        const subscription = event.data.object;
-        // Find user by Stripe subscription ID and update their status
-        // Note: You'll need to implement a method to find user by subscription ID
+      case 'customer.subscription.deleted': {
+        const subscription = event.data.object as any;
+        const customerId = typeof subscription.customer === 'string' 
+          ? subscription.customer 
+          : subscription.customer?.id;
+        
+        if (customerId) {
+          const user = await storage.getUserByStripeCustomerId(customerId);
+          if (user) {
+            if (subscription.status === 'active') {
+              await storage.updateUserSubscription(user.id, {
+                subscriptionStatus: 'pro',
+                stripeSubscriptionId: subscription.id,
+                stripeCustomerId: customerId,
+              });
+            } else if (subscription.status === 'canceled' || subscription.status === 'unpaid' || event.type === 'customer.subscription.deleted') {
+              await storage.updateUserSubscription(user.id, {
+                subscriptionStatus: 'free',
+                stripeSubscriptionId: null,
+              });
+            }
+          }
+        }
         break;
-      case 'invoice.payment_succeeded':
-        // Update user to pro status
+      }
+      case 'invoice.payment_succeeded': {
+        const invoice = event.data.object as any;
+        const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
+        if (customerId && invoice.subscription) {
+          const user = await storage.getUserByStripeCustomerId(customerId);
+          if (user) {
+            await storage.updateUserSubscription(user.id, {
+              subscriptionStatus: 'pro',
+              stripeSubscriptionId: invoice.subscription,
+              stripeCustomerId: customerId,
+            });
+          }
+        }
         break;
-      case 'invoice.payment_failed':
-        // Handle failed payment
+      }
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object as any;
+        const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
+        if (customerId) {
+          const user = await storage.getUserByStripeCustomerId(customerId);
+          if (user) {
+            await storage.updateUserSubscription(user.id, {
+              subscriptionStatus: 'past_due',
+            });
+          }
+        }
         break;
+      }
+      case 'checkout.session.completed': {
+        const session = event.data.object as any;
+        const userId = session.metadata?.userId;
+        const packageType = session.metadata?.packageType;
+        
+        if (userId && packageType && session.payment_status === 'paid' && !processedCheckoutSessions.has(session.id)) {
+          processedCheckoutSessions.add(session.id);
+          if (packageType === 'starter') {
+            await storage.addCredits(userId, 50);
+          } else if (packageType === 'pro') {
+            await storage.addCredits(userId, 100);
+          } else if (packageType === 'unlimited') {
+            await storage.updateUserSubscription(userId, {
+              subscriptionStatus: 'pro',
+              stripeSubscriptionId: session.subscription,
+              stripeCustomerId: session.customer,
+            });
+          } else if (packageType === 'master') {
+            await storage.createPaidSubmission({
+              email: session.customer_details?.email || '',
+              packageType: 'full',
+              paymentStatus: 'paid',
+              stripeSessionId: session.id,
+              priority: true,
+              phoneConsultationRequested: true,
+            });
+          }
+        }
+        break;
+      }
     }
 
     res.json({ received: true });
   });
 
-  // Get available credit packages/products
+  // Get available credit packages/products from Stripe API directly
   app.get('/api/packages', async (req, res) => {
     try {
-      const result = await db.execute(sql`
-        SELECT 
-          p.id as product_id,
-          p.name as product_name,
-          p.description as product_description,
-          p.metadata as product_metadata,
-          pr.id as price_id,
-          pr.unit_amount,
-          pr.currency,
-          pr.recurring,
-          pr.metadata as price_metadata
-        FROM stripe.products p
-        LEFT JOIN stripe.prices pr ON pr.product = p.id AND pr.active = true
-        WHERE p.active = true
-        ORDER BY pr.unit_amount ASC
-      `);
-      
+      const products = await stripe.products.list({ active: true, limit: 20 });
+      const prices = await stripe.prices.list({ active: true, limit: 50 });
+
       const productsMap = new Map();
-      for (const row of result.rows as any[]) {
-        if (!productsMap.has(row.product_id)) {
-          productsMap.set(row.product_id, {
-            id: row.product_id,
-            name: row.product_name,
-            description: row.product_description,
-            metadata: row.product_metadata,
-            prices: []
-          });
-        }
-        if (row.price_id) {
-          productsMap.get(row.product_id).prices.push({
-            id: row.price_id,
-            unit_amount: row.unit_amount,
-            currency: row.currency,
-            recurring: row.recurring,
-            metadata: row.price_metadata,
+      for (const product of products.data) {
+        const productPrices = prices.data
+          .filter(p => p.product === product.id)
+          .map(p => ({
+            id: p.id,
+            unit_amount: p.unit_amount,
+            currency: p.currency,
+            recurring: p.recurring,
+            metadata: p.metadata,
+          }));
+        
+        if (productPrices.length > 0) {
+          productsMap.set(product.id, {
+            id: product.id,
+            name: product.name,
+            description: product.description,
+            metadata: product.metadata,
+            prices: productPrices,
           });
         }
       }
@@ -341,16 +397,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const sessionUserId = session.metadata?.userId;
         
         if (sessionUserId && sessionUserId === req.user.id) {
-          if (packageType === 'starter') {
-            await storage.addCredits(sessionUserId, 50);
-          } else if (packageType === 'pro') {
-            await storage.addCredits(sessionUserId, 100);
-          } else if (packageType === 'unlimited') {
-            await storage.updateUserSubscription(sessionUserId, {
-              subscriptionStatus: 'pro',
-              stripeSubscriptionId: session.subscription as string,
-              stripeCustomerId: session.customer as string,
-            });
+          if (!processedCheckoutSessions.has(sessionId)) {
+            processedCheckoutSessions.add(sessionId);
+            if (packageType === 'starter') {
+              await storage.addCredits(sessionUserId, 50);
+            } else if (packageType === 'pro') {
+              await storage.addCredits(sessionUserId, 100);
+            } else if (packageType === 'unlimited') {
+              await storage.updateUserSubscription(sessionUserId, {
+                subscriptionStatus: 'pro',
+                stripeSubscriptionId: session.subscription as string,
+                stripeCustomerId: session.customer as string,
+              });
+            } else if (packageType === 'master') {
+              await storage.createPaidSubmission({
+                email: session.customer_details?.email || req.user.email || '',
+                packageType: 'full',
+                paymentStatus: 'paid',
+                stripeSessionId: session.id,
+                priority: true,
+                phoneConsultationRequested: true,
+              });
+            }
           }
           
           const credits = await storage.getCredits(sessionUserId);
