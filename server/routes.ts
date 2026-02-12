@@ -5,17 +5,17 @@ import * as crypto from "crypto";
 import Stripe from "stripe";
 import { storage } from "./storage";
 import { db } from "./db";
-import { sql, eq, and, desc, inArray } from "drizzle-orm";
+import { sql, eq, and, desc, inArray, gte } from "drizzle-orm";
 import { setupAuth, isAuthenticated, isAdmin } from "./auth";
 import { checkIpRateLimit, recordIpVerification, getClientIp, hashIpAddress } from "./ipRateLimit";
-import { insertVerificationResultSchema, insertFeedbackSchema, companyWatches, sponsorList, sponsorChanges, notificationPreferences } from "@shared/schema";
+import { insertVerificationResultSchema, insertFeedbackSchema, companyWatches, sponsorList, sponsorChanges, notificationPreferences, notificationLog } from "@shared/schema";
 import multer from "multer";
 import { z } from "zod";
 import { PDFAnalyzer } from "./services/pdfAnalyzer";
 import bcrypt from "bcrypt";
 import { rebuildSponsorIndex, searchSponsors, isIndexReady } from "./utils/sponsorSearch";
-import { normalizeName } from "./utils/sponsorListFetcher";
-import { runSponsorMonitorJob, startSponsorMonitorCron, isJobRunning } from "./utils/sponsorMonitorJob";
+import { normalizeName, downloadAndParseSponsorList, storeSnapshot, getLatestSnapshotDate } from "./utils/sponsorListFetcher";
+import { runSponsorMonitorJob, startSponsorMonitorCron, isJobRunning, getLastRunInfo } from "./utils/sponsorMonitorJob";
 
 const CHECKOUT_HMAC_SECRET = process.env.CHECKOUT_HMAC_SECRET || process.env.SESSION_SECRET || process.env.STRIPE_SECRET_KEY!;
 
@@ -1572,6 +1572,110 @@ Format your response in clear, professional markdown.`;
     } catch (error) {
       console.error("Error triggering sponsor monitor job:", error);
       res.status(500).json({ message: "Failed to trigger sponsor monitor job." });
+    }
+  });
+
+  // Initialize sponsor monitor with first snapshot
+  app.post('/api/admin/sponsor-monitor/initialize', isAdmin, async (req: any, res) => {
+    try {
+      const existingDate = await getLatestSnapshotDate();
+      if (existingDate) {
+        return res.status(409).json({
+          message: `A snapshot already exists (${existingDate}). Use the daily run or manual trigger to update.`,
+          latestSnapshot: existingDate,
+        });
+      }
+
+      console.log("[SponsorMonitor] Admin-triggered initialization starting...");
+      const records = await downloadAndParseSponsorList();
+
+      if (records.length === 0) {
+        return res.status(502).json({ message: "CSV download returned 0 records. The gov.uk data source may be temporarily unavailable." });
+      }
+
+      const today = new Date().toISOString().split("T")[0];
+      await storeSnapshot(records, today);
+      await rebuildSponsorIndex();
+
+      console.log(`[SponsorMonitor] Initialization complete: ${records.length} records stored for ${today}`);
+      res.json({
+        message: "Initial snapshot loaded successfully.",
+        snapshotDate: today,
+        recordCount: records.length,
+      });
+    } catch (error: any) {
+      console.error("[SponsorMonitor] Initialization failed:", error);
+      res.status(500).json({ message: "Failed to initialize sponsor monitor. " + (error.message || "") });
+    }
+  });
+
+  // Sponsor monitor status dashboard
+  app.get('/api/admin/sponsor-monitor/status', isAdmin, async (req: any, res) => {
+    try {
+      const latestDate = await getLatestSnapshotDate();
+
+      let snapshotRecordCount = 0;
+      if (latestDate) {
+        const countResult = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(sponsorList)
+          .where(eq(sponsorList.snapshotDate, latestDate));
+        snapshotRecordCount = countResult[0]?.count ?? 0;
+      }
+
+      const lastRunChanges = await db
+        .select({
+          changeType: sponsorChanges.changeType,
+          count: sql<number>`count(*)::int`,
+          snapshotDate: sponsorChanges.snapshotDate,
+        })
+        .from(sponsorChanges)
+        .groupBy(sponsorChanges.snapshotDate, sponsorChanges.changeType)
+        .orderBy(desc(sponsorChanges.snapshotDate))
+        .limit(20);
+
+      let lastRunDate: string | null = null;
+      const lastRunSummary: Record<string, number> = {};
+      if (lastRunChanges.length > 0) {
+        lastRunDate = lastRunChanges[0].snapshotDate;
+        for (const row of lastRunChanges) {
+          if (row.snapshotDate === lastRunDate) {
+            lastRunSummary[row.changeType] = row.count;
+          }
+        }
+      }
+
+      const lastRunMemory = getLastRunInfo();
+
+      const activeWatchResult = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(companyWatches)
+        .where(eq(companyWatches.isActive, true));
+      const activeWatchCount = activeWatchResult[0]?.count ?? 0;
+
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const notifResult = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(notificationLog)
+        .where(
+          and(
+            eq(notificationLog.status, "sent"),
+            gte(notificationLog.sentAt, oneDayAgo)
+          )
+        );
+      const notificationsSent24h = notifResult[0]?.count ?? 0;
+
+      res.json({
+        latestSnapshot: latestDate,
+        snapshotRecordCount,
+        lastRun: lastRunMemory || (lastRunDate ? { date: lastRunDate, success: true, changes: lastRunSummary } : null),
+        activeWatchCount,
+        notificationsSent24h,
+        jobRunning: isJobRunning(),
+      });
+    } catch (error) {
+      console.error("Error fetching sponsor monitor status:", error);
+      res.status(500).json({ message: "Failed to fetch sponsor monitor status." });
     }
   });
 

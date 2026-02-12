@@ -15,6 +15,18 @@ import { notifyAffectedUsers } from "./notificationDispatcher";
 
 let isRunning = false;
 
+interface LastRunInfo {
+  date: string;
+  success: boolean;
+  recordsProcessed: number;
+  changesDetected: number;
+  changes: Record<string, number>;
+  notificationsSent: number;
+  error?: string;
+}
+
+let lastRunInfo: LastRunInfo | null = null;
+
 const RETRY_DELAY_MS = 30 * 60 * 1000;
 const MAX_RETRIES = 3;
 
@@ -225,7 +237,20 @@ export async function runSponsorMonitorJob(source: string = "cron"): Promise<{
     return { ...result, error: errorMsg };
   } finally {
     isRunning = false;
+    lastRunInfo = {
+      date: new Date().toISOString(),
+      success: result.success,
+      recordsProcessed: result.recordsProcessed,
+      changesDetected: Object.values(result.changes).reduce((a, b) => a + b, 0),
+      changes: result.changes,
+      notificationsSent: result.notificationsSent,
+      error: (result as any).error,
+    };
   }
+}
+
+export function getLastRunInfo(): LastRunInfo | null {
+  return lastRunInfo;
 }
 
 export function startSponsorMonitorCron(): void {
