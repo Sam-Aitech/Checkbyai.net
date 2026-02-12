@@ -1249,6 +1249,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Notification history endpoint
+  app.get('/api/notifications/history', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+
+      const results = await db
+        .select({
+          id: notificationLog.id,
+          channel: notificationLog.channel,
+          status: notificationLog.status,
+          sentAt: notificationLog.sentAt,
+          organisationName: sponsorChanges.organisationName,
+          changeType: sponsorChanges.changeType,
+          previousValue: sponsorChanges.previousValue,
+          newValue: sponsorChanges.newValue,
+          detectedAt: sponsorChanges.detectedAt,
+        })
+        .from(notificationLog)
+        .innerJoin(sponsorChanges, eq(notificationLog.changeId, sponsorChanges.id))
+        .where(eq(notificationLog.userId, userId))
+        .orderBy(desc(notificationLog.sentAt))
+        .limit(50);
+
+      res.json(results);
+    } catch (error) {
+      console.error("Error fetching notification history:", error);
+      res.status(500).json({ message: "Failed to fetch notification history." });
+    }
+  });
+
   // Stats endpoint
   app.get('/api/stats', async (req, res) => {
     try {

@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Search, Plus, Building2, MapPin, Star, Route, Loader2, Shield,
   AlertTriangle, Eye, Trash2, Clock, ArrowDown, ArrowUp, XCircle, PlusCircle, CalendarDays,
-  Bell, Mail, MessageSquare, Phone, CheckCircle2, Send, Save,
+  Bell, Mail, MessageSquare, Phone, CheckCircle2, Send, Save, History, CheckCheck, XOctagon, Clock3,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -855,6 +855,8 @@ export default function SponsorMonitor() {
         )}
 
         {isAuthenticated && <NotificationSettings user={user} />}
+
+        {isAuthenticated && <NotificationHistory />}
       </div>
     </PageLayout>
   );
@@ -1029,6 +1031,177 @@ function NotificationSettings({ user }: { user: any }) {
           </div>
         </CardContent>
       </Card>
+    </motion.div>
+  );
+}
+
+interface NotificationHistoryEntry {
+  id: number;
+  channel: string;
+  status: string;
+  sentAt: string | null;
+  organisationName: string;
+  changeType: string;
+  previousValue: string | null;
+  newValue: string | null;
+  detectedAt: string;
+}
+
+function getChangeColor(changeType: string) {
+  switch (changeType) {
+    case "REMOVED": return { bg: "bg-red-100 dark:bg-red-950", text: "text-red-700 dark:text-red-300", border: "border-red-200 dark:border-red-800" };
+    case "DOWNGRADED": return { bg: "bg-amber-100 dark:bg-amber-950", text: "text-amber-700 dark:text-amber-300", border: "border-amber-200 dark:border-amber-800" };
+    case "UPGRADED": return { bg: "bg-emerald-100 dark:bg-emerald-950", text: "text-emerald-700 dark:text-emerald-300", border: "border-emerald-200 dark:border-emerald-800" };
+    case "ADDED": return { bg: "bg-blue-100 dark:bg-blue-950", text: "text-blue-700 dark:text-blue-300", border: "border-blue-200 dark:border-blue-800" };
+    default: return { bg: "bg-gray-100 dark:bg-gray-900", text: "text-gray-700 dark:text-gray-300", border: "border-gray-200 dark:border-gray-800" };
+  }
+}
+
+function getChannelBadge(channel: string) {
+  switch (channel) {
+    case "email": return <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1"><Mail className="w-3 h-3" />Email</Badge>;
+    case "whatsapp": return <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1"><MessageSquare className="w-3 h-3" />WhatsApp</Badge>;
+    case "sms": return <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1"><Phone className="w-3 h-3" />SMS</Badge>;
+    default: return <Badge variant="outline" className="text-[10px] px-1.5 py-0">{channel}</Badge>;
+  }
+}
+
+function getDeliveryStatus(status: string) {
+  switch (status) {
+    case "sent":
+    case "delivered":
+      return <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400"><CheckCheck className="w-3 h-3" />{status === "delivered" ? "Delivered" : "Sent"}</span>;
+    case "failed":
+      return <span className="inline-flex items-center gap-1 text-xs text-red-600 dark:text-red-400"><XOctagon className="w-3 h-3" />Failed</span>;
+    case "queued":
+      return <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Clock3 className="w-3 h-3" />Queued</span>;
+    default:
+      return <span className="text-xs text-muted-foreground">{status}</span>;
+  }
+}
+
+function formatDateTime(dateStr: string | null) {
+  if (!dateStr) return "—";
+  try {
+    return new Date(dateStr).toLocaleString("en-GB", {
+      day: "numeric", month: "short", year: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    });
+  } catch {
+    return dateStr;
+  }
+}
+
+function NotificationHistory() {
+  const { data: history, isLoading, error } = useQuery<NotificationHistoryEntry[]>({
+    queryKey: ["/api/notifications/history"],
+  });
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={springTransition}
+      className="mt-14"
+    >
+      <div className="flex items-center gap-3 mb-6">
+        <History className="w-5 h-5 text-primary" />
+        <h2 className="text-xl font-bold text-foreground">Notification History</h2>
+      </div>
+
+      {isLoading && (
+        <Card>
+          <CardContent className="py-6 space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex items-center justify-between">
+                <div className="space-y-2 flex-1">
+                  <Skeleton className="h-4 w-48" />
+                  <Skeleton className="h-3 w-32" />
+                </div>
+                <Skeleton className="h-5 w-16" />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {error && !isLoading && (
+        <Card className="border-destructive/30 bg-destructive/5">
+          <CardContent className="py-4 flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
+            <p className="text-sm text-destructive">
+              Unable to load notification history right now. Please try again later.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {!isLoading && !error && history && history.length === 0 && (
+        <Card className="border-dashed">
+          <CardContent className="py-10 text-center">
+            <Bell className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+            <h3 className="font-semibold text-foreground mb-1">No alerts yet</h3>
+            <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+              We'll notify you here when something changes with your watched companies.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {!isLoading && !error && history && history.length > 0 && (
+        <div className="space-y-2">
+          <AnimatePresence>
+            {history.map((entry, index) => {
+              const colors = getChangeColor(entry.changeType);
+              return (
+                <motion.div
+                  key={entry.id}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ ...springTransition, delay: index * 0.03 }}
+                >
+                  <Card className="overflow-hidden">
+                    <CardContent className="py-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                            <h4 className="font-semibold text-foreground text-sm">
+                              {entry.organisationName}
+                            </h4>
+                            <Badge className={`text-[10px] px-1.5 py-0 ${colors.bg} ${colors.text} ${colors.border}`}>
+                              {entry.changeType === "ROUTE_CHANGE" ? "Route Change" : entry.changeType.charAt(0) + entry.changeType.slice(1).toLowerCase()}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mb-2">
+                            {entry.changeType === "REMOVED"
+                              ? "Removed from the sponsor register"
+                              : entry.changeType === "ADDED"
+                                ? "Added to the sponsor register"
+                                : entry.previousValue && entry.newValue
+                                  ? `${entry.previousValue} → ${entry.newValue}`
+                                  : entry.changeType === "DOWNGRADED"
+                                    ? "Rating downgraded"
+                                    : entry.changeType === "UPGRADED"
+                                      ? "Rating upgraded"
+                                      : "Change detected"}
+                          </p>
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <span className="text-xs text-muted-foreground">
+                              {formatDateTime(entry.sentAt)}
+                            </span>
+                            {getChannelBadge(entry.channel)}
+                            {getDeliveryStatus(entry.status)}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+        </div>
+      )}
     </motion.div>
   );
 }
