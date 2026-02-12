@@ -99,6 +99,140 @@ export async function cleanupOldSnapshots(daysToKeep: number = 90): Promise<numb
   return 0; // Returning 0 as placeholder since exact count isn't critical for the UI here
 }
 
+export type ChangeType = "REMOVED" | "ADDED" | "DOWNGRADED" | "UPGRADED" | "ROUTE_CHANGE";
+
+export interface SponsorChange {
+  organisationName: string;
+  changeType: ChangeType;
+  previousValue: string | null;
+  newValue: string | null;
+}
+
+interface SnapshotEntry {
+  organisationName: string;
+  organisationNameNormalized: string;
+  typeRating: string | null;
+  route: string | null;
+}
+
+function classifyRatingChange(
+  prevRating: string,
+  newRating: string,
+): ChangeType | null {
+  const prevLower = prevRating.toLowerCase();
+  const newLower = newRating.toLowerCase();
+
+  if (prevLower === newLower) return null;
+
+  const prevIsA = prevLower.includes("a-rating") || prevLower.includes("a rating");
+  const prevIsB = prevLower.includes("b-rating") || prevLower.includes("b rating");
+  const newIsA = newLower.includes("a-rating") || newLower.includes("a rating");
+  const newIsB = newLower.includes("b-rating") || newLower.includes("b rating");
+
+  if (prevIsA && newIsB) return "DOWNGRADED";
+  if (prevIsB && newIsA) return "UPGRADED";
+
+  return null;
+}
+
+export function detectChanges(
+  previous: Map<string, SnapshotEntry>,
+  current: Map<string, SnapshotEntry>,
+): SponsorChange[] {
+  const changes: SponsorChange[] = [];
+  const warnings: string[] = [];
+
+  Array.from(previous.entries()).forEach(([normName, prevRecord]) => {
+    if (!current.has(normName)) {
+      changes.push({
+        organisationName: prevRecord.organisationName,
+        changeType: "REMOVED",
+        previousValue: prevRecord.typeRating,
+        newValue: null,
+      });
+    }
+  });
+
+  Array.from(current.entries()).forEach(([normName, currRecord]) => {
+    if (!previous.has(normName)) {
+      changes.push({
+        organisationName: currRecord.organisationName,
+        changeType: "ADDED",
+        previousValue: null,
+        newValue: currRecord.typeRating,
+      });
+    }
+  });
+
+  Array.from(previous.entries()).forEach(([normName, prevRecord]) => {
+    const currRecord = current.get(normName);
+    if (!currRecord) return;
+
+    const prevRating = (prevRecord.typeRating ?? "").trim();
+    const currRating = (currRecord.typeRating ?? "").trim();
+    if (prevRating && currRating && prevRating !== currRating) {
+      const ratingChange = classifyRatingChange(prevRating, currRating);
+      if (ratingChange) {
+        changes.push({
+          organisationName: prevRecord.organisationName,
+          changeType: ratingChange,
+          previousValue: prevRating,
+          newValue: currRating,
+        });
+      } else {
+        warnings.push(
+          `Ambiguous rating change for "${prevRecord.organisationName}": "${prevRating}" -> "${currRating}". Not flagging as change.`,
+        );
+      }
+    }
+
+    const prevRoute = (prevRecord.route ?? "").trim();
+    const currRoute = (currRecord.route ?? "").trim();
+    if (prevRoute && currRoute && prevRoute !== currRoute) {
+      changes.push({
+        organisationName: prevRecord.organisationName,
+        changeType: "ROUTE_CHANGE",
+        previousValue: prevRoute,
+        newValue: currRoute,
+      });
+    }
+  });
+
+  const counts: Record<ChangeType, number> = {
+    REMOVED: 0,
+    ADDED: 0,
+    DOWNGRADED: 0,
+    UPGRADED: 0,
+    ROUTE_CHANGE: 0,
+  };
+  for (const c of changes) counts[c.changeType]++;
+
+  console.log(
+    `[SponsorMonitor] Diff complete. Previous: ${previous.size} orgs, Current: ${current.size} orgs. ` +
+      `Changes detected: ${changes.length} total — ` +
+      `REMOVED: ${counts.REMOVED}, ADDED: ${counts.ADDED}, ` +
+      `DOWNGRADED: ${counts.DOWNGRADED}, UPGRADED: ${counts.UPGRADED}, ` +
+      `ROUTE_CHANGE: ${counts.ROUTE_CHANGE}`,
+  );
+
+  if (warnings.length > 0) {
+    console.warn(
+      `[SponsorMonitor] ${warnings.length} ambiguous change(s) skipped:\n` +
+        warnings.map((w) => `  - ${w}`).join("\n"),
+    );
+  }
+
+  const removalRatio = previous.size > 0 ? counts.REMOVED / previous.size : 0;
+  if (removalRatio > 0.1 && counts.REMOVED > 100) {
+    console.warn(
+      `[SponsorMonitor] WARNING: Unusually high removal count (${counts.REMOVED} of ${previous.size}, ${(removalRatio * 100).toFixed(1)}%). ` +
+        `This may indicate a data format change rather than genuine revocations. Manual review recommended.`,
+    );
+  }
+
+  return changes;
+}
+
 async function fetchWithTimeout(
   url: string,
   timeoutMs = 30000,
