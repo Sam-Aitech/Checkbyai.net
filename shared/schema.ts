@@ -7,6 +7,8 @@ import {
   index,
   integer,
   boolean,
+  uniqueIndex,
+  date,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -191,6 +193,103 @@ export const expertRequests = pgTable("expert_requests", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// ==========================================
+// Sponsor Licence Monitor Tables
+// ==========================================
+
+// Daily snapshot of the UK government sponsor licence register
+export const sponsorList = pgTable(
+  "sponsor_list",
+  {
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+    organisationName: varchar("organisation_name").notNull(),
+    organisationNameNormalized: varchar("organisation_name_normalized").notNull(),
+    townCity: varchar("town_city"),
+    county: varchar("county"),
+    typeRating: varchar("type_rating"),
+    route: varchar("route"),
+    snapshotDate: date("snapshot_date").notNull(),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("idx_sponsor_list_org_snapshot").on(table.organisationNameNormalized, table.snapshotDate),
+    index("idx_sponsor_list_snapshot_date").on(table.snapshotDate),
+    index("idx_sponsor_list_org_name_normalized").on(table.organisationNameNormalized),
+  ]
+);
+
+// Which companies each user is monitoring
+export const companyWatches = pgTable(
+  "company_watches",
+  {
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+    userId: varchar("user_id").references(() => users.id).notNull(),
+    organisationName: varchar("organisation_name").notNull(),
+    organisationNameNormalized: varchar("organisation_name_normalized").notNull(),
+    townCity: varchar("town_city"),
+    isActive: boolean("is_active").default(true),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (table) => [
+    index("idx_company_watches_user_id").on(table.userId),
+    index("idx_company_watches_org_normalized").on(table.organisationNameNormalized),
+  ]
+);
+
+// Logs every detected change in the sponsor register
+export const sponsorChanges = pgTable(
+  "sponsor_changes",
+  {
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+    organisationName: varchar("organisation_name").notNull(),
+    changeType: varchar("change_type").notNull(), // 'REMOVED', 'ADDED', 'DOWNGRADED', 'UPGRADED', 'ROUTE_CHANGE'
+    previousValue: varchar("previous_value"),
+    newValue: varchar("new_value"),
+    detectedAt: timestamp("detected_at").defaultNow(),
+    snapshotDate: date("snapshot_date").notNull(),
+  },
+  (table) => [
+    index("idx_sponsor_changes_org_name").on(table.organisationName),
+    index("idx_sponsor_changes_snapshot_date").on(table.snapshotDate),
+    index("idx_sponsor_changes_change_type").on(table.changeType),
+  ]
+);
+
+// How each user wants to be notified
+export const notificationPreferences = pgTable("notification_preferences", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  userId: varchar("user_id").references(() => users.id).notNull().unique(),
+  emailEnabled: boolean("email_enabled").default(true),
+  email: varchar("email"),
+  whatsappEnabled: boolean("whatsapp_enabled").default(false),
+  whatsappNumber: varchar("whatsapp_number"),
+  whatsappVerified: boolean("whatsapp_verified").default(false),
+  smsEnabled: boolean("sms_enabled").default(false),
+  smsNumber: varchar("sms_number"),
+  smsVerified: boolean("sms_verified").default(false),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Records every notification sent
+export const notificationLog = pgTable(
+  "notification_log",
+  {
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+    userId: varchar("user_id").references(() => users.id).notNull(),
+    changeId: integer("change_id").references(() => sponsorChanges.id).notNull(),
+    channel: varchar("channel").notNull(), // 'email', 'whatsapp', 'sms'
+    status: varchar("status").notNull().default("queued"), // 'queued', 'sent', 'delivered', 'failed'
+    sentAt: timestamp("sent_at"),
+    providerMessageId: varchar("provider_message_id"),
+    errorDetails: text("error_details"),
+  },
+  (table) => [
+    index("idx_notification_log_user_id").on(table.userId),
+    index("idx_notification_log_change_id").on(table.changeId),
+    index("idx_notification_log_status").on(table.status),
+  ]
+);
+
 // Type exports
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -201,6 +300,11 @@ export type VerificationResult = typeof verificationResults.$inferSelect;
 export type Feedback = typeof feedback.$inferSelect;
 export type PaidSubmission = typeof paidSubmissions.$inferSelect;
 export type ExpertRequest = typeof expertRequests.$inferSelect;
+export type SponsorListEntry = typeof sponsorList.$inferSelect;
+export type CompanyWatch = typeof companyWatches.$inferSelect;
+export type SponsorChange = typeof sponsorChanges.$inferSelect;
+export type NotificationPreference = typeof notificationPreferences.$inferSelect;
+export type NotificationLogEntry = typeof notificationLog.$inferSelect;
 
 // Zod schemas
 export const insertUserSchema = createInsertSchema(users);
@@ -235,3 +339,32 @@ export const insertExpertRequestSchema = createInsertSchema(expertRequests).omit
   updatedAt: true
 });
 export type InsertExpertRequest = z.infer<typeof insertExpertRequestSchema>;
+
+export const insertSponsorListSchema = createInsertSchema(sponsorList).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertSponsorListEntry = z.infer<typeof insertSponsorListSchema>;
+
+export const insertCompanyWatchSchema = createInsertSchema(companyWatches).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertCompanyWatch = z.infer<typeof insertCompanyWatchSchema>;
+
+export const insertSponsorChangeSchema = createInsertSchema(sponsorChanges).omit({
+  id: true,
+  detectedAt: true,
+});
+export type InsertSponsorChange = z.infer<typeof insertSponsorChangeSchema>;
+
+export const insertNotificationPreferenceSchema = createInsertSchema(notificationPreferences).omit({
+  id: true,
+  updatedAt: true,
+});
+export type InsertNotificationPreference = z.infer<typeof insertNotificationPreferenceSchema>;
+
+export const insertNotificationLogSchema = createInsertSchema(notificationLog).omit({
+  id: true,
+});
+export type InsertNotificationLog = z.infer<typeof insertNotificationLogSchema>;
