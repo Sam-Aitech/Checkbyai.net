@@ -5,15 +5,16 @@ import * as crypto from "crypto";
 import Stripe from "stripe";
 import { storage } from "./storage";
 import { db } from "./db";
-import { sql } from "drizzle-orm";
+import { sql, eq, and, desc, inArray } from "drizzle-orm";
 import { setupAuth, isAuthenticated, isAdmin } from "./auth";
 import { checkIpRateLimit, recordIpVerification, getClientIp, hashIpAddress } from "./ipRateLimit";
-import { insertVerificationResultSchema, insertFeedbackSchema } from "@shared/schema";
+import { insertVerificationResultSchema, insertFeedbackSchema, companyWatches, sponsorList, sponsorChanges } from "@shared/schema";
 import multer from "multer";
 import { z } from "zod";
 import { PDFAnalyzer } from "./services/pdfAnalyzer";
 import bcrypt from "bcrypt";
 import { rebuildSponsorIndex, searchSponsors, isIndexReady } from "./utils/sponsorSearch";
+import { normalizeName } from "./utils/sponsorListFetcher";
 
 const CHECKOUT_HMAC_SECRET = process.env.CHECKOUT_HMAC_SECRET || process.env.SESSION_SECRET || process.env.STRIPE_SECRET_KEY!;
 
@@ -765,6 +766,254 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error searching sponsors:", error);
       res.status(500).json({ message: "Failed to search sponsors." });
+    }
+  });
+
+  // ==========================================
+  // Company Watch Endpoints
+  // ==========================================
+
+  const WATCH_LIMITS: Record<string, number> = {
+    free: 1,
+    starter: 5,
+    pro: 20,
+    unlimited: -1,
+  };
+
+  function getWatchLimit(subscriptionStatus: string | null): number {
+    return WATCH_LIMITS[subscriptionStatus || "free"] ?? WATCH_LIMITS.free;
+  }
+
+  app.post('/api/watches', isAuthenticated, async (req: any, res) => {
+    try {
+      const { organisation_name, town_city } = req.body;
+      if (!organisation_name || typeof organisation_name !== 'string' || organisation_name.trim().length === 0) {
+        return res.status(400).json({ message: "Organisation name is required." });
+      }
+
+      const userId = req.user.id;
+      const normalized = normalizeName(organisation_name.trim());
+
+      const latestDateResult = await db
+        .select({ snapshotDate: sponsorList.snapshotDate })
+        .from(sponsorList)
+        .orderBy(desc(sponsorList.snapshotDate))
+        .limit(1);
+
+      if (latestDateResult.length === 0) {
+        return res.status(503).json({ message: "Sponsor list data is not yet available." });
+      }
+
+      const latestDate = latestDateResult[0].snapshotDate;
+      const sponsorMatch = await db
+        .select()
+        .from(sponsorList)
+        .where(and(
+          eq(sponsorList.organisationNameNormalized, normalized),
+          eq(sponsorList.snapshotDate, latestDate),
+        ))
+        .limit(1);
+
+      if (sponsorMatch.length === 0) {
+        return res.status(404).json({ message: "Company not found in the current sponsor register. Please check the name and try again." });
+      }
+
+      const existingWatch = await db
+        .select()
+        .from(companyWatches)
+        .where(and(
+          eq(companyWatches.userId, userId),
+          eq(companyWatches.organisationNameNormalized, normalized),
+        ))
+        .limit(1);
+
+      if (existingWatch.length > 0 && existingWatch[0].isActive) {
+        return res.status(409).json({ message: "You are already watching this company." });
+      }
+
+      const limit = getWatchLimit(req.user.subscriptionStatus);
+      if (limit !== -1) {
+        const activeWatches = await db
+          .select({ id: companyWatches.id })
+          .from(companyWatches)
+          .where(and(
+            eq(companyWatches.userId, userId),
+            eq(companyWatches.isActive, true),
+          ));
+
+        if (activeWatches.length >= limit) {
+          return res.status(403).json({
+            message: `You have reached your watch limit of ${limit}. Upgrade your plan to watch more companies.`,
+            currentCount: activeWatches.length,
+            limit,
+          });
+        }
+      }
+
+      if (existingWatch.length > 0) {
+        await db
+          .update(companyWatches)
+          .set({ isActive: true })
+          .where(eq(companyWatches.id, existingWatch[0].id));
+        return res.json({ message: "Watch reactivated.", watch: { ...existingWatch[0], isActive: true } });
+      }
+
+      const matched = sponsorMatch[0];
+      const [newWatch] = await db
+        .insert(companyWatches)
+        .values({
+          userId,
+          organisationName: matched.organisationName,
+          organisationNameNormalized: normalized,
+          townCity: town_city?.trim() || matched.townCity,
+          isActive: true,
+        })
+        .returning();
+
+      res.status(201).json({ message: "Watch created.", watch: newWatch });
+    } catch (error) {
+      console.error("Error creating watch:", error);
+      res.status(500).json({ message: "Failed to create watch." });
+    }
+  });
+
+  app.get('/api/watches', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+
+      const watches = await db
+        .select()
+        .from(companyWatches)
+        .where(eq(companyWatches.userId, userId))
+        .orderBy(desc(companyWatches.createdAt));
+
+      const latestDateResult = await db
+        .select({ snapshotDate: sponsorList.snapshotDate })
+        .from(sponsorList)
+        .orderBy(desc(sponsorList.snapshotDate))
+        .limit(1);
+
+      const latestDate = latestDateResult.length > 0 ? latestDateResult[0].snapshotDate : null;
+
+      const enriched = await Promise.all(
+        watches.map(async (watch) => {
+          let currentStatus: { listed: boolean; typeRating: string | null; route: string | null } = {
+            listed: false,
+            typeRating: null,
+            route: null,
+          };
+
+          if (latestDate) {
+            const current = await db
+              .select({
+                typeRating: sponsorList.typeRating,
+                route: sponsorList.route,
+              })
+              .from(sponsorList)
+              .where(and(
+                eq(sponsorList.organisationNameNormalized, watch.organisationNameNormalized),
+                eq(sponsorList.snapshotDate, latestDate),
+              ))
+              .limit(1);
+
+            if (current.length > 0) {
+              currentStatus = {
+                listed: true,
+                typeRating: current[0].typeRating,
+                route: current[0].route,
+              };
+            }
+          }
+
+          const recentChanges = await db
+            .select()
+            .from(sponsorChanges)
+            .where(eq(sponsorChanges.organisationName, watch.organisationName))
+            .orderBy(desc(sponsorChanges.detectedAt))
+            .limit(5);
+
+          return {
+            ...watch,
+            currentStatus,
+            recentChanges,
+          };
+        }),
+      );
+
+      res.json(enriched);
+    } catch (error) {
+      console.error("Error fetching watches:", error);
+      res.status(500).json({ message: "Failed to fetch watches." });
+    }
+  });
+
+  app.delete('/api/watches/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const watchId = parseInt(req.params.id, 10);
+      if (isNaN(watchId)) {
+        return res.status(400).json({ message: "Invalid watch ID." });
+      }
+
+      const existing = await db
+        .select()
+        .from(companyWatches)
+        .where(eq(companyWatches.id, watchId))
+        .limit(1);
+
+      if (existing.length === 0) {
+        return res.status(404).json({ message: "Watch not found." });
+      }
+
+      if (existing[0].userId !== req.user.id) {
+        return res.status(403).json({ message: "You can only manage your own watches." });
+      }
+
+      await db
+        .update(companyWatches)
+        .set({ isActive: false })
+        .where(eq(companyWatches.id, watchId));
+
+      res.json({ message: "Watch deactivated." });
+    } catch (error) {
+      console.error("Error deactivating watch:", error);
+      res.status(500).json({ message: "Failed to deactivate watch." });
+    }
+  });
+
+  app.patch('/api/watches/:id/reactivate', isAuthenticated, async (req: any, res) => {
+    try {
+      const watchId = parseInt(req.params.id, 10);
+      if (isNaN(watchId)) {
+        return res.status(400).json({ message: "Invalid watch ID." });
+      }
+
+      const existing = await db
+        .select()
+        .from(companyWatches)
+        .where(eq(companyWatches.id, watchId))
+        .limit(1);
+
+      if (existing.length === 0) {
+        return res.status(404).json({ message: "Watch not found." });
+      }
+
+      if (existing[0].userId !== req.user.id) {
+        return res.status(403).json({ message: "You can only manage your own watches." });
+      }
+
+      if (existing[0].isActive) {
+        return res.json({ message: "Watch is already active." });
+      }
+
+      await db
+        .update(companyWatches)
+        .set({ isActive: true })
+        .where(eq(companyWatches.id, watchId));
+
+      res.json({ message: "Watch reactivated." });
+    } catch (error) {
+      console.error("Error reactivating watch:", error);
+      res.status(500).json({ message: "Failed to reactivate watch." });
     }
   });
 
