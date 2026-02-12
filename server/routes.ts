@@ -13,6 +13,7 @@ import multer from "multer";
 import { z } from "zod";
 import { PDFAnalyzer } from "./services/pdfAnalyzer";
 import bcrypt from "bcrypt";
+import { rebuildSponsorIndex, searchSponsors, isIndexReady } from "./utils/sponsorSearch";
 
 const CHECKOUT_HMAC_SECRET = process.env.CHECKOUT_HMAC_SECRET || process.env.SESSION_SECRET || process.env.STRIPE_SECRET_KEY!;
 
@@ -741,6 +742,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching verification history:", error);
       res.status(500).json({ message: "Failed to fetch verification history" });
+    }
+  });
+
+  // Sponsor search endpoint
+  app.get('/api/sponsors/search', isAuthenticated, async (req: any, res) => {
+    try {
+      const q = (req.query.q as string || "").trim();
+      if (q.length < 3) {
+        return res.status(400).json({ message: "Search query must be at least 3 characters long." });
+      }
+
+      if (!isIndexReady()) {
+        await rebuildSponsorIndex();
+        if (!isIndexReady()) {
+          return res.status(503).json({ message: "Sponsor search index is not yet available. Please try again shortly." });
+        }
+      }
+
+      const results = searchSponsors(q, 20);
+      res.json(results);
+    } catch (error) {
+      console.error("Error searching sponsors:", error);
+      res.status(500).json({ message: "Failed to search sponsors." });
     }
   });
 
@@ -1834,6 +1858,10 @@ Format your response in clear, professional markdown.`;
       console.error('Error fetching HITL logs:', error);
       res.status(500).json({ message: 'Failed to fetch logs' });
     }
+  });
+
+  rebuildSponsorIndex().catch((err) => {
+    console.error("[SponsorSearch] Failed to build initial index:", err);
   });
 
   const httpServer = createServer(app);
