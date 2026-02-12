@@ -194,6 +194,12 @@ export default function SimpleAdmin() {
   const [runningJob, setRunningJob] = useState(false);
   const [runConfirmOpen, setRunConfirmOpen] = useState(false);
   const [runResult, setRunResult] = useState<string | null>(null);
+  const [initConfirmOpen, setInitConfirmOpen] = useState(false);
+  const [initializing, setInitializing] = useState(false);
+  const [storageStats, setStorageStats] = useState<any>(null);
+  const [storageLoading, setStorageLoading] = useState(false);
+  const [cleaningUp, setCleaningUp] = useState(false);
+  const [cleanupConfirmOpen, setCleanupConfirmOpen] = useState(false);
 
   const { toast } = useToast();
 
@@ -375,14 +381,72 @@ export default function SimpleAdmin() {
     }
   };
 
+  const handleInitialize = async () => {
+    setInitConfirmOpen(false);
+    setInitializing(true);
+    try {
+      const res = await fetch('/api/admin/sponsor-monitor/initialize', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast({ title: "Initialized", description: `Loaded ${data.recordCount?.toLocaleString()} records for ${data.snapshotDate}` });
+        loadSponsorMonitorData();
+        loadStorageStats();
+      } else {
+        toast({ title: "Error", description: data.message, variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to initialize", variant: "destructive" });
+    } finally {
+      setInitializing(false);
+    }
+  };
+
+  const loadStorageStats = useCallback(async () => {
+    setStorageLoading(true);
+    try {
+      const res = await fetch('/api/admin/sponsor-monitor/storage', { credentials: 'include' });
+      if (res.ok) setStorageStats(await res.json());
+    } catch (error) {
+      console.error('Failed to load storage stats:', error);
+    } finally {
+      setStorageLoading(false);
+    }
+  }, []);
+
+  const handleCleanup = async () => {
+    setCleanupConfirmOpen(false);
+    setCleaningUp(true);
+    try {
+      const res = await fetch('/api/admin/sponsor-monitor/cleanup', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast({ title: "Cleanup Complete", description: data.message });
+        loadStorageStats();
+      } else {
+        toast({ title: "Error", description: data.message, variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to clean up", variant: "destructive" });
+    } finally {
+      setCleaningUp(false);
+    }
+  };
+
   useEffect(() => {
     if (isAuthenticated && activeTab === 'knowledge') {
       loadGlobalRules();
     }
     if (isAuthenticated && activeTab === 'sponsor') {
       loadSponsorMonitorData();
+      loadStorageStats();
     }
-  }, [isAuthenticated, activeTab, loadGlobalRules, loadSponsorMonitorData]);
+  }, [isAuthenticated, activeTab, loadGlobalRules, loadSponsorMonitorData, loadStorageStats]);
 
   const createGlobalRule = async () => {
     if (!newRuleCategory || !newRuleText) {
@@ -1938,6 +2002,116 @@ export default function SimpleAdmin() {
                 </CardContent>
               </Card>
 
+              {/* Initialize / Storage Row */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Initialize Card */}
+                <Card className="bg-slate-800 border-slate-700">
+                  <CardHeader>
+                    <CardTitle className="text-white text-base flex items-center gap-2">
+                      <Database className="w-4 h-4 text-emerald-400" />
+                      Initialize Register
+                    </CardTitle>
+                    <CardDescription className="text-slate-400">
+                      First-time setup: download the full sponsor register as baseline
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {sponsorStatus?.latestSnapshot ? (
+                      <div className="flex items-center gap-2 text-sm">
+                        <CheckCircle className="w-4 h-4 text-green-400" />
+                        <span className="text-green-400">Initialized on {sponsorStatus.latestSnapshot}</span>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <Alert className="bg-amber-500/10 border-amber-500/30">
+                          <AlertTriangle className="w-4 h-4 text-amber-400" />
+                          <AlertDescription className="text-amber-300 text-sm">
+                            No baseline snapshot exists. Initialize to download the full Home Office register (this may take a few minutes).
+                          </AlertDescription>
+                        </Alert>
+                        <Button
+                          onClick={() => setInitConfirmOpen(true)}
+                          disabled={initializing}
+                          className="bg-emerald-600 hover:bg-emerald-700"
+                        >
+                          {initializing ? (
+                            <>
+                              <div className="w-4 h-4 mr-1 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              Initializing...
+                            </>
+                          ) : (
+                            <>
+                              <Download className="w-4 h-4 mr-1" />
+                              Initialize Baseline
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Storage Stats Card */}
+                <Card className="bg-slate-800 border-slate-700">
+                  <CardHeader>
+                    <CardTitle className="text-white text-base flex items-center gap-2">
+                      <HardDrive className="w-4 h-4 text-cyan-400" />
+                      Database Storage
+                    </CardTitle>
+                    <CardDescription className="text-slate-400">Sponsor register data usage</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {storageLoading && !storageStats ? (
+                      <div className="flex items-center gap-2 text-slate-400 py-2">
+                        <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+                        Loading...
+                      </div>
+                    ) : storageStats ? (
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="bg-slate-700/30 rounded-lg p-2.5">
+                            <p className="text-xs text-slate-400">Total Records</p>
+                            <p className="text-base font-bold text-white">{(storageStats.totalRecords || 0).toLocaleString()}</p>
+                          </div>
+                          <div className="bg-slate-700/30 rounded-lg p-2.5">
+                            <p className="text-xs text-slate-400">Snapshots</p>
+                            <p className="text-base font-bold text-white">{storageStats.snapshotCount || 0}</p>
+                          </div>
+                        </div>
+                        {storageStats.earliestSnapshot && (
+                          <div className="text-xs text-slate-400">
+                            Date range: <span className="text-slate-300">{storageStats.earliestSnapshot}</span> to <span className="text-slate-300">{storageStats.latestSnapshot}</span>
+                          </div>
+                        )}
+                        {storageStats.snapshotCount > 1 && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setCleanupConfirmOpen(true)}
+                            disabled={cleaningUp}
+                            className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                          >
+                            {cleaningUp ? (
+                              <>
+                                <div className="w-3 h-3 mr-1 border-2 border-slate-300 border-t-transparent rounded-full animate-spin" />
+                                Cleaning...
+                              </>
+                            ) : (
+                              <>
+                                <Trash2 className="w-3 h-3 mr-1" />
+                                Clean Up Old Snapshots
+                              </>
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-slate-500 text-sm">No data available.</p>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
               {/* Recent Changes Table */}
               <Card className="bg-slate-800 border-slate-700">
                 <CardHeader>
@@ -2375,6 +2549,68 @@ export default function SimpleAdmin() {
             >
               <Play className="w-4 h-4 mr-1" />
               Confirm & Run
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Initialize Confirmation */}
+      <Dialog open={initConfirmOpen} onOpenChange={setInitConfirmOpen}>
+        <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-emerald-400">
+              <Database className="w-5 h-5" />
+              Initialize Sponsor Register
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              This will download the complete UK Home Office Register of Licensed Sponsors and store it as the baseline snapshot. This is a one-time operation and may take several minutes depending on the file size.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setInitConfirmOpen(false)}
+              className="border-slate-600 text-slate-300 hover:bg-slate-700"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleInitialize}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              <Download className="w-4 h-4 mr-1" />
+              Confirm & Initialize
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cleanup Confirmation */}
+      <Dialog open={cleanupConfirmOpen} onOpenChange={setCleanupConfirmOpen}>
+        <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-400">
+              <Trash2 className="w-5 h-5" />
+              Clean Up Old Snapshots
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              This will delete all old sponsor register snapshots, keeping only the latest one. This frees up database storage but removes historical snapshot data. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setCleanupConfirmOpen(false)}
+              className="border-slate-600 text-slate-300 hover:bg-slate-700"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCleanup}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              <Trash2 className="w-4 h-4 mr-1" />
+              Confirm Cleanup
             </Button>
           </DialogFooter>
         </DialogContent>

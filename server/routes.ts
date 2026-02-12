@@ -1771,6 +1771,69 @@ Format your response in clear, professional markdown.`;
     }
   });
 
+  // Sponsor monitor storage stats
+  app.get('/api/admin/sponsor-monitor/storage', isAdmin, async (req: any, res) => {
+    try {
+      const totalResult = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(sponsorList);
+      const totalRecords = totalResult[0]?.count ?? 0;
+
+      const dateRange = await db
+        .select({
+          earliest: sql<string>`min(${sponsorList.snapshotDate})::text`,
+          latest: sql<string>`max(${sponsorList.snapshotDate})::text`,
+          snapshotCount: sql<number>`count(distinct ${sponsorList.snapshotDate})::int`,
+        })
+        .from(sponsorList);
+
+      res.json({
+        totalRecords,
+        earliestSnapshot: dateRange[0]?.earliest || null,
+        latestSnapshot: dateRange[0]?.latest || null,
+        snapshotCount: dateRange[0]?.snapshotCount ?? 0,
+      });
+    } catch (error) {
+      console.error("Error fetching sponsor storage stats:", error);
+      res.status(500).json({ message: "Failed to fetch storage stats." });
+    }
+  });
+
+  // Cleanup old sponsor snapshots (keep only latest)
+  app.post('/api/admin/sponsor-monitor/cleanup', isAdmin, async (req: any, res) => {
+    try {
+      const latestDate = await getLatestSnapshotDate();
+      if (!latestDate) {
+        return res.status(404).json({ message: "No snapshots found to clean up." });
+      }
+
+      const countBefore = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(sponsorList);
+      const totalBefore = countBefore[0]?.count ?? 0;
+
+      await db.delete(sponsorList).where(
+        sql`${sponsorList.snapshotDate} < ${latestDate}`
+      );
+
+      const countAfter = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(sponsorList);
+      const totalAfter = countAfter[0]?.count ?? 0;
+      const deletedRecords = totalBefore - totalAfter;
+
+      res.json({
+        message: `Cleaned up ${deletedRecords.toLocaleString()} old records. Kept latest snapshot (${latestDate}).`,
+        deletedRecords,
+        remainingRecords: totalAfter,
+        keptSnapshot: latestDate,
+      });
+    } catch (error) {
+      console.error("Error cleaning up sponsor snapshots:", error);
+      res.status(500).json({ message: "Failed to clean up old snapshots." });
+    }
+  });
+
   // Trust producer from verification - Pattern Override
   app.post('/api/admin/trust-producer', isAdmin, async (req: any, res) => {
     try {
