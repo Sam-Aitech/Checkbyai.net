@@ -8,7 +8,7 @@ import { db } from "./db";
 import { sql, eq, and, desc, inArray } from "drizzle-orm";
 import { setupAuth, isAuthenticated, isAdmin } from "./auth";
 import { checkIpRateLimit, recordIpVerification, getClientIp, hashIpAddress } from "./ipRateLimit";
-import { insertVerificationResultSchema, insertFeedbackSchema, companyWatches, sponsorList, sponsorChanges } from "@shared/schema";
+import { insertVerificationResultSchema, insertFeedbackSchema, companyWatches, sponsorList, sponsorChanges, notificationPreferences } from "@shared/schema";
 import multer from "multer";
 import { z } from "zod";
 import { PDFAnalyzer } from "./services/pdfAnalyzer";
@@ -1014,6 +1014,237 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error reactivating watch:", error);
       res.status(500).json({ message: "Failed to reactivate watch." });
+    }
+  });
+
+  // ==========================================
+  // Notification Preferences Endpoints
+  // ==========================================
+
+  const phoneOtpStore = new Map<string, { code: string; expiresAt: number; attempts: number }>();
+  const otpRateLimit = new Map<string, { count: number; resetAt: number }>();
+  const MAX_OTP_ATTEMPTS = 5;
+  const MAX_OTP_REQUESTS = 3;
+  const OTP_RATE_WINDOW = 10 * 60 * 1000;
+
+  const PHONE_REGEX = /^\+[1-9]\d{6,14}$/;
+
+  function cleanupExpiredOtps() {
+    const now = Date.now();
+    Array.from(phoneOtpStore.entries()).forEach(([key, val]) => {
+      if (val.expiresAt < now) phoneOtpStore.delete(key);
+    });
+    Array.from(otpRateLimit.entries()).forEach(([key, val]) => {
+      if (val.resetAt < now) otpRateLimit.delete(key);
+    });
+  }
+
+  app.get('/api/notification-preferences', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const result = await db
+        .select()
+        .from(notificationPreferences)
+        .where(eq(notificationPreferences.userId, userId))
+        .limit(1);
+
+      if (result.length === 0) {
+        return res.json({
+          emailEnabled: true,
+          email: req.user.email || null,
+          whatsappEnabled: false,
+          whatsappNumber: null,
+          whatsappVerified: false,
+          smsEnabled: false,
+          smsNumber: null,
+          smsVerified: false,
+        });
+      }
+
+      const prefs = result[0];
+      res.json({
+        emailEnabled: prefs.emailEnabled,
+        email: prefs.email,
+        whatsappEnabled: prefs.whatsappEnabled,
+        whatsappNumber: prefs.whatsappNumber,
+        whatsappVerified: prefs.whatsappVerified,
+        smsEnabled: prefs.smsEnabled,
+        smsNumber: prefs.smsNumber,
+        smsVerified: prefs.smsVerified,
+      });
+    } catch (error) {
+      console.error("Error fetching notification preferences:", error);
+      res.status(500).json({ message: "Failed to fetch notification preferences." });
+    }
+  });
+
+  app.put('/api/notification-preferences', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { email_enabled, whatsapp_enabled, whatsapp_number, sms_enabled, sms_number } = req.body;
+
+      if (whatsapp_number && !PHONE_REGEX.test(whatsapp_number)) {
+        return res.status(400).json({ message: "Invalid WhatsApp number. Please provide a number starting with + followed by country code and digits (e.g. +447700900000)." });
+      }
+      if (sms_number && !PHONE_REGEX.test(sms_number)) {
+        return res.status(400).json({ message: "Invalid SMS number. Please provide a number starting with + followed by country code and digits (e.g. +447700900000)." });
+      }
+
+      if (whatsapp_enabled && !whatsapp_number) {
+        return res.status(400).json({ message: "Please provide a WhatsApp number to enable WhatsApp notifications." });
+      }
+      if (sms_enabled && !sms_number) {
+        return res.status(400).json({ message: "Please provide an SMS number to enable SMS notifications." });
+      }
+
+      const existing = await db
+        .select()
+        .from(notificationPreferences)
+        .where(eq(notificationPreferences.userId, userId))
+        .limit(1);
+
+      if (whatsapp_enabled) {
+        const isVerified = existing.length > 0 && existing[0].whatsappVerified && existing[0].whatsappNumber === whatsapp_number;
+        if (!isVerified) {
+          return res.status(400).json({ message: "Please verify your WhatsApp number before enabling WhatsApp notifications." });
+        }
+      }
+
+      if (sms_enabled) {
+        const isVerified = existing.length > 0 && existing[0].smsVerified && existing[0].smsNumber === sms_number;
+        if (!isVerified) {
+          return res.status(400).json({ message: "Please verify your SMS number before enabling SMS notifications." });
+        }
+      }
+
+      const values = {
+        userId,
+        emailEnabled: email_enabled ?? true,
+        email: req.user.email || null,
+        whatsappEnabled: whatsapp_enabled ?? false,
+        whatsappNumber: whatsapp_number || null,
+        smsEnabled: sms_enabled ?? false,
+        smsNumber: sms_number || null,
+        updatedAt: new Date(),
+      };
+
+      if (existing.length > 0) {
+        await db
+          .update(notificationPreferences)
+          .set(values)
+          .where(eq(notificationPreferences.userId, userId));
+      } else {
+        await db.insert(notificationPreferences).values(values);
+      }
+
+      res.json({ message: "Notification preferences updated." });
+    } catch (error) {
+      console.error("Error updating notification preferences:", error);
+      res.status(500).json({ message: "Failed to update notification preferences." });
+    }
+  });
+
+  app.post('/api/notification-preferences/verify-phone', isAuthenticated, async (req: any, res) => {
+    try {
+      const { phone_number, channel } = req.body;
+
+      if (!phone_number || !PHONE_REGEX.test(phone_number)) {
+        return res.status(400).json({ message: "Please provide a valid phone number starting with + (e.g. +447700900000)." });
+      }
+      if (!channel || !['whatsapp', 'sms'].includes(channel)) {
+        return res.status(400).json({ message: "Channel must be 'whatsapp' or 'sms'." });
+      }
+
+      cleanupExpiredOtps();
+
+      const rateLimitKey = `${req.user.id}:${channel}`;
+      const rateEntry = otpRateLimit.get(rateLimitKey);
+      if (rateEntry && rateEntry.resetAt > Date.now() && rateEntry.count >= MAX_OTP_REQUESTS) {
+        return res.status(429).json({ message: "Too many verification requests. Please wait 10 minutes before trying again." });
+      }
+
+      const code = String(Math.floor(100000 + Math.random() * 900000));
+      const key = `${req.user.id}:${channel}:${phone_number}`;
+      phoneOtpStore.set(key, { code, expiresAt: Date.now() + 10 * 60 * 1000, attempts: 0 });
+
+      if (rateEntry && rateEntry.resetAt > Date.now()) {
+        rateEntry.count++;
+      } else {
+        otpRateLimit.set(rateLimitKey, { count: 1, resetAt: Date.now() + OTP_RATE_WINDOW });
+      }
+
+      console.log(`[NotificationOTP] Code for ${channel} ${phone_number} (user ${req.user.id}): ${code}`);
+
+      res.json({ message: `Verification code sent to ${phone_number} via ${channel}.` });
+    } catch (error) {
+      console.error("Error sending verification code:", error);
+      res.status(500).json({ message: "Failed to send verification code." });
+    }
+  });
+
+  app.post('/api/notification-preferences/confirm-phone', isAuthenticated, async (req: any, res) => {
+    try {
+      const { phone_number, channel, code } = req.body;
+
+      if (!phone_number || !channel || !code) {
+        return res.status(400).json({ message: "Phone number, channel, and code are required." });
+      }
+      if (!['whatsapp', 'sms'].includes(channel)) {
+        return res.status(400).json({ message: "Channel must be 'whatsapp' or 'sms'." });
+      }
+
+      cleanupExpiredOtps();
+
+      const key = `${req.user.id}:${channel}:${phone_number}`;
+      const stored = phoneOtpStore.get(key);
+
+      if (!stored) {
+        return res.status(400).json({ message: "No verification code found. Please request a new code." });
+      }
+      if (stored.expiresAt < Date.now()) {
+        phoneOtpStore.delete(key);
+        return res.status(400).json({ message: "Verification code has expired. Please request a new code." });
+      }
+      if (stored.attempts >= MAX_OTP_ATTEMPTS) {
+        phoneOtpStore.delete(key);
+        return res.status(429).json({ message: "Too many failed attempts. Please request a new code." });
+      }
+      if (stored.code !== String(code).trim()) {
+        stored.attempts++;
+        return res.status(400).json({ message: "Invalid verification code." });
+      }
+
+      phoneOtpStore.delete(key);
+
+      const userId = req.user.id;
+      const existing = await db
+        .select()
+        .from(notificationPreferences)
+        .where(eq(notificationPreferences.userId, userId))
+        .limit(1);
+
+      const updateFields = channel === 'whatsapp'
+        ? { whatsappNumber: phone_number, whatsappVerified: true, updatedAt: new Date() }
+        : { smsNumber: phone_number, smsVerified: true, updatedAt: new Date() };
+
+      if (existing.length > 0) {
+        await db
+          .update(notificationPreferences)
+          .set(updateFields)
+          .where(eq(notificationPreferences.userId, userId));
+      } else {
+        await db.insert(notificationPreferences).values({
+          userId,
+          emailEnabled: true,
+          email: req.user.email || null,
+          ...updateFields,
+        });
+      }
+
+      res.json({ message: `${channel === 'whatsapp' ? 'WhatsApp' : 'SMS'} number verified successfully.` });
+    } catch (error) {
+      console.error("Error confirming phone:", error);
+      res.status(500).json({ message: "Failed to verify phone number." });
     }
   });
 
