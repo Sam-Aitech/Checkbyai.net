@@ -1709,6 +1709,68 @@ Format your response in clear, professional markdown.`;
     }
   });
 
+  app.get('/api/admin/sponsor-monitor/recent-changes', isAdmin, async (req: any, res) => {
+    try {
+      const changes = await db
+        .select({
+          id: sponsorChanges.id,
+          organisationName: sponsorChanges.organisationName,
+          changeType: sponsorChanges.changeType,
+          previousValue: sponsorChanges.previousValue,
+          newValue: sponsorChanges.newValue,
+          detectedAt: sponsorChanges.detectedAt,
+          snapshotDate: sponsorChanges.snapshotDate,
+        })
+        .from(sponsorChanges)
+        .orderBy(desc(sponsorChanges.detectedAt))
+        .limit(50);
+      res.json(changes);
+    } catch (error) {
+      console.error("Error fetching recent changes:", error);
+      res.status(500).json({ message: "Failed to fetch recent changes." });
+    }
+  });
+
+  app.get('/api/admin/sponsor-monitor/top-watched', isAdmin, async (req: any, res) => {
+    try {
+      const topWatched = await db
+        .select({
+          organisationName: companyWatches.organisationName,
+          watcherCount: sql<number>`count(*)::int`,
+        })
+        .from(companyWatches)
+        .where(eq(companyWatches.isActive, true))
+        .groupBy(companyWatches.organisationName)
+        .orderBy(desc(sql`count(*)`))
+        .limit(20);
+      res.json(topWatched);
+    } catch (error) {
+      console.error("Error fetching top watched:", error);
+      res.status(500).json({ message: "Failed to fetch top watched companies." });
+    }
+  });
+
+  app.get('/api/admin/sponsor-monitor/notification-stats', isAdmin, async (req: any, res) => {
+    try {
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const stats = await db
+        .select({
+          channel: notificationLog.channel,
+          status: notificationLog.status,
+          count: sql<number>`count(*)::int`,
+          day: sql<string>`date_trunc('day', ${notificationLog.sentAt})::date::text`,
+        })
+        .from(notificationLog)
+        .where(gte(notificationLog.sentAt, sevenDaysAgo))
+        .groupBy(notificationLog.channel, notificationLog.status, sql`date_trunc('day', ${notificationLog.sentAt})`)
+        .orderBy(desc(sql`date_trunc('day', ${notificationLog.sentAt})`));
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching notification stats:", error);
+      res.status(500).json({ message: "Failed to fetch notification stats." });
+    }
+  });
+
   // Trust producer from verification - Pattern Override
   app.post('/api/admin/trust-producer', isAdmin, async (req: any, res) => {
     try {

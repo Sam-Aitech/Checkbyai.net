@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Shield, Upload, FileText, CheckCircle, AlertTriangle, XCircle, LogOut, Trash2, Eye, 
   RefreshCw, Search, Filter, ChevronLeft, ChevronRight, Activity, Database, Clock,
-  Sparkles, X, Download, ChevronDown, Users, TrendingUp, Cpu, HardDrive, Brain, Plus, Power
+  Sparkles, X, Download, ChevronDown, Users, TrendingUp, Cpu, HardDrive, Brain, Plus, Power, Radio, Play, Bell, BarChart3
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -182,6 +182,19 @@ export default function SimpleAdmin() {
   const [feedbackReasoning, setFeedbackReasoning] = useState('');
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   
+  // Sponsor Monitor state
+  const [sponsorStatus, setSponsorStatus] = useState<any>(null);
+  const [sponsorStatusLoading, setSponsorStatusLoading] = useState(false);
+  const [recentChanges, setRecentChanges] = useState<any[]>([]);
+  const [recentChangesLoading, setRecentChangesLoading] = useState(false);
+  const [topWatched, setTopWatched] = useState<any[]>([]);
+  const [topWatchedLoading, setTopWatchedLoading] = useState(false);
+  const [notifStats, setNotifStats] = useState<any[]>([]);
+  const [notifStatsLoading, setNotifStatsLoading] = useState(false);
+  const [runningJob, setRunningJob] = useState(false);
+  const [runConfirmOpen, setRunConfirmOpen] = useState(false);
+  const [runResult, setRunResult] = useState<string | null>(null);
+
   const { toast } = useToast();
 
   useEffect(() => {
@@ -309,11 +322,67 @@ export default function SimpleAdmin() {
     }
   }, []);
 
+  const loadSponsorMonitorData = useCallback(async () => {
+    setSponsorStatusLoading(true);
+    setRecentChangesLoading(true);
+    setTopWatchedLoading(true);
+    setNotifStatsLoading(true);
+    try {
+      const [statusRes, changesRes, watchedRes, statsRes] = await Promise.all([
+        fetch('/api/admin/sponsor-monitor/status', { credentials: 'include' }),
+        fetch('/api/admin/sponsor-monitor/recent-changes', { credentials: 'include' }),
+        fetch('/api/admin/sponsor-monitor/top-watched', { credentials: 'include' }),
+        fetch('/api/admin/sponsor-monitor/notification-stats', { credentials: 'include' }),
+      ]);
+      if (statusRes.ok) setSponsorStatus(await statusRes.json());
+      if (changesRes.ok) setRecentChanges(await changesRes.json());
+      if (watchedRes.ok) setTopWatched(await watchedRes.json());
+      if (statsRes.ok) setNotifStats(await statsRes.json());
+    } catch (error) {
+      console.error('Failed to load sponsor monitor data:', error);
+      toast({ title: "Error", description: "Failed to load sponsor monitor data", variant: "destructive" });
+    } finally {
+      setSponsorStatusLoading(false);
+      setRecentChangesLoading(false);
+      setTopWatchedLoading(false);
+      setNotifStatsLoading(false);
+    }
+  }, []);
+
+  const handleRunSponsorJob = async () => {
+    setRunConfirmOpen(false);
+    setRunningJob(true);
+    setRunResult(null);
+    try {
+      const res = await fetch('/api/admin/sponsor-monitor/run', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setRunResult(data.message);
+        toast({ title: "Job Started", description: data.message });
+        setTimeout(() => loadSponsorMonitorData(), 30000);
+      } else {
+        setRunResult(data.message || 'Failed to start job');
+        toast({ title: "Error", description: data.message, variant: "destructive" });
+      }
+    } catch (error) {
+      setRunResult('Network error');
+      toast({ title: "Error", description: "Failed to trigger job", variant: "destructive" });
+    } finally {
+      setRunningJob(false);
+    }
+  };
+
   useEffect(() => {
     if (isAuthenticated && activeTab === 'knowledge') {
       loadGlobalRules();
     }
-  }, [isAuthenticated, activeTab, loadGlobalRules]);
+    if (isAuthenticated && activeTab === 'sponsor') {
+      loadSponsorMonitorData();
+    }
+  }, [isAuthenticated, activeTab, loadGlobalRules, loadSponsorMonitorData]);
 
   const createGlobalRule = async () => {
     if (!newRuleCategory || !newRuleText) {
@@ -1106,6 +1175,10 @@ export default function SimpleAdmin() {
               <Brain className="w-4 h-4 mr-2" />
               AI Knowledge
             </TabsTrigger>
+            <TabsTrigger value="sponsor" className="data-[state=active]:bg-slate-700">
+              <Radio className="w-4 h-4 mr-2" />
+              Sponsor Monitor
+            </TabsTrigger>
           </TabsList>
 
           {/* Verification Logs Tab */}
@@ -1765,6 +1838,268 @@ export default function SimpleAdmin() {
               </Card>
             </div>
           </TabsContent>
+
+          {/* Sponsor Monitor Tab */}
+          <TabsContent value="sponsor">
+            <div className="space-y-6">
+              {/* Status Card */}
+              <Card className="bg-slate-800 border-slate-700">
+                <CardHeader>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <CardTitle className="text-white flex items-center gap-2">
+                        <Radio className="w-5 h-5 text-blue-400" />
+                        Sponsor Monitor Status
+                      </CardTitle>
+                      <CardDescription className="text-slate-400">
+                        UK Home Office Register monitoring dashboard
+                      </CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={loadSponsorMonitorData}
+                        disabled={sponsorStatusLoading}
+                        className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                      >
+                        <RefreshCw className={`w-4 h-4 mr-1 ${sponsorStatusLoading ? 'animate-spin' : ''}`} />
+                        Refresh
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => setRunConfirmOpen(true)}
+                        disabled={runningJob || sponsorStatus?.jobRunning}
+                        className="bg-blue-600 hover:bg-blue-700"
+                      >
+                        {runningJob || sponsorStatus?.jobRunning ? (
+                          <>
+                            <div className="w-4 h-4 mr-1 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            Running...
+                          </>
+                        ) : (
+                          <>
+                            <Play className="w-4 h-4 mr-1" />
+                            Run Now
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {sponsorStatusLoading && !sponsorStatus ? (
+                    <div className="flex items-center gap-2 text-slate-400 py-4">
+                      <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                      Loading status...
+                    </div>
+                  ) : sponsorStatus ? (
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                      <div className="bg-slate-700/50 rounded-lg p-3">
+                        <p className="text-xs text-slate-400 mb-1">Last Run</p>
+                        <p className="text-sm font-medium text-white">
+                          {sponsorStatus.lastRun?.date
+                            ? new Date(sponsorStatus.lastRun.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+                            : 'Never'}
+                        </p>
+                        {sponsorStatus.lastRun?.date && (
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {new Date(sponsorStatus.lastRun.date).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        )}
+                      </div>
+                      <div className="bg-slate-700/50 rounded-lg p-3">
+                        <p className="text-xs text-slate-400 mb-1">Last Result</p>
+                        <Badge className={sponsorStatus.lastRun?.success !== false ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30'}>
+                          {sponsorStatus.lastRun?.success !== false ? 'Success' : 'Failed'}
+                        </Badge>
+                      </div>
+                      <div className="bg-slate-700/50 rounded-lg p-3">
+                        <p className="text-xs text-slate-400 mb-1">Snapshot Records</p>
+                        <p className="text-lg font-bold text-white">{(sponsorStatus.snapshotRecordCount || 0).toLocaleString()}</p>
+                      </div>
+                      <div className="bg-slate-700/50 rounded-lg p-3">
+                        <p className="text-xs text-slate-400 mb-1">Active Watches</p>
+                        <p className="text-lg font-bold text-white">{sponsorStatus.activeWatchCount || 0}</p>
+                      </div>
+                      <div className="bg-slate-700/50 rounded-lg p-3">
+                        <p className="text-xs text-slate-400 mb-1">Notifications (24h)</p>
+                        <p className="text-lg font-bold text-white">{sponsorStatus.notificationsSent24h || 0}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-slate-400 text-sm">No status data available.</p>
+                  )}
+                  {runResult && (
+                    <Alert className="mt-4 bg-blue-500/10 border-blue-500/30">
+                      <AlertDescription className="text-blue-300">{runResult}</AlertDescription>
+                    </Alert>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Recent Changes Table */}
+              <Card className="bg-slate-800 border-slate-700">
+                <CardHeader>
+                  <CardTitle className="text-white text-base">Recent Changes</CardTitle>
+                  <CardDescription className="text-slate-400">Last 50 detected changes across all companies</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {recentChangesLoading ? (
+                    <div className="flex items-center gap-2 text-slate-400 py-4">
+                      <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                      Loading changes...
+                    </div>
+                  ) : recentChanges.length === 0 ? (
+                    <p className="text-slate-500 text-sm py-4">No changes detected yet.</p>
+                  ) : (
+                    <ScrollArea className="h-[400px]">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-slate-700">
+                              <th className="text-left text-slate-400 font-medium py-2 px-2">Date</th>
+                              <th className="text-left text-slate-400 font-medium py-2 px-2">Company</th>
+                              <th className="text-left text-slate-400 font-medium py-2 px-2">Change</th>
+                              <th className="text-left text-slate-400 font-medium py-2 px-2">Previous</th>
+                              <th className="text-left text-slate-400 font-medium py-2 px-2">New</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {recentChanges.map((change: any) => (
+                              <tr key={change.id} className="border-b border-slate-700/50 hover:bg-slate-700/30">
+                                <td className="py-2 px-2 text-slate-300 whitespace-nowrap">
+                                  {change.detectedAt ? new Date(change.detectedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : change.snapshotDate}
+                                </td>
+                                <td className="py-2 px-2 text-white font-medium max-w-[200px] truncate" title={change.organisationName}>
+                                  {change.organisationName}
+                                </td>
+                                <td className="py-2 px-2">
+                                  <Badge className={
+                                    change.changeType === 'REMOVED' ? 'bg-red-500/20 text-red-400 border-red-500/30' :
+                                    change.changeType === 'DOWNGRADED' ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' :
+                                    change.changeType === 'UPGRADED' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
+                                    change.changeType === 'ADDED' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' :
+                                    'bg-slate-500/20 text-slate-400 border-slate-500/30'
+                                  }>
+                                    {change.changeType}
+                                  </Badge>
+                                </td>
+                                <td className="py-2 px-2 text-slate-400 max-w-[150px] truncate" title={change.previousValue || '-'}>
+                                  {change.previousValue || '-'}
+                                </td>
+                                <td className="py-2 px-2 text-slate-400 max-w-[150px] truncate" title={change.newValue || '-'}>
+                                  {change.newValue || '-'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </ScrollArea>
+                  )}
+                </CardContent>
+              </Card>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Top Watched Companies */}
+                <Card className="bg-slate-800 border-slate-700">
+                  <CardHeader>
+                    <CardTitle className="text-white text-base flex items-center gap-2">
+                      <TrendingUp className="w-4 h-4 text-amber-400" />
+                      Top Watched Companies
+                    </CardTitle>
+                    <CardDescription className="text-slate-400">Companies with the most watchers</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {topWatchedLoading ? (
+                      <div className="flex items-center gap-2 text-slate-400 py-4">
+                        <div className="w-5 h-5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                        Loading...
+                      </div>
+                    ) : topWatched.length === 0 ? (
+                      <p className="text-slate-500 text-sm py-4">No companies being watched yet.</p>
+                    ) : (
+                      <ScrollArea className="h-[300px]">
+                        <div className="space-y-2">
+                          {topWatched.map((company: any, idx: number) => (
+                            <div key={idx} className="flex items-center justify-between py-2 px-3 bg-slate-700/30 rounded-lg">
+                              <div className="flex items-center gap-3">
+                                <span className="text-xs font-bold text-slate-500 w-5 text-right">#{idx + 1}</span>
+                                <span className="text-sm text-white font-medium truncate max-w-[200px]" title={company.organisationName}>
+                                  {company.organisationName}
+                                </span>
+                              </div>
+                              <Badge variant="outline" className="border-amber-500/30 text-amber-400">
+                                {company.watcherCount} {company.watcherCount === 1 ? 'watcher' : 'watchers'}
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Notification Delivery Summary */}
+                <Card className="bg-slate-800 border-slate-700">
+                  <CardHeader>
+                    <CardTitle className="text-white text-base flex items-center gap-2">
+                      <Bell className="w-4 h-4 text-purple-400" />
+                      Notification Delivery (7 days)
+                    </CardTitle>
+                    <CardDescription className="text-slate-400">Sent vs failed by channel</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {notifStatsLoading ? (
+                      <div className="flex items-center gap-2 text-slate-400 py-4">
+                        <div className="w-5 h-5 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
+                        Loading...
+                      </div>
+                    ) : notifStats.length === 0 ? (
+                      <p className="text-slate-500 text-sm py-4">No notifications sent in the last 7 days.</p>
+                    ) : (
+                      <div className="space-y-4">
+                        {(() => {
+                          const channelSummary: Record<string, { sent: number; failed: number }> = {};
+                          notifStats.forEach((row: any) => {
+                            if (!channelSummary[row.channel]) channelSummary[row.channel] = { sent: 0, failed: 0 };
+                            if (row.status === 'sent' || row.status === 'delivered') {
+                              channelSummary[row.channel].sent += row.count;
+                            } else if (row.status === 'failed') {
+                              channelSummary[row.channel].failed += row.count;
+                            }
+                          });
+                          return Object.entries(channelSummary).map(([channel, counts]) => {
+                            const total = counts.sent + counts.failed;
+                            const successRate = total > 0 ? Math.round((counts.sent / total) * 100) : 0;
+                            return (
+                              <div key={channel} className="bg-slate-700/30 rounded-lg p-3">
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="text-sm font-medium text-white capitalize">{channel}</span>
+                                  <span className="text-xs text-slate-400">{successRate}% success</span>
+                                </div>
+                                <div className="w-full bg-slate-600 rounded-full h-2 mb-2">
+                                  <div
+                                    className="bg-green-500 h-2 rounded-full transition-all"
+                                    style={{ width: `${successRate}%` }}
+                                  />
+                                </div>
+                                <div className="flex justify-between text-xs">
+                                  <span className="text-green-400">{counts.sent} sent</span>
+                                  <span className="text-red-400">{counts.failed} failed</span>
+                                </div>
+                              </div>
+                            );
+                          });
+                        })()}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </TabsContent>
         </Tabs>
       </main>
 
@@ -2009,6 +2344,37 @@ export default function SimpleAdmin() {
               className="bg-red-600 hover:bg-red-700 text-white"
             >
               {feedbackLoading ? 'Submitting...' : 'Confirm as Fake'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Sponsor Monitor Run Confirmation */}
+      <Dialog open={runConfirmOpen} onOpenChange={setRunConfirmOpen}>
+        <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-blue-400">
+              <Radio className="w-5 h-5" />
+              Run Sponsor Monitor
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              This will download the latest Home Office register, compare it against the previous snapshot, and send real notifications to all users watching affected companies. Are you sure?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setRunConfirmOpen(false)}
+              className="border-slate-600 text-slate-300 hover:bg-slate-700"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleRunSponsorJob}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <Play className="w-4 h-4 mr-1" />
+              Confirm & Run
             </Button>
           </DialogFooter>
         </DialogContent>
