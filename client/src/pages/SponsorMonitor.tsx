@@ -5,12 +5,15 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Search, Plus, Building2, MapPin, Star, Route, Loader2, Shield,
   AlertTriangle, Eye, Trash2, Clock, ArrowDown, ArrowUp, XCircle, PlusCircle, CalendarDays,
+  Bell, Mail, MessageSquare, Phone, CheckCircle2, Send, Save,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import PageLayout from "@/components/PageLayout";
 import SEOHead from "@/components/SEOHead";
 import { useAuth } from "@/hooks/useAuth";
@@ -139,6 +142,197 @@ function getChangeLabel(change: SponsorChange) {
     default:
       return change.changeType;
   }
+}
+
+interface NotificationPrefs {
+  emailEnabled: boolean;
+  email: string | null;
+  whatsappEnabled: boolean;
+  whatsappNumber: string | null;
+  whatsappVerified: boolean;
+  smsEnabled: boolean;
+  smsNumber: string | null;
+  smsVerified: boolean;
+}
+
+function PhoneVerificationField({
+  channel,
+  label,
+  icon: Icon,
+  enabled,
+  onToggle,
+  phoneNumber,
+  onPhoneChange,
+  verified,
+  isPaidUser,
+}: {
+  channel: "whatsapp" | "sms";
+  label: string;
+  icon: typeof MessageSquare;
+  enabled: boolean;
+  onToggle: (v: boolean) => void;
+  phoneNumber: string;
+  onPhoneChange: (v: string) => void;
+  verified: boolean;
+  isPaidUser: boolean;
+}) {
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const { toast } = useToast();
+
+  const sendOtpMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/notification-preferences/verify-phone", {
+        phone_number: phoneNumber,
+        channel,
+      });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setOtpSent(true);
+      setOtpCode("");
+      toast({ title: "Code sent", description: data.message });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Couldn't send code", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const confirmOtpMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/notification-preferences/confirm-phone", {
+        phone_number: phoneNumber,
+        channel,
+        code: otpCode,
+      });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setOtpSent(false);
+      setOtpCode("");
+      queryClient.invalidateQueries({ queryKey: ["/api/notification-preferences"] });
+      toast({ title: "Verified", description: data.message });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Verification failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Icon className="w-4 h-4 text-muted-foreground" />
+          <Label htmlFor={`${channel}-toggle`} className="font-medium cursor-pointer">
+            {label}
+          </Label>
+        </div>
+        <Switch
+          id={`${channel}-toggle`}
+          checked={enabled}
+          onCheckedChange={(v) => {
+            if (v && !verified) {
+              toast({
+                title: "Verification required",
+                description: `Please verify your ${channel === "whatsapp" ? "WhatsApp" : "SMS"} number before enabling this channel.`,
+              });
+              return;
+            }
+            onToggle(v);
+          }}
+          disabled={!isPaidUser}
+        />
+      </div>
+
+      {!isPaidUser && (
+        <p className="text-xs text-muted-foreground ml-7">
+          Available on paid plans only.{" "}
+          <a href="/pricing" className="underline hover:no-underline text-primary">
+            Upgrade
+          </a>
+        </p>
+      )}
+
+      {isPaidUser && (
+        <div className="ml-7 space-y-2">
+          <div className="flex items-center gap-2">
+            <Input
+              type="tel"
+              placeholder="+447700900000"
+              value={phoneNumber}
+              onChange={(e) => onPhoneChange(e.target.value)}
+              className="max-w-[220px] h-9 text-sm"
+              disabled={!isPaidUser}
+            />
+            {verified ? (
+              <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                <CheckCircle2 className="w-4 h-4" />
+                Verified
+              </span>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!phoneNumber || phoneNumber.length < 8 || sendOtpMutation.isPending}
+                onClick={() => sendOtpMutation.mutate()}
+                className="h-9"
+              >
+                {sendOtpMutation.isPending ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                ) : (
+                  <Send className="w-3.5 h-3.5 mr-1" />
+                )}
+                Verify
+              </Button>
+            )}
+          </div>
+
+          <AnimatePresence>
+            {otpSent && !verified && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={springTransition}
+                className="overflow-hidden"
+              >
+                <div className="flex items-center gap-2 mt-1">
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="Enter 6-digit code"
+                    value={otpCode}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/\D/g, "").slice(0, 6);
+                      setOtpCode(v);
+                    }}
+                    className="max-w-[160px] h-9 text-sm tracking-widest text-center"
+                    maxLength={6}
+                  />
+                  <Button
+                    size="sm"
+                    disabled={otpCode.length !== 6 || confirmOtpMutation.isPending}
+                    onClick={() => confirmOtpMutation.mutate()}
+                    className="h-9"
+                  >
+                    {confirmOtpMutation.isPending ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                    ) : (
+                      <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                    )}
+                    Confirm
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Enter the 6-digit code sent to {phoneNumber}
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function formatDate(dateStr: string) {
@@ -659,7 +853,182 @@ export default function SponsorMonitor() {
             </AnimatePresence>
           </div>
         )}
+
+        {isAuthenticated && <NotificationSettings user={user} />}
       </div>
     </PageLayout>
+  );
+}
+
+function NotificationSettings({ user }: { user: any }) {
+  const { toast } = useToast();
+  const isPaidUser = user?.subscriptionStatus !== "free";
+
+  const { data: prefs, isLoading: prefsLoading } = useQuery<NotificationPrefs>({
+    queryKey: ["/api/notification-preferences"],
+  });
+
+  const [emailEnabled, setEmailEnabled] = useState(true);
+  const [whatsappEnabled, setWhatsappEnabled] = useState(false);
+  const [whatsappNumber, setWhatsappNumber] = useState("");
+  const [smsEnabled, setSmsEnabled] = useState(false);
+  const [smsNumber, setSmsNumber] = useState("");
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  useEffect(() => {
+    if (prefs) {
+      setEmailEnabled(prefs.emailEnabled);
+      setWhatsappEnabled(prefs.whatsappEnabled);
+      setWhatsappNumber(prefs.whatsappNumber || "");
+      setSmsEnabled(prefs.smsEnabled);
+      setSmsNumber(prefs.smsNumber || "");
+      setHasUnsavedChanges(false);
+    }
+  }, [prefs]);
+
+  const markDirty = useCallback(() => setHasUnsavedChanges(true), []);
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("PUT", "/api/notification-preferences", {
+        email_enabled: emailEnabled,
+        whatsapp_enabled: whatsappEnabled,
+        whatsapp_number: whatsappNumber || null,
+        sms_enabled: smsEnabled,
+        sms_number: smsNumber || null,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      setHasUnsavedChanges(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/notification-preferences"] });
+      toast({ title: "Preferences saved", description: "Your notification settings have been updated." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Could not save", description: error.message, variant: "destructive" });
+    },
+  });
+
+  if (prefsLoading) {
+    return (
+      <div className="mt-14">
+        <div className="flex items-center gap-3 mb-6">
+          <Bell className="w-5 h-5 text-primary" />
+          <h2 className="text-xl font-bold text-foreground">Notification Settings</h2>
+        </div>
+        <Card>
+          <CardContent className="py-6 space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex items-center justify-between">
+                <Skeleton className="h-5 w-40" />
+                <Skeleton className="h-6 w-11 rounded-full" />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={springTransition}
+      className="mt-14"
+    >
+      <div className="flex items-center gap-3 mb-6">
+        <Bell className="w-5 h-5 text-primary" />
+        <h2 className="text-xl font-bold text-foreground">Notification Settings</h2>
+      </div>
+
+      <Card>
+        <CardContent className="py-6 space-y-6">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Mail className="w-4 h-4 text-muted-foreground" />
+                <Label htmlFor="email-toggle" className="font-medium cursor-pointer">
+                  Email Notifications
+                </Label>
+              </div>
+              <Switch
+                id="email-toggle"
+                checked={emailEnabled}
+                onCheckedChange={(v) => {
+                  setEmailEnabled(v);
+                  markDirty();
+                }}
+              />
+            </div>
+            {user?.email && (
+              <p className="text-xs text-muted-foreground ml-7">
+                Alerts will be sent to {user.email}
+              </p>
+            )}
+          </div>
+
+          <div className="border-t border-border/50" />
+
+          <PhoneVerificationField
+            channel="whatsapp"
+            label="WhatsApp Notifications"
+            icon={MessageSquare}
+            enabled={whatsappEnabled}
+            onToggle={(v) => {
+              setWhatsappEnabled(v);
+              markDirty();
+            }}
+            phoneNumber={whatsappNumber}
+            onPhoneChange={(v) => {
+              setWhatsappNumber(v);
+              markDirty();
+            }}
+            verified={prefs?.whatsappVerified ?? false}
+            isPaidUser={isPaidUser}
+          />
+
+          <div className="border-t border-border/50" />
+
+          <PhoneVerificationField
+            channel="sms"
+            label="SMS Notifications"
+            icon={Phone}
+            enabled={smsEnabled}
+            onToggle={(v) => {
+              setSmsEnabled(v);
+              markDirty();
+            }}
+            phoneNumber={smsNumber}
+            onPhoneChange={(v) => {
+              setSmsNumber(v);
+              markDirty();
+            }}
+            verified={prefs?.smsVerified ?? false}
+            isPaidUser={isPaidUser}
+          />
+
+          <div className="border-t border-border/50" />
+
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">
+              {hasUnsavedChanges ? "You have unsaved changes" : "All changes saved"}
+            </p>
+            <Button
+              onClick={() => saveMutation.mutate()}
+              disabled={!hasUnsavedChanges || saveMutation.isPending}
+              size="sm"
+            >
+              {saveMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-1" />
+              ) : (
+                <Save className="w-4 h-4 mr-1" />
+              )}
+              Save Preferences
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
   );
 }
