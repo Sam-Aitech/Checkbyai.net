@@ -475,9 +475,39 @@ export default function SponsorMonitor() {
   return (
     <PageLayout>
       <SEOHead
-        title="Sponsor Licence Monitor | Check By AI"
-        description="Get instant alerts when a UK sponsor licence is revoked, suspended, or downgraded. Monitor companies on the Home Office register in real time."
+        title="Sponsor Licence Monitor | Instant UK Sponsor Revocation Alerts | CheckByAI"
+        description="Get instant email, WhatsApp and SMS alerts when a UK sponsor licence is revoked, suspended or downgraded. Monitor the Home Office register automatically."
         canonicalUrl="https://checkbyai.net/sponsor-monitor"
+        ogTitle="Sponsor Licence Monitor | Instant UK Sponsor Revocation Alerts | CheckByAI"
+        ogDescription="Get instant email, WhatsApp and SMS alerts when a UK sponsor licence is revoked, suspended or downgraded. Monitor the Home Office register automatically."
+        structuredData={{
+          "@context": "https://schema.org",
+          "@type": "WebApplication",
+          "name": "Sponsor Licence Monitor",
+          "description": "Real-time monitoring service for the UK Home Office Register of Licensed Sponsors. Receive instant alerts when a sponsor licence is revoked, suspended, downgraded, or upgraded.",
+          "url": "https://checkbyai.net/sponsor-monitor",
+          "applicationCategory": "BusinessApplication",
+          "operatingSystem": "Web",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "GBP",
+            "description": "Free tier includes 1 company watch with email alerts"
+          },
+          "featureList": [
+            "Daily sponsor register monitoring",
+            "Email notifications for licence changes",
+            "WhatsApp and SMS alerts (paid plans)",
+            "Licence revocation and downgrade detection",
+            "Company watchlist management",
+            "Notification history and audit trail"
+          ],
+          "provider": {
+            "@type": "Organization",
+            "name": "CheckByAI",
+            "url": "https://checkbyai.net"
+          }
+        }}
       />
 
       <div className="max-w-3xl mx-auto px-4 py-12 sm:py-16">
