@@ -127,20 +127,20 @@ function PricingCard({ plan, index, isLoggedIn, loading, onSelect }: {
       animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 32 }}
       transition={{ ...spring, delay: index * 0.1 }}
       whileHover={{ y: -4, transition: { type: "spring", stiffness: 300, damping: 20 } }}
-      className={`relative overflow-hidden flex flex-col brutalist-border rounded-sm bg-card ${
-        plan.popular ? 'border-foreground lg:scale-105 z-10' : ''
+      className={`relative overflow-hidden flex flex-col theme-card bg-card ${
+        plan.popular ? 'border-primary lg:scale-105 z-10' : ''
       }`}
     >
       {plan.popular && (
         <div className="absolute top-3 right-3">
-          <span className="editorial-caption bg-foreground text-background px-2 py-1 rounded-sm">
+          <span className="editorial-caption bg-primary text-primary-foreground px-2 py-1 rounded-full">
             Best Value
           </span>
         </div>
       )}
 
       <div className="p-6 pb-4">
-        <div className="w-12 h-12 brutalist-border-strong rounded-sm flex items-center justify-center mb-3">
+        <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mb-3">
           <plan.icon className="w-6 h-6 text-foreground" />
         </div>
         <h3 className="text-xl font-bold text-foreground">
@@ -180,7 +180,7 @@ function PricingCard({ plan, index, isLoggedIn, loading, onSelect }: {
       <div className="p-6 pt-0 mt-auto">
         <motion.button
           {...tapScale}
-          className="w-full py-3 px-4 font-semibold bg-foreground text-background hover:bg-foreground/90 rounded-sm transition-colors disabled:opacity-50"
+          className="w-full py-3 px-4 font-semibold bg-primary text-primary-foreground hover:bg-primary/90 rounded-full transition-colors disabled:opacity-50"
           onClick={() => onSelect(plan)}
           disabled={loading !== null}
         >
@@ -383,7 +383,7 @@ export default function Pricing() {
             </p>
             
             {!isLoadingUser && !isLoggedIn && (
-              <div className="mt-6 inline-flex items-center gap-2 bg-muted text-foreground brutalist-border rounded-sm px-4 py-2">
+              <div className="mt-6 inline-flex items-center gap-2 bg-muted text-foreground border border-border rounded-xl px-4 py-2">
                 <LogIn className="w-4 h-4" />
                 <span>Please <button onClick={() => setLocation('/login')} className="underline font-semibold hover:no-underline">log in</button> to purchase credits</span>
               </div>
@@ -391,12 +391,12 @@ export default function Pricing() {
             
             {!isLoadingUser && isLoggedIn && (
               <div className="mt-6 flex flex-wrap justify-center gap-4">
-                <div className="inline-flex items-center gap-2 bg-muted text-foreground brutalist-border rounded-sm px-4 py-2">
+                <div className="inline-flex items-center gap-2 bg-muted text-foreground border border-border rounded-xl px-4 py-2">
                   <Check className="w-4 h-4" />
                   <span>Logged in as <strong>{user?.email}</strong></span>
                 </div>
                 {creditsData && (
-                  <div className="inline-flex items-center gap-2 bg-muted text-foreground brutalist-border rounded-sm px-4 py-2">
+                  <div className="inline-flex items-center gap-2 bg-muted text-foreground border border-border rounded-xl px-4 py-2">
                     <CreditCard className="w-4 h-4" />
                     <span>
                       {creditsData.isUnlimited ? (
@@ -436,8 +436,8 @@ export default function Pricing() {
             </h2>
             
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="bg-card brutalist-border rounded-sm p-6 text-center">
-                <div className="w-12 h-12 brutalist-border-strong rounded-sm flex items-center justify-center mx-auto mb-4">
+              <div className="bg-card theme-card p-6 text-center">
+                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4">
                   <Shield className="w-6 h-6 text-foreground" />
                 </div>
                 <h3 className="font-semibold text-foreground mb-2">AI Analysis</h3>
@@ -446,8 +446,8 @@ export default function Pricing() {
                 </p>
               </div>
 
-              <div className="bg-card brutalist-border rounded-sm p-6 text-center">
-                <div className="w-12 h-12 brutalist-border-strong rounded-sm flex items-center justify-center mx-auto mb-4">
+              <div className="bg-card theme-card p-6 text-center">
+                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4">
                   <Zap className="w-6 h-6 text-foreground" />
                 </div>
                 <h3 className="font-semibold text-foreground mb-2">Instant Results</h3>
@@ -456,8 +456,8 @@ export default function Pricing() {
                 </p>
               </div>
 
-              <div className="bg-card brutalist-border rounded-sm p-6 text-center">
-                <div className="w-12 h-12 brutalist-border-strong rounded-sm flex items-center justify-center mx-auto mb-4">
+              <div className="bg-card theme-card p-6 text-center">
+                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4">
                   <Clock className="w-6 h-6 text-foreground" />
                 </div>
                 <h3 className="font-semibold text-foreground mb-2">Never Expire</h3>
@@ -466,8 +466,8 @@ export default function Pricing() {
                 </p>
               </div>
 
-              <div className="bg-card brutalist-border rounded-sm p-6 text-center">
-                <div className="w-12 h-12 brutalist-border-strong rounded-sm flex items-center justify-center mx-auto mb-4">
+              <div className="bg-card theme-card p-6 text-center">
+                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4">
                   <UserCheck className="w-6 h-6 text-foreground" />
                 </div>
                 <h3 className="font-semibold text-foreground mb-2">Expert Review</h3>

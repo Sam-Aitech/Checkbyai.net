@@ -1,4 +1,5 @@
 import { Link } from "wouter";
+import { ArrowRight } from "lucide-react";
 
 interface NavigationLinksProps {
   className?: string;
@@ -19,11 +20,14 @@ export default function NavigationLinks({ className = "" }: NavigationLinksProps
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {links.map((link) => (
           <Link key={link.href} href={link.href}>
-            <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600">
-              <h3 className="font-semibold text-gray-900 dark:text-white text-sm">
-                {link.label}
-              </h3>
-              <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+            <div className="group theme-card p-5 cursor-pointer">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-semibold text-foreground text-sm">
+                  {link.label}
+                </h3>
+                <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              </div>
+              <p className="text-xs text-muted-foreground">
                 {link.description}
               </p>
             </div>

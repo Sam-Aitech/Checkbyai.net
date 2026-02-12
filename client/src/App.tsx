@@ -25,7 +25,7 @@ function RouteLoader() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
       <div className="text-center">
-        <div className="w-8 h-8 brutalist-border-strong rounded-sm mx-auto mb-4 animate-spin" />
+        <div className="w-8 h-8 bg-primary/10 rounded-xl mx-auto mb-4 animate-spin" />
         <p className="editorial-caption text-muted-foreground">Loading</p>
       </div>
     </div>

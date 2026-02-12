@@ -11,7 +11,7 @@ const HeroSection = lazy(() => import("@/components/HeroSection"));
 function LoadingSpinner() {
   return (
     <div className="flex items-center justify-center py-8">
-      <div className="animate-spin h-8 w-8 brutalist-border-strong rounded-sm"></div>
+      <div className="animate-spin h-8 w-8 bg-primary/10 rounded-xl"></div>
     </div>
   );
 }
@@ -92,7 +92,7 @@ export default function Home() {
             />
             <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
               <motion.div
-                className="bg-background dark:bg-card rounded-sm max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto brutalist-border pointer-events-auto"
+                className="bg-background dark:bg-card rounded-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto border border-border pointer-events-auto"
                 initial={{ opacity: 0, scale: 0.96 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.96 }}
@@ -105,7 +105,7 @@ export default function Home() {
                       setShowVerificationModal(false);
                       setVerificationResult(null);
                     }}
-                    className="text-muted-foreground hover:text-foreground text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-sm hover:bg-muted transition-colors"
+                    className="text-muted-foreground hover:text-foreground text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-xl hover:bg-muted transition-colors"
                   >
                     <X className="w-6 h-6" />
                   </button>
@@ -114,9 +114,9 @@ export default function Home() {
                 <div className="p-6">
                   {!verificationResult ? (
                     <div>
-                      <div className="mb-6 p-4 bg-muted rounded-sm brutalist-border">
+                      <div className="mb-6 p-4 bg-muted rounded-xl border border-border">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-primary rounded-sm flex items-center justify-center flex-shrink-0">
+                          <div className="w-8 h-8 bg-primary rounded-xl flex items-center justify-center flex-shrink-0">
                             <Shield className="w-5 h-5 text-primary-foreground" />
                           </div>
                           <div>
@@ -137,7 +137,7 @@ export default function Home() {
                   ) : (
                     <div className="text-center">
                       <div className="mb-6">
-                        <div className={`inline-block px-6 py-3 rounded-sm text-lg font-semibold transition-all duration-300 ${
+                        <div className={`inline-block px-6 py-3 rounded-xl text-lg font-semibold transition-all duration-300 ${
                           verificationResult.type === 'genuine' 
                             ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
                             : verificationResult.type === 'suspicious'
@@ -157,7 +157,7 @@ export default function Home() {
                             setShowVerificationModal(false);
                             setVerificationResult(null);
                           }}
-                          className="w-full bg-primary text-primary-foreground py-3 px-6 rounded-sm font-semibold hover:opacity-90 transition-opacity editorial-subheading"
+                          className="w-full bg-primary text-primary-foreground py-3 px-6 rounded-full font-semibold hover:opacity-90 transition-opacity editorial-subheading"
                         >
                           Close
                         </button>

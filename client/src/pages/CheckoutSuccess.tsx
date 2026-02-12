@@ -74,7 +74,7 @@ export default function CheckoutSuccess() {
       />
       <div className="bg-background flex items-center justify-center p-4 min-h-screen">
         <motion.div
-          className="w-full max-w-md brutalist-border rounded-sm bg-card p-6"
+          className="w-full max-w-md border border-border rounded-xl bg-card p-6"
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={spring}
@@ -82,7 +82,7 @@ export default function CheckoutSuccess() {
           <div className="text-center">
             {isVerifying ? (
               <>
-                <div className="brutalist-border-strong rounded-sm w-14 h-14 flex items-center justify-center mx-auto mb-4">
+                <div className="bg-primary/10 rounded-xl w-14 h-14 flex items-center justify-center mx-auto mb-4">
                   <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
                 </div>
                 <h1 className="editorial-subheading text-foreground text-2xl">Verifying Payment...</h1>
@@ -90,7 +90,7 @@ export default function CheckoutSuccess() {
               </>
             ) : error ? (
               <>
-                <div className="brutalist-border-strong rounded-sm w-14 h-14 flex items-center justify-center mx-auto mb-4">
+                <div className="bg-primary/10 rounded-xl w-14 h-14 flex items-center justify-center mx-auto mb-4">
                   <span className="text-3xl text-destructive">!</span>
                 </div>
                 <h1 className="editorial-subheading text-destructive text-2xl">Error</h1>
@@ -98,7 +98,7 @@ export default function CheckoutSuccess() {
               </>
             ) : verifyResult?.success ? (
               <>
-                <div className="brutalist-border-strong rounded-sm w-14 h-14 flex items-center justify-center mx-auto mb-4">
+                <div className="bg-primary/10 rounded-xl w-14 h-14 flex items-center justify-center mx-auto mb-4">
                   <PartyPopper className="w-8 h-8 text-emerald-500" />
                 </div>
                 <h1 className="editorial-subheading text-emerald-600 dark:text-emerald-400 text-2xl">
@@ -110,7 +110,7 @@ export default function CheckoutSuccess() {
               </>
             ) : (
               <>
-                <div className="brutalist-border-strong rounded-sm w-14 h-14 flex items-center justify-center mx-auto mb-4">
+                <div className="bg-primary/10 rounded-xl w-14 h-14 flex items-center justify-center mx-auto mb-4">
                   <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
                 </div>
                 <h1 className="editorial-subheading text-foreground text-2xl">Payment Processing</h1>
@@ -121,7 +121,7 @@ export default function CheckoutSuccess() {
 
           {!isVerifying && verifyResult?.success && (
             <div className="space-y-6 mt-6">
-              <div className="bg-muted/50 brutalist-border rounded-sm p-4 space-y-3">
+              <div className="bg-muted/50 border border-border rounded-xl p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Package:</span>
                   <span className="text-foreground font-semibold">
@@ -151,7 +151,7 @@ export default function CheckoutSuccess() {
               </div>
 
               <Button
-                className="w-full bg-foreground text-background hover:bg-foreground/90 rounded-sm"
+                className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full"
                 size="lg"
                 onClick={() => setLocation('/')}
               >
@@ -164,7 +164,7 @@ export default function CheckoutSuccess() {
           {!isVerifying && (error || !verifyResult?.success) && (
             <div className="mt-6">
               <Button
-                className="w-full brutalist-border rounded-sm text-foreground hover:bg-muted"
+                className="w-full border border-border text-foreground hover:bg-muted rounded-xl"
                 variant="outline"
                 onClick={() => setLocation('/pricing')}
               >

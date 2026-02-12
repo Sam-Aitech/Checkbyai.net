@@ -132,7 +132,7 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={spring}
-        className={`brutalist-border rounded-sm p-10 text-center cursor-pointer transition-all duration-200 grain relative overflow-hidden ${
+        className={`border border-border rounded-xl p-10 text-center cursor-pointer transition-all duration-200 relative overflow-hidden ${
           isDragging 
             ? 'border-primary bg-primary/[0.03] dark:bg-primary/[0.06]' 
             : 'hover:border-foreground/30'
@@ -143,7 +143,7 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
         onDrop={handleDrop}
       >
         <div className="relative z-10">
-          <div className="mx-auto w-12 h-12 flex items-center justify-center brutalist-border rounded-sm mb-6">
+          <div className="mx-auto w-12 h-12 flex items-center justify-center border border-border rounded-xl mb-6">
             <Upload className="w-5 h-5 text-muted-foreground" />
           </div>
           
@@ -160,7 +160,7 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
           
           <label 
             htmlFor="file-upload"
-            className="inline-flex items-center px-6 py-2.5 bg-foreground text-background text-sm font-medium rounded-sm cursor-pointer hover:bg-foreground/90 transition-colors"
+            className="inline-flex items-center px-6 py-2.5 bg-primary text-primary-foreground text-sm font-medium rounded-full cursor-pointer hover:bg-primary/90 transition-colors"
           >
             Select PDF File
           </label>
@@ -181,7 +181,7 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             transition={spring}
-            className="mt-3 p-4 bg-muted/50 brutalist-border rounded-sm overflow-hidden"
+            className="mt-3 p-4 bg-muted/50 border border-border rounded-xl overflow-hidden"
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -203,7 +203,7 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={spring}
-            className="mt-3 p-3 bg-destructive/5 border-l-2 border-destructive rounded-sm"
+            className="mt-3 p-3 bg-destructive/5 border-l-2 border-destructive rounded-xl"
           >
             <div className="flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-destructive flex-shrink-0" />
@@ -235,12 +235,12 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 16 }}
             transition={spring}
-            className="mt-6 p-6 brutalist-border rounded-sm"
+            className="mt-6 p-6 border border-border rounded-xl"
           >
             <h3 className="text-sm editorial-subheading text-foreground mb-4">Verification Result</h3>
             
             <div className="flex items-center gap-3 mb-4">
-              <span className={`editorial-caption px-3 py-1.5 rounded-sm grain relative overflow-hidden ${
+              <span className={`editorial-caption px-3 py-1.5 rounded-full relative overflow-hidden ${
                 localResult.type === 'genuine' 
                   ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
                   : localResult.type === 'suspicious'

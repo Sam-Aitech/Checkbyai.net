@@ -161,8 +161,8 @@ export default function Submit() {
     return (
       <PageLayout>
         <div className="flex items-center justify-center bg-background">
-          <div className="max-w-md brutalist-border rounded-sm bg-card overflow-hidden">
-            <div className="p-6 border-b brutalist-border">
+          <div className="max-w-md theme-card overflow-hidden">
+            <div className="p-6 border-b border-border">
               <h3 className="editorial-subheading text-destructive flex items-center gap-2">
                 <AlertCircle className="w-6 h-6 text-destructive" />
                 Invalid Session
@@ -172,7 +172,7 @@ export default function Submit() {
               </p>
             </div>
             <div className="p-6">
-              <Button onClick={() => setLocation('/pricing')} className="w-full bg-foreground text-background hover:bg-foreground/90 rounded-sm">
+              <Button onClick={() => setLocation('/pricing')} className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full">
                 Go to Pricing
               </Button>
             </div>
@@ -199,8 +199,8 @@ export default function Submit() {
     return (
       <PageLayout>
         <div className="flex items-center justify-center bg-background">
-          <div className="max-w-md brutalist-border rounded-sm bg-card overflow-hidden">
-            <div className="p-6 border-b brutalist-border">
+          <div className="max-w-md theme-card overflow-hidden">
+            <div className="p-6 border-b border-border">
               <h3 className="editorial-subheading text-destructive flex items-center gap-2">
                 <AlertCircle className="w-6 h-6 text-destructive" />
                 Error Loading Submission
@@ -210,7 +210,7 @@ export default function Submit() {
               </p>
             </div>
             <div className="p-6">
-              <Button onClick={() => setLocation('/pricing')} className="w-full bg-foreground text-background hover:bg-foreground/90 rounded-sm">
+              <Button onClick={() => setLocation('/pricing')} className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full">
                 Go to Pricing
               </Button>
             </div>
@@ -228,8 +228,8 @@ export default function Submit() {
           description="Your Certificate of Sponsorship has been submitted for expert review."
         />
         <div className="flex items-center justify-center bg-background p-4">
-          <div className="max-w-lg text-center brutalist-border rounded-sm bg-card overflow-hidden">
-            <div className="p-6 border-b brutalist-border">
+          <div className="max-w-lg text-center theme-card overflow-hidden">
+            <div className="p-6 border-b border-border">
               <CheckCircle className="w-10 h-10 text-emerald-500 mx-auto mb-4" />
               <h3 className="editorial-subheading text-emerald-600 dark:text-emerald-400 text-2xl">
                 Submission Complete!
@@ -239,11 +239,11 @@ export default function Submit() {
               </p>
             </div>
             <div className="p-6 space-y-4">
-              <div className="bg-muted/50 brutalist-border rounded-sm p-4">
+              <div className="bg-muted/50 border border-border rounded-xl p-4">
                 <p className="text-sm text-muted-foreground mb-2">Submission ID</p>
                 <p className="font-mono text-lg font-semibold">{submission.id}</p>
               </div>
-              <div className="bg-muted/50 brutalist-border rounded-sm p-4 text-left">
+              <div className="bg-muted/50 border border-border rounded-xl p-4 text-left">
                 <h4 className="font-semibold mb-2">What happens next?</h4>
                 <ul className="text-sm text-muted-foreground space-y-2">
                   <li>• Our experts will review your documents within 24-48 hours</li>
@@ -253,7 +253,7 @@ export default function Submit() {
                   )}
                 </ul>
               </div>
-              <Button onClick={() => setLocation('/')} variant="outline" className="w-full brutalist-border rounded-sm">
+              <Button onClick={() => setLocation('/')} variant="outline" className="w-full border border-border rounded-full">
                 Return to Home
               </Button>
             </div>
@@ -272,8 +272,8 @@ export default function Submit() {
       
       <div className="bg-background">
         <div className="container mx-auto px-4 py-8 max-w-3xl">
-          <div className="brutalist-border rounded-sm bg-card overflow-hidden mb-6">
-            <div className="p-6 border-b brutalist-border">
+          <div className="theme-card overflow-hidden mb-6">
+            <div className="p-6 border-b border-border">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="editorial-subheading text-foreground text-2xl">Complete Your Submission</h3>
@@ -281,7 +281,7 @@ export default function Submit() {
                     Please provide details about your CoS and upload your documents
                   </p>
                 </div>
-                <span className="editorial-caption px-2.5 py-1 rounded-sm bg-muted text-foreground brutalist-border">
+                <span className="editorial-caption px-2.5 py-1 rounded-full bg-primary/10 text-foreground">
                   {submission.packageType === 'full' ? 'Full Package' : 'Normal'}
                 </span>
               </div>
@@ -295,8 +295,8 @@ export default function Submit() {
           >
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <div className="brutalist-border rounded-sm bg-card overflow-hidden">
-                  <div className="p-6 border-b brutalist-border">
+                <div className="theme-card overflow-hidden">
+                  <div className="p-6 border-b border-border">
                     <h3 className="editorial-subheading text-foreground text-lg">1. About Your Application</h3>
                     <p className="text-muted-foreground text-sm mt-1">
                       Tell us about how you applied and any communications you received
@@ -363,8 +363,8 @@ export default function Submit() {
                   </div>
                 </div>
 
-                <div className="brutalist-border rounded-sm bg-card overflow-hidden">
-                  <div className="p-6 border-b brutalist-border">
+                <div className="theme-card overflow-hidden">
+                  <div className="p-6 border-b border-border">
                     <h3 className="editorial-subheading text-foreground text-lg">2. Job Details</h3>
                     <p className="text-muted-foreground text-sm mt-1">
                       Information about the position and employer
@@ -430,8 +430,8 @@ export default function Submit() {
                   </div>
                 </div>
 
-                <div className="brutalist-border rounded-sm bg-card overflow-hidden">
-                  <div className="p-6 border-b brutalist-border">
+                <div className="theme-card overflow-hidden">
+                  <div className="p-6 border-b border-border">
                     <h3 className="editorial-subheading text-foreground text-lg">3. Upload Documents</h3>
                     <p className="text-muted-foreground text-sm mt-1">
                       Upload your Certificate of Sponsorship and any supporting documents
@@ -442,7 +442,7 @@ export default function Submit() {
                       <label className="block text-sm font-medium mb-2">
                         Certificate of Sponsorship (PDF) <span className="text-destructive">*</span>
                       </label>
-                      <div className="brutalist-border border-dashed rounded-sm p-6 text-center hover:border-foreground/30 transition-colors">
+                      <div className="border border-dashed border-border rounded-xl p-6 text-center hover:border-foreground/30 transition-colors">
                         {cosFile ? (
                           <div className="flex items-center justify-center gap-3">
                             <FileText className="w-8 h-8 text-foreground" />
@@ -484,11 +484,11 @@ export default function Submit() {
                       <label className="block text-sm font-medium mb-2">
                         Supporting Documents (Optional)
                       </label>
-                      <div className="brutalist-border border-dashed rounded-sm p-6 text-center hover:border-foreground/30 transition-colors">
+                      <div className="border border-dashed border-border rounded-xl p-6 text-center hover:border-foreground/30 transition-colors">
                         {supportingFiles.length > 0 ? (
                           <div className="space-y-2">
                             {supportingFiles.map((file, idx) => (
-                              <div key={idx} className="flex items-center justify-between bg-muted/50 rounded-sm p-2">
+                              <div key={idx} className="flex items-center justify-between bg-muted/50 rounded-xl p-2">
                                 <span className="text-sm truncate">{file.name}</span>
                                 <Button
                                   type="button"
@@ -537,8 +537,8 @@ export default function Submit() {
                   </div>
                 </div>
 
-                <div className="brutalist-border rounded-sm bg-card overflow-hidden">
-                  <div className="p-6 border-b brutalist-border">
+                <div className="theme-card overflow-hidden">
+                  <div className="p-6 border-b border-border">
                     <h3 className="editorial-subheading text-foreground text-lg">4. Additional Notes</h3>
                   </div>
                   <div className="p-6">
@@ -566,7 +566,7 @@ export default function Submit() {
                 <Button
                   type="submit"
                   size="lg"
-                  className="w-full py-6 text-lg bg-foreground text-background hover:bg-foreground/90 rounded-sm"
+                  className="w-full py-6 text-lg bg-primary text-primary-foreground hover:bg-primary/90 rounded-full"
                   disabled={submitMutation.isPending}
                   data-testid="button-submit"
                 >

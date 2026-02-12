@@ -23,7 +23,7 @@ export default function NotFound() {
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={spring}
-          className="w-full max-w-md mx-4 brutalist-border rounded-sm bg-card p-8"
+          className="w-full max-w-md mx-4 theme-card bg-card p-8"
         >
           <div className="flex mb-4 gap-3 items-center">
             <AlertCircle className="h-6 w-6 text-destructive flex-shrink-0" />
@@ -36,7 +36,7 @@ export default function NotFound() {
 
           <Link href="/">
             <motion.div whileTap={{ scale: 0.97 }}>
-              <Button className="bg-foreground text-background hover:bg-foreground/90 rounded-sm w-full">
+              <Button className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full w-full">
                 <Home className="w-4 h-4 mr-2" />
                 Back to Home
               </Button>

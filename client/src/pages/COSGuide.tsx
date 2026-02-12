@@ -102,7 +102,7 @@ export default function COSGuide() {
             transition={spring}
             className="text-center mb-12"
           >
-            <span className="editorial-caption brutalist-border rounded-sm px-3 py-1.5 inline-flex items-center gap-2 mb-4">
+            <span className="editorial-caption bg-primary/10 rounded-full px-3 py-1.5 inline-flex items-center gap-2 mb-4">
               <FileText className="w-4 h-4" />
               UK Immigration Guide
             </span>
@@ -116,8 +116,8 @@ export default function COSGuide() {
 
           <div className="grid gap-8 mb-12">
             <AnimatedCard index={0}>
-              <div className="brutalist-border rounded-sm bg-card overflow-hidden">
-                <div className="p-6 border-b brutalist-border flex items-center gap-3">
+              <div className="theme-card bg-card overflow-hidden">
+                <div className="p-6 border-b border-border flex items-center gap-3">
                   <Info className="w-6 h-6 text-foreground" />
                   <h2 className="editorial-subheading text-foreground">What is a Certificate of Sponsorship?</h2>
                 </div>
@@ -125,7 +125,7 @@ export default function COSGuide() {
                   <p className="text-muted-foreground editorial-body">
                     A Certificate of Sponsorship (CoS) is an electronic record, not a physical document, assigned by a UK employer to a worker they want to sponsor for a Skilled Worker visa.
                   </p>
-                  <div className="bg-muted/50 brutalist-border rounded-sm p-4">
+                  <div className="bg-muted/50 border border-border rounded-xl p-4">
                     <p className="text-foreground text-sm">
                       <strong>Important:</strong> The CoS contains a unique reference number that you'll need when applying for your visa. Your employer must be a licensed sponsor to issue a CoS.
                     </p>
@@ -135,8 +135,8 @@ export default function COSGuide() {
             </AnimatedCard>
 
             <AnimatedCard index={1}>
-              <div className="brutalist-border rounded-sm bg-card overflow-hidden">
-                <div className="p-6 border-b brutalist-border flex items-center gap-3">
+              <div className="theme-card bg-card overflow-hidden">
+                <div className="p-6 border-b border-border flex items-center gap-3">
                   <CheckCircle className="w-6 h-6 text-foreground" />
                   <h2 className="editorial-subheading text-foreground">What Should a Genuine CoS Contain?</h2>
                 </div>
@@ -183,8 +183,8 @@ export default function COSGuide() {
             </AnimatedCard>
 
             <AnimatedCard index={2}>
-              <div className="brutalist-border rounded-sm bg-card overflow-hidden">
-                <div className="p-6 border-b brutalist-border flex items-center gap-3">
+              <div className="theme-card bg-card overflow-hidden">
+                <div className="p-6 border-b border-border flex items-center gap-3">
                   <AlertCircle className="w-6 h-6 text-foreground" />
                   <h2 className="editorial-subheading text-foreground">Warning Signs of a Fake CoS</h2>
                 </div>
@@ -216,8 +216,8 @@ export default function COSGuide() {
             </AnimatedCard>
 
             <AnimatedCard index={3}>
-              <div className="brutalist-border rounded-sm bg-card overflow-hidden">
-                <div className="p-6 border-b brutalist-border flex items-center gap-3">
+              <div className="theme-card bg-card overflow-hidden">
+                <div className="p-6 border-b border-border flex items-center gap-3">
                   <HelpCircle className="w-6 h-6 text-foreground" />
                   <h2 className="editorial-subheading text-foreground">Frequently Asked Questions</h2>
                 </div>
@@ -257,7 +257,7 @@ export default function COSGuide() {
             <Link href="/dashboard">
               <motion.button
                 whileTap={{ scale: 0.97 }}
-                className="inline-flex items-center justify-center px-8 py-3 text-base font-medium bg-foreground text-background hover:bg-foreground/90 rounded-sm transition-colors"
+                className="inline-flex items-center justify-center px-8 py-3 text-base font-medium bg-primary text-primary-foreground hover:bg-primary/90 rounded-full transition-colors"
               >
                 <Shield className="w-5 h-5 mr-2" />
                 Verify Your CoS Now

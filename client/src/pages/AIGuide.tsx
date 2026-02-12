@@ -26,19 +26,19 @@ function RedFlagCard({ icon, title, description, severity, index }: RedFlagCardP
       animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
       transition={{ ...spring, delay: index * 0.08 }}
     >
-      <div className={`brutalist-border rounded-sm p-6 grain relative overflow-hidden ${
+      <div className={`border border-border rounded-xl p-6 relative overflow-hidden ${
         severity === "critical"
           ? "border-l-2 border-l-destructive"
           : "border-l-2 border-l-amber-500"
       }`}>
         <div className="flex items-start gap-4">
-          <div className="brutalist-border-strong rounded-sm w-10 h-10 flex items-center justify-center flex-shrink-0">
+          <div className="bg-primary/10 rounded-xl w-10 h-10 flex items-center justify-center flex-shrink-0">
             {icon}
           </div>
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
               <h3 className="font-bold text-foreground">{title}</h3>
-              <span className={`editorial-caption px-2 py-0.5 rounded-sm ${
+              <span className={`editorial-caption px-2 py-0.5 rounded-full ${
                 severity === "critical"
                   ? "bg-destructive/10 text-destructive"
                   : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
@@ -82,7 +82,7 @@ export default function AIGuide() {
             transition={spring}
             className="text-center mb-12"
           >
-            <span className="editorial-caption brutalist-border rounded-sm px-3 py-1.5 inline-flex items-center gap-2 mb-4">
+            <span className="editorial-caption bg-primary/10 rounded-full px-3 py-1.5 inline-flex items-center gap-2 mb-4">
               <Brain className="w-4 h-4" />
               AI-Powered Protection
             </span>
@@ -100,7 +100,7 @@ export default function AIGuide() {
               initial={{ opacity: 0, y: 24 }}
               animate={alertInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
               transition={spring}
-              className="brutalist-border rounded-sm border-l-2 border-l-destructive bg-destructive/5 p-6 mb-6"
+              className="border border-border rounded-xl border-l-2 border-l-destructive bg-destructive/5 p-6 mb-6"
             >
               <div className="flex items-start gap-3">
                 <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
@@ -163,7 +163,7 @@ export default function AIGuide() {
               initial={{ opacity: 0, y: 24 }}
               animate={ctaInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
               transition={spring}
-              className="bg-muted brutalist-border rounded-sm p-8 text-center"
+              className="bg-muted border border-border rounded-xl p-8 text-center"
             >
               <AlertTriangle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="editorial-subheading text-foreground text-xl mb-2">
@@ -176,7 +176,7 @@ export default function AIGuide() {
               <Link href="/dashboard">
                 <motion.button
                   whileTap={{ scale: 0.97 }}
-                  className="bg-foreground text-background hover:bg-foreground/90 rounded-sm px-6 py-3 font-medium inline-flex items-center gap-2"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full px-6 py-3 font-medium inline-flex items-center gap-2"
                 >
                   <Shield className="w-4 h-4" />
                   Verify Your Document Now
@@ -207,8 +207,8 @@ export default function AIGuide() {
               animate={card1InView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
               transition={spring}
             >
-              <div className="brutalist-border rounded-sm bg-card">
-                <div className="p-6 border-b brutalist-border flex items-center gap-3">
+              <div className="theme-card bg-card">
+                <div className="p-6 border-b border-border flex items-center gap-3">
                   <FileSearch className="w-6 h-6 text-foreground" />
                   <h3 className="editorial-subheading text-foreground">Advanced Document Analysis</h3>
                 </div>
@@ -244,8 +244,8 @@ export default function AIGuide() {
               animate={card2InView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
               transition={spring}
             >
-              <div className="brutalist-border rounded-sm bg-card">
-                <div className="p-6 border-b brutalist-border flex items-center gap-3">
+              <div className="theme-card bg-card">
+                <div className="p-6 border-b border-border flex items-center gap-3">
                   <AlertTriangle className="w-6 h-6 text-foreground" />
                   <h3 className="editorial-subheading text-foreground">Fraud Detection Capabilities</h3>
                 </div>
@@ -281,8 +281,8 @@ export default function AIGuide() {
               animate={card3InView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
               transition={spring}
             >
-              <div className="brutalist-border rounded-sm bg-card">
-                <div className="p-6 border-b brutalist-border flex items-center gap-3">
+              <div className="theme-card bg-card">
+                <div className="p-6 border-b border-border flex items-center gap-3">
                   <Brain className="w-6 h-6 text-foreground" />
                   <h3 className="editorial-subheading text-foreground">Continuous Learning System</h3>
                 </div>
@@ -291,15 +291,15 @@ export default function AIGuide() {
                     Our AI continuously improves through expert feedback:
                   </p>
                   <div className="grid md:grid-cols-3 gap-4">
-                    <div className="bg-muted/50 brutalist-border rounded-sm p-4 text-center">
+                    <div className="bg-muted/50 border border-border rounded-xl p-4 text-center">
                       <p className="text-foreground font-semibold">Expert Review</p>
                       <p className="text-muted-foreground text-sm">Human oversight</p>
                     </div>
-                    <div className="bg-muted/50 brutalist-border rounded-sm p-4 text-center">
+                    <div className="bg-muted/50 border border-border rounded-xl p-4 text-center">
                       <p className="text-foreground font-semibold">Pattern Updates</p>
                       <p className="text-muted-foreground text-sm">Regular improvements</p>
                     </div>
-                    <div className="bg-muted/50 brutalist-border rounded-sm p-4 text-center">
+                    <div className="bg-muted/50 border border-border rounded-xl p-4 text-center">
                       <p className="text-foreground font-semibold">New Fraud Detection</p>
                       <p className="text-muted-foreground text-sm">Emerging threats</p>
                     </div>
@@ -314,8 +314,8 @@ export default function AIGuide() {
               animate={card4InView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
               transition={spring}
             >
-              <div className="brutalist-border rounded-sm bg-card">
-                <div className="p-6 border-b brutalist-border flex items-center gap-3">
+              <div className="theme-card bg-card">
+                <div className="p-6 border-b border-border flex items-center gap-3">
                   <Award className="w-6 h-6 text-foreground" />
                   <h3 className="editorial-subheading text-foreground">Accuracy & Reliability</h3>
                 </div>
@@ -349,7 +349,7 @@ export default function AIGuide() {
             <Link href="/dashboard">
               <motion.button
                 whileTap={{ scale: 0.97 }}
-                className="bg-foreground text-background hover:bg-foreground/90 rounded-sm px-8 py-4 text-lg font-medium inline-flex items-center gap-2"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full px-8 py-4 text-lg font-medium inline-flex items-center gap-2"
               >
                 <Shield className="w-5 h-5" />
                 Verify Your Document Now

@@ -155,7 +155,7 @@ export default function LoginPage() {
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: "spring", stiffness: 100, damping: 15 }}
-          className="w-full max-w-md brutalist-border rounded-sm bg-card p-0"
+          className="w-full max-w-md theme-card bg-card p-0"
         >
           <div className="text-center p-6 pb-0">
             <div className="flex justify-center mb-6">
@@ -197,7 +197,7 @@ export default function LoginPage() {
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           required
-                          className="pl-10 rounded-sm"
+                          className="pl-10 rounded-xl"
                           data-testid="input-email"
                         />
                       </div>
@@ -205,7 +205,7 @@ export default function LoginPage() {
 
                     <Button 
                       type="submit" 
-                      className="w-full bg-foreground text-background hover:bg-foreground/90 rounded-sm font-semibold" 
+                      className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full font-semibold" 
                       disabled={isLoading}
                       data-testid="button-send-otp"
                     >
@@ -249,7 +249,7 @@ export default function LoginPage() {
                           onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
                           required
                           maxLength={6}
-                          className="pl-10 text-center text-2xl tracking-widest font-mono rounded-sm"
+                          className="pl-10 text-center text-2xl tracking-widest font-mono rounded-xl"
                           data-testid="input-otp"
                         />
                       </div>
@@ -257,7 +257,7 @@ export default function LoginPage() {
 
                     <Button 
                       type="submit" 
-                      className="w-full bg-foreground text-background hover:bg-foreground/90 rounded-sm font-semibold" 
+                      className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full font-semibold" 
                       disabled={isLoading || otpCode.length !== 6}
                       data-testid="button-verify-otp"
                     >

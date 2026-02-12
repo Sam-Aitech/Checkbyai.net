@@ -71,14 +71,14 @@ const resultConfig = {
 
 function SkeletonCard() {
   return (
-    <div className="brutalist-border rounded-sm bg-card p-5">
+    <div className="border border-border rounded-xl bg-card p-5">
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 space-y-3">
           <Skeleton className="h-5 w-48" />
           <Skeleton className="h-4 w-32" />
           <Skeleton className="h-4 w-40" />
         </div>
-        <Skeleton className="h-8 w-20 rounded-sm" />
+        <Skeleton className="h-8 w-20 rounded-full" />
       </div>
     </div>
   );
@@ -115,7 +115,7 @@ function VerificationCard({ v, index }: { v: Verification; index: number }) {
       animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
       transition={{ ...spring, delay: index * 0.08 }}
     >
-      <div className="brutalist-border rounded-sm bg-card p-5 transition-shadow hover:shadow-md">
+      <div className="border border-border rounded-xl bg-card p-5 transition-shadow hover:shadow-md">
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
@@ -159,7 +159,7 @@ function VerificationCard({ v, index }: { v: Verification; index: number }) {
 
           <div className="flex items-center gap-2 flex-shrink-0">
             {(v.adminStatus === "approved" || v.adminStatus === "fake") && (
-              <span className={`editorial-caption inline-flex items-center gap-1 px-2.5 py-1 rounded-sm ${
+              <span className={`editorial-caption inline-flex items-center gap-1 px-2.5 py-1 rounded-full ${
                 v.adminStatus === "approved"
                   ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
                   : "bg-red-500/10 text-red-600 dark:text-red-400"
@@ -168,7 +168,7 @@ function VerificationCard({ v, index }: { v: Verification; index: number }) {
                 {v.adminStatus === "approved" ? "Admin Approved" : "Admin Flagged"}
               </span>
             )}
-            <span className={`editorial-caption inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm ${config.bg} ${config.text}`}>
+            <span className={`editorial-caption inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full ${config.bg} ${config.text}`}>
               {config.icon}
               {config.label}
             </span>
@@ -200,7 +200,7 @@ function VerificationCard({ v, index }: { v: Verification; index: number }) {
                     return (
                       <div
                         key={idx}
-                        className={`flex items-start gap-3 px-3 py-2 rounded-sm ${
+                        className={`flex items-start gap-3 px-3 py-2 rounded-xl ${
                           check.passed
                             ? "bg-emerald-500/5"
                             : "bg-red-500/5"
@@ -214,7 +214,7 @@ function VerificationCard({ v, index }: { v: Verification; index: number }) {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium text-foreground">{check.name}</span>
-                            <span className={`text-xs px-1.5 py-0.5 rounded-sm font-medium ${sev.bg} ${sev.text}`}>
+                            <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${sev.bg} ${sev.text}`}>
                               {check.severity}
                             </span>
                           </div>
@@ -266,7 +266,7 @@ export default function VerificationHistory() {
             <Skeleton className="h-5 w-80 mb-8" />
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
               {[...Array(4)].map((_, i) => (
-                <div key={i} className="brutalist-border rounded-sm bg-card p-5">
+                <div key={i} className="border border-border rounded-xl bg-card p-5">
                   <Skeleton className="h-24" />
                 </div>
               ))}
@@ -290,14 +290,14 @@ export default function VerificationHistory() {
           canonicalUrl="https://checkbyai.net/history"
         />
         <div className="bg-background flex items-center justify-center">
-          <div className="brutalist-border rounded-sm bg-card max-w-md mx-4 p-8 text-center">
+          <div className="border border-border rounded-xl bg-card max-w-md mx-4 p-8 text-center">
             <LogIn className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <h2 className="editorial-subheading text-xl text-foreground mb-2">Login Required</h2>
             <p className="text-muted-foreground editorial-body mb-6">
               Please log in to view your verification history and audit trail.
             </p>
             <Link href="/login">
-              <Button className="bg-foreground text-background hover:bg-foreground/90 rounded-sm">
+              <Button className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full">
                 <LogIn className="w-4 h-4 mr-2" />
                 Log In
               </Button>
@@ -336,7 +336,7 @@ export default function VerificationHistory() {
           <>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
               {[...Array(4)].map((_, i) => (
-                <div key={i} className="brutalist-border rounded-sm bg-card p-5">
+                <div key={i} className="border border-border rounded-xl bg-card p-5">
                   <Skeleton className="h-24" />
                 </div>
               ))}
@@ -350,19 +350,19 @@ export default function VerificationHistory() {
         ) : verifications && verifications.length > 0 ? (
           <>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-              <div className="brutalist-border rounded-sm bg-card p-5 text-center">
+              <div className="border border-border rounded-xl bg-card p-5 text-center">
                 <p className="text-foreground text-2xl font-bold">{totalCount}</p>
                 <p className="editorial-caption text-muted-foreground mt-1">Total</p>
               </div>
-              <div className="brutalist-border rounded-sm bg-card p-5 text-center">
+              <div className="border border-border rounded-xl bg-card p-5 text-center">
                 <p className="text-emerald-600 dark:text-emerald-400 text-2xl font-bold">{genuineCount}</p>
                 <p className="editorial-caption text-muted-foreground mt-1">Genuine</p>
               </div>
-              <div className="brutalist-border rounded-sm bg-card p-5 text-center">
+              <div className="border border-border rounded-xl bg-card p-5 text-center">
                 <p className="text-amber-600 dark:text-amber-400 text-2xl font-bold">{suspiciousCount}</p>
                 <p className="editorial-caption text-muted-foreground mt-1">Suspicious</p>
               </div>
-              <div className="brutalist-border rounded-sm bg-card p-5 text-center">
+              <div className="border border-border rounded-xl bg-card p-5 text-center">
                 <p className="text-red-600 dark:text-red-400 text-2xl font-bold">{fakeCount}</p>
                 <p className="editorial-caption text-muted-foreground mt-1">Fake</p>
               </div>
@@ -375,14 +375,14 @@ export default function VerificationHistory() {
             </div>
           </>
         ) : (
-          <div className="brutalist-border rounded-sm bg-card p-12 text-center">
+          <div className="border border-border rounded-xl bg-card p-12 text-center">
             <FileText className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
             <h3 className="editorial-subheading text-xl text-foreground mb-2">No verifications yet</h3>
             <p className="text-muted-foreground editorial-body mb-6 max-w-md mx-auto">
               You haven't verified any documents yet. Upload a document to get started with your first verification.
             </p>
             <Link href="/dashboard">
-              <Button className="bg-foreground text-background hover:bg-foreground/90 rounded-sm">
+              <Button className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full">
                 <Shield className="w-4 h-4 mr-2" />
                 Verify a Document
               </Button>
