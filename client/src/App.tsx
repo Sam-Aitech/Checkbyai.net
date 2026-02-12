@@ -23,10 +23,10 @@ const NotFound = lazy(() => import("@/pages/not-found"));
 // Minimal loading component for route transitions
 function RouteLoader() {
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-900 dark:to-gray-800">
+    <div className="flex items-center justify-center min-h-screen bg-background">
       <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-        <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+        <div className="w-8 h-8 brutalist-border-strong rounded-sm mx-auto mb-4 animate-spin" />
+        <p className="editorial-caption text-muted-foreground">Loading</p>
       </div>
     </div>
   );

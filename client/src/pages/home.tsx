@@ -1,5 +1,6 @@
 import { useState, Suspense, lazy } from "react";
 import { Shield, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import FileUploadSimple from "@/components/FileUploadSimple";
 import SEOHead from "@/components/SEOHead";
@@ -10,7 +11,7 @@ const HeroSection = lazy(() => import("@/components/HeroSection"));
 function LoadingSpinner() {
   return (
     <div className="flex items-center justify-center py-8">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="animate-spin h-8 w-8 brutalist-border-strong rounded-sm"></div>
     </div>
   );
 }
@@ -76,79 +77,99 @@ export default function Home() {
         <HeroSection onStartVerification={() => setShowVerificationModal(true)} />
       </Suspense>
 
-      {showVerificationModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white dark:bg-gray-800 p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Document Verification</h2>
-              <button
-                onClick={() => {
-                  setShowVerificationModal(false);
-                  setVerificationResult(null);
-                }}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+      <AnimatePresence>
+        {showVerificationModal && (
+          <>
+            <motion.div
+              className="fixed inset-0 bg-foreground/50 z-40"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                setShowVerificationModal(false);
+                setVerificationResult(null);
+              }}
+            />
+            <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
+              <motion.div
+                className="bg-background dark:bg-card rounded-sm max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto brutalist-border pointer-events-auto"
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.96 }}
+                transition={{ type: "spring", stiffness: 100, damping: 15 }}
               >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            
-            <div className="p-6">
-              {!verificationResult ? (
-                <div>
-                  <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                        <Shield className="w-5 h-5 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-blue-800 dark:text-blue-200">Document Verification Available</h3>
-                        <p className="text-blue-700 dark:text-blue-300 text-sm">Upload your document to verify its authenticity instantly</p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <FileUploadSimple
-                    onFileUpload={handleFileUpload}
-                    onVerificationResult={handleVerificationResult}
-                    onError={handleVerificationError}
-                    onLoading={setIsLoading}
-                    isAdmin={false}
-                  />
+                <div className="sticky top-0 bg-background dark:bg-card p-6 border-b border-border flex justify-between items-center">
+                  <h2 className="text-2xl font-bold editorial-subheading text-foreground">Document Verification</h2>
+                  <button
+                    onClick={() => {
+                      setShowVerificationModal(false);
+                      setVerificationResult(null);
+                    }}
+                    className="text-muted-foreground hover:text-foreground text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-sm hover:bg-muted transition-colors"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
                 </div>
-              ) : (
-                <div className="text-center">
-                  <div className="mb-6">
-                    <div className={`inline-block px-6 py-3 rounded-full text-lg font-semibold transition-all duration-700 ease-in-out transform hover:scale-105 ${
-                      verificationResult.type === 'genuine' 
-                        ? 'bg-gradient-to-r from-green-400 to-emerald-500 text-white shadow-lg shadow-green-500/25 animate-pulse'
-                        : verificationResult.type === 'suspicious'
-                        ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white shadow-lg shadow-yellow-500/25 animate-bounce'
-                        : 'bg-gradient-to-r from-red-400 to-rose-500 text-white shadow-lg shadow-red-500/25 animate-pulse'
-                    }`}>
-                      {verificationResult.type === 'genuine' ? 'Genuine' : verificationResult.type === 'suspicious' ? 'Suspicious' : 'Fake'}
+                
+                <div className="p-6">
+                  {!verificationResult ? (
+                    <div>
+                      <div className="mb-6 p-4 bg-muted rounded-sm brutalist-border">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-primary rounded-sm flex items-center justify-center flex-shrink-0">
+                            <Shield className="w-5 h-5 text-primary-foreground" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold editorial-subheading text-foreground">Document Verification Available</h3>
+                            <p className="text-muted-foreground text-sm editorial-body">Upload your document to verify its authenticity instantly</p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <FileUploadSimple
+                        onFileUpload={handleFileUpload}
+                        onVerificationResult={handleVerificationResult}
+                        onError={handleVerificationError}
+                        onLoading={setIsLoading}
+                        isAdmin={false}
+                      />
                     </div>
-                  </div>
+                  ) : (
+                    <div className="text-center">
+                      <div className="mb-6">
+                        <div className={`inline-block px-6 py-3 rounded-sm text-lg font-semibold transition-all duration-300 ${
+                          verificationResult.type === 'genuine' 
+                            ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
+                            : verificationResult.type === 'suspicious'
+                            ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20'
+                            : 'bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/20'
+                        }`}>
+                          {verificationResult.type === 'genuine' ? 'Genuine' : verificationResult.type === 'suspicious' ? 'Suspicious' : 'Fake'}
+                        </div>
+                      </div>
 
-                  <div className="space-y-3 mb-6">
-                    <p className="text-gray-600 dark:text-gray-300">
-                      Confidence: {Math.round(verificationResult.confidence)}%
-                    </p>
-                    <button
-                      onClick={() => {
-                        setShowVerificationModal(false);
-                        setVerificationResult(null);
-                      }}
-                      className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-                    >
-                      Close
-                    </button>
-                  </div>
+                      <div className="space-y-3 mb-6">
+                        <p className="text-muted-foreground editorial-body">
+                          Confidence: {Math.round(verificationResult.confidence)}%
+                        </p>
+                        <button
+                          onClick={() => {
+                            setShowVerificationModal(false);
+                            setVerificationResult(null);
+                          }}
+                          className="w-full bg-primary text-primary-foreground py-3 px-6 rounded-sm font-semibold hover:opacity-90 transition-opacity editorial-subheading"
+                        >
+                          Close
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
+              </motion.div>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </AnimatePresence>
     </PageLayout>
   );
 }

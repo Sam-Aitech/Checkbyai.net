@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { useLocation, useSearch } from 'wouter';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, CreditCard, Loader2, PartyPopper, ArrowRight } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { apiRequest } from '@/lib/queryClient';
 import PageLayout from '@/components/PageLayout';
 import SEOHead from '@/components/SEOHead';
@@ -15,6 +15,8 @@ interface VerifyResult {
   subscriptionStatus?: string;
   status?: string;
 }
+
+const spring = { type: "spring" as const, stiffness: 100, damping: 15 };
 
 export default function CheckoutSuccess() {
   const [, setLocation] = useLocation();
@@ -70,62 +72,67 @@ export default function CheckoutSuccess() {
         description="Your payment has been processed successfully. Your verification credits are now available."
         canonicalUrl="https://checkbyai.net/checkout/success"
       />
-      <div className="bg-gradient-to-br from-green-50 via-white to-emerald-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
+      <div className="bg-background flex items-center justify-center p-4 min-h-screen">
+        <motion.div
+          className="w-full max-w-md brutalist-border rounded-sm bg-card p-6"
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={spring}
+        >
+          <div className="text-center">
             {isVerifying ? (
               <>
-                <div className="w-16 h-16 mx-auto mb-4 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
-                  <Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" />
+                <div className="brutalist-border-strong rounded-sm w-14 h-14 flex items-center justify-center mx-auto mb-4">
+                  <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
                 </div>
-                <CardTitle className="text-2xl">Verifying Payment...</CardTitle>
-                <CardDescription>Please wait while we confirm your purchase</CardDescription>
+                <h1 className="editorial-subheading text-foreground text-2xl">Verifying Payment...</h1>
+                <p className="text-muted-foreground text-sm mt-2">Please wait while we confirm your purchase</p>
               </>
             ) : error ? (
               <>
-                <div className="w-16 h-16 mx-auto mb-4 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center">
-                  <span className="text-3xl">!</span>
+                <div className="brutalist-border-strong rounded-sm w-14 h-14 flex items-center justify-center mx-auto mb-4">
+                  <span className="text-3xl text-destructive">!</span>
                 </div>
-                <CardTitle className="text-2xl text-red-600">Error</CardTitle>
-                <CardDescription>{error}</CardDescription>
+                <h1 className="editorial-subheading text-destructive text-2xl">Error</h1>
+                <p className="text-muted-foreground text-sm mt-2">{error}</p>
               </>
             ) : verifyResult?.success ? (
               <>
-                <div className="w-16 h-16 mx-auto mb-4 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
-                  <PartyPopper className="w-8 h-8 text-green-600 dark:text-green-400" />
+                <div className="brutalist-border-strong rounded-sm w-14 h-14 flex items-center justify-center mx-auto mb-4">
+                  <PartyPopper className="w-8 h-8 text-emerald-500" />
                 </div>
-                <CardTitle className="text-2xl text-green-600 dark:text-green-400">
+                <h1 className="editorial-subheading text-emerald-600 dark:text-emerald-400 text-2xl">
                   Payment Successful!
-                </CardTitle>
-                <CardDescription>
+                </h1>
+                <p className="text-muted-foreground text-sm mt-2">
                   Thank you for your purchase
-                </CardDescription>
+                </p>
               </>
             ) : (
               <>
-                <div className="w-16 h-16 mx-auto mb-4 bg-yellow-100 dark:bg-yellow-900 rounded-full flex items-center justify-center">
-                  <Loader2 className="w-8 h-8 text-yellow-600 dark:text-yellow-400" />
+                <div className="brutalist-border-strong rounded-sm w-14 h-14 flex items-center justify-center mx-auto mb-4">
+                  <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
                 </div>
-                <CardTitle className="text-2xl">Payment Processing</CardTitle>
-                <CardDescription>Your payment is being processed</CardDescription>
+                <h1 className="editorial-subheading text-foreground text-2xl">Payment Processing</h1>
+                <p className="text-muted-foreground text-sm mt-2">Your payment is being processed</p>
               </>
             )}
-          </CardHeader>
+          </div>
 
           {!isVerifying && verifyResult?.success && (
-            <CardContent className="space-y-6">
-              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 space-y-3">
+            <div className="space-y-6 mt-6">
+              <div className="bg-muted/50 brutalist-border rounded-sm p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Package:</span>
-                  <span className="font-semibold text-gray-900 dark:text-white">
+                  <span className="text-muted-foreground">Package:</span>
+                  <span className="text-foreground font-semibold">
                     {getPackageLabel(verifyResult.packageType)}
                   </span>
                 </div>
                 
                 {verifyResult.credits !== undefined && verifyResult.packageType !== 'unlimited' && (
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Total Credits:</span>
-                    <span className="font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                    <span className="text-muted-foreground">Total Credits:</span>
+                    <span className="text-primary font-semibold flex items-center gap-1">
                       <CreditCard className="w-4 h-4" />
                       {verifyResult.credits}
                     </span>
@@ -134,8 +141,8 @@ export default function CheckoutSuccess() {
 
                 {verifyResult.subscriptionStatus === 'pro' && (
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Status:</span>
-                    <span className="font-semibold text-green-600 dark:text-green-400 flex items-center gap-1">
+                    <span className="text-muted-foreground">Status:</span>
+                    <span className="text-emerald-500 font-semibold flex items-center gap-1">
                       <Check className="w-4 h-4" />
                       Unlimited Access Active
                     </span>
@@ -144,28 +151,28 @@ export default function CheckoutSuccess() {
               </div>
 
               <Button
-                className="w-full"
+                className="w-full bg-foreground text-background hover:bg-foreground/90 rounded-sm"
                 size="lg"
                 onClick={() => setLocation('/')}
               >
                 Start Verifying Documents
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
-            </CardContent>
+            </div>
           )}
 
           {!isVerifying && (error || !verifyResult?.success) && (
-            <CardContent>
+            <div className="mt-6">
               <Button
+                className="w-full brutalist-border rounded-sm text-foreground hover:bg-muted"
                 variant="outline"
-                className="w-full"
                 onClick={() => setLocation('/pricing')}
               >
                 Back to Pricing
               </Button>
-            </CardContent>
+            </div>
           )}
-        </Card>
+        </motion.div>
       </div>
     </PageLayout>
   );

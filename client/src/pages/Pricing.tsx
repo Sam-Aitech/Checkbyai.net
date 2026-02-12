@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { Check, X, Shield, Zap, Clock, Star, LogIn, CreditCard, Infinity, UserCheck } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { motion } from 'framer-motion';
+import { useScrollReveal, spring, fadeUp, staggerItem, buttonInteraction, tapScale } from '@/lib/animations';
+import { useInView } from 'react-intersection-observer';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, getQueryFn } from '@/lib/queryClient';
 import SEOHead from '@/components/SEOHead';
@@ -30,7 +30,6 @@ interface PricingPlan {
   packageType: 'starter' | 'pro' | 'unlimited' | 'master';
   credits?: number;
   icon: typeof CreditCard;
-  gradient: string;
 }
 
 const plans: PricingPlan[] = [
@@ -42,7 +41,6 @@ const plans: PricingPlan[] = [
     packageType: 'starter',
     credits: 50,
     icon: CreditCard,
-    gradient: 'from-emerald-500 to-teal-600',
     features: [
       '50 verification credits',
       'AI-powered document analysis',
@@ -64,7 +62,6 @@ const plans: PricingPlan[] = [
     credits: 100,
     popular: true,
     icon: Zap,
-    gradient: 'from-blue-500 to-indigo-600',
     features: [
       '100 verification credits',
       'AI-powered document analysis',
@@ -85,7 +82,6 @@ const plans: PricingPlan[] = [
     description: 'Unlimited verifications for businesses',
     packageType: 'unlimited',
     icon: Infinity,
-    gradient: 'from-purple-500 to-violet-600',
     features: [
       'Unlimited verifications',
       'AI-powered document analysis',
@@ -103,7 +99,6 @@ const plans: PricingPlan[] = [
     description: 'Priority expert human review with 24-hour SLA',
     packageType: 'master',
     icon: UserCheck,
-    gradient: 'from-amber-500 to-orange-600',
     features: [
       'Expert human review',
       '24-hour turnaround guarantee',
@@ -115,6 +110,98 @@ const plans: PricingPlan[] = [
     ],
   },
 ];
+
+function PricingCard({ plan, index, isLoggedIn, loading, onSelect }: {
+  plan: PricingPlan;
+  index: number;
+  isLoggedIn: boolean;
+  loading: string | null;
+  onSelect: (plan: PricingPlan) => void;
+}) {
+  const [ref, inView] = useInView({ triggerOnce: true, threshold: 0.15 });
+
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y: 32 }}
+      animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 32 }}
+      transition={{ ...spring, delay: index * 0.1 }}
+      whileHover={{ y: -4, transition: { type: "spring", stiffness: 300, damping: 20 } }}
+      className={`relative overflow-hidden flex flex-col brutalist-border rounded-sm bg-card ${
+        plan.popular ? 'border-foreground lg:scale-105 z-10' : ''
+      }`}
+    >
+      {plan.popular && (
+        <div className="absolute top-3 right-3">
+          <span className="editorial-caption bg-foreground text-background px-2 py-1 rounded-sm">
+            Best Value
+          </span>
+        </div>
+      )}
+
+      <div className="p-6 pb-4">
+        <div className="w-12 h-12 brutalist-border-strong rounded-sm flex items-center justify-center mb-3">
+          <plan.icon className="w-6 h-6 text-foreground" />
+        </div>
+        <h3 className="text-xl font-bold text-foreground">
+          {plan.name}
+        </h3>
+        <p className="text-muted-foreground text-sm mt-1">
+          {plan.description}
+        </p>
+      </div>
+
+      <div className="px-6 pb-6 flex-grow">
+        <div className="mb-6">
+          <span className="editorial-heading text-4xl text-foreground">
+            {plan.price}
+          </span>
+          <span className="text-muted-foreground text-sm ml-1">
+            {plan.period || ' one-time'}
+          </span>
+        </div>
+
+        <ul className="space-y-2">
+          {plan.features.map((feature, idx) => (
+            <li key={idx} className="flex items-start gap-2 text-sm text-foreground">
+              <Check className="w-4 h-4 mt-0.5 flex-shrink-0 text-foreground" />
+              <span>{feature}</span>
+            </li>
+          ))}
+          {plan.notIncluded?.map((feature, idx) => (
+            <li key={`not-${idx}`} className="flex items-start gap-2 text-sm text-muted-foreground">
+              <X className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <span className="line-through">{feature}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="p-6 pt-0 mt-auto">
+        <motion.button
+          {...tapScale}
+          className="w-full py-3 px-4 font-semibold bg-foreground text-background hover:bg-foreground/90 rounded-sm transition-colors disabled:opacity-50"
+          onClick={() => onSelect(plan)}
+          disabled={loading !== null}
+        >
+          {loading === plan.packageType ? (
+            <span className="flex items-center justify-center gap-2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-background"></div>
+              Processing...
+            </span>
+          ) : !isLoggedIn ? (
+            <span className="flex items-center justify-center gap-2">
+              <LogIn className="w-4 h-4" />
+              Login to Purchase
+            </span>
+          ) : (
+            `Get ${plan.name}`
+          )}
+        </motion.button>
+      </div>
+    </motion.div>
+  );
+}
 
 export default function Pricing() {
   const [, setLocation] = useLocation();
@@ -183,6 +270,9 @@ export default function Pricing() {
       setLoading(null);
     }
   };
+
+  const headerReveal = useScrollReveal();
+  const whyReveal = useScrollReveal();
 
   return (
     <PageLayout>
@@ -277,21 +367,27 @@ export default function Pricing() {
         }}
       />
       
-      <div className="bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+      <div className="bg-background">
         <div className="container mx-auto px-4 py-12">
-          <div className="text-center mb-12">
-            <Badge className="mb-4 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+          <motion.div
+            ref={headerReveal.ref}
+            initial={fadeUp.initial}
+            animate={headerReveal.inView ? fadeUp.animate : fadeUp.initial}
+            transition={spring}
+            className="text-center mb-12"
+          >
+            <span className="editorial-caption text-muted-foreground mb-4 inline-block">
               Verification Credits
-            </Badge>
-            <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
+            </span>
+            <h1 className="text-5xl md:text-6xl editorial-heading text-foreground mb-4">
               Choose Your Plan
             </h1>
-            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto editorial-body">
               Purchase verification credits or subscribe for unlimited access. Credits never expire and can be used anytime.
             </p>
             
             {!isLoadingUser && !isLoggedIn && (
-              <div className="mt-6 inline-flex items-center gap-2 bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 px-4 py-2 rounded-lg">
+              <div className="mt-6 inline-flex items-center gap-2 bg-muted text-foreground brutalist-border rounded-sm px-4 py-2">
                 <LogIn className="w-4 h-4" />
                 <span>Please <button onClick={() => setLocation('/login')} className="underline font-semibold hover:no-underline">log in</button> to purchase credits</span>
               </div>
@@ -299,12 +395,12 @@ export default function Pricing() {
             
             {!isLoadingUser && isLoggedIn && (
               <div className="mt-6 flex flex-wrap justify-center gap-4">
-                <div className="inline-flex items-center gap-2 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 px-4 py-2 rounded-lg">
+                <div className="inline-flex items-center gap-2 bg-muted text-foreground brutalist-border rounded-sm px-4 py-2">
                   <Check className="w-4 h-4" />
                   <span>Logged in as <strong>{user?.email}</strong></span>
                 </div>
                 {creditsData && (
-                  <div className="inline-flex items-center gap-2 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 px-4 py-2 rounded-lg">
+                  <div className="inline-flex items-center gap-2 bg-muted text-foreground brutalist-border rounded-sm px-4 py-2">
                     <CreditCard className="w-4 h-4" />
                     <span>
                       {creditsData.isUnlimited ? (
@@ -317,141 +413,79 @@ export default function Pricing() {
                 )}
               </div>
             )}
-          </div>
+          </motion.div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto mb-16">
-            {plans.map((plan) => (
-              <Card
+            {plans.map((plan, index) => (
+              <PricingCard
                 key={plan.packageType}
-                className={`relative overflow-hidden transition-all duration-300 hover:shadow-2xl flex flex-col ${
-                  plan.popular
-                    ? 'border-2 border-blue-500 dark:border-blue-400 shadow-xl lg:scale-105 z-10'
-                    : 'border border-gray-200 dark:border-gray-700 hover:border-blue-300'
-                }`}
-              >
-                {plan.popular && (
-                  <div className="absolute top-0 right-0 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-3 py-1 text-xs font-semibold rounded-bl-lg">
-                    <Star className="w-3 h-3 inline mr-1" />
-                    Best Value
-                  </div>
-                )}
-                
-                <CardHeader className="pb-4">
-                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${plan.gradient} flex items-center justify-center mb-3`}>
-                    <plan.icon className="w-6 h-6 text-white" />
-                  </div>
-                  <CardTitle className="text-xl font-bold text-gray-900 dark:text-white">
-                    {plan.name}
-                  </CardTitle>
-                  <CardDescription className="text-gray-600 dark:text-gray-400 text-sm">
-                    {plan.description}
-                  </CardDescription>
-                </CardHeader>
-
-                <CardContent className="pb-6 flex-grow">
-                  <div className="mb-6">
-                    <span className="text-4xl font-bold text-gray-900 dark:text-white">
-                      {plan.price}
-                    </span>
-                    <span className="text-gray-500 dark:text-gray-400 text-sm">
-                      {plan.period || ' one-time'}
-                    </span>
-                  </div>
-
-                  <ul className="space-y-2">
-                    {plan.features.map((feature, idx) => (
-                      <li key={idx} className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
-                        <Check className="w-4 h-4 mt-0.5 flex-shrink-0 text-green-600 dark:text-green-400" />
-                        <span>{feature}</span>
-                      </li>
-                    ))}
-                    {plan.notIncluded?.map((feature, idx) => (
-                      <li key={`not-${idx}`} className="flex items-start gap-2 text-sm text-gray-400 dark:text-gray-500">
-                        <X className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                        <span className="line-through">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-
-                <CardFooter className="mt-auto">
-                  <Button
-                    className={`w-full py-5 font-semibold bg-gradient-to-r ${plan.gradient} hover:opacity-90 text-white`}
-                    size="lg"
-                    onClick={() => handleSelectPlan(plan)}
-                    disabled={loading !== null}
-                  >
-                    {loading === plan.packageType ? (
-                      <span className="flex items-center gap-2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        Processing...
-                      </span>
-                    ) : !isLoggedIn ? (
-                      <span className="flex items-center gap-2">
-                        <LogIn className="w-4 h-4" />
-                        Login to Purchase
-                      </span>
-                    ) : (
-                      `Get ${plan.name}`
-                    )}
-                  </Button>
-                </CardFooter>
-              </Card>
+                plan={plan}
+                index={index}
+                isLoggedIn={isLoggedIn}
+                loading={loading}
+                onSelect={handleSelectPlan}
+              />
             ))}
           </div>
 
-          <div className="max-w-4xl mx-auto">
-            <h2 className="text-2xl font-bold text-center text-gray-900 dark:text-white mb-8">
+          <motion.div
+            ref={whyReveal.ref}
+            initial={fadeUp.initial}
+            animate={whyReveal.inView ? fadeUp.animate : fadeUp.initial}
+            transition={spring}
+            className="max-w-4xl mx-auto"
+          >
+            <h2 className="text-2xl editorial-subheading text-center text-foreground mb-8">
               Why Choose Our Verification Service?
             </h2>
             
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md text-center">
-                <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Shield className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+              <div className="bg-card brutalist-border rounded-sm p-6 text-center">
+                <div className="w-12 h-12 brutalist-border-strong rounded-sm flex items-center justify-center mx-auto mb-4">
+                  <Shield className="w-6 h-6 text-foreground" />
                 </div>
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-2">AI Analysis</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <h3 className="font-semibold text-foreground mb-2">AI Analysis</h3>
+                <p className="text-sm text-muted-foreground">
                   Advanced forensic document analysis
                 </p>
               </div>
 
-              <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md text-center">
-                <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Zap className="w-6 h-6 text-green-600 dark:text-green-400" />
+              <div className="bg-card brutalist-border rounded-sm p-6 text-center">
+                <div className="w-12 h-12 brutalist-border-strong rounded-sm flex items-center justify-center mx-auto mb-4">
+                  <Zap className="w-6 h-6 text-foreground" />
                 </div>
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Instant Results</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <h3 className="font-semibold text-foreground mb-2">Instant Results</h3>
+                <p className="text-sm text-muted-foreground">
                   Get verification in seconds
                 </p>
               </div>
 
-              <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md text-center">
-                <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Clock className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+              <div className="bg-card brutalist-border rounded-sm p-6 text-center">
+                <div className="w-12 h-12 brutalist-border-strong rounded-sm flex items-center justify-center mx-auto mb-4">
+                  <Clock className="w-6 h-6 text-foreground" />
                 </div>
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Never Expire</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <h3 className="font-semibold text-foreground mb-2">Never Expire</h3>
+                <p className="text-sm text-muted-foreground">
                   Credits stay valid forever
                 </p>
               </div>
 
-              <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md text-center">
-                <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <UserCheck className="w-6 h-6 text-orange-600 dark:text-orange-400" />
+              <div className="bg-card brutalist-border rounded-sm p-6 text-center">
+                <div className="w-12 h-12 brutalist-border-strong rounded-sm flex items-center justify-center mx-auto mb-4">
+                  <UserCheck className="w-6 h-6 text-foreground" />
                 </div>
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Expert Review</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <h3 className="font-semibold text-foreground mb-2">Expert Review</h3>
+                <p className="text-sm text-muted-foreground">
                   Human experts for complex cases
                 </p>
               </div>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="mt-12 text-center text-gray-600 dark:text-gray-400">
+          <div className="mt-12 text-center text-muted-foreground">
             <p className="text-sm">
               Questions? Contact us at{' '}
-              <a href="mailto:support@cosverify.uk" className="text-blue-600 hover:underline">
+              <a href="mailto:support@cosverify.uk" className="text-foreground underline hover:no-underline">
                 support@cosverify.uk
               </a>
             </p>

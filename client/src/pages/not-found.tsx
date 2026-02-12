@@ -1,9 +1,11 @@
-import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle, Home } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import SEOHead from "@/components/SEOHead";
 import PageLayout from "@/components/PageLayout";
+import { motion } from "framer-motion";
+
+const spring = { type: "spring" as const, stiffness: 100, damping: 15 };
 
 export default function NotFound() {
   const notFoundSEO = {
@@ -16,26 +18,31 @@ export default function NotFound() {
   return (
     <PageLayout>
       <SEOHead {...notFoundSEO} />
-      <div className="w-full flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-20">
-        <Card className="w-full max-w-md mx-4">
-          <CardContent className="pt-6">
-            <div className="flex mb-4 gap-2">
-              <AlertCircle className="h-8 w-8 text-red-500" />
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">404 Page Not Found</h1>
-            </div>
+      <div className="w-full flex items-center justify-center bg-background py-20">
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={spring}
+          className="w-full max-w-md mx-4 brutalist-border rounded-sm bg-card p-8"
+        >
+          <div className="flex mb-4 gap-3 items-center">
+            <AlertCircle className="h-6 w-6 text-destructive flex-shrink-0" />
+            <h1 className="text-2xl editorial-subheading text-foreground">404 Page Not Found</h1>
+          </div>
 
-            <p className="mt-4 text-sm text-gray-600 dark:text-gray-400 mb-6">
-              The page you're looking for doesn't exist or has been moved.
-            </p>
+          <p className="mt-4 text-sm text-muted-foreground editorial-body mb-6">
+            The page you're looking for doesn't exist or has been moved.
+          </p>
 
-            <Link href="/">
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white w-full">
+          <Link href="/">
+            <motion.div whileTap={{ scale: 0.97 }}>
+              <Button className="bg-foreground text-background hover:bg-foreground/90 rounded-sm w-full">
                 <Home className="w-4 h-4 mr-2" />
                 Back to Home
               </Button>
-            </Link>
-          </CardContent>
-        </Card>
+            </motion.div>
+          </Link>
+        </motion.div>
       </div>
     </PageLayout>
   );
