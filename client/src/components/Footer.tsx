@@ -4,17 +4,15 @@ import { Shield } from 'lucide-react';
 
 export default function Footer() {
   return (
-    <footer className="bg-gradient-to-r from-[#003366] to-[#0066CC] text-white py-12">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+    <footer className="bg-foreground text-background grain relative overflow-hidden">
+      <div className="relative z-10 max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
+        <div className="py-16 grid grid-cols-1 md:grid-cols-4 gap-12">
           <div className="md:col-span-2">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="p-2 bg-white/20 rounded-lg">
-                <Shield className="w-6 h-6 text-white" />
-              </div>
-              <h3 className="text-2xl font-bold">Check By AI</h3>
+            <div className="flex items-center gap-2.5 mb-6">
+              <Shield className="w-5 h-5" />
+              <span className="text-lg font-bold tracking-tight">Check By AI</span>
             </div>
-            <p className="text-blue-100 mb-6 leading-relaxed">
+            <p className="text-sm editorial-body opacity-70 mb-8 max-w-md">
               AI-powered Certificate of Sponsorship verification for UK visa applicants. 
               Protect yourself from CoS fraud with instant, accurate document authentication.
             </p>
@@ -22,81 +20,65 @@ export default function Footer() {
               href="https://www.youtube.com/@CheckByAi"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center space-x-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors duration-300"
+              className="inline-flex items-center gap-2 px-4 py-2 border border-background/20 rounded-sm text-xs font-medium tracking-wide hover:bg-background/10 transition-colors"
               aria-label="Visit our YouTube channel"
             >
-              <SiYoutube className="w-5 h-5" />
-              <span className="text-sm font-medium">YouTube Channel</span>
+              <SiYoutube className="w-4 h-4" />
+              YouTube Channel
             </a>
           </div>
 
           <div>
-            <h4 className="text-lg font-semibold mb-6 text-white">Quick Links</h4>
+            <h4 className="editorial-caption mb-6 opacity-50">Quick Links</h4>
             <ul className="space-y-3">
-              <li>
-                <Link href="/" className="text-blue-100 hover:text-white transition-colors font-medium">
-                  Home
-                </Link>
-              </li>
-              <li>
-                <Link href="/dashboard" className="text-blue-100 hover:text-white transition-colors font-medium">
-                  Verify CoS
-                </Link>
-              </li>
-              <li>
-                <Link href="/pricing" className="text-blue-100 hover:text-white transition-colors font-medium">
-                  Pricing
-                </Link>
-              </li>
-              <li>
-                <Link href="/history" className="text-blue-100 hover:text-white transition-colors font-medium">
-                  Verification History
-                </Link>
-              </li>
+              {[
+                { href: "/", label: "Home" },
+                { href: "/dashboard", label: "Verify CoS" },
+                { href: "/pricing", label: "Pricing" },
+                { href: "/history", label: "Verification History" },
+              ].map(link => (
+                <li key={link.href}>
+                  <Link href={link.href} className="text-sm opacity-70 hover:opacity-100 transition-opacity font-medium">
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
 
           <div>
-            <h4 className="text-lg font-semibold mb-6 text-white">Resources</h4>
+            <h4 className="editorial-caption mb-6 opacity-50">Resources</h4>
             <ul className="space-y-3">
-              <li>
-                <Link href="/ai-guide" className="text-blue-100 hover:text-white transition-colors font-medium">
-                  AI Guide
-                </Link>
-              </li>
-              <li>
-                <Link href="/cos-guide" className="text-blue-100 hover:text-white transition-colors font-medium">
-                  CoS Guide
-                </Link>
-              </li>
-              <li>
-                <Link href="/technology" className="text-blue-100 hover:text-white transition-colors font-medium">
-                  Our Technology
-                </Link>
-              </li>
-              <li>
-                <Link href="/api-docs" className="text-blue-100 hover:text-white transition-colors font-medium">
-                  API Documentation
-                </Link>
-              </li>
+              {[
+                { href: "/ai-guide", label: "AI Guide" },
+                { href: "/cos-guide", label: "CoS Guide" },
+                { href: "/technology", label: "Our Technology" },
+                { href: "/api-docs", label: "API Documentation" },
+              ].map(link => (
+                <li key={link.href}>
+                  <Link href={link.href} className="text-sm opacity-70 hover:opacity-100 transition-opacity font-medium">
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
         </div>
 
-        <div className="border-t border-white/20 mt-8 pt-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div className="text-left">
-              <h5 className="text-sm font-semibold text-white mb-2">Data Protection</h5>
-              <p className="text-blue-100/80 text-xs leading-relaxed">
+        <div className="border-t border-background/10 py-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+            <div>
+              <h5 className="editorial-caption mb-3 opacity-50">Data Protection</h5>
+              <p className="text-xs opacity-50 leading-relaxed">
                 Compliant with UK GDPR and the Data Protection Act 2018. We process document metadata only. 
                 Original documents are deleted immediately after verification. Free users: results are removed 
                 when you leave the site. Paid account holders: only verification results are retained, never 
                 original documents. You have the right to request erasure of your data at any time.
               </p>
             </div>
-            <div className="text-left md:text-right">
-              <h5 className="text-sm font-semibold text-white mb-2">Legal</h5>
-              <p className="text-blue-100/80 text-xs leading-relaxed">
+            <div className="md:text-right">
+              <h5 className="editorial-caption mb-3 opacity-50">Legal</h5>
+              <p className="text-xs opacity-50 leading-relaxed">
                 This tool provides technical analysis only and does not constitute legal or immigration advice.
                 Processing is carried out under Article 6(1)(f) UK GDPR (legitimate interests) for fraud 
                 prevention purposes. For data subject requests, contact us via the admin portal.
@@ -104,7 +86,7 @@ export default function Footer() {
             </div>
           </div>
           <div className="text-center">
-            <p className="text-blue-100 text-sm font-medium">
+            <p className="text-xs opacity-40 font-medium tracking-wide">
               &copy; {new Date().getFullYear()} Check By AI. All rights reserved.
             </p>
           </div>

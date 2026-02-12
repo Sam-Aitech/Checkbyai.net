@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Upload, FileText, AlertCircle, Loader2, Lock } from 'lucide-react';
 
 interface FileUploadProps {
   onFileUpload: (file: File) => void;
@@ -6,6 +8,8 @@ interface FileUploadProps {
   onLoading?: (loading: boolean) => void;
   onError?: (error: string) => void;
 }
+
+const spring = { type: "spring" as const, stiffness: 100, damping: 15 };
 
 export default function FileUpload({ onFileUpload, onVerificationResult, onLoading, onError }: FileUploadProps) {
   const [file, setFile] = useState<File | null>(null);
@@ -57,18 +61,14 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
     
     setFile(selectedFile);
     setError('');
-    
-    // Always trigger verification directly
     uploadAndVerify(selectedFile);
     
-    // Also trigger parent component callback for compatibility
     if (onFileUpload) {
       onFileUpload(selectedFile);
     }
   };
 
   const uploadAndVerify = async (selectedFile: File) => {
-    // Set loading state both locally and via callback
     setLocalLoading(true);
     setLocalResult(null);
     setError('');
@@ -76,27 +76,26 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
     if (onError) onError('');
     
     try {
-      // Validate file
       if (!selectedFile || selectedFile.size === 0) {
-        throw new Error('Invalid file selected');
+        throw new Error('No file selected');
       }
-      
+
       const formData = new FormData();
-      formData.append('file', selectedFile, selectedFile.name);
-      
+      formData.append('file', selectedFile);
+
       const response = await fetch('/api/verify', {
         method: 'POST',
-        body: formData
+        body: formData,
+        credentials: 'include',
       });
-      
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(`Verification failed: ${errorData.error || 'Unknown error'}`);
+        const errorData = await response.json().catch(() => ({ error: 'Verification failed' }));
+        throw new Error(errorData.error || errorData.message || `Verification failed (${response.status})`);
       }
-      
+
       const data = await response.json();
-      
-      // Transform backend response
+
       const typeMapping: Record<string, 'genuine' | 'suspicious' | 'fake'> = {
         'genuine': 'genuine',
         'suspicious': 'suspicious',
@@ -109,7 +108,6 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
         mismatchedFields: data.mismatchedFields || []
       };
 
-      // Set results both locally and via callback
       setLocalResult(transformedResult);
       if (onVerificationResult) {
         onVerificationResult(transformedResult);
@@ -130,108 +128,145 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
 
   return (
     <div className="w-full">
-      <div 
-        className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
-          ${isDragging ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30' : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'}`}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={spring}
+        className={`brutalist-border rounded-sm p-10 text-center cursor-pointer transition-all duration-200 grain relative overflow-hidden ${
+          isDragging 
+            ? 'border-primary bg-primary/[0.03] dark:bg-primary/[0.06]' 
+            : 'hover:border-foreground/30'
+        }`}
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
       >
-        <svg 
-          className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500" 
-          stroke="currentColor" 
-          fill="none" 
-          viewBox="0 0 48 48"
-        >
-          <path 
-            d="M24 12c0-2.21-1.79-4-4-4S16 9.79 16 12s1.79 4 4 4 4-1.79 4-4zm0 12c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm0 12c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4z" 
-            strokeLinecap="round" 
-            strokeLinejoin="round" 
-            strokeWidth="2"
-          />
-        </svg>
-        
-        <h3 className="mt-2 text-lg font-medium text-gray-900 dark:text-gray-100">Upload Document</h3>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Drag and drop your PDF file here, or click to select</p>
-        
-        <input 
-          type="file" 
-          accept=".pdf" 
-          onChange={handleFileChange}
-          className="hidden"
-          id="file-upload"
-        />
-        
-        <label 
-          htmlFor="file-upload"
-          className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"
-        >
-          Select PDF File
-        </label>
-        
-        <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
-          PDF only, max 10MB. Compliant with UK GDPR and the Data Protection Act 2018. We process metadata only. Your document is permanently deleted immediately after verification.
-        </p>
-      </div>
-      
-      {file && (
-        <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-md">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <svg className="h-5 w-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <span className="ml-2 text-sm text-gray-900 dark:text-gray-100 truncate">{file.name}</span>
-            </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">
-              {(file.size / 1024).toFixed(1)} KB
-            </div>
+        <div className="relative z-10">
+          <div className="mx-auto w-12 h-12 flex items-center justify-center brutalist-border rounded-sm mb-6">
+            <Upload className="w-5 h-5 text-muted-foreground" />
           </div>
-        </div>
-      )}
-      
-      {error && (
-        <div className="mt-4 p-3 bg-red-100 dark:bg-red-900/30 border-l-4 border-red-500 text-red-700 dark:text-red-400">
-          <p className="text-sm">{error}</p>
-        </div>
-      )}
-
-      {localLoading && (
-        <div className="mt-6 flex justify-center items-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-          <span className="ml-3 text-gray-600 dark:text-gray-400">Analyzing document...</span>
-        </div>
-      )}
-
-      {localResult && (
-        <div className="mt-6 p-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Verification Result</h3>
           
-          <div className="flex items-center gap-3 mb-4">
-            <div className={`px-3 py-1 rounded-full text-sm font-medium transition-all duration-700 ease-in-out transform hover:scale-105 ${
-              localResult.type === 'Genuine' 
-                ? 'bg-gradient-to-r from-green-400 to-emerald-500 text-white shadow-lg shadow-green-500/25 animate-pulse'
-                : localResult.type === 'Edited'
-                ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white shadow-lg shadow-yellow-500/25 animate-bounce'
-                : 'bg-gradient-to-r from-red-400 to-rose-500 text-white shadow-lg shadow-red-500/25 animate-pulse'
-            }`}>
-              {localResult.type}
-            </div>
+          <h3 className="text-base editorial-subheading text-foreground mb-2">Upload Document</h3>
+          <p className="text-sm text-muted-foreground mb-6">Drag and drop your PDF file here, or click to select</p>
+          
+          <input 
+            type="file" 
+            accept=".pdf" 
+            onChange={handleFileChange}
+            className="hidden"
+            id="file-upload"
+          />
+          
+          <label 
+            htmlFor="file-upload"
+            className="inline-flex items-center px-6 py-2.5 bg-foreground text-background text-sm font-medium rounded-sm cursor-pointer hover:bg-foreground/90 transition-colors"
+          >
+            Select PDF File
+          </label>
+          
+          <div className="mt-6 flex items-center justify-center gap-1.5 text-muted-foreground">
+            <Lock className="w-3 h-3" />
+            <p className="text-[11px] leading-relaxed">
+              PDF only, max 10MB. UK GDPR compliant. Document deleted immediately after verification.
+            </p>
           </div>
-
-          {localResult.mismatchedFields && localResult.mismatchedFields.length > 0 && (
-            <div className="mb-4">
-              <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Issues detected:</h4>
-              <ul className="list-disc list-inside text-gray-600 dark:text-gray-400">
-                {localResult.mismatchedFields.map((field: string, index: number) => (
-                  <li key={index}>{field}</li>
-                ))}
-              </ul>
-            </div>
-          )}
         </div>
-      )}
+      </motion.div>
+      
+      <AnimatePresence>
+        {file && !localLoading && !localResult && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={spring}
+            className="mt-3 p-4 bg-muted/50 brutalist-border rounded-sm overflow-hidden"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-destructive" />
+                <span className="text-sm font-medium text-foreground truncate">{file.name}</span>
+              </div>
+              <span className="text-xs text-muted-foreground font-mono">
+                {(file.size / 1024).toFixed(1)} KB
+              </span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={spring}
+            className="mt-3 p-3 bg-destructive/5 border-l-2 border-destructive rounded-sm"
+          >
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-destructive flex-shrink-0" />
+              <p className="text-sm text-destructive">{error}</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {localLoading && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={spring}
+            className="mt-6 flex justify-center items-center gap-3"
+          >
+            <Loader2 className="w-5 h-5 text-primary animate-spin" />
+            <span className="text-sm text-muted-foreground font-medium">Analyzing document...</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {localResult && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 16 }}
+            transition={spring}
+            className="mt-6 p-6 brutalist-border rounded-sm"
+          >
+            <h3 className="text-sm editorial-subheading text-foreground mb-4">Verification Result</h3>
+            
+            <div className="flex items-center gap-3 mb-4">
+              <span className={`editorial-caption px-3 py-1.5 rounded-sm grain relative overflow-hidden ${
+                localResult.type === 'genuine' 
+                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
+                  : localResult.type === 'suspicious'
+                  ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20'
+                  : 'bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/20'
+              }`}>
+                {localResult.type}
+              </span>
+            </div>
+
+            {localResult.mismatchedFields && localResult.mismatchedFields.length > 0 && (
+              <div className="mb-4">
+                <h4 className="text-xs font-semibold text-foreground mb-2">Issues detected:</h4>
+                <ul className="space-y-1">
+                  {localResult.mismatchedFields.map((field: string, index: number) => (
+                    <li key={index} className="text-sm text-muted-foreground flex items-start gap-2">
+                      <span className="text-destructive mt-1">&#x2022;</span>
+                      {field}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

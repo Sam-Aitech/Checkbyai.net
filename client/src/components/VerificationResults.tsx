@@ -1,9 +1,12 @@
 import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle, XCircle, AlertTriangle, Info, Shield, Copy, ChevronDown, ChevronUp, Lock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import FeedbackForm from "./FeedbackForm";
+
+const spring = { type: "spring" as const, stiffness: 100, damping: 15 };
 
 interface VerificationResultsProps {
   result: {
@@ -45,33 +48,27 @@ export default function VerificationResults({ result, verificationId }: Verifica
   const statusConfig = {
     genuine: {
       label: "Genuine",
-      gradient: "from-emerald-500 via-green-500 to-teal-500",
-      bgLight: "bg-green-50",
-      bgDark: "dark:bg-green-950/30",
-      border: "border-green-200 dark:border-green-800",
-      textColor: "text-green-700 dark:text-green-300",
-      icon: <CheckCircle className="w-6 h-6" />,
-      ringColor: "text-emerald-500",
+      accent: "text-emerald-600 dark:text-emerald-400",
+      bg: "bg-emerald-500/5 dark:bg-emerald-500/10",
+      border: "border-emerald-500/20",
+      badgeBg: "bg-emerald-500",
+      icon: <CheckCircle className="w-5 h-5" />,
     },
     suspicious: {
       label: "Suspicious",
-      gradient: "from-amber-500 via-orange-500 to-yellow-500",
-      bgLight: "bg-amber-50",
-      bgDark: "dark:bg-amber-950/30",
-      border: "border-amber-200 dark:border-amber-800",
-      textColor: "text-amber-700 dark:text-amber-300",
-      icon: <AlertTriangle className="w-6 h-6" />,
-      ringColor: "text-amber-500",
+      accent: "text-amber-600 dark:text-amber-400",
+      bg: "bg-amber-500/5 dark:bg-amber-500/10",
+      border: "border-amber-500/20",
+      badgeBg: "bg-amber-500",
+      icon: <AlertTriangle className="w-5 h-5" />,
     },
     fake: {
       label: "Fake",
-      gradient: "from-red-500 via-rose-500 to-pink-500",
-      bgLight: "bg-red-50",
-      bgDark: "dark:bg-red-950/30",
-      border: "border-red-200 dark:border-red-800",
-      textColor: "text-red-700 dark:text-red-300",
-      icon: <XCircle className="w-6 h-6" />,
-      ringColor: "text-red-500",
+      accent: "text-red-600 dark:text-red-400",
+      bg: "bg-red-500/5 dark:bg-red-500/10",
+      border: "border-red-500/20",
+      badgeBg: "bg-red-500",
+      icon: <XCircle className="w-5 h-5" />,
     },
   };
 
@@ -81,9 +78,9 @@ export default function VerificationResults({ result, verificationId }: Verifica
   const strokeOffset = circumference - (result.confidence * circumference);
 
   const severityConfig = {
-    critical: { color: "text-red-600 dark:text-red-400", bg: "bg-red-100 dark:bg-red-900/40", label: "Critical" },
-    warning: { color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-100 dark:bg-amber-900/40", label: "Warning" },
-    info: { color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-100 dark:bg-blue-900/40", label: "Info" },
+    critical: { color: "text-red-600 dark:text-red-400", bg: "bg-red-500/10", label: "Critical" },
+    warning: { color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10", label: "Warning" },
+    info: { color: "text-primary", bg: "bg-primary/10", label: "Info" },
   };
 
   const getExplanation = () => {
@@ -98,84 +95,84 @@ export default function VerificationResults({ result, verificationId }: Verifica
   };
 
   return (
-    <div className="space-y-4">
-      {/* Result Header */}
-      <Card className={`overflow-hidden border ${config.border}`}>
-        <div className={`bg-gradient-to-r ${config.gradient} p-1`}>
-          <div className={`${config.bgLight} ${config.bgDark} p-5 sm:p-6`}>
-            <div className="flex flex-col sm:flex-row items-center gap-5">
-              {/* Circular Progress */}
-              <div className="relative flex-shrink-0">
-                <svg className="w-24 h-24 -rotate-90" viewBox="0 0 100 100">
-                  <circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" strokeWidth="6" className="text-gray-200 dark:text-gray-700" />
-                  <circle
-                    cx="50" cy="50" r="40" fill="none" strokeWidth="6"
-                    stroke="currentColor"
-                    strokeLinecap="round"
-                    strokeDasharray={circumference}
-                    strokeDashoffset={strokeOffset}
-                    className={`${config.ringColor} transition-all duration-1000 ease-out`}
-                  />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className={`text-xl font-bold ${config.textColor}`}>{confidencePercent}%</span>
-                </div>
+    <motion.div
+      initial={{ opacity: 0, y: 24 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={spring}
+      className="space-y-4"
+    >
+      <div className={`brutalist-border rounded-sm overflow-hidden ${config.bg}`}>
+        <div className="p-6 sm:p-8">
+          <div className="flex flex-col sm:flex-row items-center gap-6">
+            <div className="relative flex-shrink-0">
+              <svg className="w-24 h-24 -rotate-90" viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" strokeWidth="4" className="text-border" />
+                <motion.circle
+                  cx="50" cy="50" r="40" fill="none" strokeWidth="4"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeDasharray={circumference}
+                  initial={{ strokeDashoffset: circumference }}
+                  animate={{ strokeDashoffset: strokeOffset }}
+                  transition={{ duration: 1.2, ease: "easeOut", delay: 0.3 }}
+                  className={config.accent}
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className={`text-xl font-black tracking-tight ${config.accent}`}>{confidencePercent}%</span>
               </div>
+            </div>
 
-              {/* Status Info */}
-              <div className="text-center sm:text-left flex-1">
-                <div className="flex items-center justify-center sm:justify-start gap-2 mb-1">
-                  <div className={config.textColor}>{config.icon}</div>
-                  <h3 className={`text-2xl font-bold ${config.textColor}`}>
-                    Document is {config.label}
-                  </h3>
-                </div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  AI confidence: {confidencePercent}%, {totalChecks > 0 ? `${passedCount} of ${totalChecks} checks passed` : "Analysis complete"}
-                </p>
+            <div className="text-center sm:text-left flex-1">
+              <div className="flex items-center justify-center sm:justify-start gap-2 mb-1">
+                <span className={config.accent}>{config.icon}</span>
+                <h3 className={`text-xl editorial-subheading ${config.accent}`}>
+                  Document is {config.label}
+                </h3>
               </div>
+              <p className="text-sm text-muted-foreground">
+                AI confidence: {confidencePercent}%, {totalChecks > 0 ? `${passedCount} of ${totalChecks} checks passed` : "Analysis complete"}
+              </p>
+            </div>
 
-              {/* Badge */}
-              <div className={`px-4 py-2 rounded-full bg-gradient-to-r ${config.gradient} text-white font-semibold text-sm shadow-lg flex-shrink-0`}>
-                <div className="flex items-center gap-1.5">
-                  <Shield className="w-4 h-4" />
-                  {config.label}
-                </div>
+            <div className={`editorial-caption px-4 py-2 rounded-sm ${config.badgeBg} text-white flex-shrink-0 grain relative overflow-hidden`}>
+              <div className="relative z-10 flex items-center gap-1.5">
+                <Shield className="w-3.5 h-3.5" />
+                {config.label}
               </div>
             </div>
           </div>
         </div>
-      </Card>
+      </div>
 
-      {/* Receipt Card */}
       {(result.receiptId || result.documentHash) && (
-        <Card className="border border-gray-200 dark:border-gray-700">
+        <Card className="brutalist-border rounded-sm shadow-none">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-3">
-              <Shield className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-              <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Verification Receipt</h4>
+              <Shield className="w-4 h-4 text-muted-foreground" />
+              <h4 className="editorial-caption text-muted-foreground">Verification Receipt</h4>
             </div>
             <div className="space-y-2">
               {result.receiptId && (
-                <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
+                <div className="flex items-center justify-between bg-muted/50 rounded-sm px-3 py-2">
                   <div>
-                    <span className="text-xs text-gray-500 dark:text-gray-400 block">Receipt ID</span>
-                    <span className="text-sm font-mono text-gray-800 dark:text-gray-200">{result.receiptId}</span>
+                    <span className="text-[10px] text-muted-foreground block uppercase tracking-widest">Receipt ID</span>
+                    <span className="text-sm font-mono text-foreground">{result.receiptId}</span>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => copyToClipboard(result.receiptId!, "Receipt ID")} className="h-8 w-8 p-0">
+                  <Button variant="ghost" size="sm" onClick={() => copyToClipboard(result.receiptId!, "Receipt ID")} className="h-8 w-8 p-0 rounded-sm">
                     <Copy className="w-3.5 h-3.5" />
                   </Button>
                 </div>
               )}
               {result.documentHash && (
-                <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
+                <div className="flex items-center justify-between bg-muted/50 rounded-sm px-3 py-2">
                   <div>
-                    <span className="text-xs text-gray-500 dark:text-gray-400 block">Document Hash</span>
-                    <span className="text-sm font-mono text-gray-800 dark:text-gray-200">
+                    <span className="text-[10px] text-muted-foreground block uppercase tracking-widest">Document Hash</span>
+                    <span className="text-sm font-mono text-foreground">
                       {result.documentHash.length > 16 ? `${result.documentHash.slice(0, 8)}...${result.documentHash.slice(-8)}` : result.documentHash}
                     </span>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => copyToClipboard(result.documentHash!, "Document Hash")} className="h-8 w-8 p-0">
+                  <Button variant="ghost" size="sm" onClick={() => copyToClipboard(result.documentHash!, "Document Hash")} className="h-8 w-8 p-0 rounded-sm">
                     <Copy className="w-3.5 h-3.5" />
                   </Button>
                 </div>
@@ -185,43 +182,58 @@ export default function VerificationResults({ result, verificationId }: Verifica
         </Card>
       )}
 
-      {/* Forensic Checks Breakdown */}
       {checks.length > 0 && (
-        <Card className="border border-gray-200 dark:border-gray-700">
+        <Card className="brutalist-border rounded-sm shadow-none">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-4">
-              <Info className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-              <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Forensic Checks Breakdown</h4>
+              <Info className="w-4 h-4 text-muted-foreground" />
+              <h4 className="editorial-caption text-muted-foreground">Forensic Checks</h4>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {checks.map((check, index) => {
                 const sev = severityConfig[check.severity] || severityConfig.info;
                 const isExpanded = expandedChecks[index];
                 return (
-                  <div key={index} className={`rounded-lg border transition-colors ${check.passed ? "border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20" : "border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20"}`}>
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, x: -8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ ...spring, delay: index * 0.05 }}
+                    className={`rounded-sm brutalist-border transition-colors ${check.passed ? "bg-emerald-500/[0.02] dark:bg-emerald-500/[0.04]" : "bg-red-500/[0.02] dark:bg-red-500/[0.04]"}`}
+                  >
                     <button
                       onClick={() => toggleCheck(index)}
                       className="w-full flex items-center justify-between px-4 py-3 text-left"
                     >
                       <div className="flex items-center gap-3 flex-1 min-w-0">
                         {check.passed ? (
-                          <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                          <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
                         ) : (
-                          <XCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0" />
+                          <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
                         )}
-                        <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{check.name}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${sev.bg} ${sev.color}`}>
+                        <span className="text-sm font-medium text-foreground truncate">{check.name}</span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-sm font-semibold tracking-wider uppercase flex-shrink-0 ${sev.bg} ${sev.color}`}>
                           {sev.label}
                         </span>
                       </div>
-                      {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400 flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />}
+                      {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />}
                     </button>
-                    {isExpanded && (
-                      <div className="px-4 pb-3 pt-0">
-                        <p className="text-sm text-gray-600 dark:text-gray-400 ml-8">{check.message}</p>
-                      </div>
-                    )}
-                  </div>
+                    <AnimatePresence>
+                      {isExpanded && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={spring}
+                          className="overflow-hidden"
+                        >
+                          <div className="px-4 pb-3 pt-0">
+                            <p className="text-sm text-muted-foreground ml-7">{check.message}</p>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.div>
                 );
               })}
             </div>
@@ -229,37 +241,38 @@ export default function VerificationResults({ result, verificationId }: Verifica
         </Card>
       )}
 
-      {/* Confidence Score Explanation */}
       {totalChecks > 0 && (
-        <Card className="border border-gray-200 dark:border-gray-700">
+        <Card className="brutalist-border rounded-sm shadow-none">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-3">
-              <Shield className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-              <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Confidence Score Explanation</h4>
+              <Shield className="w-4 h-4 text-muted-foreground" />
+              <h4 className="editorial-caption text-muted-foreground">Confidence Score</h4>
             </div>
             <div className="space-y-3">
               <div className="flex items-center gap-3">
-                <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
-                  <div
-                    className={`h-full rounded-full bg-gradient-to-r ${config.gradient} transition-all duration-1000 ease-out`}
-                    style={{ width: `${confidencePercent}%` }}
+                <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
+                  <motion.div
+                    className={`h-full rounded-full ${config.badgeBg}`}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${confidencePercent}%` }}
+                    transition={{ duration: 1, ease: "easeOut", delay: 0.5 }}
                   />
                 </div>
-                <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 w-12 text-right">{confidencePercent}%</span>
+                <span className="text-sm font-bold text-foreground w-12 text-right">{confidencePercent}%</span>
               </div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              <p className="text-sm text-muted-foreground editorial-body">
                 {passedCount} out of {totalChecks} forensic checks passed. 
                 {passedCount === totalChecks && " All checks passed successfully, indicating a high confidence in document authenticity."}
-                {passedCount > 0 && passedCount < totalChecks && ` ${totalChecks - passedCount} check${totalChecks - passedCount > 1 ? "s" : ""} flagged potential issues, reducing overall confidence.`}
+                {passedCount > 0 && passedCount < totalChecks && ` ${totalChecks - passedCount} check${totalChecks - passedCount > 1 ? "s" : ""} flagged potential issues.`}
                 {passedCount === 0 && " No checks passed, indicating significant concerns about this document."}
               </p>
-              <div className="flex gap-4 text-xs text-gray-500 dark:text-gray-400">
-                <div className="flex items-center gap-1">
-                  <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+              <div className="flex gap-4">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <CheckCircle className="w-3 h-3 text-emerald-500" />
                   <span>{passedCount} passed</span>
                 </div>
-                <div className="flex items-center gap-1">
-                  <XCircle className="w-3.5 h-3.5 text-red-500" />
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <XCircle className="w-3 h-3 text-red-500" />
                   <span>{totalChecks - passedCount} failed</span>
                 </div>
               </div>
@@ -268,18 +281,17 @@ export default function VerificationResults({ result, verificationId }: Verifica
         </Card>
       )}
 
-      {/* Mismatched Fields */}
       {result.mismatchedFields && result.mismatchedFields.length > 0 && (
-        <Card className="border border-amber-200 dark:border-amber-800">
+        <Card className="brutalist-border border-amber-500/20 rounded-sm shadow-none">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-3">
               <AlertTriangle className="w-4 h-4 text-amber-500" />
-              <h4 className="text-sm font-semibold text-amber-700 dark:text-amber-300">Mismatched Fields</h4>
+              <h4 className="editorial-caption text-amber-600 dark:text-amber-400">Mismatched Fields</h4>
             </div>
             <ul className="space-y-1.5">
               {result.mismatchedFields.map((field, index) => (
-                <li key={index} className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
-                  <XCircle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                <li key={index} className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <XCircle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
                   {field}
                 </li>
               ))}
@@ -288,51 +300,60 @@ export default function VerificationResults({ result, verificationId }: Verifica
         </Card>
       )}
 
-      {/* What This Means */}
-      <Card className={`border ${config.border}`}>
+      <Card className={`brutalist-border ${config.border} rounded-sm shadow-none`}>
         <CardContent className="p-4">
           <div className="flex items-center gap-2 mb-3">
-            <Info className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-            <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">What This Means</h4>
+            <Info className="w-4 h-4 text-muted-foreground" />
+            <h4 className="editorial-caption text-muted-foreground">What This Means</h4>
           </div>
-          <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+          <p className="text-sm text-muted-foreground editorial-body">
             {getExplanation()}
           </p>
         </CardContent>
       </Card>
 
-      {/* Data Protection Notice */}
-      <div className="px-3 py-2 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
-        <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
-          <Lock className="w-3 h-3 inline mr-1" />
-          UK GDPR and Data Protection Act 2018: Your original document has been permanently deleted from our servers. Only metadata was processed. Free users: these results will not be saved. Paid account holders: only the verification result is retained for your records.
-        </p>
+      <div className="px-4 py-3 bg-primary/[0.03] dark:bg-primary/[0.06] brutalist-border rounded-sm">
+        <div className="flex items-start gap-2">
+          <Lock className="w-3.5 h-3.5 text-primary flex-shrink-0 mt-0.5" />
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            UK GDPR and Data Protection Act 2018: Your original document has been permanently deleted from our servers. Only metadata was processed. Free users: these results will not be saved. Paid account holders: only the verification result is retained for your records.
+          </p>
+        </div>
       </div>
 
-      {/* Feedback Section */}
-      <Card className="border border-gray-200 dark:border-gray-700">
+      <Card className="brutalist-border rounded-sm shadow-none">
         <CardContent className="p-4">
           <Button
             variant="outline"
             size="sm"
             onClick={() => setShowFeedback(!showFeedback)}
-            className="w-full flex items-center justify-center space-x-2"
+            className="w-full flex items-center justify-center gap-2 rounded-sm brutalist-border"
             data-testid="toggle-feedback"
           >
-            <span>Rate this verification</span>
-            {showFeedback ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            <span className="text-xs font-medium">Rate this verification</span>
+            {showFeedback ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </Button>
           
-          {showFeedback && (
-            <div className="mt-4">
-              <FeedbackForm 
-                verificationId={verificationId}
-                onSubmitSuccess={() => setShowFeedback(false)}
-              />
-            </div>
-          )}
+          <AnimatePresence>
+            {showFeedback && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={spring}
+                className="overflow-hidden"
+              >
+                <div className="mt-4">
+                  <FeedbackForm 
+                    verificationId={verificationId}
+                    onSubmitSuccess={() => setShowFeedback(false)}
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </CardContent>
       </Card>
-    </div>
+    </motion.div>
   );
 }
