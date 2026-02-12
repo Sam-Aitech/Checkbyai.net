@@ -42,6 +42,7 @@ The system employs a dual-portal design. An Admin Portal facilitates the upload 
 - **Dynamic AI Knowledge Engine**: Trainable AI system that allows admins to add custom forensic rules and pattern-specific instructions. Global rules apply to all verifications; pattern-specific instructions apply when producer matches. AI explicitly cites admin rules in analysis output (e.g., "Per Admin Rule #3...").
 - **Human-in-the-Loop (HITL) Feedback**: Admins can override AI results by approving or marking documents as fake. When marking as fake, admins must provide reasoning. This feedback is injected into future AI analyses as "human expert corrections" to train the AI and prevent repeated mistakes. Visual "Admin Overridden" badges appear when admins disagree with AI.
 - **Multi-AI Fallback System**: Automatic failover between AI providers (OpenAI → Claude → DeepSeek) for reliable document analysis even if one provider is down.
+- **Sponsor Licence Monitor**: Tracks changes in the UK Home Office Register of Licensed Sponsors. Utility at `server/utils/sponsorListFetcher.ts` downloads and parses the CSV from gov.uk, with `normalizeName()` for company name matching. Database tables: `sponsor_list`, `company_watches`, `sponsor_changes`, `notification_preferences`, `notification_log`.
 
 ## Verification Engine
 
