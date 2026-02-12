@@ -114,12 +114,24 @@ The system employs a dual-portal design. An Admin Portal facilitates the upload 
 - `POST /api/auth/logout` - Logout current session
 - `GET /api/auth/user` - Get current authenticated user
 
+**Checkout Routes:**
+- `POST /api/checkout/sign` - Generate HMAC-signed client_reference_id for Stripe Payment Link redirect (authenticated)
+
+## Stripe Payment Links
+Checkout uses Stripe Payment Links (not server-side Checkout Sessions). Each plan has a hardcoded payment link URL. The flow:
+1. User clicks "Buy" on Pricing page
+2. Frontend calls `POST /api/checkout/sign` to get an HMAC-signed `client_reference_id` (format: `userId::packageType::hmacSignature`)
+3. User is redirected to the Stripe Payment Link with `client_reference_id` and `prefilled_email` query params
+4. On `checkout.session.completed` webhook, server verifies the HMAC signature before crediting the user
+5. Payment links: Starter (`3cIeVec9k1pz2uQdIveZ203`), Pro (`fZufZi4GSfgp1qMfQDeZ201`), Unlimited (`dRm3cw7T41pz8Te5bZeZ202`), Master (`28E28s4GS6JTfhC6g3eZ200`)
+
 ## Environment Variables
 - `ADMIN_EMAIL` - Admin email address for OTP-based admin access
 - `BREVO_API_KEY` - Brevo API key for sending verification emails
 - `GOOGLE_CLIENT_ID` - Google OAuth client ID
 - `GOOGLE_CLIENT_SECRET` - Google OAuth client secret
 - `DATABASE_URL` - PostgreSQL connection string
+- `CHECKOUT_HMAC_SECRET` - (optional) Dedicated HMAC key for signing checkout client_reference_id; falls back to SESSION_SECRET or STRIPE_SECRET_KEY
 
 **Verification Routes:**
 - `POST /api/verify` - Upload and verify a COS document (returns receiptId, documentHash, checks[])

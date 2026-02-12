@@ -220,12 +220,14 @@ export default function Pricing() {
     enabled: !!user,
   });
 
-  const { data: packagesData } = useQuery<{ packages: any[] }>({
-    queryKey: ['/api/packages'],
-    retry: false,
-  });
-
   const isLoggedIn = !!user?.id;
+
+  const paymentLinks: Record<string, string> = {
+    starter: 'https://buy.stripe.com/3cIeVec9k1pz2uQdIveZ203',
+    pro: 'https://buy.stripe.com/fZufZi4GSfgp1qMfQDeZ201',
+    unlimited: 'https://buy.stripe.com/dRm3cw7T41pz8Te5bZeZ202',
+    master: 'https://buy.stripe.com/28E28s4GS6JTfhC6g3eZ200',
+  };
 
   const handleSelectPlan = async (plan: PricingPlan) => {
     if (!isLoggedIn) {
@@ -238,35 +240,29 @@ export default function Pricing() {
     }
 
     setLoading(plan.packageType);
-    try {
-      const packages = packagesData?.packages || [];
-      const stripeProduct = packages.find((p: any) => 
-        p.metadata?.packageType === plan.packageType
-      );
-      
-      const priceId = stripeProduct?.prices?.[0]?.id;
-      
-      if (!priceId) {
-        throw new Error('Package not available. Please try again later.');
-      }
 
-      const response = await apiRequest('POST', '/api/checkout/credits', {
-        priceId,
-        packageType: plan.packageType,
+    const link = paymentLinks[plan.packageType];
+    if (!link) {
+      toast({
+        title: 'Error',
+        description: 'Package not available. Please try again later.',
+        variant: 'destructive',
       });
+      setLoading(null);
+      return;
+    }
 
-      const data = await response.json();
-
-      if (data.url) {
-        window.location.href = data.url;
-      }
+    try {
+      const res = await apiRequest('POST', '/api/checkout/sign', { packageType: plan.packageType });
+      const { clientReferenceId } = await res.json();
+      const url = `${link}?client_reference_id=${encodeURIComponent(clientReferenceId)}&prefilled_email=${encodeURIComponent(user.email || '')}`;
+      window.location.href = url;
     } catch (error: any) {
       toast({
         title: 'Error',
         description: error.message || 'Failed to start checkout. Please try again.',
         variant: 'destructive',
       });
-    } finally {
       setLoading(null);
     }
   };

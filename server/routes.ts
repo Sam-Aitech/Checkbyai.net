@@ -14,6 +14,31 @@ import { z } from "zod";
 import { PDFAnalyzer } from "./services/pdfAnalyzer";
 import bcrypt from "bcrypt";
 
+const CHECKOUT_HMAC_SECRET = process.env.CHECKOUT_HMAC_SECRET || process.env.SESSION_SECRET || process.env.STRIPE_SECRET_KEY!;
+
+function signClientReferenceId(userId: string, packageType: string): string {
+  const payload = `${userId}::${packageType}`;
+  const hmac = crypto.createHmac('sha256', CHECKOUT_HMAC_SECRET).update(payload).digest('hex').slice(0, 16);
+  return `${payload}::${hmac}`;
+}
+
+function verifyClientReferenceId(clientRefId: string): { userId: string; packageType: string } | null {
+  try {
+    const parts = clientRefId.split('::');
+    if (parts.length !== 3) return null;
+    const [userId, packageType, signature] = parts;
+    if (!userId || !packageType || !signature || signature.length !== 16) return null;
+    const expected = crypto.createHmac('sha256', CHECKOUT_HMAC_SECRET).update(`${userId}::${packageType}`).digest('hex').slice(0, 16);
+    const sigBuf = Buffer.from(signature, 'hex');
+    const expBuf = Buffer.from(expected, 'hex');
+    if (sigBuf.length !== expBuf.length) return null;
+    if (!crypto.timingSafeEqual(sigBuf, expBuf)) return null;
+    return { userId, packageType };
+  } catch {
+    return null;
+  }
+}
+
 function generateReceiptId(): string {
   const random1 = crypto.randomBytes(4).toString('hex').toUpperCase();
   const random2 = crypto.randomBytes(4).toString('hex').toUpperCase();
@@ -289,8 +314,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       case 'checkout.session.completed': {
         const session = event.data.object as any;
-        const userId = session.metadata?.userId;
-        const packageType = session.metadata?.packageType;
+        let userId = session.metadata?.userId;
+        let packageType = session.metadata?.packageType;
+        
+        if (!userId && session.client_reference_id) {
+          const verified = verifyClientReferenceId(session.client_reference_id);
+          if (verified) {
+            userId = verified.userId;
+            packageType = verified.packageType;
+          } else {
+            console.error('Invalid client_reference_id signature:', session.client_reference_id);
+          }
+        }
         
         if (userId && packageType && session.payment_status === 'paid' && !isSessionProcessed(session.id)) {
           markSessionProcessed(session.id);
@@ -358,7 +393,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create checkout session for credit packages
+  app.post('/api/checkout/sign', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { packageType } = req.body;
+      const validTypes = ['starter', 'pro', 'unlimited', 'master'];
+      if (!packageType || !validTypes.includes(packageType)) {
+        return res.status(400).json({ message: 'Invalid package type' });
+      }
+      const clientReferenceId = signClientReferenceId(userId, packageType);
+      res.json({ clientReferenceId });
+    } catch (error: any) {
+      console.error('Sign checkout error:', error);
+      res.status(500).json({ message: 'Failed to prepare checkout' });
+    }
+  });
+
+  // Create checkout session for credit packages (legacy)
   app.post('/api/checkout/credits', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
