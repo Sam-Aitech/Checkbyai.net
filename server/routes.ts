@@ -15,6 +15,7 @@ import { PDFAnalyzer } from "./services/pdfAnalyzer";
 import bcrypt from "bcrypt";
 import { rebuildSponsorIndex, searchSponsors, isIndexReady } from "./utils/sponsorSearch";
 import { normalizeName } from "./utils/sponsorListFetcher";
+import { runSponsorMonitorJob, startSponsorMonitorCron, isJobRunning } from "./utils/sponsorMonitorJob";
 
 const CHECKOUT_HMAC_SECRET = process.env.CHECKOUT_HMAC_SECRET || process.env.SESSION_SECRET || process.env.STRIPE_SECRET_KEY!;
 
@@ -1556,6 +1557,24 @@ Format your response in clear, professional markdown.`;
     }
   });
 
+  // Manual trigger for sponsor monitor job
+  app.post('/api/admin/sponsor-monitor/run', isAdmin, async (req: any, res) => {
+    try {
+      if (isJobRunning()) {
+        return res.status(409).json({ message: "Sponsor monitor job is already running. Please wait for it to finish." });
+      }
+
+      res.json({ message: "Sponsor monitor job started. This may take several minutes." });
+
+      runSponsorMonitorJob("manual-admin").catch((err) => {
+        console.error("[SponsorMonitorJob] Manual run error:", err);
+      });
+    } catch (error) {
+      console.error("Error triggering sponsor monitor job:", error);
+      res.status(500).json({ message: "Failed to trigger sponsor monitor job." });
+    }
+  });
+
   // Trust producer from verification - Pattern Override
   app.post('/api/admin/trust-producer', isAdmin, async (req: any, res) => {
     try {
@@ -2343,6 +2362,8 @@ Format your response in clear, professional markdown.`;
   rebuildSponsorIndex().catch((err) => {
     console.error("[SponsorSearch] Failed to build initial index:", err);
   });
+
+  startSponsorMonitorCron();
 
   const httpServer = createServer(app);
   return httpServer;
