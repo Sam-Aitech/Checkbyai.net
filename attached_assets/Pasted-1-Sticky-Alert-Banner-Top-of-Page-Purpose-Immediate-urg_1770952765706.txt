@@ -1,0 +1,118 @@
+1. Sticky Alert Banner (Top of Page)
+Purpose: Immediate urgency and social proof
+
+Text: "URGENT: 3 sponsor licences revoked in the last 48 hours. Last alert sent 14 minutes ago to 847 subscribers."
+Background: Deep red (bg-red-600) or amber for warning. White text. Full width.
+Closeable on desktop, persistent on mobile.
+2. Navigation (Sticky on Scroll)
+
+Left: Logo
+Center: "Verify CoS" | "Pricing" | "Sponsor Monitor"
+Right: "Search Free" (secondary outline button) | "Get Alerts" (primary solid button, contrasting color)
+Behavior: When user scrolls past the free search tool, the nav button changes to "Upgrade to Alerts" to capture escaping traffic.
+3. Hero Section: The Fear, Then The Guard
+
+Pre-headline (Small caps): "UK HOME OFFICE REGISTER MONITOR"
+Headline (Large, bold): "You Will Only Know Your Sponsor Was Revoked After It Is Too Late"
+Subheadline: "The Home Office updates the register at midnight. They do not email you. By the time the letter arrives, your visa application is already rejected. We check every night and text you instantly."
+CTA Pair:
+Primary: "Protect My Job Offer — £24.99/year" (This anchors the subscription, not the one-off check)
+Secondary: "Or Search Free (No Alerts)" (This diminishes the free option visually and psychologically)
+4. The "Last Night" Proof Bar
+Purpose: Prove the engine is live and working
+
+Three column layout:
+"Last night we checked: 47,823 companies"
+"Changes detected: 3 downgraded, 1 revoked"
+"Alerts sent: 04:32 AM GMT"
+Include a "View Recent Changes" link that opens the public history page (transparency builds trust).
+5. The Free Teaser Tool (Above the Fold)
+Purpose: Immediate gratification, but engineered to create pain
+
+Headline: "Check Any Company Right Now (Free)"
+Search input with placeholder: "e.g., 'Deloitte' or your employer name..."
+Critical Conversion Trigger: When they search and see the result, show a red warning banner above the result:
+"This status is live right now. It can change at midnight tonight. Without monitoring, you will not know."
+Below the result, grey out the "Watch This Company" button with a lock icon and text: "Upgrade to Starter Plan to enable 24/7 monitoring."
+6. The "Manual vs Automated" Pain Gap
+Purpose: Justify the subscription price
+
+Two column visual comparison:
+Left (The Old Way): "Checking manually"
+"Download CSV from gov.uk"
+"Open 40,000 row spreadsheet"
+"Ctrl+F search your company"
+"Repeat daily for months"
+Result: "You miss the change. Visa refused."
+Right (Your Way): "Automated alerts"
+"Add company to watchlist"
+"We check every midnight"
+"WhatsApp alert at 00:35 if revoked"
+"Take action before Home Office sends letter"
+Result: "Switch employers in time. Visa saved."
+Bridge Text: "Manual checking takes 4 minutes per day. That is 24 hours per year. The Starter plan costs 7 pence per day."
+7. Feature Blocks (Benefits, not Specs)
+
+"The 12-Hour Advantage"
+Headline: "Be 12 Hours Ahead of the Home Office Letter"
+Body: "When a licence is revoked, the register updates at 00:00. Letters are posted the next morning. Our WhatsApp alert hits your phone at 00:30. You have half a day to pivot before your employer even knows."
+"Historical Fraud Detection"
+Headline: "See If They Were Ever Suspended Before"
+Body: "We keep 90 days of history. See if your employer was downgraded to B-rating last month (a warning sign). Free search only shows today's status."
+"Multi-Channel Reliability"
+Headline: "Email Fails. WhatsApp Doesn't."
+Body: "We send Email + WhatsApp + SMS simultaneously. If one fails, the others get through. You cannot afford to miss this alert."
+8. Social Proof & Specificity
+
+Live Ticker (or static recent examples):
+"Alert sent to 43 users monitoring 'TechSolutions Ltd' on 14 Jan at 00:33 AM — Licence downgraded."
+Testimonial Quote:
+"I got the alert at midnight. My employer got the suspension email at 9 AM. I had already applied for a new job. That £39.99 saved my 5-year UK career." — Rahul K., Skilled Worker Visa Holder
+9. Pricing Section (The Choice Architect)
+
+Headline: "Choose Your Protection Level"
+Tier 1: "Search Only" (Free)
+Check today's status
+No alerts
+No history
+Button: "Current Plan" (Disabled)
+Tier 2: "Starter" (£24.99/year) [BEST VALUE badge]
+Monitor 5 companies
+Email + WhatsApp alerts
+30-day history
+Button: "Get Instant Alerts" (Primary, glowing/pulsing subtly)
+Tier 3: "Pro" (£39.99/year)
+Monitor 20 companies
+Email + WhatsApp + SMS
+90-day history
+Button: "Get Pro Protection"
+Guarantee Line (Below cards): "Cancel anytime. If you do not receive an alert within 30 days and want to cancel, we refund 100%."
+10. The "What If" FAQ (Objection Handling)
+
+Q: "What if my company is revoked while I sleep?"
+A: "You wake up to our alert, not a rejection letter. You can immediately stop your visa application or find new employment before the Home Office updates your employer."
+Q: "Is this legal/official?"
+A: "We monitor the official public register. We are not affiliated with the Home Office, which is why we can alert you faster than their bureaucratic process."
+Q: "Can I just check myself for free?"
+A: "Yes, but you must remember to check every single night. Most people check once, forget, and find out too late. We are your insurance policy against forgetfulness."
+11. Final Sticky CTA (Mobile) / Footer CTA (Desktop)
+
+Mobile: Fixed bottom bar with "Upgrade to Get Alerts — £24.99/year" button. Closes only when "X" is tapped.
+Desktop: Large footer section repeating the Hero headline and a single email capture field: "Enter your email to start monitoring instantly."
+Key Visual Conversion Rules (for your implementation)
+
+Color Psychology: Use amber/gold for the "FREE" elements (caution, temporary). Use solid black or deep navy for the "PAID" elements (authority, safety). Red is reserved only for the "REVOKED" status and urgency banners.
+Typography: The price "£24.99" should appear smaller than the outcome "Keep Your Visa." People buy the outcome, not the subscription.
+Whitespace: Pack the free search tool with data (dense, informative). Give the paid tiers generous whitespace (premium, breathable).
+Lock Icons: Use lock icons on all free-tier limitations to create mild frustration that converts.
+The "Trap" Mechanism
+Ensure the free search result page explicitly shows what the user is not getting:
+
+"Status: Active" (Green check)
+"History: [Locked — Upgrade to view]"
+"Alert Setting: [Locked — Upgrade to enable]"
+"Next Check: Manual only"
+This creates loss aversion (they see the value is there, they just cannot access it) rather than simple absence of value.
+
+Priority for Max Revenue:
+Build the Pricing Section and the "Lock" UI on free results first. These two elements alone will convert browsers to subscribers before you even build the rest of the page.
