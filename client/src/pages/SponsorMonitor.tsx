@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/accordion";
 import PageLayout from "@/components/PageLayout";
 import SEOHead from "@/components/SEOHead";
+import LandingDigest from "@/components/LandingDigest";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -882,6 +883,7 @@ export default function SponsorMonitor() {
       </nav>
 
       <HeroSection onScrollToSearch={scrollToSearch} />
+      <LandingDigest />
       <ProofBar />
 
       <section className="py-12 sm:py-16" ref={searchRef}>

@@ -319,7 +319,35 @@ export const notificationLog = pgTable(
   ]
 );
 
+// Daily AI-generated digest for landing page
+export const dailyDigest = pgTable("daily_digest", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  snapshotDate: date("snapshot_date").notNull().unique(),
+  addedCount: integer("added_count").notNull(),
+  updatedCount: integer("updated_count").notNull(),
+  removedCount: integer("removed_count").notNull(),
+  headlineGenerated: text("headline_generated").notNull(),
+  headlineVariants: jsonb("headline_variants").notNull(),
+  generatedAt: timestamp("generated_at").defaultNow(),
+  displayedOnLanding: boolean("displayed_on_landing").default(false),
+  selectedVariantIndex: integer("selected_variant_index").default(0),
+  aiModel: text("ai_model").default("deepseek-chat"),
+});
+
+// AI generation audit log
+export const aiGenerationLogs = pgTable("ai_generation_logs", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  snapshotDate: date("snapshot_date").notNull(),
+  headlineGenerated: text("headline_generated"),
+  validationPassed: boolean("validation_passed").notNull(),
+  modelUsed: text("model_used").notNull(),
+  errorDetails: text("error_details"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Type exports
+export type DailyDigest = typeof dailyDigest.$inferSelect;
+export type AiGenerationLog = typeof aiGenerationLogs.$inferSelect;
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
 export type IpVerification = typeof ipVerifications.$inferSelect;

@@ -1,7 +1,7 @@
 import cron from "node-cron";
 import stringSimilarity from "string-similarity";
 import { db } from "../db";
-import { sponsorCanonical, sponsorChanges } from "@shared/schema";
+import { sponsorCanonical, sponsorChanges, dailyDigest } from "@shared/schema";
 import { eq, and, ne, sql } from "drizzle-orm";
 import {
   downloadAndParseSponsorList,
@@ -13,6 +13,7 @@ import {
 } from "./sponsorListFetcher";
 import { rebuildSponsorIndex } from "./sponsorSearch";
 import { notifyAffectedUsers, processDelayedNotifications } from "./notificationDispatcher";
+import { generateHeadline, type RawDigestData } from "../services/aiDigest";
 
 let isRunning = false;
 
@@ -524,6 +525,63 @@ export async function runSponsorMonitorJob(source: string = "cron"): Promise<{
       }
     } else {
       console.log("[SponsorMonitorJob] No changes detected today.");
+    }
+
+    try {
+      const addedCount = changeCounts["ADDED"] || changeCounts["NEW_LICENCE"] || 0;
+      const updatedCount = (changeCounts["UPGRADED"] || 0) + (changeCounts["DOWNGRADED"] || 0) + (changeCounts["ROUTE_CHANGE"] || 0) + (changeCounts["NAME_CHANGE"] || 0);
+      const removedCount = changeCounts["REMOVED"] || 0;
+
+      const removedCompanies = detectedChanges
+        .filter((c) => c.changeType === "REMOVED")
+        .slice(0, 10)
+        .map((c) => c.organisationName);
+      const addedCompanies = detectedChanges
+        .filter((c) => c.changeType === "ADDED" || c.changeType === "NEW_LICENCE")
+        .slice(0, 5)
+        .map((c) => c.organisationName);
+
+      const digestData: RawDigestData = {
+        snapshotDate: today,
+        addedCount,
+        updatedCount,
+        removedCount,
+        removedCompanies,
+        addedCompanies,
+      };
+
+      const headlineResult = await generateHeadline(digestData);
+      const selectedVariantIndex = Math.floor(Math.random() * 3);
+
+      await db.update(dailyDigest).set({ displayedOnLanding: false });
+      await db.insert(dailyDigest).values({
+        snapshotDate: today,
+        addedCount,
+        updatedCount,
+        removedCount,
+        headlineGenerated: headlineResult.headline,
+        headlineVariants: headlineResult.variants,
+        displayedOnLanding: true,
+        selectedVariantIndex,
+        aiModel: headlineResult.model,
+      }).onConflictDoUpdate({
+        target: dailyDigest.snapshotDate,
+        set: {
+          addedCount,
+          updatedCount,
+          removedCount,
+          headlineGenerated: headlineResult.headline,
+          headlineVariants: headlineResult.variants,
+          displayedOnLanding: true,
+          selectedVariantIndex,
+          aiModel: headlineResult.model,
+          generatedAt: new Date(),
+        },
+      });
+
+      console.log(`[SponsorMonitorJob] Daily digest generated: "${headlineResult.headline}" (model: ${headlineResult.model})`);
+    } catch (digestErr: any) {
+      console.error("[SponsorMonitorJob] Failed to generate daily digest:", digestErr.message);
     }
 
     console.log(`[SponsorMonitorJob] Cleaning up snapshots older than 90 days...`);

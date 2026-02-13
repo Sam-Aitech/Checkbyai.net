@@ -8,7 +8,7 @@ import { db } from "./db";
 import { sql, eq, and, desc, inArray, gte } from "drizzle-orm";
 import { setupAuth, isAuthenticated, isAdmin } from "./auth";
 import { checkIpRateLimit, recordIpVerification, getClientIp, hashIpAddress } from "./ipRateLimit";
-import { insertVerificationResultSchema, insertFeedbackSchema, companyWatches, sponsorList, sponsorCanonical, sponsorChanges, notificationPreferences, notificationLog } from "@shared/schema";
+import { insertVerificationResultSchema, insertFeedbackSchema, companyWatches, sponsorList, sponsorCanonical, sponsorChanges, notificationPreferences, notificationLog, dailyDigest } from "@shared/schema";
 import multer from "multer";
 import { z } from "zod";
 import { PDFAnalyzer } from "./services/pdfAnalyzer";
@@ -16,6 +16,7 @@ import bcrypt from "bcrypt";
 import { rebuildSponsorIndex, searchSponsors, isIndexReady } from "./utils/sponsorSearch";
 import { normalizeName, downloadAndParseSponsorList, storeSnapshot, getLatestSnapshotDate, generateFingerprint } from "./utils/sponsorListFetcher";
 import { runSponsorMonitorJob, startSponsorMonitorCron, isJobRunning, getLastRunInfo } from "./utils/sponsorMonitorJob";
+import { generateHeadline, signDigest, deterministicHeadline } from "./services/aiDigest";
 import { encryptPhone, decryptPhone } from "./utils/phoneCrypto";
 import { sendSMS, sendWhatsApp } from "./services/messaging";
 
@@ -836,6 +837,119 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error in free sponsor search:", error);
       res.status(500).json({ message: "Failed to search sponsors." });
+    }
+  });
+
+  app.get('/api/daily-digest/current', async (_req: any, res) => {
+    try {
+      const result = await db
+        .select()
+        .from(dailyDigest)
+        .where(eq(dailyDigest.displayedOnLanding, true))
+        .orderBy(desc(dailyDigest.snapshotDate))
+        .limit(1);
+
+      if (result.length === 0) {
+        return res.json({ available: false });
+      }
+
+      const digest = result[0];
+      const variants = (digest.headlineVariants as any[]) || [];
+      const idx = digest.selectedVariantIndex ?? 0;
+      const selected = variants[idx] || variants[0] || { headline: digest.headlineGenerated, subheadline: "", emotion: "neutral", focus: "general" };
+
+      const signature = signDigest({
+        date: digest.snapshotDate,
+        added: digest.addedCount,
+        updated: digest.updatedCount,
+        removed: digest.removedCount,
+      });
+
+      res.json({
+        available: true,
+        date: digest.snapshotDate,
+        headline: selected.headline || digest.headlineGenerated,
+        emotion: selected.emotion || "neutral",
+        focus: selected.focus || "general",
+        counts: {
+          added: digest.addedCount,
+          updated: digest.updatedCount,
+          removed: digest.removedCount,
+        },
+        signature,
+      });
+    } catch (error) {
+      console.error("Error fetching daily digest:", error);
+      res.status(500).json({ message: "Failed to fetch daily digest." });
+    }
+  });
+
+  app.post('/api/admin/daily-digest/refresh', isAdmin, async (req: any, res) => {
+    try {
+      const latestChanges = await db
+        .select({
+          changeType: sponsorChanges.changeType,
+          organisationName: sponsorChanges.organisationName,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(sponsorChanges)
+        .groupBy(sponsorChanges.changeType, sponsorChanges.organisationName)
+        .orderBy(desc(sql`count(*)`))
+        .limit(50);
+
+      const today = new Date().toISOString().split("T")[0];
+      let addedCount = 0, updatedCount = 0, removedCount = 0;
+      const removedCompanies: string[] = [];
+      const addedCompanies: string[] = [];
+
+      for (const c of latestChanges) {
+        if (c.changeType === "ADDED" || c.changeType === "NEW_LICENCE") {
+          addedCount += c.count;
+          if (addedCompanies.length < 5) addedCompanies.push(c.organisationName);
+        } else if (c.changeType === "REMOVED") {
+          removedCount += c.count;
+          if (removedCompanies.length < 10) removedCompanies.push(c.organisationName);
+        } else if (["UPGRADED", "DOWNGRADED", "ROUTE_CHANGE", "NAME_CHANGE"].includes(c.changeType)) {
+          updatedCount += c.count;
+        }
+      }
+
+      const headlineResult = await generateHeadline({
+        snapshotDate: today,
+        addedCount,
+        updatedCount,
+        removedCount,
+        removedCompanies,
+        addedCompanies,
+      });
+
+      await db.update(dailyDigest).set({ displayedOnLanding: false });
+      await db.insert(dailyDigest).values({
+        snapshotDate: today,
+        addedCount,
+        updatedCount,
+        removedCount,
+        headlineGenerated: headlineResult.headline,
+        headlineVariants: headlineResult.variants,
+        displayedOnLanding: true,
+        selectedVariantIndex: 0,
+        aiModel: headlineResult.model,
+      }).onConflictDoUpdate({
+        target: dailyDigest.snapshotDate,
+        set: {
+          headlineGenerated: headlineResult.headline,
+          headlineVariants: headlineResult.variants,
+          displayedOnLanding: true,
+          selectedVariantIndex: 0,
+          aiModel: headlineResult.model,
+          generatedAt: new Date(),
+        },
+      });
+
+      res.json({ success: true, headline: headlineResult.headline, model: headlineResult.model });
+    } catch (error: any) {
+      console.error("Error refreshing daily digest:", error);
+      res.status(500).json({ message: "Failed to refresh digest.", error: error.message });
     }
   });
 
