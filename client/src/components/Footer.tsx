@@ -1,6 +1,6 @@
 import { SiYoutube } from 'react-icons/si';
 import { Link } from 'wouter';
-import { Shield } from 'lucide-react';
+import logoImg from "@assets/Checkbyai.net_(250_x_80_px)_(1)_1770958528706.png";
 
 export default function Footer() {
   return (
@@ -10,10 +10,7 @@ export default function Footer() {
         <div className="py-16 grid grid-cols-1 md:grid-cols-4 gap-12">
           <div className="md:col-span-2">
             <div className="flex items-center gap-2.5 mb-6">
-              <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center">
-                <Shield className="w-4 h-4" />
-              </div>
-              <span className="text-lg font-bold tracking-tight">Check By AI</span>
+              <img src={logoImg} alt="CheckByAi.net" className="h-10 w-auto" />
             </div>
             <p className="text-sm editorial-body text-white/70 mb-8 max-w-md">
               UK sponsor licence monitoring with instant WhatsApp, email and SMS alerts. 

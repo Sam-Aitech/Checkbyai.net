@@ -8,6 +8,7 @@ import { Loader2, Mail, KeyRound, ArrowLeft, CheckCircle } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
 import SEOHead from "@/components/SEOHead";
 import { motion, AnimatePresence } from "framer-motion";
+import logoImg from "@assets/Checkbyai.net_(250_x_80_px)_(1)_1770958528706.png";
 
 const fadeUp = {
   initial: { opacity: 0, y: 16 },
@@ -160,11 +161,9 @@ export default function LoginPage() {
           <div className="text-center p-6 pb-0">
             <div className="flex justify-center mb-6">
               <img 
-                src="/checkbyai-logo.png" 
+                src={logoImg} 
                 alt="CheckByAi.net Logo - AI-powered Certificate of Sponsorship Verification" 
                 className="h-16 w-auto sm:h-20"
-                width="80"
-                height="80"
                 loading="eager"
               />
             </div>

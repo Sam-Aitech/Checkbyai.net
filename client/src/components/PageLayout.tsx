@@ -1,9 +1,10 @@
 import { Link, useLocation } from "wouter";
-import { Shield, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import UserProfile from "./UserProfile";
 import Footer from "./Footer";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import logoImg from "@assets/Checkbyai.net_(250_x_80_px)_(1)_1770958528706.png";
 
 interface PageLayoutProps {
   children: React.ReactNode;
@@ -31,11 +32,8 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
         <nav className="sticky top-0 z-50 bg-white/80 dark:bg-background/80 backdrop-blur-xl border-b border-border/50">
           <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
             <div className="flex justify-between items-center h-16">
-              <Link href="/" className="flex items-center gap-2.5 shrink-0">
-                <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-                  <Shield className="text-primary-foreground w-4 h-4" />
-                </div>
-                <span className="text-sm font-bold tracking-tight text-foreground">Check By AI</span>
+              <Link href="/" className="flex items-center shrink-0">
+                <img src={logoImg} alt="CheckByAi.net" className="h-8 w-auto" />
               </Link>
 
               <div className="hidden lg:flex items-center gap-1">

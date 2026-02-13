@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Link, useLocation } from 'wouter'
+import logoImg from "@assets/Checkbyai.net_(250_x_80_px)_(1)_1770958528706.png"
 import CreditCounter from '@/components/CreditCounter'
 import Footer from '@/components/Footer'
 
@@ -94,8 +95,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
           <div className="relative z-10 max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
             <nav className="flex justify-between items-center py-4 mb-6">
               <Link href="/" className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center backdrop-blur-sm"><Shield className="text-white w-5 h-5" /></div>
-                <span className="text-white font-bold tracking-tight">Check By AI</span>
+                <img src={logoImg} alt="CheckByAi.net" className="h-9 w-auto" />
               </Link>
               <div className="hidden md:flex items-center gap-1">
                 {[
