@@ -37,16 +37,16 @@ export default function Home() {
 
   // SEO data for home page
   const homePageSEO = {
-    title: "AI Certificate of Sponsorship Checker | Verify UK CoS Documents",
-    description: "Verify your UK Certificate of Sponsorship instantly with AI-powered fraud detection. Protect yourself from fake CoS documents and visa scams. Free verification for UK visa applicants.",
-    keywords: "certificate of sponsorship verification, verify UK CoS, AI CoS checker, fake CoS detection, UK visa document verification, sponsor license verification, CoS authenticity check",
+    title: "UK Sponsor Licence Monitor & CoS Verification | Instant Revocation Alerts | CheckByAI",
+    description: "Get instant WhatsApp, email and SMS alerts when a UK sponsor licence is revoked. Monitor your employer's licence status automatically. Plus AI-powered Certificate of Sponsorship verification.",
+    keywords: "sponsor licence revoked alert, UK sponsor monitor, certificate of sponsorship verification, sponsor licence check, visa revocation alert, CoS verification, UK immigration",
     canonicalUrl: "https://checkbyai.net/",
     ogImage: "https://checkbyai.net/og-image.svg",
     structuredData: {
       "@context": "https://schema.org",
       "@type": "WebApplication",
-      "name": "Certificate of Sponsorship Verification Tool",
-      "description": "AI-powered verification service for UK Certificates of Sponsorship. Detects fake CoS documents and helps visa applicants verify sponsor authenticity before applying for UK work visas.",
+      "name": "UK Sponsor Licence Monitor and CoS Verification",
+      "description": "Real-time UK sponsor licence monitoring with instant WhatsApp, email, and SMS alerts when a licence is revoked. Plus AI-powered Certificate of Sponsorship verification.",
       "url": "https://checkbyai.net/",
       "applicationCategory": "SecurityApplication",
       "operatingSystem": "Web Browser",
@@ -56,11 +56,12 @@ export default function Home() {
         "priceCurrency": "GBP"
       },
       "featureList": [
-        "AI-powered document verification",
-        "PDF metadata analysis", 
-        "Fake document detection",
-        "Real-time verification results",
-        "Secure document processing"
+        "Instant sponsor licence revocation alerts",
+        "WhatsApp, email and SMS notifications",
+        "Daily Home Office register monitoring",
+        "AI-powered CoS document verification",
+        "90-day licence change history",
+        "Multi-channel notification reliability"
       ],
       "provider": {
         "@type": "Organization",
@@ -71,7 +72,7 @@ export default function Home() {
   };
 
   return (
-    <PageLayout hideFooter>
+    <PageLayout hideNav hideFooter>
       <SEOHead {...homePageSEO} />
       <Suspense fallback={<LoadingSpinner />}>
         <HeroSection onStartVerification={() => setShowVerificationModal(true)} />

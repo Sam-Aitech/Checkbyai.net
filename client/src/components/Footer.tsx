@@ -16,8 +16,8 @@ export default function Footer() {
               <span className="text-lg font-bold tracking-tight">Check By AI</span>
             </div>
             <p className="text-sm editorial-body text-white/70 mb-8 max-w-md">
-              AI-powered Certificate of Sponsorship verification for UK visa applicants. 
-              Protect yourself from CoS fraud with instant, accurate document authentication.
+              UK sponsor licence monitoring with instant WhatsApp, email and SMS alerts. 
+              Plus AI-powered Certificate of Sponsorship verification for visa applicants.
             </p>
             <a
               href="https://www.youtube.com/@CheckByAi"
@@ -36,9 +36,9 @@ export default function Footer() {
             <ul className="space-y-3">
               {[
                 { href: "/", label: "Home" },
+                { href: "/sponsor-monitor", label: "Sponsor Monitor" },
                 { href: "/dashboard", label: "Verify CoS" },
                 { href: "/pricing", label: "Pricing" },
-                { href: "/history", label: "Verification History" },
               ].map(link => (
                 <li key={link.href}>
                   <Link href={link.href} className="text-sm text-white/70 hover:text-white transition-colors font-medium">
@@ -53,10 +53,10 @@ export default function Footer() {
             <h4 className="editorial-caption mb-6 text-white/50">Resources</h4>
             <ul className="space-y-3">
               {[
+                { href: "/sponsor-changes", label: "Recent Changes" },
                 { href: "/ai-guide", label: "AI Guide" },
                 { href: "/cos-guide", label: "CoS Guide" },
                 { href: "/technology", label: "Our Technology" },
-                { href: "/api-docs", label: "API Documentation" },
               ].map(link => (
                 <li key={link.href}>
                   <Link href={link.href} className="text-sm text-white/70 hover:text-white transition-colors font-medium">

@@ -7,12 +7,12 @@ interface NavigationLinksProps {
 
 export default function NavigationLinks({ className = "" }: NavigationLinksProps) {
   const links = [
-    { href: "/", label: "Home", description: "COS Check by AI homepage" },
-    { href: "/dashboard", label: "COS Check", description: "Upload and verify your Certificate of Sponsorship" },
-    { href: "/ai-guide", label: "AI Guide", description: "Learn about check by AI technology" },
-    { href: "/cos-guide", label: "COS Guide", description: "Certificate of Sponsorship verification guide" },
-    { href: "/technology", label: "Technology", description: "How our AI verification technology works" },
-    { href: "/api-docs", label: "API Docs", description: "Integration documentation for developers" },
+    { href: "/sponsor-monitor", label: "Sponsor Monitor", description: "Get instant alerts when a UK sponsor licence is revoked" },
+    { href: "/dashboard", label: "Verify CoS", description: "Upload and verify your Certificate of Sponsorship" },
+    { href: "/sponsor-changes", label: "Recent Changes", description: "See the latest sponsor licence changes detected" },
+    { href: "/ai-guide", label: "AI Guide", description: "Learn about our AI verification technology" },
+    { href: "/cos-guide", label: "CoS Guide", description: "Certificate of Sponsorship verification guide" },
+    { href: "/technology", label: "Technology", description: "How our verification technology works" },
   ];
 
   return (
