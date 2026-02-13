@@ -21,7 +21,7 @@ export const TIER_CONFIGS: Record<PlanTier, TierConfig> = {
     webhooks: false,
   },
   starter: {
-    watchLimit: 5,
+    watchLimit: 2,
     channels: ["email", "whatsapp"],
     alertTiming: "same-day",
     apiAccess: false,
@@ -30,7 +30,7 @@ export const TIER_CONFIGS: Record<PlanTier, TierConfig> = {
     webhooks: false,
   },
   pro: {
-    watchLimit: 20,
+    watchLimit: 5,
     channels: ["email", "whatsapp", "sms"],
     alertTiming: "immediate",
     apiAccess: false,

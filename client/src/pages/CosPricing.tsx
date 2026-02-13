@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
-import { Check, X, Shield, Zap, Clock, LogIn, Bell, Eye, MessageSquare, ArrowRight } from 'lucide-react';
+import { Check, X, Shield, Zap, Clock, LogIn, CreditCard, Infinity, UserCheck, Bell, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useScrollReveal, spring, fadeUp, tapScale } from '@/lib/animations';
 import { useInView } from 'react-intersection-observer';
@@ -18,64 +18,109 @@ interface User {
   subscriptionStatus?: string;
 }
 
-interface NotificationPlan {
+interface PricingPlan {
   name: string;
   price: string;
-  period: string;
+  priceValue: number;
+  period?: string;
   description: string;
-  packageType: 'notification_starter' | 'notification_pro';
-  popular?: boolean;
   features: string[];
   notIncluded?: string[];
-  icon: typeof Bell;
+  popular?: boolean;
+  packageType: 'starter' | 'pro' | 'unlimited' | 'master';
+  credits?: number;
+  icon: typeof CreditCard;
+  bundleBadge?: string;
 }
 
-const notificationPlans: NotificationPlan[] = [
+const plans: PricingPlan[] = [
   {
-    name: 'Starter',
+    name: 'Starter Package',
     price: '£24.99',
+    priceValue: 2499,
     period: '/month',
-    description: 'Stay informed when your sponsor licence status changes.',
-    packageType: 'notification_starter',
-    icon: Bell,
+    description: 'Protect your visa with same-day alerts. £239.99 billed annually (20% off).',
+    packageType: 'starter',
+    credits: 50,
+    icon: CreditCard,
     features: [
-      'Monitor up to 2 companies',
-      'Email + WhatsApp alerts',
-      'Same-day alerts (6 PM)',
-      '30-day change history',
-      'Monitoring dashboard',
+      '50 verification credits',
+      'AI-powered document analysis',
+      'Forensic metadata extraction',
+      'Instant results',
+      'Credits never expire',
     ],
     notIncluded: [
-      'SMS notifications',
-      'Immediate alerts',
-      'CoS verification checks',
+      'Expert human review',
     ],
   },
   {
-    name: 'Pro',
+    name: 'Pro Package',
     price: '£49.99',
+    priceValue: 4999,
     period: '/month',
-    description: 'Full protection with immediate alerts and CoS checks.',
-    packageType: 'notification_pro',
+    description: 'Complete protection with immediate alerts. £479.99 billed annually (20% off).',
+    packageType: 'pro',
+    credits: 100,
     popular: true,
     icon: Zap,
     features: [
-      'Monitor up to 5 companies',
-      'Email + WhatsApp + SMS',
-      'Immediate alerts',
-      '90-day change history',
-      '5 CoS verification checks per month',
+      '100 verification credits',
+      'AI-powered document analysis',
+      'Forensic metadata extraction',
+      'Instant results',
+      'Credits never expire',
       'Priority support',
     ],
+    notIncluded: [
+      'Expert human review',
+    ],
+  },
+  {
+    name: 'Unlimited Monthly',
+    price: '£99.99',
+    priceValue: 9999,
+    period: '/month',
+    description: 'Unlimited verifications for businesses',
+    packageType: 'unlimited',
+    icon: Infinity,
+    features: [
+      'Unlimited verifications',
+      'AI-powered document analysis',
+      'Forensic metadata extraction',
+      'Instant results',
+      'Priority support',
+      'Perfect for high volume',
+      'Cancel anytime',
+    ],
+    bundleBadge: 'Includes Notification Engine: 10 companies watchlist',
+  },
+  {
+    name: 'Master Package',
+    price: '£99.99',
+    priceValue: 9999,
+    description: 'Priority expert human review with 24-hour SLA',
+    packageType: 'master',
+    icon: UserCheck,
+    features: [
+      'Expert human review',
+      '24-hour turnaround guarantee',
+      'Detailed analysis report',
+      'Document authenticity assessment',
+      'Employer verification check',
+      'Recommendations & next steps',
+      'Email report delivery',
+    ],
+    bundleBadge: 'Bonus: 5-company notifications for 3 months',
   },
 ];
 
-function NotificationPlanCard({ plan, index, isLoggedIn, loading, onSelect }: {
-  plan: NotificationPlan;
+function PricingCard({ plan, index, isLoggedIn, loading, onSelect }: {
+  plan: PricingPlan;
   index: number;
   isLoggedIn: boolean;
   loading: string | null;
-  onSelect: (plan: NotificationPlan) => void;
+  onSelect: (plan: PricingPlan) => void;
 }) {
   const [ref, inView] = useInView({ triggerOnce: true, threshold: 0.15 });
 
@@ -93,7 +138,7 @@ function NotificationPlanCard({ plan, index, isLoggedIn, loading, onSelect }: {
       {plan.popular && (
         <div className="absolute top-3 right-3">
           <span className="editorial-caption bg-primary text-primary-foreground px-2 py-1 rounded-full">
-            Most Popular
+            Best Value
           </span>
         </div>
       )}
@@ -116,7 +161,7 @@ function NotificationPlanCard({ plan, index, isLoggedIn, loading, onSelect }: {
             {plan.price}
           </span>
           <span className="text-muted-foreground text-sm ml-1">
-            {plan.period}
+            {plan.period || ' one-time'}
           </span>
         </div>
 
@@ -134,6 +179,15 @@ function NotificationPlanCard({ plan, index, isLoggedIn, loading, onSelect }: {
             </li>
           ))}
         </ul>
+
+        {plan.bundleBadge && (
+          <div className="mt-4 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+            <div className="flex items-start gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-400">
+              <Bell className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <span>{plan.bundleBadge}</span>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="p-6 pt-0 mt-auto">
@@ -151,7 +205,7 @@ function NotificationPlanCard({ plan, index, isLoggedIn, loading, onSelect }: {
           ) : !isLoggedIn ? (
             <span className="flex items-center justify-center gap-2">
               <LogIn className="w-4 h-4" />
-              Login to Subscribe
+              Login to Purchase
             </span>
           ) : (
             `Get ${plan.name}`
@@ -162,7 +216,7 @@ function NotificationPlanCard({ plan, index, isLoggedIn, loading, onSelect }: {
   );
 }
 
-export default function Pricing() {
+export default function CosPricing() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [loading, setLoading] = useState<string | null>(null);
@@ -173,18 +227,26 @@ export default function Pricing() {
     retry: false,
   });
 
+  const { data: creditsData } = useQuery<{ credits: number; subscriptionStatus: string; isUnlimited: boolean }>({
+    queryKey: ['/api/credits'],
+    queryFn: getQueryFn({ on401: 'returnNull' }),
+    enabled: !!user,
+  });
+
   const isLoggedIn = !!user?.id;
 
   const paymentLinks: Record<string, string> = {
-    notification_starter: 'https://buy.stripe.com/8x24gAb5g6JTglG5bZeZ204',
-    notification_pro: 'https://buy.stripe.com/aFa00kflwd8h4CYcEreZ205',
+    starter: 'https://buy.stripe.com/8x24gAb5g6JTglG5bZeZ204',
+    pro: 'https://buy.stripe.com/aFa00kflwd8h4CYcEreZ205',
+    unlimited: 'https://buy.stripe.com/dRm3cw7T41pz8Te5bZeZ202',
+    master: 'https://buy.stripe.com/28E28s4GS6JTfhC6g3eZ200',
   };
 
-  const handleSelectNotification = async (plan: NotificationPlan) => {
+  const handleSelectPlan = async (plan: PricingPlan) => {
     if (!isLoggedIn) {
       toast({
         title: 'Login Required',
-        description: 'Please log in or create an account to subscribe.',
+        description: 'Please log in or create an account to purchase this package.',
       });
       setLocation('/login');
       return;
@@ -196,7 +258,7 @@ export default function Pricing() {
     if (!link) {
       toast({
         title: 'Error',
-        description: 'Plan not available. Please try again later.',
+        description: 'Package not available. Please try again later.',
         variant: 'destructive',
       });
       setLoading(null);
@@ -206,7 +268,7 @@ export default function Pricing() {
     try {
       const res = await apiRequest('POST', '/api/checkout/sign', { packageType: plan.packageType });
       const { clientReferenceId } = await res.json();
-      const url = `${link}?client_reference_id=${encodeURIComponent(clientReferenceId)}&prefilled_email=${encodeURIComponent(user?.email || '')}`;
+      const url = `${link}?client_reference_id=${encodeURIComponent(clientReferenceId)}&prefilled_email=${encodeURIComponent(user.email || '')}`;
       window.location.href = url;
     } catch (error: any) {
       toast({
@@ -224,8 +286,9 @@ export default function Pricing() {
   return (
     <PageLayout>
       <SEOHead
-        title="Pricing - Sponsor Licence Notification Engine | CheckByAI"
-        description="Get instant alerts when your UK sponsor licence status changes. Starter from £24.99/month for 2 companies, Pro £49.99/month for 5 companies with CoS checks included."
+        title="CoS Verification Credits | UK Immigration Document Check"
+        description="Purchase verification credits for your Certificate of Sponsorship documents. From £24.99 for 50 credits, unlimited plans for businesses, and expert human review packages."
+        canonicalUrl="https://checkbyai.net/cos-pricing"
         structuredData={{
           "@context": "https://schema.org",
           "@graph": [
@@ -241,41 +304,41 @@ export default function Pricing() {
                 {
                   "@type": "ListItem",
                   "position": 2,
-                  "name": "Pricing",
-                  "item": "https://checkbyai.net/pricing"
+                  "name": "CoS Verification Plans",
+                  "item": "https://checkbyai.net/cos-pricing"
                 }
               ]
             },
             {
               "@type": "Product",
-              "name": "Notification Engine Starter",
-              "description": "Monitor 2 companies with same-day alerts via Email and WhatsApp",
+              "name": "Unlimited Monthly",
+              "description": "Unlimited verifications for businesses",
               "brand": {
                 "@type": "Brand",
                 "name": "Check By AI"
               },
               "offers": {
                 "@type": "Offer",
-                "price": "24.99",
+                "price": "99.99",
                 "priceCurrency": "GBP",
                 "availability": "https://schema.org/InStock",
-                "url": "https://checkbyai.net/pricing"
+                "url": "https://checkbyai.net/cos-pricing"
               }
             },
             {
               "@type": "Product",
-              "name": "Notification Engine Pro",
-              "description": "Monitor 5 companies with immediate alerts, SMS, and 5 CoS checks per month",
+              "name": "Master Package",
+              "description": "Priority expert human review with 24-hour SLA",
               "brand": {
                 "@type": "Brand",
                 "name": "Check By AI"
               },
               "offers": {
                 "@type": "Offer",
-                "price": "49.99",
+                "price": "99.99",
                 "priceCurrency": "GBP",
                 "availability": "https://schema.org/InStock",
-                "url": "https://checkbyai.net/pricing"
+                "url": "https://checkbyai.net/cos-pricing"
               }
             }
           ]
@@ -292,43 +355,55 @@ export default function Pricing() {
             className="text-center mb-12"
           >
             <span className="editorial-caption text-muted-foreground mb-4 inline-block">
-              Notification Engine
+              Verification Credits
             </span>
             <h1 className="text-5xl md:text-6xl editorial-heading text-foreground mb-4">
-              Protect Your Visa
+              CoS Verification Plans
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto editorial-body">
-              Get alerted the moment your sponsor's licence status changes. Never be caught off guard by a revocation or suspension.
+              Purchase verification credits or subscribe for unlimited access. Credits never expire and can be used anytime.
             </p>
             
             {!isLoadingUser && !isLoggedIn && (
               <div className="mt-6 inline-flex items-center gap-2 bg-muted text-foreground border border-border rounded-xl px-4 py-2">
                 <LogIn className="w-4 h-4" />
-                <span>Please <button onClick={() => setLocation('/login')} className="underline font-semibold hover:no-underline">log in</button> to subscribe</span>
+                <span>Please <button onClick={() => setLocation('/login')} className="underline font-semibold hover:no-underline">log in</button> to purchase credits</span>
               </div>
             )}
             
             {!isLoadingUser && isLoggedIn && (
-              <div className="mt-6 inline-flex items-center gap-2 bg-muted text-foreground border border-border rounded-xl px-4 py-2">
-                <Check className="w-4 h-4" />
-                <span>Logged in as <strong>{user?.email}</strong></span>
+              <div className="mt-6 flex flex-wrap justify-center gap-4">
+                <div className="inline-flex items-center gap-2 bg-muted text-foreground border border-border rounded-xl px-4 py-2">
+                  <Check className="w-4 h-4" />
+                  <span>Logged in as <strong>{user?.email}</strong></span>
+                </div>
+                {creditsData && (
+                  <div className="inline-flex items-center gap-2 bg-muted text-foreground border border-border rounded-xl px-4 py-2">
+                    <CreditCard className="w-4 h-4" />
+                    <span>
+                      {creditsData.isUnlimited ? (
+                        <><Infinity className="w-4 h-4 inline" /> Unlimited verifications</>
+                      ) : (
+                        <><strong>{creditsData.credits}</strong> credits remaining</>
+                      )}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </motion.div>
 
-          <div className="max-w-3xl mx-auto mb-16">
-            <div className="grid md:grid-cols-2 gap-6">
-              {notificationPlans.map((plan, index) => (
-                <NotificationPlanCard
-                  key={plan.packageType}
-                  plan={plan}
-                  index={index}
-                  isLoggedIn={isLoggedIn}
-                  loading={loading}
-                  onSelect={handleSelectNotification}
-                />
-              ))}
-            </div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto mb-16">
+            {plans.map((plan, index) => (
+              <PricingCard
+                key={plan.packageType}
+                plan={plan}
+                index={index}
+                isLoggedIn={isLoggedIn}
+                loading={loading}
+                onSelect={handleSelectPlan}
+              />
+            ))}
           </div>
 
           <motion.div
@@ -339,60 +414,60 @@ export default function Pricing() {
             className="max-w-4xl mx-auto"
           >
             <h2 className="text-2xl editorial-subheading text-center text-foreground mb-8">
-              Why You Need Sponsor Monitoring
+              Why Choose Our Verification Service?
             </h2>
             
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
               <div className="bg-card theme-card p-6 text-center">
                 <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4">
-                  <Bell className="w-6 h-6 text-foreground" />
-                </div>
-                <h3 className="font-semibold text-foreground mb-2">Instant Alerts</h3>
-                <p className="text-sm text-muted-foreground">
-                  Get notified the moment something changes
-                </p>
-              </div>
-
-              <div className="bg-card theme-card p-6 text-center">
-                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4">
-                  <Eye className="w-6 h-6 text-foreground" />
-                </div>
-                <h3 className="font-semibold text-foreground mb-2">24/7 Monitoring</h3>
-                <p className="text-sm text-muted-foreground">
-                  We track the Home Office register daily
-                </p>
-              </div>
-
-              <div className="bg-card theme-card p-6 text-center">
-                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4">
-                  <MessageSquare className="w-6 h-6 text-foreground" />
-                </div>
-                <h3 className="font-semibold text-foreground mb-2">Multi-Channel</h3>
-                <p className="text-sm text-muted-foreground">
-                  Email, WhatsApp, and SMS alerts
-                </p>
-              </div>
-
-              <div className="bg-card theme-card p-6 text-center">
-                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4">
                   <Shield className="w-6 h-6 text-foreground" />
                 </div>
-                <h3 className="font-semibold text-foreground mb-2">Peace of Mind</h3>
+                <h3 className="font-semibold text-foreground mb-2">AI Analysis</h3>
                 <p className="text-sm text-muted-foreground">
-                  Protect your visa status proactively
+                  Advanced forensic document analysis
+                </p>
+              </div>
+
+              <div className="bg-card theme-card p-6 text-center">
+                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4">
+                  <Zap className="w-6 h-6 text-foreground" />
+                </div>
+                <h3 className="font-semibold text-foreground mb-2">Instant Results</h3>
+                <p className="text-sm text-muted-foreground">
+                  Get verification in seconds
+                </p>
+              </div>
+
+              <div className="bg-card theme-card p-6 text-center">
+                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4">
+                  <Clock className="w-6 h-6 text-foreground" />
+                </div>
+                <h3 className="font-semibold text-foreground mb-2">Never Expire</h3>
+                <p className="text-sm text-muted-foreground">
+                  Credits stay valid forever
+                </p>
+              </div>
+
+              <div className="bg-card theme-card p-6 text-center">
+                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4">
+                  <UserCheck className="w-6 h-6 text-foreground" />
+                </div>
+                <h3 className="font-semibold text-foreground mb-2">Expert Review</h3>
+                <p className="text-sm text-muted-foreground">
+                  Human experts for complex cases
                 </p>
               </div>
             </div>
 
             <div className="text-center bg-card theme-card p-6 rounded-xl">
               <p className="text-sm text-muted-foreground mb-3">
-                Need to verify a Certificate of Sponsorship document?
+                Want to monitor your sponsor's licence status?
               </p>
               <button
-                onClick={() => setLocation('/cos-pricing')}
+                onClick={() => setLocation('/pricing')}
                 className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline"
               >
-                View CoS Verification Plans <ArrowRight className="w-4 h-4" />
+                View Notification Engine Plans <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           </motion.div>
