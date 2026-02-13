@@ -1016,10 +1016,10 @@ function NotificationSettings({ user }: { user: any }) {
           <span className="font-medium text-foreground">Alert timing:</span>{" "}
           {alertTiming}
           {resolvedTier === "free" && (
-            <span> — <a href="/pricing" className="underline hover:no-underline text-primary">upgrade for faster alerts</a></span>
+            <span>, <a href="/pricing" className="underline hover:no-underline text-primary">upgrade for faster alerts</a></span>
           )}
           {resolvedTier === "starter" && (
-            <span> — <a href="/pricing" className="underline hover:no-underline text-primary">upgrade to Pro for immediate alerts</a></span>
+            <span> , <a href="/pricing" className="underline hover:no-underline text-primary">upgrade to Pro for immediate alerts</a></span>
           )}
         </p>
       </div>
@@ -1163,7 +1163,7 @@ function getDeliveryStatus(status: string) {
 }
 
 function formatDateTime(dateStr: string | null) {
-  if (!dateStr) return "—";
+  if (!dateStr) return "N/A";
   try {
     return new Date(dateStr).toLocaleString("en-GB", {
       day: "numeric", month: "short", year: "numeric",

@@ -7,7 +7,7 @@ const AUTH_TAG_LENGTH = 16;
 function getKey(): Buffer {
   const keyHex = process.env.PHONE_ENCRYPTION_KEY;
   if (!keyHex) {
-    console.warn("[PhoneCrypto] PHONE_ENCRYPTION_KEY not set — phone numbers will be stored in plain text");
+    console.warn("[PhoneCrypto] PHONE_ENCRYPTION_KEY not set, phone numbers will be stored in plain text");
     return Buffer.alloc(0);
   }
   const keyBuffer = Buffer.from(keyHex, "hex");

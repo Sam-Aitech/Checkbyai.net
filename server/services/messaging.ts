@@ -9,7 +9,7 @@ interface SendResult {
 export async function sendSMS(phoneNumber: string, message: string): Promise<SendResult> {
   const apiKey = process.env.BREVO_API_KEY;
   if (!apiKey) {
-    console.warn("[Messaging] BREVO_API_KEY not configured — SMS will not be sent");
+    console.warn("[Messaging] BREVO_API_KEY not configured, SMS will not be sent");
     return { success: false, error: "BREVO_API_KEY not configured" };
   }
 
@@ -49,11 +49,11 @@ export async function sendWhatsApp(phoneNumber: string, message: string): Promis
   const fromNumber = process.env.TWILIO_WHATSAPP_NUMBER;
 
   if (!accountSid || !authToken) {
-    console.warn("[Messaging] TWILIO_ACCOUNT_SID or TWILIO_AUTH_TOKEN not configured — WhatsApp will not be sent");
+    console.warn("[Messaging] TWILIO_ACCOUNT_SID or TWILIO_AUTH_TOKEN not configured, WhatsApp will not be sent");
     return { success: false, error: "Twilio credentials not configured" };
   }
   if (!fromNumber) {
-    console.warn("[Messaging] TWILIO_WHATSAPP_NUMBER not configured — WhatsApp will not be sent");
+    console.warn("[Messaging] TWILIO_WHATSAPP_NUMBER not configured, WhatsApp will not be sent");
     return { success: false, error: "TWILIO_WHATSAPP_NUMBER not configured" };
   }
 

@@ -72,11 +72,12 @@ export async function cleanupOldSnapshots(daysToKeep: number = 90): Promise<numb
   cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
   const formattedDate = cutoffDate.toISOString().split('T')[0];
 
-  const result = await db
+  const deleted = await db
     .delete(sponsorList)
-    .where(lt(sponsorList.snapshotDate, formattedDate));
+    .where(lt(sponsorList.snapshotDate, formattedDate))
+    .returning({ id: sponsorList.id });
   
-  return 0;
+  return deleted.length;
 }
 
 export type ChangeType = "REMOVED" | "ADDED" | "DOWNGRADED" | "UPGRADED" | "ROUTE_CHANGE" | "NAME_CHANGE" | "NEW_LICENCE";

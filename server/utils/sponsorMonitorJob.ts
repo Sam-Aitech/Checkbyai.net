@@ -181,7 +181,7 @@ async function reconcile(
   const matchedFingerprints = new Set<string>();
   const newRecordsToday: TodayRecord[] = [];
 
-  // ── Phase 1: Process today's records against canonical ──
+  // Phase 1: Process today's records against canonical
   for (const [fp, todayRec] of Array.from(todayMap.entries())) {
     const canonical = canonicalMap.get(fp);
 
@@ -236,7 +236,7 @@ async function reconcile(
     }
   }
 
-  // ── Phase 1b: Insert genuinely new records ──
+  // Phase 1b: Insert genuinely new records
   for (const newRec of newRecordsToday) {
     try {
       await db.insert(sponsorCanonical).values({
@@ -263,7 +263,7 @@ async function reconcile(
     }
   }
 
-  // ── Phase 2: Process missing records (in canonical but not in today's CSV) ──
+  // Phase 2: Process missing records (in canonical but not in today's CSV)
   const missingRecords: CanonicalRecord[] = [];
   for (const [fp, canonical] of Array.from(canonicalMap.entries())) {
     if (!matchedFingerprints.has(fp) && !todayMap.has(fp)) {
@@ -286,7 +286,7 @@ async function reconcile(
       const newMissCount = missing.consecutiveMisses + 1;
 
       if (newMissCount === 1) {
-        // First absence — run rename check against new records
+        // First absence, run rename check against new records
         let renamed = false;
 
         for (const newRec of newRecordsToday) {
@@ -352,7 +352,7 @@ async function reconcile(
             .where(eq(sponsorCanonical.id, missing.id));
 
           console.log(
-            `[Reconciliation] First absence for "${missing.currentName}" — waiting for confirmation.`
+            `[Reconciliation] First absence for "${missing.currentName}", waiting for confirmation.`
           );
         }
       } else if (newMissCount >= 2) {
@@ -383,7 +383,7 @@ async function reconcile(
     }
   }
 
-  // ── Summary ──
+  // Summary
   const counts: Record<string, number> = {};
   for (const c of changes) counts[c.changeType] = (counts[c.changeType] || 0) + 1;
 
