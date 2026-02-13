@@ -1518,10 +1518,14 @@ export default function SimpleAdmin() {
                               <td className="py-3 px-4">
                                 {u.isRestricted ? (
                                   <Badge className="bg-red-500/20 text-red-400">Restricted</Badge>
+                                ) : u.subscriptionStatus === 'unlimited' || u.subscriptionStatus === 'enterprise' ? (
+                                  <Badge className="bg-purple-500/20 text-purple-400">Unlimited</Badge>
                                 ) : u.subscriptionStatus === 'pro' ? (
                                   <Badge className="bg-green-500/20 text-green-400">Pro</Badge>
+                                ) : u.subscriptionStatus === 'starter' ? (
+                                  <Badge className="bg-blue-500/20 text-blue-400">Starter</Badge>
                                 ) : (
-                                  <Badge className="bg-blue-500/20 text-blue-400">Free</Badge>
+                                  <Badge className="bg-slate-500/20 text-slate-400">Free</Badge>
                                 )}
                               </td>
                               <td className="py-3 px-4">

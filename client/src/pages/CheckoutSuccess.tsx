@@ -139,12 +139,12 @@ export default function CheckoutSuccess() {
                   </div>
                 )}
 
-                {verifyResult.subscriptionStatus === 'pro' && (
+                {verifyResult.subscriptionStatus && ['starter', 'pro', 'unlimited', 'enterprise'].includes(verifyResult.subscriptionStatus) && (
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Status:</span>
                     <span className="text-emerald-500 font-semibold flex items-center gap-1">
                       <Check className="w-4 h-4" />
-                      Unlimited Access Active
+                      {verifyResult.subscriptionStatus === 'unlimited' || verifyResult.subscriptionStatus === 'enterprise' ? 'Unlimited Access Active' : `${verifyResult.subscriptionStatus.charAt(0).toUpperCase() + verifyResult.subscriptionStatus.slice(1)} Plan Active`}
                     </span>
                   </div>
                 )}

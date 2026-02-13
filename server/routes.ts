@@ -170,7 +170,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const canVerify = await storage.checkDailyLimit(userId);
       const user = await storage.getUser(userId);
       
-      if (user?.subscriptionStatus === 'pro') {
+      if (user?.subscriptionStatus === 'unlimited' || user?.subscriptionStatus === 'enterprise') {
         return res.json({ canVerify: true, isAnonymous: false, verificationsLeft: 'unlimited' });
       }
       
@@ -274,8 +274,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const user = await storage.getUserByStripeCustomerId(customerId);
           if (user) {
             if (subscription.status === 'active') {
+              const subPkgType = subscription.metadata?.packageType;
+              const subStatus = subPkgType === 'starter' ? 'starter' : subPkgType === 'pro' ? 'pro' : 'unlimited';
               await storage.updateUserSubscription(user.id, {
-                subscriptionStatus: 'pro',
+                subscriptionStatus: subStatus,
                 stripeSubscriptionId: subscription.id,
                 stripeCustomerId: customerId,
               });
@@ -295,11 +297,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (customerId && invoice.subscription) {
           const user = await storage.getUserByStripeCustomerId(customerId);
           if (user) {
-            await storage.updateUserSubscription(user.id, {
-              subscriptionStatus: 'pro',
-              stripeSubscriptionId: invoice.subscription,
-              stripeCustomerId: customerId,
-            });
+            if (user.subscriptionStatus && user.subscriptionStatus !== 'free') {
+              await storage.updateUserSubscription(user.id, {
+                subscriptionStatus: user.subscriptionStatus,
+                stripeSubscriptionId: invoice.subscription,
+                stripeCustomerId: customerId,
+              });
+            }
           }
         }
         break;
@@ -336,11 +340,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           markSessionProcessed(session.id);
           if (packageType === 'starter') {
             await storage.addCredits(userId, 50);
+            await storage.updateUserSubscription(userId, {
+              subscriptionStatus: 'starter',
+              stripeSubscriptionId: session.subscription,
+              stripeCustomerId: session.customer,
+            });
           } else if (packageType === 'pro') {
             await storage.addCredits(userId, 100);
-          } else if (packageType === 'unlimited') {
             await storage.updateUserSubscription(userId, {
               subscriptionStatus: 'pro',
+              stripeSubscriptionId: session.subscription,
+              stripeCustomerId: session.customer,
+            });
+          } else if (packageType === 'unlimited') {
+            await storage.updateUserSubscription(userId, {
+              subscriptionStatus: 'unlimited',
               stripeSubscriptionId: session.subscription,
               stripeCustomerId: session.customer,
             });
@@ -477,7 +491,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ 
         credits, 
         subscriptionStatus: user?.subscriptionStatus || 'free',
-        isUnlimited: user?.subscriptionStatus === 'pro' || user?.verificationLimit === -1
+        isUnlimited: user?.subscriptionStatus === 'unlimited' || user?.subscriptionStatus === 'enterprise' || user?.verificationLimit === -1
       });
     } catch (error: any) {
       console.error('Error fetching credits:', error);
@@ -500,11 +514,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
             markSessionProcessed(sessionId);
             if (packageType === 'starter') {
               await storage.addCredits(sessionUserId, 50);
+              await storage.updateUserSubscription(sessionUserId, {
+                subscriptionStatus: 'starter',
+                stripeSubscriptionId: session.subscription as string,
+                stripeCustomerId: session.customer as string,
+              });
             } else if (packageType === 'pro') {
               await storage.addCredits(sessionUserId, 100);
-            } else if (packageType === 'unlimited') {
               await storage.updateUserSubscription(sessionUserId, {
                 subscriptionStatus: 'pro',
+                stripeSubscriptionId: session.subscription as string,
+                stripeCustomerId: session.customer as string,
+              });
+            } else if (packageType === 'unlimited') {
+              await storage.updateUserSubscription(sessionUserId, {
+                subscriptionStatus: 'unlimited',
                 stripeSubscriptionId: session.subscription as string,
                 stripeCustomerId: session.customer as string,
               });
@@ -574,8 +598,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return res.status(404).json({ message: 'User not found' });
           }
           
-          // Priority 1: Unlimited subscription (pro status or verificationLimit -1)
-          const hasUnlimited = user.subscriptionStatus === 'pro' || user.verificationLimit === -1;
+          const hasUnlimited = user.subscriptionStatus === 'unlimited' || user.subscriptionStatus === 'enterprise' || user.verificationLimit === -1;
           
           if (!hasUnlimited) {
             // Priority 2: Check purchased credits

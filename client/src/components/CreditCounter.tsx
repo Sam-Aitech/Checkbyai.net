@@ -31,7 +31,7 @@ export default function CreditCounter({ variant = 'default', className = '' }: C
     return null;
   }
 
-  const isUnlimited = creditsData?.isUnlimited || creditsData?.subscriptionStatus === 'pro';
+  const isUnlimited = creditsData?.isUnlimited || creditsData?.subscriptionStatus === 'unlimited' || creditsData?.subscriptionStatus === 'enterprise';
   const credits = creditsData?.credits || 0;
 
   if (variant === 'compact') {

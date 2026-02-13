@@ -36,15 +36,25 @@ export class WebhookHandlers {
     switch (packageType) {
       case 'starter':
         await storage.addCredits(userId, 50);
-        console.log(`Added 50 credits to user ${userId}`);
+        await storage.updateUserSubscription(userId, {
+          subscriptionStatus: 'starter',
+          stripeSubscriptionId: session.subscription,
+          stripeCustomerId: session.customer,
+        });
+        console.log(`Added 50 credits and activated starter subscription for user ${userId}`);
         break;
       case 'pro':
         await storage.addCredits(userId, 100);
-        console.log(`Added 100 credits to user ${userId}`);
+        await storage.updateUserSubscription(userId, {
+          subscriptionStatus: 'pro',
+          stripeSubscriptionId: session.subscription,
+          stripeCustomerId: session.customer,
+        });
+        console.log(`Added 100 credits and activated pro subscription for user ${userId}`);
         break;
       case 'unlimited':
         await storage.updateUserSubscription(userId, {
-          subscriptionStatus: 'pro',
+          subscriptionStatus: 'unlimited',
           stripeSubscriptionId: session.subscription,
           stripeCustomerId: session.customer,
         });
@@ -75,9 +85,11 @@ export class WebhookHandlers {
     }
 
     const status = subscription.status;
+    const packageType = subscription.metadata?.packageType;
     if (status === 'active' || status === 'trialing') {
+      const subStatus = packageType === 'starter' ? 'starter' : packageType === 'pro' ? 'pro' : 'unlimited';
       await storage.updateUserSubscription(user.id, {
-        subscriptionStatus: 'pro',
+        subscriptionStatus: subStatus,
         stripeSubscriptionId: subscription.id,
       });
     } else if (status === 'canceled' || status === 'unpaid' || status === 'past_due') {

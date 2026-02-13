@@ -20,6 +20,6 @@ export function useAuth() {
     isLoading: isLoading && !error, // Don't show loading if we know it's a 401
     isAuthenticated,
     isAdmin: user?.role === 'admin',
-    isPro: user?.subscriptionStatus === 'pro',
+    isPro: ['starter', 'pro', 'unlimited', 'enterprise'].includes(user?.subscriptionStatus || ''),
   };
 }

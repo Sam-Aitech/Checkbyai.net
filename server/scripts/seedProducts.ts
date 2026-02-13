@@ -15,23 +15,25 @@ interface Product {
 const products: Product[] = [
   {
     name: 'Starter Package',
-    description: '50 verification credits for CoS document analysis',
+    description: 'Monitor 5 companies with same-day alerts, 50 verification credits included',
     priceAmount: 2499, // £24.99 in pence
     currency: 'gbp',
     metadata: {
       packageType: 'starter',
       credits: '50',
     },
+    recurring: { interval: 'month' },
   },
   {
     name: 'Pro Package',
-    description: '100 verification credits for CoS document analysis',
-    priceAmount: 3999, // £39.99 in pence
+    description: 'Monitor 20 companies with immediate alerts, 100 verification credits included',
+    priceAmount: 4999, // £49.99 in pence
     currency: 'gbp',
     metadata: {
       packageType: 'pro',
       credits: '100',
     },
+    recurring: { interval: 'month' },
   },
   {
     name: 'Unlimited Monthly',

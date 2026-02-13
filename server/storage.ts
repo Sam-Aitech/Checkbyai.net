@@ -22,7 +22,7 @@ import {
   type ExpertRequest,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, gte, count, avg, sql } from "drizzle-orm";
+import { eq, desc, gte, count, avg, sql, inArray } from "drizzle-orm";
 
 // Interface for storage operations
 export interface IStorage {
@@ -339,8 +339,7 @@ export class DatabaseStorage implements IStorage {
     const user = await this.getUser(userId);
     if (!user) return false;
     
-    // Pro users have unlimited access
-    if (user.subscriptionStatus === 'pro') return true;
+    if (user.subscriptionStatus === 'unlimited' || user.subscriptionStatus === 'enterprise') return true;
     
     // Admin-assigned unlimited access (verificationLimit = -1)
     if (user.verificationLimit === -1) return true;
@@ -647,7 +646,7 @@ export class DatabaseStorage implements IStorage {
     const [proUsers] = await db
       .select({ count: count() })
       .from(users)
-      .where(eq(users.subscriptionStatus, 'pro'));
+      .where(inArray(users.subscriptionStatus, ['starter', 'pro', 'unlimited', 'enterprise']));
     
     return {
       trustedPatterns: trustedPatternsCount.count,

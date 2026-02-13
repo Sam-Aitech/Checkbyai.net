@@ -22,7 +22,7 @@ export const TIER_CONFIGS: Record<PlanTier, TierConfig> = {
   },
   starter: {
     watchLimit: 5,
-    channels: ["email"],
+    channels: ["email", "whatsapp"],
     alertTiming: "same-day",
     apiAccess: false,
     weeklyReports: false,
@@ -31,7 +31,7 @@ export const TIER_CONFIGS: Record<PlanTier, TierConfig> = {
   },
   pro: {
     watchLimit: 20,
-    channels: ["email", "whatsapp"],
+    channels: ["email", "whatsapp", "sms"],
     alertTiming: "immediate",
     apiAccess: false,
     weeklyReports: false,
@@ -61,7 +61,7 @@ export const TIER_CONFIGS: Record<PlanTier, TierConfig> = {
 const STATUS_TO_TIER: Record<string, PlanTier> = {
   free: "free",
   starter: "starter",
-  pro: "unlimited",
+  pro: "pro",
   unlimited: "unlimited",
   enterprise: "enterprise",
 };
