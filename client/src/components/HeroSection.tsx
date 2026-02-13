@@ -1,7 +1,7 @@
 import { useState, useEffect, Suspense, lazy } from 'react'
 import { motion } from 'framer-motion'
 import { useInView } from 'react-intersection-observer'
-import { Shield, Zap, Lock, Award, ArrowRight, Play, Bell, Activity, CheckCircle, XCircle, Timer, FileSearch, Wifi, AlertTriangle, ShieldCheck, Eye, Building2, Search, ChevronRight, MapPin } from 'lucide-react'
+import { Shield, Zap, Lock, Award, ArrowRight, Play, Bell, Activity, CheckCircle, XCircle, Timer, FileSearch, Wifi, AlertTriangle, ShieldCheck, Eye, Building2, Search, ChevronRight, MapPin, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -46,20 +46,49 @@ interface HeroSectionProps {
   onStartVerification?: () => void;
 }
 
+interface FreeSearchResult {
+  fingerprint: string;
+  organisationName: string;
+  townCity: string | null;
+  typeRating: string | null;
+  route: string | null;
+  status: string;
+  matchScore: number;
+}
+
 export default function HeroSection({ onStartVerification }: HeroSectionProps) {
   const [isLoaded, setIsLoaded] = useState(false)
   const [showDemo, setShowDemo] = useState(false)
   const [, setLocation] = useLocation()
   const [searchQuery, setSearchQuery] = useState("")
+  const [searchResults, setSearchResults] = useState<FreeSearchResult[]>([])
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [searchLimitReached, setSearchLimitReached] = useState(false)
+  const [hasSearched, setHasSearched] = useState(false)
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoaded(true), 300)
     return () => clearTimeout(timer)
   }, [])
 
-  const handleSearchSubmit = () => {
-    if (searchQuery.trim().length >= 3) {
-      setLocation(`/sponsor-monitor?q=${encodeURIComponent(searchQuery.trim())}`)
+  const handleSearchSubmit = async () => {
+    if (searchQuery.trim().length < 3) return;
+    setSearchLoading(true);
+    setSearchResults([]);
+    setSearchLimitReached(false);
+    setHasSearched(true);
+    try {
+      const res = await fetch(`/api/sponsors/free-search?q=${encodeURIComponent(searchQuery.trim())}`);
+      const data = await res.json();
+      if (res.status === 429 && data.limitReached) {
+        setSearchLimitReached(true);
+      } else if (res.ok) {
+        setSearchResults(data.results || []);
+      }
+    } catch {
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
     }
   }
 
@@ -219,14 +248,87 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
               onKeyDown={(e) => e.key === "Enter" && handleSearchSubmit()}
               className="pl-11 h-14 text-base border-2 border-slate-200 dark:border-slate-700 focus-visible:ring-emerald-500 focus-visible:border-emerald-500 rounded-xl"
             />
-            <Button onClick={handleSearchSubmit} disabled={searchQuery.trim().length < 3} className="absolute right-2 top-1/2 -translate-y-1/2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 rounded-lg px-4 h-10">
-              Search
+            <Button onClick={handleSearchSubmit} disabled={searchQuery.trim().length < 3 || searchLoading} className="absolute right-2 top-1/2 -translate-y-1/2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 rounded-lg px-4 h-10">
+              {searchLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Search"}
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Free search shows today's status only.{" "}
-            <Link href="/pricing" className="text-primary font-semibold hover:underline">Upgrade for monitoring and alerts</Link>
-          </p>
+
+          {searchLoading && (
+            <div className="flex justify-center py-6">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          )}
+
+          {searchLimitReached && (
+            <div className="max-w-lg mx-auto mt-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl p-5 text-center">
+              <Lock className="w-8 h-8 text-amber-500 mx-auto mb-3" />
+              <h3 className="font-bold text-foreground mb-1">Free search limit reached</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                You've used your free search for today. Subscribe to the Notification Engine for unlimited searches and real-time alerts when your sponsor's licence changes.
+              </p>
+              <Link href="/pricing">
+                <Button className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-full px-6 font-bold">
+                  <Bell className="w-4 h-4 mr-2" />View Plans from £24.99/mo
+                </Button>
+              </Link>
+            </div>
+          )}
+
+          {!searchLoading && !searchLimitReached && hasSearched && searchResults.length === 0 && (
+            <p className="text-sm text-muted-foreground mt-4">No sponsors found matching your search. Try a different name.</p>
+          )}
+
+          {!searchLoading && searchResults.length > 0 && (
+            <div className="max-w-lg mx-auto mt-4 text-left space-y-2">
+              {searchResults.map((r) => {
+                const isActive = r.status !== "NOT_LISTED";
+                const rating = (r.typeRating || "").toLowerCase();
+                const isBRated = rating.includes("b rating") || rating.includes("b-rating") || rating === "b";
+                return (
+                  <div key={r.fingerprint} className="bg-card border border-border rounded-xl p-4 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-foreground text-sm truncate">{r.organisationName}</p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                        {r.townCity && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{r.townCity}</span>}
+                        {r.route && <span>{r.route}</span>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {isActive ? (
+                        <Badge className="bg-emerald-600 text-white border-emerald-700 rounded-full text-[11px] font-bold px-2.5">
+                          <CheckCircle className="w-3 h-3 mr-1" />Active
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-red-600 text-white border-red-700 rounded-full text-[11px] font-bold px-2.5">
+                          <XCircle className="w-3 h-3 mr-1" />Revoked
+                        </Badge>
+                      )}
+                      {isBRated && (
+                        <Badge className="bg-amber-500 text-white border-amber-600 rounded-full text-[11px] font-bold px-2.5">
+                          <AlertTriangle className="w-3 h-3 mr-1" />B-Rated
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              <div className="text-center pt-3">
+                <p className="text-xs text-muted-foreground mb-2">Want to get alerts when this sponsor's status changes?</p>
+                <Link href="/pricing">
+                  <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-full px-5 font-bold text-xs">
+                    <Bell className="w-3.5 h-3.5 mr-1.5" />Get Instant Alerts
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {!hasSearched && (
+            <p className="text-xs text-muted-foreground">
+              One free search per day. No login required.{" "}
+              <Link href="/pricing" className="text-primary font-semibold hover:underline">Subscribe for unlimited searches and alerts</Link>
+            </p>
+          )}
         </div>
       </section>
 

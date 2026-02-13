@@ -714,7 +714,8 @@ function MobileStickyBar() {
 }
 
 export default function SponsorMonitor() {
-  const [searchQuery, setSearchQuery] = useState("");
+  const urlQ = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("q") || "" : "";
+  const [searchQuery, setSearchQuery] = useState(urlQ);
   const [, setLocation] = useLocation();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
@@ -725,8 +726,12 @@ export default function SponsorMonitor() {
   const searchRef = useRef<HTMLDivElement>(null);
 
   const userPlan = user?.subscriptionStatus || "free";
-  const isFreeUser = userPlan === "free" || !userPlan;
-  const shouldSearch = debouncedQuery.trim().length >= 3 && isAuthenticated;
+  const isFreeUser = !isAuthenticated || userPlan === "free" || !userPlan;
+  const shouldSearch = debouncedQuery.trim().length >= 3;
+  const [freeSearchResults, setFreeSearchResults] = useState<SponsorSearchResult[]>([]);
+  const [freeSearchLoading, setFreeSearchLoading] = useState(false);
+  const [freeSearchLimitReached, setFreeSearchLimitReached] = useState(false);
+  const [freeSearchDone, setFreeSearchDone] = useState(false);
 
   const scrollToSearch = useCallback(() => {
     searchRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -745,10 +750,40 @@ export default function SponsorMonitor() {
       if (!res.ok) { const data = await res.json().catch(() => ({})); throw new Error(data.message || "Search failed"); }
       return res.json();
     },
-    enabled: shouldSearch,
+    enabled: shouldSearch && isAuthenticated,
     staleTime: 30 * 1000,
     retry: false,
   });
+
+  useEffect(() => {
+    if (!shouldSearch || isAuthenticated) {
+      setFreeSearchResults([]);
+      setFreeSearchDone(false);
+      return;
+    }
+    let cancelled = false;
+    const doFreeSearch = async () => {
+      setFreeSearchLoading(true);
+      setFreeSearchLimitReached(false);
+      try {
+        const res = await fetch(`/api/sponsors/free-search?q=${encodeURIComponent(debouncedQuery.trim())}`);
+        if (cancelled) return;
+        const data = await res.json();
+        if (res.status === 429 && data.limitReached) {
+          setFreeSearchLimitReached(true);
+          setFreeSearchResults([]);
+        } else if (res.ok) {
+          setFreeSearchResults(data.results || []);
+        }
+      } catch {
+        if (!cancelled) setFreeSearchResults([]);
+      } finally {
+        if (!cancelled) { setFreeSearchLoading(false); setFreeSearchDone(true); }
+      }
+    };
+    doFreeSearch();
+    return () => { cancelled = true; };
+  }, [debouncedQuery, shouldSearch, isAuthenticated]);
 
   const {
     data: watches, isLoading: watchesLoading, error: watchesError,
@@ -800,7 +835,10 @@ export default function SponsorMonitor() {
     setHistoryOpen(true);
   }, []);
 
-  const hasSearchResults = searchResults && searchResults.length > 0;
+  const effectiveResults = isAuthenticated ? searchResults : freeSearchResults;
+  const effectiveLoading = isAuthenticated ? searchLoading : freeSearchLoading;
+  const effectiveFetching = isAuthenticated ? searchFetching : freeSearchLoading;
+  const hasSearchResults = effectiveResults && effectiveResults.length > 0;
 
   return (
     <PageLayout hideNav hideFooter>
@@ -862,16 +900,27 @@ export default function SponsorMonitor() {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10 h-14 text-base border-2 border-slate-200 dark:border-slate-700 focus-visible:ring-emerald-500 focus-visible:border-emerald-500"
             />
-            {searchFetching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground animate-spin" />}
+            {effectiveFetching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground animate-spin" />}
           </div>
 
-          {!isAuthenticated && !authLoading && searchQuery.trim().length >= 3 && (
+          {!isAuthenticated && !authLoading && freeSearchLimitReached && (
             <Card className="mt-4 border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700">
-              <CardContent className="flex items-center gap-3 py-4">
-                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
-                <p className="text-sm text-amber-800 dark:text-amber-200">
-                  <button onClick={() => setLocation("/login")} className="underline font-semibold hover:no-underline">Log in</button> to search the register and view results.
+              <CardContent className="py-6 text-center">
+                <Lock className="w-8 h-8 text-amber-500 mx-auto mb-3" />
+                <h3 className="font-bold text-foreground mb-1">Free search limit reached</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  You've used your free search for today. Subscribe to get unlimited searches and real-time alerts.
                 </p>
+                <div className="flex gap-3 justify-center flex-wrap">
+                  <Link href="/pricing">
+                    <Button className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-full px-5 font-bold">
+                      <Bell className="w-4 h-4 mr-2" />View Plans from £24.99/mo
+                    </Button>
+                  </Link>
+                  <Button variant="outline" onClick={() => setLocation("/login")} className="rounded-full px-5 font-semibold">
+                    Sign In
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           )}
@@ -880,7 +929,7 @@ export default function SponsorMonitor() {
             <p className="text-sm text-muted-foreground mt-3 text-center">Type at least 3 characters to search</p>
           )}
 
-          {searchLoading && shouldSearch && (
+          {effectiveLoading && shouldSearch && (
             <div className="mt-4 space-y-3">
               {[1, 2, 3].map((i) => (
                 <Card key={i}><CardContent className="py-4"><div className="flex items-center justify-between"><div className="space-y-2 flex-1"><Skeleton className="h-5 w-64" /><Skeleton className="h-4 w-40" /><Skeleton className="h-4 w-48" /></div><Skeleton className="h-9 w-32" /></div></CardContent></Card>
@@ -888,13 +937,13 @@ export default function SponsorMonitor() {
             </div>
           )}
 
-          {searchError && shouldSearch && (
+          {searchError && shouldSearch && isAuthenticated && (
             <Card className="mt-4 border-destructive/30 bg-destructive/5">
               <CardContent className="py-4"><p className="text-sm text-destructive">{(searchError as Error).message?.includes("503") ? "Index is being built. Try again in a moment." : "Unable to search right now."}</p></CardContent>
             </Card>
           )}
 
-          {searchResults && searchResults.length === 0 && shouldSearch && !searchLoading && (
+          {effectiveResults && effectiveResults.length === 0 && shouldSearch && !effectiveLoading && !freeSearchLimitReached && (isAuthenticated || freeSearchDone) && (
             <Card className="mt-4">
               <CardContent className="py-8 text-center">
                 <Building2 className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
@@ -916,9 +965,9 @@ export default function SponsorMonitor() {
               )}
 
               <p className="text-sm text-muted-foreground mb-3">
-                {searchResults!.length} result{searchResults!.length !== 1 ? "s" : ""} found
+                {effectiveResults!.length} result{effectiveResults!.length !== 1 ? "s" : ""} found
               </p>
-              {searchResults!.map((result, index) => {
+              {effectiveResults!.map((result, index) => {
                 const isAdded = addedCompanies.has(result.organisationName) || activeWatches.some(w => w.organisationName === result.organisationName);
                 const isAdding = addWatchMutation.isPending && addWatchMutation.variables?.organisationName === result.organisationName;
 

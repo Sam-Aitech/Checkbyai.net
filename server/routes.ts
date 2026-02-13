@@ -798,6 +798,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  const freeSearchTracker = new Map<string, number>();
+  setInterval(() => {
+    const now = Date.now();
+    const entries = Array.from(freeSearchTracker.entries());
+    for (const [ip, ts] of entries) {
+      if (now - ts > 24 * 60 * 60 * 1000) freeSearchTracker.delete(ip);
+    }
+  }, 60 * 60 * 1000);
+
+  app.get('/api/sponsors/free-search', async (req: any, res) => {
+    try {
+      const q = (req.query.q as string || "").trim();
+      if (q.length < 3) {
+        return res.status(400).json({ message: "Search query must be at least 3 characters long." });
+      }
+
+      const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || req.connection?.remoteAddress || 'unknown';
+      const lastSearch = freeSearchTracker.get(ip);
+      if (lastSearch && Date.now() - lastSearch < 24 * 60 * 60 * 1000) {
+        return res.status(429).json({
+          message: "You've used your free search for today. Subscribe to the Notification Engine for unlimited searches and real-time alerts.",
+          limitReached: true,
+        });
+      }
+
+      if (!isIndexReady()) {
+        await rebuildSponsorIndex();
+        if (!isIndexReady()) {
+          return res.status(503).json({ message: "Sponsor search index is not yet available. Please try again shortly." });
+        }
+      }
+
+      const results = searchSponsors(q, 10);
+      freeSearchTracker.set(ip, Date.now());
+      res.json({ results, freeSearchUsed: true });
+    } catch (error) {
+      console.error("Error in free sponsor search:", error);
+      res.status(500).json({ message: "Failed to search sponsors." });
+    }
+  });
+
   // Sponsor search endpoint
   app.get('/api/sponsors/search', isAuthenticated, async (req: any, res) => {
     try {

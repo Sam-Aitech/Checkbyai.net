@@ -103,7 +103,7 @@ export default function LoginPage() {
         description: "You're now logged in.",
       });
       
-      setLocation("/dashboard");
+      setLocation("/sponsor-monitor");
     } catch (error: any) {
       toast({
         title: "Verification failed",

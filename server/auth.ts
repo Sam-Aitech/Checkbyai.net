@@ -319,8 +319,7 @@ export async function setupAuth(app: Express) {
     app.get("/api/auth/google/callback", 
       passport.authenticate("google", { failureRedirect: "/login?error=auth_failed" }),
       (req, res) => {
-        // Successful authentication, redirect to dashboard
-        res.redirect("/dashboard");
+        res.redirect("/sponsor-monitor");
       }
     );
   }
