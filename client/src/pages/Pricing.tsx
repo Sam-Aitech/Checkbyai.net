@@ -30,6 +30,7 @@ interface PricingPlan {
   packageType: 'starter' | 'pro' | 'unlimited' | 'master';
   credits?: number;
   icon: typeof CreditCard;
+  bundleBadge?: string;
 }
 
 const plans: PricingPlan[] = [
@@ -95,11 +96,8 @@ const plans: PricingPlan[] = [
       'Priority support',
       'Perfect for high volume',
       'Cancel anytime',
-      'Unlimited company watches',
-      'Immediate alerts',
-      'All notification channels',
-      'Weekly reports',
     ],
+    bundleBadge: 'Includes Notification Engine: 10 companies watchlist',
   },
   {
     name: 'Master Package',
@@ -117,6 +115,7 @@ const plans: PricingPlan[] = [
       'Recommendations & next steps',
       'Email report delivery',
     ],
+    bundleBadge: 'Bonus: 5-company notifications for 3 months',
   },
 ];
 
@@ -184,6 +183,15 @@ function PricingCard({ plan, index, isLoggedIn, loading, onSelect }: {
             </li>
           ))}
         </ul>
+
+        {plan.bundleBadge && (
+          <div className="mt-4 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+            <div className="flex items-start gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-400">
+              <Bell className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <span>{plan.bundleBadge}</span>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="p-6 pt-0 mt-auto">
@@ -212,98 +220,63 @@ function PricingCard({ plan, index, isLoggedIn, loading, onSelect }: {
   );
 }
 
-const sponsorTiers = [
-  {
-    name: 'Free',
-    price: 'Included with free account',
-    watchLimit: '1 company',
-    channels: 'Email only',
-    alertTiming: '24hr delay (next morning)',
-    features: [
-      { label: 'Company watching', included: true },
-      { label: 'Email notifications', included: true },
-      { label: 'WhatsApp notifications', included: false },
-      { label: 'SMS notifications', included: false },
-      { label: 'Immediate alerts', included: false },
-      { label: 'API access', included: false },
-      { label: 'Weekly summary reports', included: false },
-      { label: 'Bulk CSV upload', included: false },
-      { label: 'Custom webhooks', included: false },
-    ],
-  },
+interface NotificationPlan {
+  name: string;
+  price: string;
+  period: string;
+  description: string;
+  packageType: 'notification_starter' | 'notification_pro';
+  popular?: boolean;
+  features: string[];
+  notIncluded?: string[];
+  icon: typeof Bell;
+}
+
+const notificationPlans: NotificationPlan[] = [
   {
     name: 'Starter',
-    price: '£24.99 / month',
-    watchLimit: 'Up to 5 companies',
-    channels: 'Email + WhatsApp',
-    alertTiming: 'Same-day alerts (6 PM)',
+    price: '£24.99',
+    period: '/month',
+    description: 'Stay informed when your sponsor licence status changes.',
+    packageType: 'notification_starter',
+    icon: Bell,
     features: [
-      { label: 'Company watching', included: true },
-      { label: 'Email notifications', included: true },
-      { label: 'WhatsApp notifications', included: true },
-      { label: 'SMS notifications', included: false },
-      { label: 'Immediate alerts', included: false },
-      { label: '30-day history', included: true },
-      { label: '50 verification credits', included: true },
+      'Monitor up to 5 companies',
+      'Email + WhatsApp alerts',
+      'Same-day alerts (6 PM)',
+      '30-day change history',
+      'Basic monitoring dashboard',
+    ],
+    notIncluded: [
+      'SMS notifications',
+      'Immediate alerts',
+      'CoS verification checks',
     ],
   },
   {
     name: 'Pro',
-    price: '£49.99 / month',
-    watchLimit: 'Up to 20 companies',
-    channels: 'Email + WhatsApp + SMS',
-    alertTiming: 'Immediate alerts',
+    price: '£49.99',
+    period: '/month',
+    description: 'Full protection with immediate alerts and CoS checks.',
+    packageType: 'notification_pro',
+    popular: true,
+    icon: Zap,
     features: [
-      { label: 'Company watching', included: true },
-      { label: 'Email notifications', included: true },
-      { label: 'WhatsApp notifications', included: true },
-      { label: 'SMS notifications', included: true },
-      { label: 'Immediate alerts', included: true },
-      { label: '90-day history', included: true },
-      { label: '100 verification credits', included: true },
+      'Monitor up to 20 companies',
+      'Email + WhatsApp + SMS',
+      'Immediate alerts',
+      '90-day change history',
+      '5 CoS verification checks per month',
+      'Priority support',
     ],
-  },
-  {
-    name: 'Unlimited',
-    price: 'Included with £99.99/month',
-    watchLimit: 'Unlimited companies',
-    channels: 'Email + WhatsApp + SMS',
-    alertTiming: 'Immediate alerts',
-    features: [
-      { label: 'Company watching', included: true },
-      { label: 'Email notifications', included: true },
-      { label: 'WhatsApp notifications', included: true },
-      { label: 'SMS notifications', included: true },
-      { label: 'Immediate alerts', included: true },
-      { label: 'API access', included: true },
-      { label: 'Weekly summary reports', included: true },
-      { label: 'Bulk CSV upload', included: false },
-      { label: 'Custom webhooks', included: false },
-    ],
-  },
-  {
-    name: 'Enterprise',
-    price: 'Custom pricing',
-    watchLimit: 'Unlimited companies',
-    channels: 'Email + WhatsApp + SMS',
-    alertTiming: 'Immediate alerts',
-    isEnterprise: true,
-    features: [
-      { label: 'Company watching', included: true },
-      { label: 'Email notifications', included: true },
-      { label: 'WhatsApp notifications', included: true },
-      { label: 'SMS notifications', included: true },
-      { label: 'Immediate alerts', included: true },
-      { label: 'API access', included: true },
-      { label: 'Weekly summary reports', included: true },
-      { label: 'Bulk CSV upload', included: true },
-      { label: 'Custom webhooks', included: true },
-    ],
-    extraFeatures: ['Dedicated account manager', 'Compliance reporting'],
   },
 ];
 
-function SponsorMonitorSection() {
+function NotificationEngineSection({ isLoggedIn, loading, onSelectNotification }: {
+  isLoggedIn: boolean;
+  loading: string | null;
+  onSelectNotification: (plan: NotificationPlan) => void;
+}) {
   const sectionReveal = useScrollReveal();
 
   return (
@@ -312,105 +285,130 @@ function SponsorMonitorSection() {
       initial={fadeUp.initial}
       animate={sectionReveal.inView ? fadeUp.animate : fadeUp.initial}
       transition={spring}
-      className="max-w-7xl mx-auto mb-16"
+      className="max-w-4xl mx-auto mb-16"
     >
       <div className="text-center mb-10">
         <div className="w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4">
-          <Building2 className="w-7 h-7 text-foreground" />
+          <Bell className="w-7 h-7 text-foreground" />
         </div>
         <h2 className="text-3xl md:text-4xl editorial-heading text-foreground mb-3">
-          Sponsor Monitor
+          Notification Engine
         </h2>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto editorial-body">
-          Track changes to the UK Home Office Register of Licensed Sponsors. Included with all packages.
+          Get alerted when your sponsor's licence status changes. Track the UK Home Office Register of Licensed Sponsors in real time.
         </p>
       </div>
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        {sponsorTiers.map((tier, index) => (
-          <SponsorTierCard key={tier.name} tier={tier} index={index} />
+      <div className="grid md:grid-cols-2 gap-6">
+        {notificationPlans.map((plan, index) => (
+          <NotificationPlanCard
+            key={plan.packageType}
+            plan={plan}
+            index={index}
+            isLoggedIn={isLoggedIn}
+            loading={loading}
+            onSelect={onSelectNotification}
+          />
         ))}
+      </div>
+
+      <div className="mt-6 text-center">
+        <p className="text-sm text-muted-foreground">
+          Already have a CoS Check plan? The Unlimited Monthly and Master Package include notification features at no extra cost.
+        </p>
       </div>
     </motion.div>
   );
 }
 
-function SponsorTierCard({ tier, index }: { tier: typeof sponsorTiers[0]; index: number }) {
-  const [ref, inView] = useInView({ triggerOnce: true, threshold: 0.1 });
+function NotificationPlanCard({ plan, index, isLoggedIn, loading, onSelect }: {
+  plan: NotificationPlan;
+  index: number;
+  isLoggedIn: boolean;
+  loading: string | null;
+  onSelect: (plan: NotificationPlan) => void;
+}) {
+  const [ref, inView] = useInView({ triggerOnce: true, threshold: 0.15 });
 
   return (
     <motion.div
       ref={ref}
-      initial={{ opacity: 0, y: 24 }}
-      animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
-      transition={{ ...spring, delay: index * 0.08 }}
+      initial={{ opacity: 0, y: 32 }}
+      animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 32 }}
+      transition={{ ...spring, delay: index * 0.1 }}
+      whileHover={{ y: -4, transition: { type: "spring", stiffness: 300, damping: 20 } }}
       className={`relative overflow-hidden flex flex-col theme-card bg-card ${
-        tier.name === 'Enterprise' ? 'border-primary' : ''
+        plan.popular ? 'border-primary lg:scale-105 z-10' : ''
       }`}
     >
-      {tier.name === 'Enterprise' && (
+      {plan.popular && (
         <div className="absolute top-3 right-3">
-          <span className="editorial-caption bg-primary text-primary-foreground px-2 py-1 rounded-full text-xs">
-            Custom
+          <span className="editorial-caption bg-primary text-primary-foreground px-2 py-1 rounded-full">
+            Most Popular
           </span>
         </div>
       )}
 
-      <div className="p-5 pb-3">
-        <h3 className="text-lg font-bold text-foreground mb-1">{tier.name}</h3>
-        <p className="text-xs text-muted-foreground">{tier.price}</p>
+      <div className="p-6 pb-4">
+        <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mb-3">
+          <plan.icon className="w-6 h-6 text-foreground" />
+        </div>
+        <h3 className="text-xl font-bold text-foreground">
+          {plan.name}
+        </h3>
+        <p className="text-muted-foreground text-sm mt-1">
+          {plan.description}
+        </p>
       </div>
 
-      <div className="px-5 pb-3 space-y-3">
-        <div className="flex items-center gap-2 text-sm text-foreground">
-          <Eye className="w-4 h-4 flex-shrink-0 text-muted-foreground" />
-          <span>{tier.watchLimit}</span>
+      <div className="px-6 pb-6 flex-grow">
+        <div className="mb-6">
+          <span className="editorial-heading text-4xl text-foreground">
+            {plan.price}
+          </span>
+          <span className="text-muted-foreground text-sm ml-1">
+            {plan.period}
+          </span>
         </div>
-        <div className="flex items-center gap-2 text-sm text-foreground">
-          <MessageSquare className="w-4 h-4 flex-shrink-0 text-muted-foreground" />
-          <span>{tier.channels}</span>
-        </div>
-        <div className="flex items-center gap-2 text-sm text-foreground">
-          <Clock className="w-4 h-4 flex-shrink-0 text-muted-foreground" />
-          <span>{tier.alertTiming}</span>
-        </div>
+
+        <ul className="space-y-2">
+          {plan.features.map((feature, idx) => (
+            <li key={idx} className="flex items-start gap-2 text-sm text-foreground">
+              <Check className="w-4 h-4 mt-0.5 flex-shrink-0 text-foreground" />
+              <span>{feature}</span>
+            </li>
+          ))}
+          {plan.notIncluded?.map((feature, idx) => (
+            <li key={`not-${idx}`} className="flex items-start gap-2 text-sm text-muted-foreground">
+              <X className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <span className="line-through">{feature}</span>
+            </li>
+          ))}
+        </ul>
       </div>
 
-      <div className="px-5 pb-4 flex-grow">
-        <div className="border-t border-border pt-3">
-          <ul className="space-y-1.5">
-            {tier.features.map((feature, idx) => (
-              <li key={idx} className="flex items-center gap-2 text-xs">
-                {feature.included ? (
-                  <Check className="w-3.5 h-3.5 flex-shrink-0 text-foreground" />
-                ) : (
-                  <X className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground/50" />
-                )}
-                <span className={feature.included ? 'text-foreground' : 'text-muted-foreground/50'}>
-                  {feature.label}
-                </span>
-              </li>
-            ))}
-            {'extraFeatures' in tier && tier.extraFeatures?.map((feat: string, idx: number) => (
-              <li key={`extra-${idx}`} className="flex items-center gap-2 text-xs">
-                <Check className="w-3.5 h-3.5 flex-shrink-0 text-foreground" />
-                <span className="text-foreground">{feat}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
+      <div className="p-6 pt-0 mt-auto">
+        <motion.button
+          {...tapScale}
+          className="w-full py-3 px-4 font-semibold bg-primary text-primary-foreground hover:bg-primary/90 rounded-full transition-colors disabled:opacity-50"
+          onClick={() => onSelect(plan)}
+          disabled={loading !== null}
+        >
+          {loading === plan.packageType ? (
+            <span className="flex items-center justify-center gap-2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-background"></div>
+              Processing...
+            </span>
+          ) : !isLoggedIn ? (
+            <span className="flex items-center justify-center gap-2">
+              <LogIn className="w-4 h-4" />
+              Login to Subscribe
+            </span>
+          ) : (
+            `Get ${plan.name}`
+          )}
+        </motion.button>
       </div>
-
-      {'isEnterprise' in tier && tier.isEnterprise && (
-        <div className="p-5 pt-0 mt-auto">
-          <a
-            href="mailto:support@cosverify.uk?subject=Enterprise%20Sponsor%20Monitor%20Enquiry"
-            className="block w-full py-2.5 px-4 text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 rounded-full transition-colors text-center"
-          >
-            Contact Us
-          </a>
-        </div>
-      )}
     </motion.div>
   );
 }
@@ -439,6 +437,8 @@ export default function Pricing() {
     pro: 'https://buy.stripe.com/aFa00kflwd8h4CYcEreZ205',
     unlimited: 'https://buy.stripe.com/dRm3cw7T41pz8Te5bZeZ202',
     master: 'https://buy.stripe.com/28E28s4GS6JTfhC6g3eZ200',
+    notification_starter: 'https://buy.stripe.com/8x24gAb5g6JTglG5bZeZ204', // TODO: Replace with dedicated Notification Engine Starter Stripe payment link
+    notification_pro: 'https://buy.stripe.com/aFa00kflwd8h4CYcEreZ205', // TODO: Replace with dedicated Notification Engine Pro Stripe payment link
   };
 
   const handleSelectPlan = async (plan: PricingPlan) => {
@@ -479,6 +479,44 @@ export default function Pricing() {
     }
   };
 
+  const handleSelectNotification = async (plan: NotificationPlan) => {
+    if (!isLoggedIn) {
+      toast({
+        title: 'Login Required',
+        description: 'Please log in or create an account to subscribe.',
+      });
+      setLocation('/login');
+      return;
+    }
+
+    setLoading(plan.packageType);
+
+    const link = paymentLinks[plan.packageType];
+    if (!link) {
+      toast({
+        title: 'Error',
+        description: 'Plan not available. Please try again later.',
+        variant: 'destructive',
+      });
+      setLoading(null);
+      return;
+    }
+
+    try {
+      const res = await apiRequest('POST', '/api/checkout/sign', { packageType: plan.packageType });
+      const { clientReferenceId } = await res.json();
+      const url = `${link}?client_reference_id=${encodeURIComponent(clientReferenceId)}&prefilled_email=${encodeURIComponent(user?.email || '')}`;
+      window.location.href = url;
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to start checkout. Please try again.',
+        variant: 'destructive',
+      });
+      setLoading(null);
+    }
+  };
+
   const headerReveal = useScrollReveal();
   const whyReveal = useScrollReveal();
 
@@ -486,7 +524,7 @@ export default function Pricing() {
     <PageLayout>
       <SEOHead
         title="Pricing - CoS Verification Credits | UK Immigration Document Check"
-        description="Purchase verification credits for your Certificate of Sponsorship documents. From £24.99 for 50 credits, unlimited plans for businesses, and expert human review packages."
+        description="CoS verification credits and Sponsor Notification Engine plans. From £24.99/month for monitoring and verification. Unlimited plans for businesses and expert human review packages."
         structuredData={{
           "@context": "https://schema.org",
           "@graph": [
@@ -636,7 +674,11 @@ export default function Pricing() {
             ))}
           </div>
 
-          <SponsorMonitorSection />
+          <NotificationEngineSection
+            isLoggedIn={isLoggedIn}
+            loading={loading}
+            onSelectNotification={handleSelectNotification}
+          />
 
           <motion.div
             ref={whyReveal.ref}

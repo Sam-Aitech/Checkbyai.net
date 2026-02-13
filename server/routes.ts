@@ -367,6 +367,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
               priority: true,
               phoneConsultationRequested: true,
             });
+          } else if (packageType === 'notification_starter') {
+            await storage.updateUserSubscription(userId, {
+              subscriptionStatus: 'starter',
+              stripeSubscriptionId: session.subscription,
+              stripeCustomerId: session.customer,
+            });
+          } else if (packageType === 'notification_pro') {
+            await storage.addCredits(userId, 5);
+            await storage.updateUserSubscription(userId, {
+              subscriptionStatus: 'pro',
+              stripeSubscriptionId: session.subscription,
+              stripeCustomerId: session.customer,
+            });
           }
         }
         break;
@@ -416,7 +429,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.id;
       const { packageType } = req.body;
-      const validTypes = ['starter', 'pro', 'unlimited', 'master'];
+      const validTypes = ['starter', 'pro', 'unlimited', 'master', 'notification_starter', 'notification_pro'];
       if (!packageType || !validTypes.includes(packageType)) {
         return res.status(400).json({ message: 'Invalid package type' });
       }
@@ -540,6 +553,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 stripeSessionId: session.id,
                 priority: true,
                 phoneConsultationRequested: true,
+              });
+            } else if (packageType === 'notification_starter') {
+              await storage.updateUserSubscription(sessionUserId, {
+                subscriptionStatus: 'starter',
+                stripeSubscriptionId: session.subscription as string,
+                stripeCustomerId: session.customer as string,
+              });
+            } else if (packageType === 'notification_pro') {
+              await storage.addCredits(sessionUserId, 5);
+              await storage.updateUserSubscription(sessionUserId, {
+                subscriptionStatus: 'pro',
+                stripeSubscriptionId: session.subscription as string,
+                stripeCustomerId: session.customer as string,
               });
             }
           }

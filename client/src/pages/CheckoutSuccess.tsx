@@ -61,6 +61,8 @@ export default function CheckoutSuccess() {
       case 'pro': return 'Pro Package (100 credits)';
       case 'unlimited': return 'Unlimited Monthly Subscription';
       case 'master': return 'Master Package - Expert Review';
+      case 'notification_starter': return 'Notification Engine - Starter';
+      case 'notification_pro': return 'Notification Engine - Pro (5 CoS checks/month)';
       default: return 'Package';
     }
   };
