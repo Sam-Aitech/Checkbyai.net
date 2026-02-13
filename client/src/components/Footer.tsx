@@ -29,13 +29,14 @@ export default function Footer() {
           </div>
 
           <div>
-            <h4 className="editorial-caption mb-6 text-white/50">Quick Links</h4>
+            <h4 className="editorial-caption mb-6 text-white/50">Products</h4>
             <ul className="space-y-3">
               {[
-                { href: "/", label: "Home" },
                 { href: "/sponsor-monitor", label: "Sponsor Monitor" },
+                { href: "/pricing", label: "Alert Plans" },
                 { href: "/dashboard", label: "Verify CoS" },
-                { href: "/pricing", label: "Pricing" },
+                { href: "/cos-pricing", label: "CoS Credits" },
+                { href: "/sponsor-changes", label: "Today's Changes" },
               ].map(link => (
                 <li key={link.href}>
                   <Link href={link.href} className="text-sm text-white/70 hover:text-white transition-colors font-medium">
@@ -50,10 +51,12 @@ export default function Footer() {
             <h4 className="editorial-caption mb-6 text-white/50">Resources</h4>
             <ul className="space-y-3">
               {[
-                { href: "/sponsor-changes", label: "Recent Changes" },
-                { href: "/ai-guide", label: "AI Guide" },
                 { href: "/cos-guide", label: "CoS Guide" },
+                { href: "/ai-guide", label: "AI Guide" },
                 { href: "/technology", label: "Our Technology" },
+                { href: "/about", label: "About Us" },
+                { href: "/privacy", label: "Privacy Policy" },
+                { href: "/data-security", label: "Data Security" },
               ].map(link => (
                 <li key={link.href}>
                   <Link href={link.href} className="text-sm text-white/70 hover:text-white transition-colors font-medium">

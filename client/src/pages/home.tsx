@@ -35,39 +35,119 @@ export default function Home() {
     setIsLoading(false);
   };
 
-  // SEO data for home page
   const homePageSEO = {
     title: "UK Sponsor Licence Monitor & CoS Verification | Instant Revocation Alerts | CheckByAI",
     description: "Get instant WhatsApp, email and SMS alerts when a UK sponsor licence is revoked. Monitor your employer's licence status automatically. Plus AI-powered Certificate of Sponsorship verification.",
     keywords: "sponsor licence revoked alert, UK sponsor monitor, certificate of sponsorship verification, sponsor licence check, visa revocation alert, CoS verification, UK immigration",
     canonicalUrl: "https://checkbyai.net/",
-    ogImage: "https://checkbyai.net/og-image.svg",
+    ogImage: "https://checkbyai.net/og-image.png",
+    breadcrumbs: [{ name: "Home", url: "https://checkbyai.net/" }],
     structuredData: {
       "@context": "https://schema.org",
-      "@type": "WebApplication",
-      "name": "UK Sponsor Licence Monitor and CoS Verification",
-      "description": "Real-time UK sponsor licence monitoring with instant WhatsApp, email, and SMS alerts when a licence is revoked. Plus AI-powered Certificate of Sponsorship verification.",
-      "url": "https://checkbyai.net/",
-      "applicationCategory": "SecurityApplication",
-      "operatingSystem": "Web Browser",
-      "offers": {
-        "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "GBP"
-      },
-      "featureList": [
-        "Instant sponsor licence revocation alerts",
-        "WhatsApp, email and SMS notifications",
-        "Daily Home Office register monitoring",
-        "AI-powered CoS document verification",
-        "90-day licence change history",
-        "Multi-channel notification reliability"
-      ],
-      "provider": {
-        "@type": "Organization",
-        "name": "Check By AI",
-        "url": "https://checkbyai.net/"
-      }
+      "@graph": [
+        {
+          "@type": "WebApplication",
+          "name": "UK Sponsor Licence Monitor and CoS Verification",
+          "description": "Real-time UK sponsor licence monitoring with instant WhatsApp, email, and SMS alerts when a licence is revoked. Plus AI-powered Certificate of Sponsorship verification.",
+          "url": "https://checkbyai.net/",
+          "applicationCategory": "SecurityApplication",
+          "operatingSystem": "Web Browser",
+          "offers": [
+            {
+              "@type": "Offer",
+              "name": "Free Sponsor Search",
+              "price": "0",
+              "priceCurrency": "GBP",
+              "description": "Search the UK sponsor register once per day for free"
+            },
+            {
+              "@type": "Offer",
+              "name": "Notification Starter",
+              "price": "24.99",
+              "priceCurrency": "GBP",
+              "priceSpecification": { "@type": "UnitPriceSpecification", "price": "24.99", "priceCurrency": "GBP", "unitText": "MONTH" }
+            },
+            {
+              "@type": "Offer",
+              "name": "Notification Pro",
+              "price": "49.99",
+              "priceCurrency": "GBP",
+              "priceSpecification": { "@type": "UnitPriceSpecification", "price": "49.99", "priceCurrency": "GBP", "unitText": "MONTH" }
+            }
+          ],
+          "featureList": [
+            "Instant sponsor licence revocation alerts",
+            "WhatsApp, email and SMS notifications",
+            "Daily Home Office register monitoring",
+            "AI-powered CoS document verification",
+            "90-day licence change history",
+            "Multi-channel notification reliability"
+          ],
+          "provider": {
+            "@type": "Organization",
+            "name": "Check By AI",
+            "url": "https://checkbyai.net/",
+            "logo": "https://checkbyai.net/checkbyai-logo.png",
+            "sameAs": ["https://www.youtube.com/@CheckByAi"],
+            "address": { "@type": "PostalAddress", "addressCountry": "GB" }
+          }
+        },
+        {
+          "@type": "FAQPage",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "What happens when a UK sponsor licence is revoked?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "When a UK sponsor licence is revoked, all workers sponsored by that company typically have 60 days to find a new sponsor or leave the UK. CheckByAI's Notification Engine sends instant alerts via WhatsApp, email, and SMS so you can act immediately."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How do I check if my employer has a valid UK sponsor licence?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "You can search the UK Home Office Register of Licensed Sponsors for free on CheckByAI. Simply visit our Sponsor Monitor page and enter your employer's name. We offer one free search per day, or unlimited searches with a subscription."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "What is a Certificate of Sponsorship (CoS)?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "A Certificate of Sponsorship (CoS) is an electronic document issued by a UK employer with a sponsor licence. It contains details about the job and the sponsored worker, and is required when applying for a Skilled Worker visa. CheckByAI can verify CoS documents for authenticity using AI forensic analysis."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How quickly does CheckByAI detect sponsor licence changes?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "CheckByAI monitors the Home Office Register of Licensed Sponsors daily. Pro plan subscribers receive alerts within minutes of detection. Starter plan subscribers receive same-day alerts at 6 PM UTC."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Is the sponsor licence search really free?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes, anyone can search the UK sponsor register once every 24 hours without creating an account or providing any personal information. For unlimited searches and real-time alerts, subscription plans start from £24.99 per month."
+              }
+            }
+          ]
+        },
+        {
+          "@type": "WebSite",
+          "name": "CheckByAI",
+          "url": "https://checkbyai.net/",
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": "https://checkbyai.net/sponsor-monitor?q={search_term_string}",
+            "query-input": "required name=search_term_string"
+          }
+        }
+      ]
     }
   };
 

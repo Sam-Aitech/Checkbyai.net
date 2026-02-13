@@ -286,60 +286,37 @@ export default function CosPricing() {
   return (
     <PageLayout>
       <SEOHead
-        title="CoS Verification Credits | UK Immigration Document Check"
-        description="Purchase verification credits for your Certificate of Sponsorship documents. From £24.99 for 50 credits, unlimited plans for businesses, and expert human review packages."
+        title="CoS Verification Pricing | AI Document Check from £24.99 | CheckByAI"
+        description="AI-powered Certificate of Sponsorship verification. Detect fake CoS documents with forensic metadata analysis. Starter 50 credits, Pro 100 credits, Unlimited monthly checking."
         canonicalUrl="https://checkbyai.net/cos-pricing"
+        ogTitle="CoS Verification Credits | From £24.99"
+        ogDescription="Verify UK Certificate of Sponsorship documents with AI forensic analysis. Multiple credit packages available."
+        keywords="CoS verification pricing, certificate of sponsorship check cost, fake CoS detection, UK visa document verification"
+        breadcrumbs={[
+          { name: "Home", url: "https://checkbyai.net/" },
+          { name: "CoS Verification Pricing", url: "https://checkbyai.net/cos-pricing" }
+        ]}
         structuredData={{
           "@context": "https://schema.org",
           "@graph": [
             {
-              "@type": "BreadcrumbList",
-              "itemListElement": [
-                {
-                  "@type": "ListItem",
-                  "position": 1,
-                  "name": "Home",
-                  "item": "https://checkbyai.net"
-                },
-                {
-                  "@type": "ListItem",
-                  "position": 2,
-                  "name": "CoS Verification Plans",
-                  "item": "https://checkbyai.net/cos-pricing"
-                }
+              "@type": "Product",
+              "name": "CheckByAI CoS Verification",
+              "description": "AI-powered Certificate of Sponsorship verification for UK visa applicants. Forensic metadata analysis to detect fake or edited documents.",
+              "brand": { "@type": "Brand", "name": "CheckByAI" },
+              "offers": [
+                { "@type": "Offer", "name": "Starter", "price": "24.99", "priceCurrency": "GBP", "description": "50 verification credits" },
+                { "@type": "Offer", "name": "Pro", "price": "49.99", "priceCurrency": "GBP", "description": "100 verification credits" },
+                { "@type": "Offer", "name": "Unlimited Monthly", "price": "99.99", "priceCurrency": "GBP", "priceSpecification": { "@type": "UnitPriceSpecification", "price": "99.99", "priceCurrency": "GBP", "unitText": "MONTH" } }
               ]
             },
             {
-              "@type": "Product",
-              "name": "Unlimited Monthly",
-              "description": "Unlimited verifications for businesses",
-              "brand": {
-                "@type": "Brand",
-                "name": "Check By AI"
-              },
-              "offers": {
-                "@type": "Offer",
-                "price": "99.99",
-                "priceCurrency": "GBP",
-                "availability": "https://schema.org/InStock",
-                "url": "https://checkbyai.net/cos-pricing"
-              }
-            },
-            {
-              "@type": "Product",
-              "name": "Master Package",
-              "description": "Priority expert human review with 24-hour SLA",
-              "brand": {
-                "@type": "Brand",
-                "name": "Check By AI"
-              },
-              "offers": {
-                "@type": "Offer",
-                "price": "99.99",
-                "priceCurrency": "GBP",
-                "availability": "https://schema.org/InStock",
-                "url": "https://checkbyai.net/cos-pricing"
-              }
+              "@type": "Service",
+              "name": "Certificate of Sponsorship Verification",
+              "description": "Forensic AI analysis of UK Certificate of Sponsorship documents to verify authenticity",
+              "provider": { "@type": "Organization", "name": "CheckByAI", "url": "https://checkbyai.net" },
+              "areaServed": { "@type": "Country", "name": "United Kingdom" },
+              "serviceType": "Document Verification"
             }
           ]
         }}

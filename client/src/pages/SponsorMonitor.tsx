@@ -849,14 +849,44 @@ export default function SponsorMonitor() {
         canonicalUrl="https://checkbyai.net/sponsor-monitor"
         ogTitle="Sponsor Licence Monitor | Instant UK Sponsor Revocation Alerts | CheckByAI"
         ogDescription="Get instant email, WhatsApp and SMS alerts when a UK sponsor licence is revoked, suspended or downgraded."
+        breadcrumbs={[
+          { name: "Home", url: "https://checkbyai.net/" },
+          { name: "Sponsor Monitor", url: "https://checkbyai.net/sponsor-monitor" }
+        ]}
         structuredData={{
-          "@context": "https://schema.org", "@type": "WebApplication",
-          "name": "Sponsor Licence Monitor",
-          "description": "Real-time monitoring of the UK Home Office Register of Licensed Sponsors with instant alerts.",
-          "url": "https://checkbyai.net/sponsor-monitor",
-          "applicationCategory": "BusinessApplication", "operatingSystem": "Web",
-          "offers": { "@type": "Offer", "price": "0", "priceCurrency": "GBP", "description": "Free search, paid alerts" },
-          "provider": { "@type": "Organization", "name": "CheckByAI", "url": "https://checkbyai.net" }
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "WebApplication",
+              "name": "UK Sponsor Licence Monitor",
+              "description": "Search and monitor the UK Home Office Register of Licensed Sponsors. Get instant alerts when sponsor licences are revoked.",
+              "url": "https://checkbyai.net/sponsor-monitor",
+              "applicationCategory": "BusinessApplication",
+              "operatingSystem": "Web",
+              "offers": { "@type": "Offer", "price": "0", "priceCurrency": "GBP", "description": "Free search, paid alerts from £24.99/mo" },
+              "provider": { "@type": "Organization", "name": "CheckByAI", "url": "https://checkbyai.net" }
+            },
+            {
+              "@type": "FAQPage",
+              "mainEntity": [
+                {
+                  "@type": "Question",
+                  "name": "How do I check if a company has a UK sponsor licence?",
+                  "acceptedAnswer": { "@type": "Answer", "text": "Use CheckByAI's free Sponsor Monitor to search the UK Home Office Register of Licensed Sponsors. Enter any company name to instantly see their licence status, type/rating, and sponsorship routes. One free search per day, unlimited with subscription." }
+                },
+                {
+                  "@type": "Question",
+                  "name": "What does it mean if a sponsor licence is revoked?",
+                  "acceptedAnswer": { "@type": "Answer", "text": "If your employer's sponsor licence is revoked by the Home Office, your visa may be curtailed. You typically have 60 days to find a new sponsor or make alternative arrangements. CheckByAI sends instant alerts so you can act immediately." }
+                },
+                {
+                  "@type": "Question",
+                  "name": "How often is the sponsor register updated?",
+                  "acceptedAnswer": { "@type": "Answer", "text": "The UK Home Office updates the Register of Licensed Sponsors regularly. CheckByAI checks for changes daily and detects additions, removals, upgrades, downgrades, and route changes across all licensed sponsors." }
+                }
+              ]
+            }
+          ]
         }}
       />
 

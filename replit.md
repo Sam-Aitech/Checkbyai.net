@@ -35,6 +35,8 @@ The system features a dual-portal design: an Admin Portal for managing genuine C
 - **Verification Receipt System**: Each verification generates a unique Receipt ID, Document Hash, and Integrity Hash for audit trails, ensuring tamper-proof verification while documents are immediately deleted after processing.
 - **Security Hardening**: Includes measures like OTP-only admin login, file upload limits (10MB max, PDF only), same-origin CORS, secure session cookies, generic error responses, and robust security headers.
 - **Data Protection Policy**: Adheres to UK GDPR by processing only document metadata, permanently deleting original documents post-verification, and offering users data erasure rights.
+- **Daily Digest System**: AI-generated headlines from sponsor register changes using DeepSeek API. Database tables: `daily_digest` (headline variants, counts, HMAC-signed), `ai_generation_logs` (audit trail). Cron generates after detecting changes. Deterministic fallback when API unavailable. Frontend `LandingDigest.tsx` component with animated counters.
+- **SEO & AI Discovery Infrastructure**: Dynamic server-side `/sitemap.xml` (17 URLs), `/robots.txt` (AI bot directives for GPTBot, PerplexityBot, ClaudeBot, etc.), `/llms.txt` and `/llms-full.txt` (LLM discovery files). Bot meta injection middleware serves per-route meta tags to crawlers. FAQ schema (JSON-LD) on home, sponsor-monitor, pricing pages. Product/Offer schema on pricing pages. BreadcrumbList schema via SEOHead component. SpeakableSpecification and Organization schema in index.html. Enhanced footer with topical internal link clusters.
 
 ## External Dependencies
 - **@neondatabase/serverless**: Serverless PostgreSQL connection.

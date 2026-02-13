@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import * as fs from "fs";
+import * as path from "path";
 import * as crypto from "crypto";
 import Stripe from "stripe";
 import { storage } from "./storage";
@@ -115,6 +116,251 @@ function isSessionProcessed(sessionId: string): boolean {
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
+
+  // === SEO ROUTES (must be before Vite middleware) ===
+
+  app.get('/sitemap.xml', (req, res) => {
+    const today = new Date().toISOString().split('T')[0];
+    const baseUrl = 'https://checkbyai.net';
+    const urls: Array<{ path: string; priority: string; changefreq: string }> = [
+      { path: '/', priority: '1.0', changefreq: 'weekly' },
+      { path: '/sponsor-monitor', priority: '0.9', changefreq: 'daily' },
+      { path: '/pricing', priority: '0.9', changefreq: 'weekly' },
+      { path: '/cos-pricing', priority: '0.8', changefreq: 'weekly' },
+      { path: '/dashboard', priority: '0.8', changefreq: 'weekly' },
+      { path: '/sponsor-changes', priority: '0.8', changefreq: 'daily' },
+      { path: '/ai-guide', priority: '0.7', changefreq: 'monthly' },
+      { path: '/cos-guide', priority: '0.7', changefreq: 'monthly' },
+      { path: '/technology', priority: '0.7', changefreq: 'monthly' },
+      { path: '/login', priority: '0.5', changefreq: 'monthly' },
+      { path: '/about', priority: '0.6', changefreq: 'monthly' },
+      { path: '/privacy', priority: '0.4', changefreq: 'yearly' },
+      { path: '/data-security', priority: '0.4', changefreq: 'yearly' },
+      { path: '/guides/how-to-check-cos-genuine', priority: '0.8', changefreq: 'monthly' },
+      { path: '/guides/cos-scams-red-flags', priority: '0.8', changefreq: 'monthly' },
+      { path: '/guides/employers-guide-fake-cos', priority: '0.7', changefreq: 'monthly' },
+      { path: '/guides/what-to-do-fake-cos', priority: '0.7', changefreq: 'monthly' },
+    ];
+
+    const urlEntries = urls.map(u => `  <url>
+    <loc>${baseUrl}${u.path}</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>${u.changefreq}</changefreq>
+    <priority>${u.priority}</priority>
+  </url>`).join('\n');
+
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urlEntries}
+</urlset>`;
+
+    res.set('Content-Type', 'application/xml');
+    res.send(xml);
+  });
+
+  app.get('/robots.txt', (req, res) => {
+    const content = `User-agent: *
+Allow: /
+
+Sitemap: https://checkbyai.net/sitemap.xml
+
+User-agent: GPTBot
+Allow: /
+Allow: /llms.txt
+Allow: /llms-full.txt
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+Disallow: /api/
+Disallow: /admin
+Disallow: /uploads/`;
+
+    res.set('Content-Type', 'text/plain');
+    res.send(content);
+  });
+
+  const llmsBaseContent = `# CheckByAI - UK Sponsor Licence Monitor & CoS Verification
+
+> Real-time monitoring of the UK Home Office Register of Licensed Sponsors with instant WhatsApp, email and SMS alerts when licences are revoked. Plus AI-powered Certificate of Sponsorship verification.
+
+## Products
+
+- [Notification Engine](https://checkbyai.net/pricing): Real-time UK sponsor licence monitoring. Get instant alerts via WhatsApp, email, and SMS when your employer's licence is revoked, suspended, or downgraded. Plans from £24.99/month.
+- [CoS Verification](https://checkbyai.net/cos-pricing): AI-powered Certificate of Sponsorship document verification. Detect fake or edited CoS documents using forensic metadata analysis.
+- [Free Sponsor Search](https://checkbyai.net/sponsor-monitor): Search the UK Home Office Register of Licensed Sponsors for free. Check if any company holds a valid sponsor licence.
+
+## Key Pages
+
+- [Sponsor Licence Monitor](https://checkbyai.net/sponsor-monitor): Search and monitor UK sponsor licences
+- [Recent Changes](https://checkbyai.net/sponsor-changes): Daily updates to the UK sponsor register
+- [Notification Plans](https://checkbyai.net/pricing): Starter (£24.99/mo) and Pro (£49.99/mo) alert plans
+- [CoS Check Plans](https://checkbyai.net/cos-pricing): Document verification credit packages
+- [How to Check CoS](https://checkbyai.net/guides/how-to-check-cos-genuine): Guide to verifying Certificate of Sponsorship
+- [CoS Scams](https://checkbyai.net/guides/cos-scams-red-flags): Red flags for fake CoS documents
+- [Our Technology](https://checkbyai.net/technology): How our AI verification works
+
+## About
+
+CheckByAI is a UK-focused immigration technology platform. We monitor the Home Office Register of Licensed Sponsors daily and alert subscribers instantly when changes affect their employer. Our CoS verification tool uses forensic AI analysis to detect fraudulent Certificate of Sponsorship documents.
+
+Website: https://checkbyai.net`;
+
+  const llmsFullExtra = `
+
+## Detailed Product Information
+
+### Notification Engine (Primary Product)
+The Notification Engine monitors the UK Home Office Register of Licensed Sponsors, which lists all companies authorised to sponsor migrant workers. The register is updated regularly, and when a sponsor licence is revoked, all workers sponsored by that company may lose their right to work in the UK.
+
+**Starter Plan - £24.99/month (£239.99/year)**
+- Monitor up to 2 companies
+- Email and WhatsApp alerts
+- Same-day alerts delivered at 6 PM UTC
+- 30-day change history
+
+**Pro Plan - £49.99/month (£479.99/year)**
+- Monitor up to 5 companies
+- Email, WhatsApp, and SMS alerts
+- Immediate alerts (within minutes of detection)
+- 90-day change history
+- 5 CoS verification checks per month
+- Priority support
+
+### CoS Verification
+AI-powered forensic analysis of Certificate of Sponsorship PDF documents. The system examines:
+- PDF producer and creator metadata
+- XMP modification history
+- Font consistency analysis
+- Date format validation
+- Suspicious software signatures (e.g., Photoshop, online PDF editors)
+
+Results are classified as Genuine, Suspicious, or Fake with confidence scores.
+
+### Free Features
+- One free sponsor licence search per 24 hours (no account required)
+- View recent register changes
+- Educational guides on CoS verification
+
+## Common Questions
+
+Q: What happens when a sponsor licence is revoked?
+A: Workers sponsored by that company typically have 60 days to find a new sponsor or leave the UK. Our alerts help you act fast.
+
+Q: Is the free search really free?
+A: Yes. Anyone can search the sponsor register once per day without creating an account.
+
+Q: How quickly do you detect changes?
+A: We check the Home Office register daily. Pro subscribers receive alerts within minutes of detection.
+
+Q: Do you store uploaded documents?
+A: No. Documents are analysed in memory and permanently deleted immediately after verification. We only retain the verification result metadata.`;
+
+  app.get('/llms.txt', (req, res) => {
+    res.set('Content-Type', 'text/plain');
+    res.send(llmsBaseContent);
+  });
+
+  app.get('/llms-full.txt', (req, res) => {
+    res.set('Content-Type', 'text/plain');
+    res.send(llmsBaseContent + llmsFullExtra);
+  });
+
+  const seoMetaMap: Record<string, { title: string; description: string }> = {
+    '/': {
+      title: 'UK Sponsor Licence Monitor & CoS Verification | Instant Revocation Alerts | CheckByAI',
+      description: 'Get instant WhatsApp, email and SMS alerts when a UK sponsor licence is revoked. Monitor your employer\'s licence status. Plus AI-powered CoS verification.',
+    },
+    '/sponsor-monitor': {
+      title: 'Sponsor Licence Monitor | Instant UK Sponsor Revocation Alerts | CheckByAI',
+      description: 'Get instant email, WhatsApp and SMS alerts when a UK sponsor licence is revoked, suspended or downgraded. Monitor the Home Office register automatically.',
+    },
+    '/pricing': {
+      title: 'Notification Engine Pricing | UK Sponsor Licence Alerts from £24.99/mo | CheckByAI',
+      description: 'Get real-time UK sponsor licence revocation alerts. Starter plan £24.99/mo for 2 companies. Pro plan £49.99/mo for 5 companies with SMS and immediate alerts.',
+    },
+    '/cos-pricing': {
+      title: 'CoS Verification Pricing | AI Document Check Credits | CheckByAI',
+      description: 'AI-powered Certificate of Sponsorship verification credits. Detect fake CoS documents with forensic analysis. Plans from £24.99.',
+    },
+    '/sponsor-changes': {
+      title: 'UK Sponsor Licence Changes Today | Live Register Updates | CheckByAI',
+      description: 'Track daily changes to the UK Home Office Register of Licensed Sponsors. See which companies have been added, removed, upgraded, or downgraded.',
+    },
+    '/dashboard': {
+      title: 'Upload & Verify Certificate of Sponsorship | UK CoS Checker | CheckByAI',
+      description: 'Upload your Certificate of Sponsorship for instant AI verification. Detect fake or edited CoS documents with forensic metadata analysis.',
+    },
+    '/technology': {
+      title: 'Our AI Verification Technology | How CheckByAI Works',
+      description: 'Learn how CheckByAI uses forensic AI analysis, metadata extraction, and machine learning to verify UK Certificate of Sponsorship documents.',
+    },
+    '/ai-guide': {
+      title: 'AI Document Verification Guide | How AI Detects Fake Documents | CheckByAI',
+      description: 'Understand how artificial intelligence detects forged and edited documents through metadata analysis, pattern recognition, and forensic techniques.',
+    },
+    '/cos-guide': {
+      title: 'Certificate of Sponsorship Guide | What is a CoS & How to Verify | CheckByAI',
+      description: 'Complete guide to UK Certificates of Sponsorship. Learn what a CoS is, how to verify it\'s genuine, and what to do if you suspect fraud.',
+    },
+    '/login': {
+      title: 'Sign In | CheckByAI - UK Sponsor Licence Monitor',
+      description: 'Sign in to your CheckByAI account to access sponsor licence monitoring, alerts, and CoS verification tools.',
+    },
+  };
+
+  const botPatterns = /bot|crawl|spider|slurp|Googlebot|Bingbot|GPTBot|PerplexityBot|facebookexternalhit|Twitterbot|LinkedInBot/i;
+
+  app.use((req, res, next) => {
+    const ua = req.headers['user-agent'] || '';
+    if (!botPatterns.test(ua)) return next();
+
+    const routeMeta = seoMetaMap[req.path];
+    if (!routeMeta) return next();
+
+    if (req.path.startsWith('/api/')) return next();
+
+    const accept = req.headers['accept'] || '';
+    if (!accept.includes('text/html')) return next();
+
+    try {
+      const indexPath = path.resolve('client/index.html');
+      let html = fs.readFileSync(indexPath, 'utf-8');
+      const { title, description } = routeMeta;
+      const canonical = `https://checkbyai.net${req.path === '/' ? '/' : req.path}`;
+
+      html = html.replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`);
+      html = html.replace(/<meta name="title" content="[^"]*"/, `<meta name="title" content="${title}"`);
+      html = html.replace(/<meta name="description" content="[^"]*"/, `<meta name="description" content="${description}"`);
+      html = html.replace(/<meta property="og:title" content="[^"]*"/, `<meta property="og:title" content="${title}"`);
+      html = html.replace(/<meta property="og:description" content="[^"]*"/, `<meta property="og:description" content="${description}"`);
+      html = html.replace(/<meta property="og:url" content="[^"]*"/, `<meta property="og:url" content="${canonical}"`);
+      html = html.replace(/<meta property="twitter:title" content="[^"]*"/, `<meta property="twitter:title" content="${title}"`);
+      html = html.replace(/<meta property="twitter:description" content="[^"]*"/, `<meta property="twitter:description" content="${description}"`);
+      html = html.replace(/<meta property="twitter:url" content="[^"]*"/, `<meta property="twitter:url" content="${canonical}"`);
+      html = html.replace(/<link rel="canonical" href="[^"]*"/, `<link rel="canonical" href="${canonical}"`);
+
+      res.set('Content-Type', 'text/html');
+      res.send(html);
+    } catch (err) {
+      console.error('Bot meta injection error:', err);
+      next();
+    }
+  });
+
+  // === END SEO ROUTES ===
 
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {

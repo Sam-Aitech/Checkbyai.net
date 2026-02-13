@@ -224,59 +224,66 @@ export default function Pricing() {
   return (
     <PageLayout>
       <SEOHead
-        title="Pricing - Sponsor Licence Notification Engine | CheckByAI"
-        description="Get instant alerts when your UK sponsor licence status changes. Starter from £24.99/month for 2 companies, Pro £49.99/month for 5 companies with CoS checks included."
+        title="Notification Engine Pricing | UK Sponsor Licence Alerts from £24.99/mo | CheckByAI"
+        description="Get real-time UK sponsor licence revocation alerts via WhatsApp, email and SMS. Starter plan £24.99/mo for 2 companies. Pro plan £49.99/mo for 5 companies with immediate alerts."
+        canonicalUrl="https://checkbyai.net/pricing"
+        ogTitle="UK Sponsor Licence Alert Plans | From £24.99/mo"
+        ogDescription="Monitor your employer's sponsor licence and get instant alerts when it changes. Choose Starter or Pro plan."
+        keywords="sponsor licence alerts pricing, UK visa monitoring subscription, sponsor revocation alert plans, WhatsApp sponsor alerts"
+        breadcrumbs={[
+          { name: "Home", url: "https://checkbyai.net/" },
+          { name: "Pricing", url: "https://checkbyai.net/pricing" }
+        ]}
         structuredData={{
           "@context": "https://schema.org",
           "@graph": [
             {
-              "@type": "BreadcrumbList",
-              "itemListElement": [
-                {
-                  "@type": "ListItem",
-                  "position": 1,
-                  "name": "Home",
-                  "item": "https://checkbyai.net"
-                },
-                {
-                  "@type": "ListItem",
-                  "position": 2,
-                  "name": "Pricing",
-                  "item": "https://checkbyai.net/pricing"
-                }
-              ]
-            },
-            {
               "@type": "Product",
-              "name": "Notification Engine Starter",
-              "description": "Monitor 2 companies with same-day alerts via Email and WhatsApp",
-              "brand": {
-                "@type": "Brand",
-                "name": "Check By AI"
-              },
+              "name": "CheckByAI Notification Engine - Starter",
+              "description": "UK sponsor licence monitoring with email and WhatsApp alerts for up to 2 companies. Same-day alerts at 6 PM UTC.",
+              "brand": { "@type": "Brand", "name": "CheckByAI" },
               "offers": {
                 "@type": "Offer",
                 "price": "24.99",
                 "priceCurrency": "GBP",
+                "priceSpecification": { "@type": "UnitPriceSpecification", "price": "24.99", "priceCurrency": "GBP", "unitText": "MONTH" },
                 "availability": "https://schema.org/InStock",
                 "url": "https://checkbyai.net/pricing"
               }
             },
             {
               "@type": "Product",
-              "name": "Notification Engine Pro",
-              "description": "Monitor 5 companies with immediate alerts, SMS, and 5 CoS checks per month",
-              "brand": {
-                "@type": "Brand",
-                "name": "Check By AI"
-              },
+              "name": "CheckByAI Notification Engine - Pro",
+              "description": "UK sponsor licence monitoring with immediate email, WhatsApp and SMS alerts for up to 5 companies. Includes 5 CoS verification checks per month.",
+              "brand": { "@type": "Brand", "name": "CheckByAI" },
               "offers": {
                 "@type": "Offer",
                 "price": "49.99",
                 "priceCurrency": "GBP",
+                "priceSpecification": { "@type": "UnitPriceSpecification", "price": "49.99", "priceCurrency": "GBP", "unitText": "MONTH" },
                 "availability": "https://schema.org/InStock",
                 "url": "https://checkbyai.net/pricing"
               }
+            },
+            {
+              "@type": "FAQPage",
+              "mainEntity": [
+                {
+                  "@type": "Question",
+                  "name": "What's the difference between Starter and Pro plans?",
+                  "acceptedAnswer": { "@type": "Answer", "text": "The Starter plan (£24.99/mo) monitors up to 2 companies with email and WhatsApp alerts delivered same-day at 6 PM. The Pro plan (£49.99/mo) monitors up to 5 companies with immediate alerts via email, WhatsApp, and SMS, plus 5 CoS verification checks per month." }
+                },
+                {
+                  "@type": "Question",
+                  "name": "Can I cancel my subscription anytime?",
+                  "acceptedAnswer": { "@type": "Answer", "text": "Yes, you can cancel your CheckByAI subscription at any time. Your monitoring will continue until the end of your current billing period." }
+                },
+                {
+                  "@type": "Question",
+                  "name": "How are alerts delivered?",
+                  "acceptedAnswer": { "@type": "Answer", "text": "Starter plan subscribers receive alerts via email and WhatsApp at 6 PM UTC on the day a change is detected. Pro plan subscribers receive immediate alerts via email, WhatsApp, and SMS within minutes of detection." }
+                }
+              ]
             }
           ]
         }}

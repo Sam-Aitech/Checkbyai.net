@@ -1,5 +1,10 @@
 import { useEffect } from 'react';
 
+interface BreadcrumbItem {
+  name: string;
+  url: string;
+}
+
 interface SEOHeadProps {
   title: string;
   description: string;
@@ -9,6 +14,8 @@ interface SEOHeadProps {
   ogImage?: string;
   canonicalUrl?: string;
   structuredData?: object;
+  breadcrumbs?: BreadcrumbItem[];
+  speakable?: boolean;
 }
 
 export default function SEOHead({
@@ -19,13 +26,13 @@ export default function SEOHead({
   ogDescription,
   ogImage,
   canonicalUrl,
-  structuredData
+  structuredData,
+  breadcrumbs,
+  speakable
 }: SEOHeadProps) {
   useEffect(() => {
-    // Update document title
     document.title = title;
 
-    // Update or create meta tags
     const updateMetaTag = (name: string, content: string, property?: boolean) => {
       const attribute = property ? 'property' : 'name';
       let meta = document.querySelector(`meta[${attribute}="${name}"]`) as HTMLMetaElement;
@@ -38,7 +45,6 @@ export default function SEOHead({
       meta.content = content;
     };
 
-    // Update or create link tags
     const updateLinkTag = (rel: string, href: string) => {
       let link = document.querySelector(`link[rel="${rel}"]`) as HTMLLinkElement;
       
@@ -50,12 +56,10 @@ export default function SEOHead({
       link.href = href;
     };
 
-    // Primary meta tags
     updateMetaTag('title', title);
     updateMetaTag('description', description);
     if (keywords) updateMetaTag('keywords', keywords);
 
-    // Open Graph tags
     updateMetaTag('og:title', ogTitle || title, true);
     updateMetaTag('og:description', ogDescription || description, true);
     updateMetaTag('og:type', 'website', true);
@@ -69,7 +73,6 @@ export default function SEOHead({
       updateLinkTag('canonical', canonicalUrl);
     }
 
-    // Twitter tags
     updateMetaTag('twitter:title', ogTitle || title, true);
     updateMetaTag('twitter:description', ogDescription || description, true);
     updateMetaTag('twitter:card', 'summary_large_image', true);
@@ -78,7 +81,6 @@ export default function SEOHead({
       updateMetaTag('twitter:image', ogImage, true);
     }
 
-    // Structured data
     if (structuredData) {
       let scriptTag = document.querySelector('script[type="application/ld+json"][data-dynamic]') as HTMLScriptElement;
       
@@ -88,11 +90,51 @@ export default function SEOHead({
         scriptTag.setAttribute('data-dynamic', 'true');
         document.head.appendChild(scriptTag);
       }
+
+      let sdObject = structuredData as Record<string, any>;
+      if (speakable) {
+        sdObject = {
+          ...sdObject,
+          speakable: {
+            "@type": "SpeakableSpecification",
+            cssSelector: ["h1", ".editorial-subheading", "meta[name='description']"]
+          }
+        };
+      }
       
-      scriptTag.textContent = JSON.stringify(structuredData);
+      scriptTag.textContent = JSON.stringify(sdObject);
     }
 
-  }, [title, description, keywords, ogTitle, ogDescription, ogImage, canonicalUrl, structuredData]);
+    if (breadcrumbs && breadcrumbs.length > 0) {
+      let breadcrumbScript = document.querySelector('script[type="application/ld+json"][data-breadcrumb]') as HTMLScriptElement;
+      
+      if (!breadcrumbScript) {
+        breadcrumbScript = document.createElement('script');
+        breadcrumbScript.type = 'application/ld+json';
+        breadcrumbScript.setAttribute('data-breadcrumb', 'true');
+        document.head.appendChild(breadcrumbScript);
+      }
+      
+      const breadcrumbSchema = {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: breadcrumbs.map((item, index) => ({
+          "@type": "ListItem",
+          position: index + 1,
+          name: item.name,
+          item: item.url
+        }))
+      };
+      
+      breadcrumbScript.textContent = JSON.stringify(breadcrumbSchema);
+    } else {
+      const existingBreadcrumb = document.querySelector('script[type="application/ld+json"][data-breadcrumb]');
+      if (existingBreadcrumb) {
+        existingBreadcrumb.remove();
+      }
+    }
 
-  return null; // This component doesn't render anything
+  }, [title, description, keywords, ogTitle, ogDescription, ogImage, canonicalUrl, structuredData, breadcrumbs, speakable]);
+
+  return null;
 }

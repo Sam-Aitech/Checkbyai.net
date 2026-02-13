@@ -80,6 +80,10 @@ export default function SponsorChanges() {
         canonicalUrl="https://checkbyai.net/sponsor-changes"
         ogTitle="UK Sponsor Licence Changes: Last 7 Days"
         ogDescription="Real-time monitoring of the UK sponsor licence register. Stay informed about companies being added, removed, or having their licence status changed."
+        breadcrumbs={[
+          { name: "Home", url: "https://checkbyai.net/" },
+          { name: "Sponsor Changes", url: "https://checkbyai.net/sponsor-changes" }
+        ]}
         structuredData={{
           "@context": "https://schema.org",
           "@type": "WebPage",
