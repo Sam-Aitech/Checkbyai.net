@@ -1,0 +1,81 @@
+I need to refactor the Sponsor Monitor to use professional grade reconciliation logic. The current simple CSV diff is generating false positives and missing name changes.
+
+Step 1: Update Database Schema (Drizzle ORM)
+Add a new table `sponsor_canonical` with these columns:
+- id (serial primary key)
+- fingerprint (text, unique index) - format: "clean_name|clean_city|route"
+- current_name (text) - the most recent name seen
+- town_city (text)
+- type_rating (text)
+- route (text)
+- status (text) - either "ACTIVE" or "NOT_LISTED"
+- first_seen (date)
+- last_seen (date)
+- consecutive_misses (integer, default 0)
+- historical_names (text array or jsonb) - store previous names for audit trail
+
+Update the existing `sponsor_list` table to add:
+- fingerprint (text, indexed)
+- Keep the daily snapshot functionality for raw data
+
+Step 2: Install Dependencies
+Install cheerio (for HTML scraping to find the dynamic CSV URL).
+Install string-similarity (npm package for Levenshtein comparison).
+
+Step 3: Refactor the Daily Cron Job
+Replace the simple diff logic with this new flow:
+
+A. Scrape the CSV URL:
+   - Fetch https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers
+   - Use cheerio to find the anchor tag linking to assets.publishing.service.gov.uk ending in .csv
+   - Download that specific file (the URL changes daily)
+
+B. Ingest and Fingerprint:
+   - Parse the CSV.
+   - For each row, generate: fingerprint = normalize(name) + "|" + normalize(city) + "|" + route
+   - Store in a temporary array: todaysRecords
+
+C. Reconciliation Logic:
+   - Load all ACTIVE records from sponsor_canonical into memory as a Map keyed by fingerprint.
+   
+   Process todaysRecords:
+   - If fingerprint exists in Map: Update last_seen to today, reset consecutive_misses to 0. Check if type_rating changed (A to B = DOWNGRADE event, B to A = UPGRADE event). Update current_name if it differs (name correction).
+   - If fingerprint does NOT exist: Add to sponsor_canonical as new ACTIVE record with first_seen today. Log "NEW_LICENCE" event.
+
+   Process missing records (in DB but not in todaysRecords):
+   - For each missing record, increment consecutive_misses by 1.
+   - If consecutive_misses == 1: This is first absence. Run "Rename Check":
+     - Compare missing record's name against all NEW records added today (same city, same route).
+     - Use string-similarity. If similarity > 0.85 (85%):
+       - This is a RENAME. Update the fingerprint in sponsor_canonical to the new fingerprint.
+       - Merge the records. Do NOT mark as NOT_LISTED.
+       - Log "NAME_CHANGE" event.
+     - If similarity < 0.85: Mark as potentially gone. Wait.
+   - If consecutive_misses >= 2: Mark status as "NOT_LISTED". Log "REMOVED" event. Trigger notification alerts.
+
+D. Cleanup:
+   - Keep daily snapshots in sponsor_list for 90 days as before.
+   - Keep canonical records forever (or archive after 2 years).
+
+Step 4: Update Notification Logic
+Modify the notification dispatcher:
+- Only trigger "URGENT: Revoked" alerts when status changes to NOT_LISTED (consecutive_misses >= 2).
+- Add "Alert: Downgraded" when type_rating changes from A-rated to B-rated.
+- Add "Info: New Licence" when new companies appear (useful for competitors tracking market entry).
+- Do NOT alert on name changes or new additions to the user's specific watchlist unless it is a genuine removal.
+
+Step 5: Update the Search API
+When users search to add a watch:
+- Search against sponsor_canonical where status = "ACTIVE".
+- Use fuzzy matching on current_name AND historical_names (so if they search old name, they find the company).
+- Return the fingerprint, current_name, and city to disambiguate duplicates.
+
+Step 6: Data Migration
+Write a one-time script (admin endpoint) that:
+- Reads the latest snapshot from sponsor_list.
+- Populates sponsor_canonical with fingerprints.
+- Sets all existing records to ACTIVE with first_seen = today and consecutive_misses = 0.
+
+Important: Ensure the logic handles the first 2 days gracefully. On day 1 of this new system, every record will have consecutive_misses = 0. On day 2, if a company is missing, it hits the rename check. On day 3, if still missing, it is marked NOT_LISTED. This prevents immediate false alerts on day 1.
+
+Fix any TypeScript errors and ensure all database queries use the Drizzle ORM patterns already in the codebase.
