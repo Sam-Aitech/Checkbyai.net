@@ -37,43 +37,43 @@ const plans: PricingPlan[] = [
     name: 'Starter Package',
     price: '£24.99',
     priceValue: 2499,
-    description: '50 verification credits for occasional use',
+    period: '/month',
+    description: 'Protect your visa with same-day alerts. £239.99 billed annually (20% off).',
     packageType: 'starter',
     credits: 50,
     icon: CreditCard,
     features: [
-      '50 verification credits',
+      'Monitor 5 companies',
+      'Email + WhatsApp alerts',
+      '30-day history',
+      'Same-day alerts (6 PM)',
+      '50 verification credits included',
       'AI-powered document analysis',
-      'Forensic metadata extraction',
-      'Instant results',
       'Credits never expire',
-      'Watch 5 companies',
-      'Same-day sponsor alerts',
     ],
     notIncluded: [
-      'Priority support',
-      'Expert human review',
+      'Immediate alerts',
+      'SMS notifications',
     ],
   },
   {
     name: 'Pro Package',
-    price: '£39.99',
-    priceValue: 3999,
-    description: '100 verification credits - best value',
+    price: '£49.99',
+    priceValue: 4999,
+    period: '/month',
+    description: 'Complete protection with immediate alerts. £479.99 billed annually (20% off).',
     packageType: 'pro',
     credits: 100,
     popular: true,
     icon: Zap,
     features: [
-      '100 verification credits',
+      'Monitor 20 companies',
+      'Email + WhatsApp + SMS',
+      '90-day history',
+      'Immediate alerts',
+      '100 verification credits included',
       'AI-powered document analysis',
-      'Forensic metadata extraction',
-      'Instant results',
       'Credits never expire',
-      '20% savings vs Starter',
-      'Watch 20 companies',
-      'Immediate sponsor alerts',
-      'WhatsApp notifications',
     ],
     notIncluded: [
       'Expert human review',
@@ -233,38 +233,34 @@ const sponsorTiers = [
   },
   {
     name: 'Starter',
-    price: 'Included with £24.99 package',
+    price: '£24.99 / month',
     watchLimit: 'Up to 5 companies',
-    channels: 'Email',
-    alertTiming: 'Same-day alerts',
-    features: [
-      { label: 'Company watching', included: true },
-      { label: 'Email notifications', included: true },
-      { label: 'WhatsApp notifications', included: false },
-      { label: 'SMS notifications', included: false },
-      { label: 'Immediate alerts', included: false },
-      { label: 'API access', included: false },
-      { label: 'Weekly summary reports', included: false },
-      { label: 'Bulk CSV upload', included: false },
-      { label: 'Custom webhooks', included: false },
-    ],
-  },
-  {
-    name: 'Pro',
-    price: 'Included with £39.99 package',
-    watchLimit: 'Up to 20 companies',
     channels: 'Email + WhatsApp',
-    alertTiming: 'Immediate alerts',
+    alertTiming: 'Same-day alerts (6 PM)',
     features: [
       { label: 'Company watching', included: true },
       { label: 'Email notifications', included: true },
       { label: 'WhatsApp notifications', included: true },
       { label: 'SMS notifications', included: false },
+      { label: 'Immediate alerts', included: false },
+      { label: '30-day history', included: true },
+      { label: '50 verification credits', included: true },
+    ],
+  },
+  {
+    name: 'Pro',
+    price: '£49.99 / month',
+    watchLimit: 'Up to 20 companies',
+    channels: 'Email + WhatsApp + SMS',
+    alertTiming: 'Immediate alerts',
+    features: [
+      { label: 'Company watching', included: true },
+      { label: 'Email notifications', included: true },
+      { label: 'WhatsApp notifications', included: true },
+      { label: 'SMS notifications', included: true },
       { label: 'Immediate alerts', included: true },
-      { label: 'API access', included: false },
-      { label: 'Weekly summary reports', included: false },
-      { label: 'Bulk CSV upload', included: false },
-      { label: 'Custom webhooks', included: false },
+      { label: '90-day history', included: true },
+      { label: '100 verification credits', included: true },
     ],
   },
   {
@@ -511,38 +507,38 @@ export default function Pricing() {
                 }
               ]
             },
-            {
-              "@type": "Product",
-              "name": "Starter Package",
-              "description": "50 verification credits for occasional use",
-              "brand": {
-                "@type": "Brand",
-                "name": "Check By AI"
+              {
+                "@type": "Product",
+                "name": "Starter Package",
+                "description": "Monitor 5 companies with same-day alerts",
+                "brand": {
+                  "@type": "Brand",
+                  "name": "Check By AI"
+                },
+                "offers": {
+                  "@type": "Offer",
+                  "price": "24.99",
+                  "priceCurrency": "GBP",
+                  "availability": "https://schema.org/InStock",
+                  "url": "https://checkbyai.net/pricing"
+                }
               },
-              "offers": {
-                "@type": "Offer",
-                "price": "24.99",
-                "priceCurrency": "GBP",
-                "availability": "https://schema.org/InStock",
-                "url": "https://checkbyai.net/pricing"
-              }
-            },
-            {
-              "@type": "Product",
-              "name": "Pro Package",
-              "description": "100 verification credits - best value",
-              "brand": {
-                "@type": "Brand",
-                "name": "Check By AI"
+              {
+                "@type": "Product",
+                "name": "Pro Package",
+                "description": "Monitor 20 companies with immediate alerts",
+                "brand": {
+                  "@type": "Brand",
+                  "name": "Check By AI"
+                },
+                "offers": {
+                  "@type": "Offer",
+                  "price": "49.99",
+                  "priceCurrency": "GBP",
+                  "availability": "https://schema.org/InStock",
+                  "url": "https://checkbyai.net/pricing"
+                }
               },
-              "offers": {
-                "@type": "Offer",
-                "price": "39.99",
-                "priceCurrency": "GBP",
-                "availability": "https://schema.org/InStock",
-                "url": "https://checkbyai.net/pricing"
-              }
-            },
             {
               "@type": "Product",
               "name": "Unlimited Monthly",
