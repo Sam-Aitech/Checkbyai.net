@@ -1,7 +1,7 @@
 import Fuse, { type IFuseOptions } from "fuse.js";
 import { db } from "../db";
 import { sponsorCanonical } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 interface SponsorSearchRecord {
   fingerprint: string;
@@ -9,6 +9,7 @@ interface SponsorSearchRecord {
   townCity: string | null;
   typeRating: string | null;
   route: string | null;
+  status: string;
   historicalNames: string[];
 }
 
@@ -18,6 +19,7 @@ export interface SponsorSearchResult {
   townCity: string | null;
   typeRating: string | null;
   route: string | null;
+  status: string;
   matchScore: number;
   historicalNames: string[];
 }
@@ -44,10 +46,11 @@ export async function rebuildSponsorIndex(): Promise<void> {
       townCity: sponsorCanonical.townCity,
       typeRating: sponsorCanonical.typeRating,
       route: sponsorCanonical.route,
+      status: sponsorCanonical.status,
       historicalNames: sponsorCanonical.historicalNames,
     })
     .from(sponsorCanonical)
-    .where(eq(sponsorCanonical.status, "ACTIVE"));
+    .where(inArray(sponsorCanonical.status, ["ACTIVE", "NOT_LISTED"]));
 
   const searchRecords: SponsorSearchRecord[] = records.map((r) => ({
     fingerprint: r.fingerprint,
@@ -55,13 +58,14 @@ export async function rebuildSponsorIndex(): Promise<void> {
     townCity: r.townCity,
     typeRating: r.typeRating,
     route: r.route,
+    status: r.status,
     historicalNames: r.historicalNames || [],
   }));
 
   fuseIndex = new Fuse(searchRecords, FUSE_OPTIONS);
   indexBuiltAt = Date.now();
   console.log(
-    `[SponsorSearch] Index built with ${searchRecords.length} ACTIVE canonical records.`,
+    `[SponsorSearch] Index built with ${searchRecords.length} canonical records.`,
   );
 }
 
@@ -78,6 +82,7 @@ export function searchSponsors(query: string, limit: number = 20): SponsorSearch
     townCity: r.item.townCity,
     typeRating: r.item.typeRating,
     route: r.item.route,
+    status: r.item.status,
     matchScore: Math.round((1 - (r.score ?? 1)) * 100),
     historicalNames: r.item.historicalNames,
   }));

@@ -772,6 +772,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/sponsors/:fingerprint/history', isAuthenticated, async (req: any, res) => {
+    try {
+      const { fingerprint } = req.params;
+      if (!fingerprint || typeof fingerprint !== 'string') {
+        return res.status(400).json({ message: "Fingerprint is required." });
+      }
+
+      const canonical = await db
+        .select()
+        .from(sponsorCanonical)
+        .where(eq(sponsorCanonical.fingerprint, fingerprint))
+        .limit(1);
+
+      if (canonical.length === 0) {
+        return res.status(404).json({ message: "Company not found." });
+      }
+
+      const record = canonical[0];
+      const allNames = [record.currentName, ...(record.historicalNames || [])];
+
+      const changes = await db
+        .select()
+        .from(sponsorChanges)
+        .where(inArray(sponsorChanges.organisationName, allNames))
+        .orderBy(desc(sponsorChanges.detectedAt))
+        .limit(100);
+
+      const history = changes.map(c => ({
+        id: c.id,
+        date: c.detectedAt,
+        event: c.changeType,
+        organisationName: c.organisationName,
+        previousValue: c.previousValue,
+        newValue: c.newValue,
+        snapshotDate: c.snapshotDate,
+      }));
+
+      res.json({
+        fingerprint: record.fingerprint,
+        currentName: record.currentName,
+        townCity: record.townCity,
+        typeRating: record.typeRating,
+        route: record.route,
+        status: record.status,
+        firstSeen: record.firstSeen,
+        lastSeen: record.lastSeen,
+        historicalNames: record.historicalNames || [],
+        history,
+      });
+    } catch (error) {
+      console.error("Error fetching sponsor history:", error);
+      res.status(500).json({ message: "Failed to fetch sponsor history." });
+    }
+  });
+
   // ==========================================
   // Company Watch Endpoints
   // ==========================================
@@ -787,6 +842,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { organisation_name, town_city, fingerprint: fpParam } = req.body;
       if (!organisation_name || typeof organisation_name !== 'string' || organisation_name.trim().length === 0) {
         return res.status(400).json({ message: "Organisation name is required." });
+      }
+
+      const userSub = req.user.subscriptionStatus || "free";
+      if (userSub === "free" || !userSub) {
+        return res.status(403).json({
+          message: "Upgrade to Starter plan to add companies to your watchlist. Free users can view search results and history only.",
+          requiresUpgrade: true,
+        });
       }
 
       const userId = req.user.id;

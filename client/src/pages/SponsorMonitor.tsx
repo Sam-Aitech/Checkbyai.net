@@ -6,6 +6,7 @@ import {
   Search, Plus, Building2, MapPin, Star, Route, Loader2, Shield,
   AlertTriangle, Eye, Trash2, Clock, ArrowDown, ArrowUp, XCircle, PlusCircle, CalendarDays,
   Bell, Mail, MessageSquare, Phone, CheckCircle2, Send, Save, History, CheckCheck, XOctagon, Clock3,
+  ExternalLink, Linkedin, CheckCircle, FileText,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,9 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import PageLayout from "@/components/PageLayout";
 import SEOHead from "@/components/SEOHead";
 import { useAuth } from "@/hooks/useAuth";
@@ -21,12 +25,14 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
 interface SponsorSearchResult {
+  fingerprint: string;
   organisationName: string;
-  townCity: string;
-  county: string;
-  typeRating: string;
-  route: string;
+  townCity: string | null;
+  typeRating: string | null;
+  route: string | null;
+  status: string;
   matchScore: number;
+  historicalNames: string[];
 }
 
 interface SponsorChange {
@@ -43,14 +49,39 @@ interface WatchEntry {
   id: number;
   organisationName: string;
   townCity: string | null;
+  fingerprint: string | null;
   isActive: boolean;
   createdAt: string;
   currentStatus: {
     listed: boolean;
     typeRating: string | null;
     route: string | null;
+    status?: string;
   };
   recentChanges: SponsorChange[];
+}
+
+interface HistoryEvent {
+  id: number;
+  date: string;
+  event: string;
+  organisationName: string;
+  previousValue: string | null;
+  newValue: string | null;
+  snapshotDate: string;
+}
+
+interface CompanyHistoryData {
+  fingerprint: string;
+  currentName: string;
+  townCity: string | null;
+  typeRating: string | null;
+  route: string | null;
+  status: string;
+  firstSeen: string;
+  lastSeen: string;
+  historicalNames: string[];
+  history: HistoryEvent[];
 }
 
 function useDebounce<T>(value: T, delay: number): T {
@@ -64,52 +95,40 @@ function useDebounce<T>(value: T, delay: number): T {
 
 const springTransition = { type: "spring" as const, stiffness: 100, damping: 15 };
 
-function getStatusBadge(currentStatus: WatchEntry["currentStatus"]) {
-  if (!currentStatus.listed) {
+function StatusBadge({ status, typeRating }: { status: string; typeRating: string | null }) {
+  const rating = (typeRating || "").toLowerCase();
+  const isBRated = rating.includes("b rating") || rating.includes("b-rating") || rating === "b";
+
+  if (status === "NOT_LISTED") {
     return (
-      <motion.div layout transition={springTransition}>
-        <Badge className="bg-red-100 text-red-800 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800">
+      <div className="flex items-center gap-1.5">
+        <Badge className="bg-red-100 text-red-800 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800 rounded-full px-2 py-0.5">
           <XCircle className="w-3 h-3 mr-1" />
-          Not Found
+          Removed / Revoked
         </Badge>
-      </motion.div>
-    );
-  }
-
-  const rating = (currentStatus.typeRating || "").trim().toUpperCase();
-  const isARated = rating === "A RATING" || rating === "A" || rating.startsWith("A RATING");
-  const isBRated = rating === "B RATING" || rating === "B" || rating.startsWith("B RATING");
-
-  if (isARated) {
-    return (
-      <motion.div layout transition={springTransition}>
-        <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800">
-          <Shield className="w-3 h-3 mr-1" />
-          Active, A-rated
-        </Badge>
-      </motion.div>
-    );
-  }
-
-  if (isBRated) {
-    return (
-      <motion.div layout transition={springTransition}>
-        <Badge className="bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800">
-          <AlertTriangle className="w-3 h-3 mr-1" />
-          Active, B-rated
-        </Badge>
-      </motion.div>
+      </div>
     );
   }
 
   return (
-    <motion.div layout transition={springTransition}>
-      <Badge variant="secondary">
-        <Shield className="w-3 h-3 mr-1" />
+    <div className="flex items-center gap-1.5 flex-wrap">
+      <Badge className="bg-green-100 text-green-800 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800 rounded-full px-2 py-0.5">
+        <CheckCircle className="w-3 h-3 mr-1" />
         Active
       </Badge>
-    </motion.div>
+      {isBRated && (
+        <Badge className="bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800 rounded-full px-2 py-0.5">
+          <AlertTriangle className="w-3 h-3 mr-1" />
+          B-Rated (Compliance Issues)
+        </Badge>
+      )}
+    </div>
   );
+}
+
+function getWatchStatusBadge(currentStatus: WatchEntry["currentStatus"]) {
+  const canonicalStatus = currentStatus.status || (currentStatus.listed ? "ACTIVE" : "NOT_LISTED");
+  return <StatusBadge status={canonicalStatus} typeRating={currentStatus.typeRating} />;
 }
 
 function getChangeIcon(changeType: string) {
@@ -121,26 +140,43 @@ function getChangeIcon(changeType: string) {
     case "UPGRADED":
       return <ArrowUp className="w-3.5 h-3.5 text-emerald-500 shrink-0" />;
     case "ADDED":
+    case "NEW_LICENCE":
       return <PlusCircle className="w-3.5 h-3.5 text-blue-500 shrink-0" />;
+    case "NAME_CHANGE":
+      return <FileText className="w-3.5 h-3.5 text-purple-500 shrink-0" />;
     default:
       return <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />;
   }
 }
 
-function getChangeLabel(change: SponsorChange) {
-  switch (change.changeType) {
-    case "REMOVED":
-      return "Removed from register";
-    case "DOWNGRADED":
-      return `Downgraded${change.previousValue && change.newValue ? ` from ${change.previousValue} to ${change.newValue}` : ""}`;
-    case "UPGRADED":
-      return `Upgraded${change.previousValue && change.newValue ? ` from ${change.previousValue} to ${change.newValue}` : ""}`;
+function getEventLabel(event: string, prev?: string | null, next?: string | null) {
+  switch (event) {
     case "ADDED":
-      return "Added to register";
+    case "NEW_LICENCE":
+      return "Licence Granted";
+    case "REMOVED":
+      return "Licence Revoked / Removed from Register";
+    case "DOWNGRADED":
+      return prev && next ? `Downgraded from ${prev} to ${next}` : "Downgraded to B-Rating";
+    case "UPGRADED":
+      return prev && next ? `Upgraded from ${prev} to ${next}` : "Upgraded to A-Rating";
+    case "NAME_CHANGE":
+      return prev && next ? `Name changed from "${prev}" to "${next}"` : "Company Name Updated";
     case "ROUTE_CHANGE":
-      return `Route changed${change.previousValue && change.newValue ? ` from ${change.previousValue} to ${change.newValue}` : ""}`;
+      return prev && next ? `Route changed from ${prev} to ${next}` : "Route Changed";
     default:
-      return change.changeType;
+      return event;
+  }
+}
+
+function getEventColor(event: string) {
+  switch (event) {
+    case "REMOVED": return "border-red-400 bg-red-50 dark:bg-red-950/30";
+    case "DOWNGRADED": return "border-amber-400 bg-amber-50 dark:bg-amber-950/30";
+    case "UPGRADED": return "border-emerald-400 bg-emerald-50 dark:bg-emerald-950/30";
+    case "ADDED": case "NEW_LICENCE": return "border-blue-400 bg-blue-50 dark:bg-blue-950/30";
+    case "NAME_CHANGE": return "border-purple-400 bg-purple-50 dark:bg-purple-950/30";
+    default: return "border-gray-300 bg-gray-50 dark:bg-gray-900/30";
   }
 }
 
@@ -356,6 +392,141 @@ function formatDate(dateStr: string) {
   }
 }
 
+function CompanyHistoryDialog({
+  fingerprint,
+  companyName,
+  open,
+  onOpenChange,
+}: {
+  fingerprint: string;
+  companyName: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { data, isLoading, error } = useQuery<CompanyHistoryData>({
+    queryKey: ["/api/sponsors", fingerprint, "history"],
+    queryFn: async () => {
+      const res = await fetch(`/api/sponsors/${encodeURIComponent(fingerprint)}/history`, {
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.message || "Failed to load history");
+      }
+      return res.json();
+    },
+    enabled: open && !!fingerprint,
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-lg">
+            <History className="w-5 h-5 text-primary" />
+            {companyName}
+          </DialogTitle>
+        </DialogHeader>
+
+        {isLoading && (
+          <div className="py-8 flex justify-center">
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          </div>
+        )}
+
+        {error && (
+          <div className="py-4 text-center">
+            <AlertTriangle className="w-6 h-6 text-destructive mx-auto mb-2" />
+            <p className="text-sm text-destructive">{(error as Error).message}</p>
+          </div>
+        )}
+
+        {data && (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge status={data.status} typeRating={data.typeRating} />
+            </div>
+
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+              {data.townCity && (
+                <span className="inline-flex items-center gap-1">
+                  <MapPin className="w-3.5 h-3.5" /> {data.townCity}
+                </span>
+              )}
+              {data.route && (
+                <span className="inline-flex items-center gap-1">
+                  <Route className="w-3.5 h-3.5" /> {data.route}
+                </span>
+              )}
+              {data.typeRating && (
+                <span className="inline-flex items-center gap-1">
+                  <Star className="w-3.5 h-3.5" /> {data.typeRating}
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <a
+                href="https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+              >
+                <ExternalLink className="w-3 h-3" /> View on Gov.uk
+              </a>
+              <a
+                href={`https://www.linkedin.com/search/results/companies/?keywords=${encodeURIComponent(data.currentName)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+              >
+                <Linkedin className="w-3 h-3" /> Search on LinkedIn
+              </a>
+            </div>
+
+            {data.historicalNames && data.historicalNames.length > 0 && (
+              <div className="text-xs text-muted-foreground">
+                <span className="font-medium">Previous names:</span>{" "}
+                {data.historicalNames.join(", ")}
+              </div>
+            )}
+
+            <div className="border-t pt-4">
+              <h4 className="text-sm font-semibold text-foreground mb-3">Event History</h4>
+              {data.history.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No recorded changes yet. This company has been stable since tracking began.
+                </p>
+              ) : (
+                <div className="relative pl-6">
+                  <div className="absolute left-[9px] top-2 bottom-2 w-px bg-border" />
+                  <div className="space-y-4">
+                    {data.history.map((evt) => (
+                      <div key={evt.id} className="relative">
+                        <div className="absolute -left-6 top-1 w-[18px] h-[18px] rounded-full bg-background border-2 border-border flex items-center justify-center z-10">
+                          {getChangeIcon(evt.event)}
+                        </div>
+                        <div className={`ml-2 p-2.5 rounded-lg border-l-2 ${getEventColor(evt.event)}`}>
+                          <p className="text-sm font-medium text-foreground">
+                            {getEventLabel(evt.event, evt.previousValue, evt.newValue)}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {formatDate(evt.date || evt.snapshotDate)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function SponsorMonitor() {
   const [searchQuery, setSearchQuery] = useState("");
   const [, setLocation] = useLocation();
@@ -363,6 +534,11 @@ export default function SponsorMonitor() {
   const { toast } = useToast();
   const debouncedQuery = useDebounce(searchQuery, 300);
   const [addedCompanies, setAddedCompanies] = useState<Set<string>>(new Set());
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyTarget, setHistoryTarget] = useState<{ fingerprint: string; name: string } | null>(null);
+
+  const userPlan = user?.subscriptionStatus || "free";
+  const isFreeUser = userPlan === "free" || !userPlan;
 
   const shouldSearch = debouncedQuery.trim().length >= 3 && isAuthenticated;
 
@@ -404,6 +580,7 @@ export default function SponsorMonitor() {
       const res = await apiRequest("POST", "/api/watches", {
         organisation_name: company.organisationName,
         town_city: company.townCity,
+        fingerprint: company.fingerprint,
       });
       return res.json();
     },
@@ -417,7 +594,23 @@ export default function SponsorMonitor() {
     },
     onError: (error: Error, company) => {
       const msg = error.message || "";
-      if (msg.includes("limit") || msg.includes("upgrade") || msg.includes("maximum")) {
+      if (msg.includes("Upgrade") || msg.includes("upgrade")) {
+        toast({
+          title: "Upgrade required",
+          description: msg,
+          variant: "destructive",
+          action: (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setLocation("/pricing")}
+              className="shrink-0"
+            >
+              Upgrade
+            </Button>
+          ),
+        });
+      } else if (msg.includes("limit") || msg.includes("maximum")) {
         toast({
           title: "Watch limit reached",
           description: "You've reached the maximum number of watches for your plan. Upgrade to monitor more companies.",
@@ -481,6 +674,11 @@ export default function SponsorMonitor() {
     [isAuthenticated, setLocation, addWatchMutation]
   );
 
+  const openHistory = useCallback((fingerprint: string, name: string) => {
+    setHistoryTarget({ fingerprint, name });
+    setHistoryOpen(true);
+  }, []);
+
   return (
     <PageLayout>
       <SEOHead
@@ -501,7 +699,7 @@ export default function SponsorMonitor() {
             "@type": "Offer",
             "price": "0",
             "priceCurrency": "GBP",
-            "description": "Free tier includes 1 company watch with email alerts"
+            "description": "Free tier includes search and history viewing"
           },
           "featureList": [
             "Daily sponsor register monitoring",
@@ -559,7 +757,7 @@ export default function SponsorMonitor() {
                 >
                   log in
                 </button>{" "}
-                to search the sponsor register and add companies to your watchlist.
+                to search the sponsor register and view company history.
               </p>
             </CardContent>
           </Card>
@@ -622,31 +820,32 @@ export default function SponsorMonitor() {
               {searchResults.length} result{searchResults.length !== 1 ? "s" : ""} found
             </p>
             {searchResults.map((result, index) => {
-              const isAdded = addedCompanies.has(result.organisationName);
+              const isAdded = addedCompanies.has(result.organisationName) ||
+                activeWatches.some(w => w.organisationName === result.organisationName);
               const isAdding =
                 addWatchMutation.isPending &&
                 addWatchMutation.variables?.organisationName === result.organisationName;
 
               return (
                 <Card
-                  key={`${result.organisationName}-${index}`}
+                  key={`${result.fingerprint}-${index}`}
                   className="transition-colors hover:bg-muted/30"
                 >
                   <CardContent className="py-4">
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 mb-1.5">
+                        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                           <Building2 className="w-4 h-4 text-primary shrink-0" />
                           <h3 className="font-semibold text-foreground truncate">
                             {result.organisationName}
                           </h3>
+                          <StatusBadge status={result.status} typeRating={result.typeRating} />
                         </div>
                         <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                           {result.townCity && (
                             <span className="inline-flex items-center gap-1">
                               <MapPin className="w-3.5 h-3.5" />
                               {result.townCity}
-                              {result.county ? `, ${result.county}` : ""}
                             </span>
                           )}
                           {result.typeRating && (
@@ -662,28 +861,68 @@ export default function SponsorMonitor() {
                             </span>
                           )}
                         </div>
-                        {result.matchScore > 0 && (
-                          <Badge variant="secondary" className="mt-2 text-xs">
-                            {result.matchScore}% match
-                          </Badge>
+                        <div className="flex items-center gap-3 mt-2 flex-wrap">
+                          {result.matchScore > 0 && (
+                            <Badge variant="secondary" className="text-xs">
+                              {result.matchScore}% match
+                            </Badge>
+                          )}
+                          <button
+                            onClick={() => openHistory(result.fingerprint, result.organisationName)}
+                            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                          >
+                            <History className="w-3 h-3" /> View History
+                          </button>
+                          <a
+                            href="https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary hover:underline"
+                          >
+                            <ExternalLink className="w-3 h-3" /> Gov.uk
+                          </a>
+                          <a
+                            href={`https://www.linkedin.com/search/results/companies/?keywords=${encodeURIComponent(result.organisationName)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary hover:underline"
+                          >
+                            <Linkedin className="w-3 h-3" /> LinkedIn
+                          </a>
+                        </div>
+                      </div>
+                      <div className="shrink-0">
+                        {isFreeUser ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setLocation("/pricing")}
+                            className="text-xs"
+                          >
+                            <Plus className="w-3.5 h-3.5 mr-1" />
+                            Upgrade to Monitor
+                          </Button>
+                        ) : isAdded ? (
+                          <Button size="sm" variant="secondary" disabled>
+                            <Shield className="w-4 h-4 mr-1" />
+                            Watching
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="default"
+                            disabled={isAdding}
+                            onClick={() => handleAddWatch(result)}
+                          >
+                            {isAdding ? (
+                              <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                            ) : (
+                              <Plus className="w-4 h-4 mr-1" />
+                            )}
+                            Add to Watchlist
+                          </Button>
                         )}
                       </div>
-                      <Button
-                        size="sm"
-                        variant={isAdded ? "secondary" : "default"}
-                        disabled={isAdded || isAdding}
-                        onClick={() => handleAddWatch(result)}
-                        className="shrink-0"
-                      >
-                        {isAdding ? (
-                          <Loader2 className="w-4 h-4 animate-spin mr-1" />
-                        ) : isAdded ? (
-                          <Shield className="w-4 h-4 mr-1" />
-                        ) : (
-                          <Plus className="w-4 h-4 mr-1" />
-                        )}
-                        {isAdded ? "Watching" : "Add to Watchlist"}
-                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -740,6 +979,21 @@ export default function SponsorMonitor() {
               )}
             </div>
 
+            {isFreeUser && (
+              <Card className="mb-4 border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-800">
+                <CardContent className="py-3 flex items-center gap-3">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <p className="text-sm text-amber-800 dark:text-amber-200">
+                    Free plan: search and view history only.{" "}
+                    <a href="/pricing" className="underline font-semibold hover:no-underline text-primary">
+                      Upgrade to Starter
+                    </a>{" "}
+                    to add companies to your watchlist and receive alerts.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
             {watchesLoading && (
               <div className="space-y-4">
                 {[1, 2].map((i) => (
@@ -781,8 +1035,20 @@ export default function SponsorMonitor() {
                     <Eye className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
                     <h3 className="font-semibold text-foreground mb-1">No companies watched yet</h3>
                     <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                      Use the search above to find a company on the UK sponsor register and add it to your watchlist. We'll alert you if anything changes.
+                      {isFreeUser
+                        ? "Upgrade to a paid plan to add companies to your watchlist and receive alerts."
+                        : "Use the search above to find a company on the UK sponsor register and add it to your watchlist. We'll alert you if anything changes."}
                     </p>
+                    {isFreeUser && (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="mt-4"
+                        onClick={() => setLocation("/pricing")}
+                      >
+                        View Plans
+                      </Button>
+                    )}
                   </CardContent>
                 </Card>
               </motion.div>
@@ -812,7 +1078,7 @@ export default function SponsorMonitor() {
                               <h3 className="text-lg font-bold text-foreground">
                                 {watch.organisationName}
                               </h3>
-                              {getStatusBadge(watch.currentStatus)}
+                              {getWatchStatusBadge(watch.currentStatus)}
                             </div>
 
                             <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-sm text-muted-foreground mb-1">
@@ -832,6 +1098,33 @@ export default function SponsorMonitor() {
                                 <CalendarDays className="w-3.5 h-3.5" />
                                 Watching since {formatDate(watch.createdAt)}
                               </span>
+                            </div>
+
+                            <div className="flex items-center gap-3 mt-2 flex-wrap">
+                              {watch.fingerprint && (
+                                <button
+                                  onClick={() => openHistory(watch.fingerprint!, watch.organisationName)}
+                                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                >
+                                  <History className="w-3 h-3" /> View History
+                                </button>
+                              )}
+                              <a
+                                href="https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary hover:underline"
+                              >
+                                <ExternalLink className="w-3 h-3" /> Gov.uk
+                              </a>
+                              <a
+                                href={`https://www.linkedin.com/search/results/companies/?keywords=${encodeURIComponent(watch.organisationName)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary hover:underline"
+                              >
+                                <Linkedin className="w-3 h-3" /> LinkedIn
+                              </a>
                             </div>
                           </div>
 
@@ -872,7 +1165,7 @@ export default function SponsorMonitor() {
                                     </div>
                                     <div className="ml-4">
                                       <p className="text-sm font-medium text-foreground">
-                                        {getChangeLabel(change)}
+                                        {getEventLabel(change.changeType, change.previousValue, change.newValue)}
                                       </p>
                                       <p className="text-xs text-muted-foreground">
                                         {formatDate(change.detectedAt)}
@@ -897,6 +1190,18 @@ export default function SponsorMonitor() {
 
         {isAuthenticated && <NotificationHistory />}
       </div>
+
+      {historyTarget && (
+        <CompanyHistoryDialog
+          fingerprint={historyTarget.fingerprint}
+          companyName={historyTarget.name}
+          open={historyOpen}
+          onOpenChange={(open) => {
+            setHistoryOpen(open);
+            if (!open) setHistoryTarget(null);
+          }}
+        />
+      )}
     </PageLayout>
   );
 }
@@ -1019,7 +1324,7 @@ function NotificationSettings({ user }: { user: any }) {
             <span>, <a href="/pricing" className="underline hover:no-underline text-primary">upgrade for faster alerts</a></span>
           )}
           {resolvedTier === "starter" && (
-            <span> , <a href="/pricing" className="underline hover:no-underline text-primary">upgrade to Pro for immediate alerts</a></span>
+            <span>, <a href="/pricing" className="underline hover:no-underline text-primary">upgrade to Pro for immediate alerts</a></span>
           )}
         </p>
       </div>
@@ -1255,17 +1560,7 @@ function NotificationHistory() {
                             </Badge>
                           </div>
                           <p className="text-xs text-muted-foreground mb-2">
-                            {entry.changeType === "REMOVED"
-                              ? "Removed from the sponsor register"
-                              : entry.changeType === "ADDED"
-                                ? "Added to the sponsor register"
-                                : entry.previousValue && entry.newValue
-                                  ? `${entry.previousValue} → ${entry.newValue}`
-                                  : entry.changeType === "DOWNGRADED"
-                                    ? "Rating downgraded"
-                                    : entry.changeType === "UPGRADED"
-                                      ? "Rating upgraded"
-                                      : "Change detected"}
+                            {getEventLabel(entry.changeType, entry.previousValue, entry.newValue)}
                           </p>
                           <div className="flex items-center gap-3 flex-wrap">
                             <span className="text-xs text-muted-foreground">
