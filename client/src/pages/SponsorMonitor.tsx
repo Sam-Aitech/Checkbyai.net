@@ -407,7 +407,7 @@ function HeroSection({ onScrollToSearch }: { onScrollToSearch: () => void }) {
           >
             <ShieldCheck className="w-5 h-5 mr-2" />
             <span>Protect My Job Offer</span>
-            <span className="ml-2 text-sm font-normal text-slate-500">from 7p/day</span>
+            <span className="ml-2 text-sm font-normal text-slate-500">from £24.99/mo</span>
           </Button>
           <Button
             size="lg"
@@ -455,7 +455,7 @@ function ManualVsAutomated() {
     <section className="py-16 sm:py-20 bg-slate-50 dark:bg-slate-950/50">
       <div className="max-w-4xl mx-auto px-4">
         <h2 className="text-2xl sm:text-3xl font-bold text-center text-foreground mb-4">Stop Checking Manually</h2>
-        <p className="text-center text-muted-foreground mb-12 max-w-xl mx-auto">Manual checking takes 4 minutes per day. That is 24 hours per year. The Starter plan costs 7 pence per day.</p>
+        <p className="text-center text-muted-foreground mb-12 max-w-xl mx-auto">Manual checking takes 4 minutes per day. That is 24 hours per year. The Starter plan costs less than 82p per day.</p>
 
         <div className="grid md:grid-cols-2 gap-6">
           <Card className="border-red-200 dark:border-red-900 bg-red-50/50 dark:bg-red-950/20">
@@ -607,10 +607,10 @@ function PricingSection() {
             <CardContent className="py-6">
               <p className="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-2">Starter</p>
               <div className="mb-1">
-                <span className="text-3xl font-extrabold text-foreground">$24.99</span>
-                <span className="text-sm text-muted-foreground">/year</span>
+                <span className="text-3xl font-extrabold text-foreground">£24.99</span>
+                <span className="text-sm text-muted-foreground">/month</span>
               </div>
-              <p className="text-xs text-muted-foreground mb-6">7p per day to keep your visa safe</p>
+              <p className="text-xs text-muted-foreground mb-6">£239.99/year (save 20%)</p>
               <ul className="space-y-2.5 text-sm mb-6">
                 <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />Monitor 5 companies</li>
                 <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />Email + WhatsApp alerts</li>
@@ -627,10 +627,10 @@ function PricingSection() {
             <CardContent className="py-6">
               <p className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-2">Pro</p>
               <div className="mb-1">
-                <span className="text-3xl font-extrabold text-foreground">$39.99</span>
-                <span className="text-sm text-muted-foreground">/year</span>
+                <span className="text-3xl font-extrabold text-foreground">£49.99</span>
+                <span className="text-sm text-muted-foreground">/month</span>
               </div>
-              <p className="text-xs text-muted-foreground mb-6">Complete protection</p>
+              <p className="text-xs text-muted-foreground mb-6">£479.99/year (save 20%)</p>
               <ul className="space-y-2.5 text-sm mb-6">
                 <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />Monitor 20 companies</li>
                 <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />Email + WhatsApp + SMS</li>
@@ -704,7 +704,7 @@ function MobileStickyBar() {
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 sm:hidden bg-slate-900 border-t border-slate-700 px-4 py-3 flex items-center justify-between gap-2 shadow-2xl">
       <Button onClick={() => setLocation("/pricing")} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-5 text-sm rounded-lg">
-        <ShieldCheck className="w-4 h-4 mr-2" />Get Alerts from 7p/day
+        <ShieldCheck className="w-4 h-4 mr-2" />Get Alerts from £24.99/mo
       </Button>
       <button onClick={() => setDismissed(true)} className="p-2 text-slate-400 hover:text-white" aria-label="Dismiss">
         <X className="w-4 h-4" />
@@ -1103,7 +1103,7 @@ export default function SponsorMonitor() {
           <Button onClick={() => setLocation("/pricing")} size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-base px-10 py-6 rounded-xl shadow-lg shadow-emerald-500/20">
             <ShieldCheck className="w-5 h-5 mr-2" />Start Monitoring Now
           </Button>
-          <p className="text-xs text-slate-500 mt-4">From 7p per day. Cancel anytime.</p>
+          <p className="text-xs text-slate-500 mt-4">From £24.99/month. Cancel anytime.</p>
         </div>
       </section>
 

@@ -146,7 +146,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                     <Button size="lg" className="bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-3 rounded-full font-bold shadow-xl shadow-emerald-500/20 transition-all duration-200 w-full sm:w-auto">
                       <ShieldCheck className="mr-2 w-5 h-5" />
                       Protect My Visa
-                      <span className="ml-2 text-sm font-normal text-emerald-200">from 7p/day</span>
+                      <span className="ml-2 text-sm font-normal text-emerald-200">from £24.99/mo</span>
                     </Button>
                   </Link>
                   <Button variant="outline" size="lg" className="border-white/30 text-white hover:bg-white/10 rounded-full px-6 py-3 font-semibold transition-all duration-200 bg-transparent" onClick={onStartVerification}>
@@ -320,8 +320,8 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
               <div className="absolute -top-3 left-1/2 -translate-x-1/2"><Badge className="bg-emerald-600 text-white font-bold text-[10px] uppercase tracking-wider px-3 py-1 shadow-sm">Best Value</Badge></div>
               <CardContent className="py-6">
                 <p className="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-2">Starter</p>
-                <div className="mb-1"><span className="text-3xl font-extrabold text-foreground">$24.99</span><span className="text-sm text-muted-foreground">/year</span></div>
-                <p className="text-xs text-muted-foreground mb-6">7p per day to keep your visa safe</p>
+                <div className="mb-1"><span className="text-3xl font-extrabold text-foreground">£24.99</span><span className="text-sm text-muted-foreground">/month</span></div>
+                <p className="text-xs text-muted-foreground mb-6">£239.99/year (save 20%)</p>
                 <ul className="space-y-2.5 text-sm mb-6">
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />Monitor 5 companies</li>
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />Email + WhatsApp alerts</li>
@@ -335,8 +335,8 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
             <Card className="border-slate-300 dark:border-slate-700">
               <CardContent className="py-6">
                 <p className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-2">Pro</p>
-                <div className="mb-1"><span className="text-3xl font-extrabold text-foreground">$39.99</span><span className="text-sm text-muted-foreground">/year</span></div>
-                <p className="text-xs text-muted-foreground mb-6">Complete protection</p>
+                <div className="mb-1"><span className="text-3xl font-extrabold text-foreground">£49.99</span><span className="text-sm text-muted-foreground">/month</span></div>
+                <p className="text-xs text-muted-foreground mb-6">£479.99/year (save 20%)</p>
                 <ul className="space-y-2.5 text-sm mb-6">
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />Monitor 20 companies</li>
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />Email + WhatsApp + SMS</li>
@@ -413,7 +413,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
               <ShieldCheck className="w-5 h-5 mr-2" />Start Monitoring Now
             </Button>
           </Link>
-          <p className="text-xs text-slate-500 mt-4">From 7p per day. Cancel anytime.</p>
+          <p className="text-xs text-slate-500 mt-4">From 82p per day. Cancel anytime.</p>
         </div>
       </section>
 
