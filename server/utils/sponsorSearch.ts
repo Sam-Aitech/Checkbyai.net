@@ -1,32 +1,35 @@
 import Fuse, { type IFuseOptions } from "fuse.js";
 import { db } from "../db";
-import { sponsorList } from "@shared/schema";
-import { eq, desc } from "drizzle-orm";
+import { sponsorCanonical } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 interface SponsorSearchRecord {
+  fingerprint: string;
   organisationName: string;
   townCity: string | null;
-  county: string | null;
   typeRating: string | null;
   route: string | null;
+  historicalNames: string[];
 }
 
 export interface SponsorSearchResult {
+  fingerprint: string;
   organisationName: string;
   townCity: string | null;
-  county: string | null;
   typeRating: string | null;
   route: string | null;
   matchScore: number;
+  historicalNames: string[];
 }
 
 let fuseIndex: Fuse<SponsorSearchRecord> | null = null;
-let indexSnapshotDate: string | null = null;
+let indexBuiltAt: number = 0;
 
 const FUSE_OPTIONS: IFuseOptions<SponsorSearchRecord> = {
   keys: [
-    { name: "organisationName", weight: 0.7 },
-    { name: "townCity", weight: 0.3 },
+    { name: "organisationName", weight: 0.6 },
+    { name: "historicalNames", weight: 0.2 },
+    { name: "townCity", weight: 0.2 },
   ],
   threshold: 0.3,
   includeScore: true,
@@ -34,41 +37,31 @@ const FUSE_OPTIONS: IFuseOptions<SponsorSearchRecord> = {
 };
 
 export async function rebuildSponsorIndex(): Promise<void> {
-  const latestDateResult = await db
-    .select({ snapshotDate: sponsorList.snapshotDate })
-    .from(sponsorList)
-    .orderBy(desc(sponsorList.snapshotDate))
-    .limit(1);
-
-  if (latestDateResult.length === 0) {
-    console.log("[SponsorSearch] No snapshot data found. Index not built.");
-    fuseIndex = null;
-    indexSnapshotDate = null;
-    return;
-  }
-
-  const snapshotDate = latestDateResult[0].snapshotDate;
-
-  if (snapshotDate === indexSnapshotDate && fuseIndex) {
-    console.log(`[SponsorSearch] Index already up to date for ${snapshotDate}.`);
-    return;
-  }
-
   const records = await db
     .select({
-      organisationName: sponsorList.organisationName,
-      townCity: sponsorList.townCity,
-      county: sponsorList.county,
-      typeRating: sponsorList.typeRating,
-      route: sponsorList.route,
+      fingerprint: sponsorCanonical.fingerprint,
+      organisationName: sponsorCanonical.currentName,
+      townCity: sponsorCanonical.townCity,
+      typeRating: sponsorCanonical.typeRating,
+      route: sponsorCanonical.route,
+      historicalNames: sponsorCanonical.historicalNames,
     })
-    .from(sponsorList)
-    .where(eq(sponsorList.snapshotDate, snapshotDate));
+    .from(sponsorCanonical)
+    .where(eq(sponsorCanonical.status, "ACTIVE"));
 
-  fuseIndex = new Fuse(records, FUSE_OPTIONS);
-  indexSnapshotDate = snapshotDate;
+  const searchRecords: SponsorSearchRecord[] = records.map((r) => ({
+    fingerprint: r.fingerprint,
+    organisationName: r.organisationName,
+    townCity: r.townCity,
+    typeRating: r.typeRating,
+    route: r.route,
+    historicalNames: r.historicalNames || [],
+  }));
+
+  fuseIndex = new Fuse(searchRecords, FUSE_OPTIONS);
+  indexBuiltAt = Date.now();
   console.log(
-    `[SponsorSearch] Index built with ${records.length} records from snapshot ${snapshotDate}.`,
+    `[SponsorSearch] Index built with ${searchRecords.length} ACTIVE canonical records.`,
   );
 }
 
@@ -80,12 +73,13 @@ export function searchSponsors(query: string, limit: number = 20): SponsorSearch
   const results = fuseIndex.search(query, { limit });
 
   return results.map((r) => ({
+    fingerprint: r.item.fingerprint,
     organisationName: r.item.organisationName,
     townCity: r.item.townCity,
-    county: r.item.county,
     typeRating: r.item.typeRating,
     route: r.item.route,
     matchScore: Math.round((1 - (r.score ?? 1)) * 100),
+    historicalNames: r.item.historicalNames,
   }));
 }
 

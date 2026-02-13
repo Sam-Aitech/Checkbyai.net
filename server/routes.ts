@@ -8,13 +8,13 @@ import { db } from "./db";
 import { sql, eq, and, desc, inArray, gte } from "drizzle-orm";
 import { setupAuth, isAuthenticated, isAdmin } from "./auth";
 import { checkIpRateLimit, recordIpVerification, getClientIp, hashIpAddress } from "./ipRateLimit";
-import { insertVerificationResultSchema, insertFeedbackSchema, companyWatches, sponsorList, sponsorChanges, notificationPreferences, notificationLog } from "@shared/schema";
+import { insertVerificationResultSchema, insertFeedbackSchema, companyWatches, sponsorList, sponsorCanonical, sponsorChanges, notificationPreferences, notificationLog } from "@shared/schema";
 import multer from "multer";
 import { z } from "zod";
 import { PDFAnalyzer } from "./services/pdfAnalyzer";
 import bcrypt from "bcrypt";
 import { rebuildSponsorIndex, searchSponsors, isIndexReady } from "./utils/sponsorSearch";
-import { normalizeName, downloadAndParseSponsorList, storeSnapshot, getLatestSnapshotDate, getPreviousSnapshot, detectChanges } from "./utils/sponsorListFetcher";
+import { normalizeName, downloadAndParseSponsorList, storeSnapshot, getLatestSnapshotDate, generateFingerprint } from "./utils/sponsorListFetcher";
 import { runSponsorMonitorJob, startSponsorMonitorCron, isJobRunning, getLastRunInfo } from "./utils/sponsorMonitorJob";
 import { encryptPhone, decryptPhone } from "./utils/phoneCrypto";
 import { sendSMS, sendWhatsApp } from "./services/messaging";
@@ -784,7 +784,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/watches', isAuthenticated, async (req: any, res) => {
     try {
-      const { organisation_name, town_city } = req.body;
+      const { organisation_name, town_city, fingerprint: fpParam } = req.body;
       if (!organisation_name || typeof organisation_name !== 'string' || organisation_name.trim().length === 0) {
         return res.status(400).json({ message: "Organisation name is required." });
       }
@@ -792,27 +792,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.id;
       const normalized = normalizeName(organisation_name.trim());
 
-      const latestDateResult = await db
-        .select({ snapshotDate: sponsorList.snapshotDate })
-        .from(sponsorList)
-        .orderBy(desc(sponsorList.snapshotDate))
-        .limit(1);
-
-      if (latestDateResult.length === 0) {
-        return res.status(503).json({ message: "Sponsor list data is not yet available." });
+      let canonicalMatch;
+      if (fpParam) {
+        const match = await db
+          .select()
+          .from(sponsorCanonical)
+          .where(and(
+            eq(sponsorCanonical.fingerprint, fpParam),
+            eq(sponsorCanonical.status, "ACTIVE"),
+          ))
+          .limit(1);
+        canonicalMatch = match[0] || null;
       }
 
-      const latestDate = latestDateResult[0].snapshotDate;
-      const sponsorMatch = await db
-        .select()
-        .from(sponsorList)
-        .where(and(
-          eq(sponsorList.organisationNameNormalized, normalized),
-          eq(sponsorList.snapshotDate, latestDate),
-        ))
-        .limit(1);
+      if (!canonicalMatch) {
+        const fp = generateFingerprint(organisation_name.trim(), town_city || "", "");
+        const fpMatch = await db
+          .select()
+          .from(sponsorCanonical)
+          .where(and(
+            eq(sponsorCanonical.fingerprint, fp),
+            eq(sponsorCanonical.status, "ACTIVE"),
+          ))
+          .limit(1);
+        canonicalMatch = fpMatch[0] || null;
+      }
 
-      if (sponsorMatch.length === 0) {
+      if (!canonicalMatch) {
+        const normalizedCity = town_city ? normalizeName(town_city.trim()) : null;
+        const activeRecords = await db
+          .select()
+          .from(sponsorCanonical)
+          .where(eq(sponsorCanonical.status, "ACTIVE"));
+
+        canonicalMatch = activeRecords.find(m => {
+          const mNorm = normalizeName(m.currentName);
+          if (mNorm !== normalized) return false;
+          if (normalizedCity && m.townCity) {
+            return normalizeName(m.townCity) === normalizedCity;
+          }
+          return true;
+        }) || null;
+      }
+
+      if (!canonicalMatch) {
         return res.status(404).json({ message: "Company not found in the current sponsor register. Please check the name and try again." });
       }
 
@@ -851,19 +874,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (existingWatch.length > 0) {
         await db
           .update(companyWatches)
-          .set({ isActive: true })
+          .set({ isActive: true, fingerprint: canonicalMatch.fingerprint })
           .where(eq(companyWatches.id, existingWatch[0].id));
         return res.json({ message: "Watch reactivated.", watch: { ...existingWatch[0], isActive: true } });
       }
 
-      const matched = sponsorMatch[0];
       const [newWatch] = await db
         .insert(companyWatches)
         .values({
           userId,
-          organisationName: matched.organisationName,
+          organisationName: canonicalMatch.currentName,
           organisationNameNormalized: normalized,
-          townCity: town_city?.trim() || matched.townCity,
+          townCity: town_city?.trim() || canonicalMatch.townCity,
+          fingerprint: canonicalMatch.fingerprint,
           isActive: true,
         })
         .returning();
@@ -885,41 +908,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(companyWatches.userId, userId))
         .orderBy(desc(companyWatches.createdAt));
 
-      const latestDateResult = await db
-        .select({ snapshotDate: sponsorList.snapshotDate })
-        .from(sponsorList)
-        .orderBy(desc(sponsorList.snapshotDate))
-        .limit(1);
-
-      const latestDate = latestDateResult.length > 0 ? latestDateResult[0].snapshotDate : null;
-
       const enriched = await Promise.all(
         watches.map(async (watch) => {
-          let currentStatus: { listed: boolean; typeRating: string | null; route: string | null } = {
+          let currentStatus: { listed: boolean; typeRating: string | null; route: string | null; status: string } = {
             listed: false,
             typeRating: null,
             route: null,
+            status: "UNKNOWN",
           };
 
-          if (latestDate) {
-            const current = await db
+          if (watch.fingerprint) {
+            const canonical = await db
               .select({
-                typeRating: sponsorList.typeRating,
-                route: sponsorList.route,
+                typeRating: sponsorCanonical.typeRating,
+                route: sponsorCanonical.route,
+                status: sponsorCanonical.status,
+                currentName: sponsorCanonical.currentName,
               })
-              .from(sponsorList)
-              .where(and(
-                eq(sponsorList.organisationNameNormalized, watch.organisationNameNormalized),
-                eq(sponsorList.snapshotDate, latestDate),
-              ))
+              .from(sponsorCanonical)
+              .where(eq(sponsorCanonical.fingerprint, watch.fingerprint))
               .limit(1);
 
-            if (current.length > 0) {
+            if (canonical.length > 0) {
               currentStatus = {
-                listed: true,
-                typeRating: current[0].typeRating,
-                route: current[0].route,
+                listed: canonical[0].status === "ACTIVE",
+                typeRating: canonical[0].typeRating,
+                route: canonical[0].route,
+                status: canonical[0].status,
               };
+            }
+          } else {
+            const normalized = watch.organisationNameNormalized;
+            const normalizedCity = watch.townCity ? normalizeName(watch.townCity) : null;
+            const allCanonical = await db
+              .select({
+                fingerprint: sponsorCanonical.fingerprint,
+                currentName: sponsorCanonical.currentName,
+                townCity: sponsorCanonical.townCity,
+                typeRating: sponsorCanonical.typeRating,
+                route: sponsorCanonical.route,
+                status: sponsorCanonical.status,
+              })
+              .from(sponsorCanonical);
+
+            const match = allCanonical.find(c => {
+              const cNorm = normalizeName(c.currentName);
+              if (cNorm !== normalized) return false;
+              if (normalizedCity && c.townCity) {
+                return normalizeName(c.townCity) === normalizedCity;
+              }
+              return true;
+            });
+
+            if (match) {
+              currentStatus = {
+                listed: match.status === "ACTIVE",
+                typeRating: match.typeRating,
+                route: match.route,
+                status: match.status,
+              };
+              db.update(companyWatches)
+                .set({ fingerprint: match.fingerprint })
+                .where(eq(companyWatches.id, watch.id))
+                .then(() => {})
+                .catch(() => {});
             }
           }
 
@@ -1886,6 +1938,86 @@ Format your response in clear, professional markdown.`;
     } catch (error) {
       console.error("Error cleaning up sponsor snapshots:", error);
       res.status(500).json({ message: "Failed to clean up old snapshots." });
+    }
+  });
+
+  app.post('/api/admin/migrate-canonical', isAdmin, async (req: any, res) => {
+    try {
+      const existingCount = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(sponsorCanonical);
+
+      if ((existingCount[0]?.count ?? 0) > 0) {
+        return res.status(409).json({
+          message: `Canonical table already has ${existingCount[0].count} records. To re-run, clear the table first.`,
+          existingCount: existingCount[0].count,
+        });
+      }
+
+      const latestDate = await getLatestSnapshotDate();
+      if (!latestDate) {
+        return res.status(404).json({ message: "No sponsor list snapshots found. Run the monitor job first." });
+      }
+
+      const snapshot = await db
+        .select()
+        .from(sponsorList)
+        .where(eq(sponsorList.snapshotDate, latestDate));
+
+      if (snapshot.length === 0) {
+        return res.status(404).json({ message: "Latest snapshot is empty." });
+      }
+
+      const today = new Date().toISOString().split("T")[0];
+      let inserted = 0;
+      let skipped = 0;
+      const batchSize = 500;
+      const canonicalRecords = snapshot.map((r) => {
+        const fp = generateFingerprint(r.organisationName, r.townCity || "", r.route || "");
+        return {
+          fingerprint: fp,
+          currentName: r.organisationName,
+          townCity: r.townCity || null,
+          typeRating: r.typeRating || null,
+          route: r.route || null,
+          status: "ACTIVE" as const,
+          firstSeen: today,
+          lastSeen: today,
+          consecutiveMisses: 0,
+          historicalNames: [] as string[],
+        };
+      });
+
+      const seen = new Set<string>();
+      const deduplicated = canonicalRecords.filter((r) => {
+        if (seen.has(r.fingerprint)) {
+          skipped++;
+          return false;
+        }
+        seen.add(r.fingerprint);
+        return true;
+      });
+
+      for (let i = 0; i < deduplicated.length; i += batchSize) {
+        const batch = deduplicated.slice(i, i + batchSize);
+        await db.insert(sponsorCanonical).values(batch).onConflictDoNothing();
+        inserted += batch.length;
+      }
+
+      await (await import("./utils/sponsorSearch")).rebuildSponsorIndex();
+
+      console.log(`[Migration] Canonical table populated: ${inserted} records inserted, ${skipped} duplicates skipped from snapshot ${latestDate}.`);
+
+      res.json({
+        message: `Migration complete. ${inserted} canonical records created from snapshot ${latestDate}.`,
+        inserted,
+        skipped,
+        snapshotDate: latestDate,
+        snapshotRecords: snapshot.length,
+      });
+    } catch (error) {
+      console.error("Error migrating canonical data:", error);
+      res.status(500).json({ message: "Failed to migrate canonical data." });
     }
   });
 

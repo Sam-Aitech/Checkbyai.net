@@ -1,4 +1,5 @@
 import { parse } from "csv-parse/sync";
+import * as cheerio from "cheerio";
 import { db } from "../db";
 import { sponsorList } from "@shared/schema";
 import { eq, desc, lt, sql } from "drizzle-orm";
@@ -30,14 +31,13 @@ export function normalizeName(name: string): string {
     .trim();
 }
 
-function compositeKey(normalizedName: string, townCity?: string | null): string {
-  const town = (townCity || "").toLowerCase().trim();
-  return town ? `${normalizedName}::${town}` : normalizedName;
+export function generateFingerprint(name: string, city: string, route: string): string {
+  const normalizedName = normalizeName(name);
+  const normalizedCity = normalizeName(city);
+  const cleanedRoute = (route || "").toLowerCase().trim();
+  return `${normalizedName}|${normalizedCity}|${cleanedRoute}`;
 }
 
-/**
- * Bulk inserts sponsor records into the database in batches.
- */
 export async function storeSnapshot(records: SponsorRecord[], date: string): Promise<void> {
   const batchSize = 500;
   const formattedRecords = records.map(r => ({
@@ -47,6 +47,7 @@ export async function storeSnapshot(records: SponsorRecord[], date: string): Pro
     county: r.county,
     typeRating: r.typeRating,
     route: r.route,
+    fingerprint: generateFingerprint(r.organisationName, r.townCity, r.route),
     snapshotDate: date,
   }));
 
@@ -56,9 +57,6 @@ export async function storeSnapshot(records: SponsorRecord[], date: string): Pro
   }
 }
 
-/**
- * Returns the most recent snapshot date from the database.
- */
 export async function getLatestSnapshotDate(): Promise<string | null> {
   const result = await db
     .select({ snapshotDate: sponsorList.snapshotDate })
@@ -69,29 +67,6 @@ export async function getLatestSnapshotDate(): Promise<string | null> {
   return result.length > 0 ? result[0].snapshotDate : null;
 }
 
-/**
- * Retrieves all records from the latest snapshot and returns them as a Map.
- */
-export async function getPreviousSnapshot(): Promise<Map<string, typeof sponsorList.$inferSelect>> {
-  const latestDate = await getLatestSnapshotDate();
-  if (!latestDate) return new Map();
-
-  const records = await db
-    .select()
-    .from(sponsorList)
-    .where(eq(sponsorList.snapshotDate, latestDate));
-
-  const map = new Map<string, typeof sponsorList.$inferSelect>();
-  for (const record of records) {
-    const key = compositeKey(record.organisationNameNormalized, record.townCity);
-    map.set(key, record);
-  }
-  return map;
-}
-
-/**
- * Deletes snapshot records older than the specified number of days.
- */
 export async function cleanupOldSnapshots(daysToKeep: number = 90): Promise<number> {
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
@@ -101,143 +76,16 @@ export async function cleanupOldSnapshots(daysToKeep: number = 90): Promise<numb
     .delete(sponsorList)
     .where(lt(sponsorList.snapshotDate, formattedDate));
   
-  // Drizzle doesn't return count directly for all drivers, but this works for PG
-  return 0; // Returning 0 as placeholder since exact count isn't critical for the UI here
+  return 0;
 }
 
-export type ChangeType = "REMOVED" | "ADDED" | "DOWNGRADED" | "UPGRADED" | "ROUTE_CHANGE";
+export type ChangeType = "REMOVED" | "ADDED" | "DOWNGRADED" | "UPGRADED" | "ROUTE_CHANGE" | "NAME_CHANGE" | "NEW_LICENCE";
 
 export interface SponsorChange {
   organisationName: string;
   changeType: ChangeType;
   previousValue: string | null;
   newValue: string | null;
-}
-
-interface SnapshotEntry {
-  organisationName: string;
-  organisationNameNormalized: string;
-  townCity?: string | null;
-  typeRating: string | null;
-  route: string | null;
-}
-
-function classifyRatingChange(
-  prevRating: string,
-  newRating: string,
-): ChangeType | null {
-  const prevLower = prevRating.toLowerCase();
-  const newLower = newRating.toLowerCase();
-
-  if (prevLower === newLower) return null;
-
-  const prevIsA = prevLower.includes("a-rating") || prevLower.includes("a rating");
-  const prevIsB = prevLower.includes("b-rating") || prevLower.includes("b rating");
-  const newIsA = newLower.includes("a-rating") || newLower.includes("a rating");
-  const newIsB = newLower.includes("b-rating") || newLower.includes("b rating");
-
-  if (prevIsA && newIsB) return "DOWNGRADED";
-  if (prevIsB && newIsA) return "UPGRADED";
-
-  return null;
-}
-
-export function detectChanges(
-  previous: Map<string, SnapshotEntry>,
-  current: Map<string, SnapshotEntry>,
-): SponsorChange[] {
-  const changes: SponsorChange[] = [];
-  const warnings: string[] = [];
-
-  Array.from(previous.entries()).forEach(([key, prevRecord]) => {
-    if (!current.has(key)) {
-      changes.push({
-        organisationName: prevRecord.organisationName,
-        changeType: "REMOVED",
-        previousValue: prevRecord.typeRating,
-        newValue: null,
-      });
-    }
-  });
-
-  Array.from(current.entries()).forEach(([key, currRecord]) => {
-    if (!previous.has(key)) {
-      changes.push({
-        organisationName: currRecord.organisationName,
-        changeType: "ADDED",
-        previousValue: null,
-        newValue: currRecord.typeRating,
-      });
-    }
-  });
-
-  Array.from(previous.entries()).forEach(([key, prevRecord]) => {
-    const currRecord = current.get(key);
-    if (!currRecord) return;
-
-    const prevRating = (prevRecord.typeRating ?? "").trim();
-    const currRating = (currRecord.typeRating ?? "").trim();
-    if (prevRating && currRating && prevRating !== currRating) {
-      const ratingChange = classifyRatingChange(prevRating, currRating);
-      if (ratingChange) {
-        changes.push({
-          organisationName: prevRecord.organisationName,
-          changeType: ratingChange,
-          previousValue: prevRating,
-          newValue: currRating,
-        });
-      } else {
-        warnings.push(
-          `Ambiguous rating change for "${prevRecord.organisationName}": "${prevRating}" -> "${currRating}". Not flagging as change.`,
-        );
-      }
-    }
-
-    const prevRoute = (prevRecord.route ?? "").trim();
-    const currRoute = (currRecord.route ?? "").trim();
-    if (prevRoute && currRoute && prevRoute !== currRoute) {
-      changes.push({
-        organisationName: prevRecord.organisationName,
-        changeType: "ROUTE_CHANGE",
-        previousValue: prevRoute,
-        newValue: currRoute,
-      });
-    }
-  });
-
-  const counts: Record<ChangeType, number> = {
-    REMOVED: 0,
-    ADDED: 0,
-    DOWNGRADED: 0,
-    UPGRADED: 0,
-    ROUTE_CHANGE: 0,
-  };
-  for (const c of changes) counts[c.changeType]++;
-
-  console.log(
-    `[SponsorMonitor] Diff complete. Previous: ${previous.size} orgs, Current: ${current.size} orgs. ` +
-      `Changes detected: ${changes.length} total — ` +
-      `REMOVED: ${counts.REMOVED}, ADDED: ${counts.ADDED}, ` +
-      `DOWNGRADED: ${counts.DOWNGRADED}, UPGRADED: ${counts.UPGRADED}, ` +
-      `ROUTE_CHANGE: ${counts.ROUTE_CHANGE}`,
-  );
-
-  if (warnings.length > 0) {
-    console.warn(
-      `[SponsorMonitor] ${warnings.length} ambiguous change(s) skipped:\n` +
-        warnings.map((w) => `  - ${w}`).join("\n"),
-    );
-  }
-
-  const removalRatio = previous.size > 0 ? counts.REMOVED / previous.size : 0;
-  if (removalRatio > 0.1 && counts.REMOVED > 100) {
-    console.warn(
-      `[SponsorMonitor] WARNING: Unusually high removal count (${counts.REMOVED} of ${previous.size}, ${(removalRatio * 100).toFixed(1)}%). ` +
-        `This may indicate a data format change rather than genuine revocations. Manual review recommended.`,
-    );
-  }
-
-  return changes;
 }
 
 async function fetchWithTimeout(
@@ -279,19 +127,29 @@ async function findCsvUrl(): Promise<string> {
   }
 
   const html = await response.text();
+  const $ = cheerio.load(html);
 
-  const csvLinkMatch = html.match(
-    /href=["'](https:\/\/assets\.publishing\.service\.gov\.uk[^"']*\.csv)["']/i,
-  );
+  let csvUrl: string | null = null;
+  $("a[href]").each((_i, el) => {
+    const href = $(el).attr("href");
+    if (
+      href &&
+      href.includes("assets.publishing.service.gov.uk") &&
+      href.endsWith(".csv")
+    ) {
+      csvUrl = href;
+      return false;
+    }
+  });
 
-  if (!csvLinkMatch || !csvLinkMatch[1]) {
+  if (!csvUrl) {
     throw new Error(
       "Could not find a CSV download link on the gov.uk sponsor register page. " +
         "The page structure may have changed. Expected a link to assets.publishing.service.gov.uk ending in .csv.",
     );
   }
 
-  return csvLinkMatch[1];
+  return csvUrl;
 }
 
 export async function downloadAndParseSponsorList(): Promise<SponsorRecord[]> {

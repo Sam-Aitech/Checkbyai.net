@@ -197,6 +197,29 @@ export const expertRequests = pgTable("expert_requests", {
 // Sponsor Licence Monitor Tables
 // ==========================================
 
+// Canonical sponsor records — single source of truth for all sponsors
+export const sponsorCanonical = pgTable(
+  "sponsor_canonical",
+  {
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+    fingerprint: text("fingerprint").notNull(),
+    currentName: text("current_name").notNull(),
+    townCity: text("town_city"),
+    typeRating: text("type_rating"),
+    route: text("route"),
+    status: text("status").notNull().default("ACTIVE"), // ACTIVE | NOT_LISTED
+    firstSeen: date("first_seen").notNull(),
+    lastSeen: date("last_seen").notNull(),
+    consecutiveMisses: integer("consecutive_misses").notNull().default(0),
+    historicalNames: text("historical_names").array().default([]),
+  },
+  (table) => [
+    uniqueIndex("idx_sponsor_canonical_fingerprint").on(table.fingerprint),
+    index("idx_sponsor_canonical_status").on(table.status),
+    index("idx_sponsor_canonical_current_name").on(table.currentName),
+  ]
+);
+
 // Daily snapshot of the UK government sponsor licence register
 export const sponsorList = pgTable(
   "sponsor_list",
@@ -208,6 +231,7 @@ export const sponsorList = pgTable(
     county: varchar("county"),
     typeRating: varchar("type_rating"),
     route: varchar("route"),
+    fingerprint: text("fingerprint"),
     snapshotDate: date("snapshot_date").notNull(),
     createdAt: timestamp("created_at").defaultNow(),
   },
@@ -215,6 +239,7 @@ export const sponsorList = pgTable(
     uniqueIndex("idx_sponsor_list_org_snapshot").on(table.organisationNameNormalized, table.snapshotDate),
     index("idx_sponsor_list_snapshot_date").on(table.snapshotDate),
     index("idx_sponsor_list_org_name_normalized").on(table.organisationNameNormalized),
+    index("idx_sponsor_list_fingerprint").on(table.fingerprint),
   ]
 );
 
@@ -227,12 +252,14 @@ export const companyWatches = pgTable(
     organisationName: varchar("organisation_name").notNull(),
     organisationNameNormalized: varchar("organisation_name_normalized").notNull(),
     townCity: varchar("town_city"),
+    fingerprint: text("fingerprint"),
     isActive: boolean("is_active").default(true),
     createdAt: timestamp("created_at").defaultNow(),
   },
   (table) => [
     index("idx_company_watches_user_id").on(table.userId),
     index("idx_company_watches_org_normalized").on(table.organisationNameNormalized),
+    index("idx_company_watches_fingerprint").on(table.fingerprint),
   ]
 );
 
@@ -302,6 +329,7 @@ export type VerificationResult = typeof verificationResults.$inferSelect;
 export type Feedback = typeof feedback.$inferSelect;
 export type PaidSubmission = typeof paidSubmissions.$inferSelect;
 export type ExpertRequest = typeof expertRequests.$inferSelect;
+export type SponsorCanonicalEntry = typeof sponsorCanonical.$inferSelect;
 export type SponsorListEntry = typeof sponsorList.$inferSelect;
 export type CompanyWatch = typeof companyWatches.$inferSelect;
 export type SponsorChange = typeof sponsorChanges.$inferSelect;

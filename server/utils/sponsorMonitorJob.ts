@@ -1,19 +1,42 @@
 import cron from "node-cron";
+import stringSimilarity from "string-similarity";
 import { db } from "../db";
-import { sponsorChanges } from "@shared/schema";
+import { sponsorCanonical, sponsorChanges } from "@shared/schema";
+import { eq, and, ne, sql } from "drizzle-orm";
 import {
   downloadAndParseSponsorList,
   storeSnapshot,
-  getPreviousSnapshot,
-  detectChanges,
   cleanupOldSnapshots,
-  normalizeName,
+  generateFingerprint,
   type SponsorRecord,
+  type SponsorChange,
 } from "./sponsorListFetcher";
 import { rebuildSponsorIndex } from "./sponsorSearch";
 import { notifyAffectedUsers, processDelayedNotifications } from "./notificationDispatcher";
 
 let isRunning = false;
+
+interface CanonicalRecord {
+  id: number;
+  fingerprint: string;
+  currentName: string;
+  townCity: string | null;
+  typeRating: string | null;
+  route: string | null;
+  status: string;
+  firstSeen: string;
+  lastSeen: string;
+  consecutiveMisses: number;
+  historicalNames: string[] | null;
+}
+
+interface TodayRecord {
+  fingerprint: string;
+  organisationName: string;
+  townCity: string;
+  typeRating: string;
+  route: string;
+}
 
 interface LastRunInfo {
   date: string;
@@ -29,6 +52,25 @@ let lastRunInfo: LastRunInfo | null = null;
 
 const RETRY_DELAY_MS = 30 * 60 * 1000;
 const MAX_RETRIES = 3;
+const RENAME_SIMILARITY_THRESHOLD = 0.85;
+
+function classifyRatingChange(
+  prevRating: string,
+  newRating: string,
+): "DOWNGRADED" | "UPGRADED" | null {
+  const prevLower = prevRating.toLowerCase();
+  const newLower = newRating.toLowerCase();
+  if (prevLower === newLower) return null;
+
+  const prevIsA = prevLower.includes("a-rating") || prevLower.includes("a rating");
+  const prevIsB = prevLower.includes("b-rating") || prevLower.includes("b rating");
+  const newIsA = newLower.includes("a-rating") || newLower.includes("a rating");
+  const newIsB = newLower.includes("b-rating") || newLower.includes("b rating");
+
+  if (prevIsA && newIsB) return "DOWNGRADED";
+  if (prevIsB && newIsA) return "UPGRADED";
+  return null;
+}
 
 async function sendAdminFailureAlert(errorMessage: string): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
@@ -100,6 +142,263 @@ async function downloadWithRetry(): Promise<SponsorRecord[]> {
   throw lastError || new Error("CSV download failed after all retries");
 }
 
+async function loadActiveCanonical(): Promise<Map<string, CanonicalRecord>> {
+  const records = await db
+    .select()
+    .from(sponsorCanonical)
+    .where(eq(sponsorCanonical.status, "ACTIVE"));
+
+  const map = new Map<string, CanonicalRecord>();
+  for (const r of records) {
+    map.set(r.fingerprint, r as CanonicalRecord);
+  }
+  return map;
+}
+
+function buildTodayRecords(csvRecords: SponsorRecord[]): Map<string, TodayRecord> {
+  const map = new Map<string, TodayRecord>();
+  for (const r of csvRecords) {
+    const fp = generateFingerprint(r.organisationName, r.townCity, r.route);
+    if (!map.has(fp)) {
+      map.set(fp, {
+        fingerprint: fp,
+        organisationName: r.organisationName,
+        townCity: r.townCity || "",
+        typeRating: r.typeRating || "",
+        route: r.route || "",
+      });
+    }
+  }
+  return map;
+}
+
+async function reconcile(
+  canonicalMap: Map<string, CanonicalRecord>,
+  todayMap: Map<string, TodayRecord>,
+  today: string,
+): Promise<SponsorChange[]> {
+  const changes: SponsorChange[] = [];
+  const matchedFingerprints = new Set<string>();
+  const newRecordsToday: TodayRecord[] = [];
+
+  // ── Phase 1: Process today's records against canonical ──
+  for (const [fp, todayRec] of Array.from(todayMap.entries())) {
+    const canonical = canonicalMap.get(fp);
+
+    if (canonical) {
+      matchedFingerprints.add(fp);
+
+      await db
+        .update(sponsorCanonical)
+        .set({
+          lastSeen: today,
+          consecutiveMisses: 0,
+          currentName: todayRec.organisationName,
+          typeRating: todayRec.typeRating || null,
+          route: todayRec.route || null,
+        })
+        .where(eq(sponsorCanonical.id, canonical.id));
+
+      const prevRating = (canonical.typeRating ?? "").trim();
+      const currRating = (todayRec.typeRating ?? "").trim();
+      if (prevRating && currRating && prevRating !== currRating) {
+        const ratingChange = classifyRatingChange(prevRating, currRating);
+        if (ratingChange) {
+          changes.push({
+            organisationName: todayRec.organisationName,
+            changeType: ratingChange,
+            previousValue: prevRating,
+            newValue: currRating,
+          });
+        }
+      }
+
+      if (canonical.currentName !== todayRec.organisationName) {
+        const existingHistorical = canonical.historicalNames || [];
+        if (!existingHistorical.includes(canonical.currentName)) {
+          await db
+            .update(sponsorCanonical)
+            .set({
+              historicalNames: sql`array_append(${sponsorCanonical.historicalNames}, ${canonical.currentName})`,
+            })
+            .where(eq(sponsorCanonical.id, canonical.id));
+        }
+
+        changes.push({
+          organisationName: todayRec.organisationName,
+          changeType: "NAME_CHANGE",
+          previousValue: canonical.currentName,
+          newValue: todayRec.organisationName,
+        });
+      }
+    } else {
+      newRecordsToday.push(todayRec);
+    }
+  }
+
+  // ── Phase 1b: Insert genuinely new records ──
+  for (const newRec of newRecordsToday) {
+    try {
+      await db.insert(sponsorCanonical).values({
+        fingerprint: newRec.fingerprint,
+        currentName: newRec.organisationName,
+        townCity: newRec.townCity || null,
+        typeRating: newRec.typeRating || null,
+        route: newRec.route || null,
+        status: "ACTIVE",
+        firstSeen: today,
+        lastSeen: today,
+        consecutiveMisses: 0,
+        historicalNames: [],
+      }).onConflictDoNothing();
+
+      changes.push({
+        organisationName: newRec.organisationName,
+        changeType: "NEW_LICENCE",
+        previousValue: null,
+        newValue: newRec.typeRating || null,
+      });
+    } catch (err: any) {
+      console.error(`[Reconciliation] Error inserting new canonical "${newRec.organisationName}":`, err.message);
+    }
+  }
+
+  // ── Phase 2: Process missing records (in canonical but not in today's CSV) ──
+  const missingRecords: CanonicalRecord[] = [];
+  for (const [fp, canonical] of Array.from(canonicalMap.entries())) {
+    if (!matchedFingerprints.has(fp) && !todayMap.has(fp)) {
+      missingRecords.push(canonical);
+    }
+  }
+
+  if (missingRecords.length > 0) {
+    const missingRatio = canonicalMap.size > 0 ? missingRecords.length / canonicalMap.size : 0;
+    if (missingRatio > 0.1 && missingRecords.length > 100) {
+      console.warn(
+        `[Reconciliation] WARNING: ${missingRecords.length} of ${canonicalMap.size} (${(missingRatio * 100).toFixed(1)}%) canonical records missing from today's CSV. ` +
+        `This may indicate a data format change. Processing normally but flagging for review.`
+      );
+    }
+
+    console.log(`[Reconciliation] Processing ${missingRecords.length} missing record(s)...`);
+
+    for (const missing of missingRecords) {
+      const newMissCount = missing.consecutiveMisses + 1;
+
+      if (newMissCount === 1) {
+        // First absence — run rename check against new records
+        let renamed = false;
+
+        for (const newRec of newRecordsToday) {
+          const sameCity = (newRec.townCity || "").toLowerCase().trim() === (missing.townCity || "").toLowerCase().trim();
+          const sameRoute = (newRec.route || "").toLowerCase().trim() === (missing.route || "").toLowerCase().trim();
+
+          if (sameCity && sameRoute) {
+            const similarity = stringSimilarity.compareTwoStrings(
+              missing.currentName.toLowerCase(),
+              newRec.organisationName.toLowerCase(),
+            );
+
+            if (similarity >= RENAME_SIMILARITY_THRESHOLD) {
+              console.log(
+                `[Reconciliation] Rename detected: "${missing.currentName}" → "${newRec.organisationName}" (similarity: ${(similarity * 100).toFixed(1)}%)`
+              );
+
+              const existingHistorical = missing.historicalNames || [];
+              const updatedHistorical = existingHistorical.includes(missing.currentName)
+                ? existingHistorical
+                : [...existingHistorical, missing.currentName];
+
+              await db
+                .update(sponsorCanonical)
+                .set({
+                  fingerprint: newRec.fingerprint,
+                  currentName: newRec.organisationName,
+                  lastSeen: today,
+                  consecutiveMisses: 0,
+                  historicalNames: updatedHistorical,
+                  typeRating: newRec.typeRating || missing.typeRating,
+                })
+                .where(eq(sponsorCanonical.id, missing.id));
+
+              try {
+                await db
+                  .delete(sponsorCanonical)
+                  .where(
+                    and(
+                      eq(sponsorCanonical.fingerprint, newRec.fingerprint),
+                      ne(sponsorCanonical.id, missing.id),
+                    )
+                  );
+              } catch {}
+
+              changes.push({
+                organisationName: newRec.organisationName,
+                changeType: "NAME_CHANGE",
+                previousValue: missing.currentName,
+                newValue: newRec.organisationName,
+              });
+
+              renamed = true;
+              break;
+            }
+          }
+        }
+
+        if (!renamed) {
+          await db
+            .update(sponsorCanonical)
+            .set({ consecutiveMisses: newMissCount })
+            .where(eq(sponsorCanonical.id, missing.id));
+
+          console.log(
+            `[Reconciliation] First absence for "${missing.currentName}" — waiting for confirmation.`
+          );
+        }
+      } else if (newMissCount >= 2) {
+        await db
+          .update(sponsorCanonical)
+          .set({
+            consecutiveMisses: newMissCount,
+            status: "NOT_LISTED",
+          })
+          .where(eq(sponsorCanonical.id, missing.id));
+
+        changes.push({
+          organisationName: missing.currentName,
+          changeType: "REMOVED",
+          previousValue: missing.typeRating,
+          newValue: null,
+        });
+
+        console.log(
+          `[Reconciliation] Confirmed removal: "${missing.currentName}" (missing ${newMissCount} consecutive days)`
+        );
+      } else {
+        await db
+          .update(sponsorCanonical)
+          .set({ consecutiveMisses: newMissCount })
+          .where(eq(sponsorCanonical.id, missing.id));
+      }
+    }
+  }
+
+  // ── Summary ──
+  const counts: Record<string, number> = {};
+  for (const c of changes) counts[c.changeType] = (counts[c.changeType] || 0) + 1;
+
+  console.log(
+    `[Reconciliation] Complete. Canonical: ${canonicalMap.size}, Today: ${todayMap.size}, ` +
+    `New: ${newRecordsToday.length}, Missing: ${missingRecords.length}, ` +
+    `Changes: ${changes.length} total` +
+    (Object.keys(counts).length > 0
+      ? ` (${Object.entries(counts).map(([k, v]) => `${k}: ${v}`).join(", ")})`
+      : "")
+  );
+
+  return changes;
+}
+
 export async function runSponsorMonitorJob(source: string = "cron"): Promise<{
   success: boolean;
   recordsProcessed: number;
@@ -149,37 +448,25 @@ export async function runSponsorMonitorJob(source: string = "cron"): Promise<{
       return { ...result, error: errorMsg };
     }
 
-    const previousSnapshot = await getPreviousSnapshot();
-
     const today = new Date().toISOString().split("T")[0];
 
-    if (previousSnapshot.size === 0) {
-      console.log(`[SponsorMonitorJob] No previous snapshot found. Storing initial snapshot (${currentRecords.length} records) for ${today}.`);
-      await storeSnapshot(currentRecords, today);
+    console.log(`[SponsorMonitorJob] Storing snapshot for ${today} (${currentRecords.length} records)...`);
+    await storeSnapshot(currentRecords, today);
+
+    const canonicalMap = await loadActiveCanonical();
+
+    if (canonicalMap.size === 0) {
+      console.log(`[SponsorMonitorJob] No canonical records found. This appears to be the first run.`);
+      console.log(`[SponsorMonitorJob] Run the migration endpoint (POST /api/admin/migrate-canonical) to populate canonical data from the latest snapshot.`);
       await rebuildSponsorIndex();
-      console.log(`[SponsorMonitorJob] Initial snapshot stored. No changes to detect on first run.`);
       result.success = true;
       return result;
     }
 
-    const currentMap = new Map<string, { organisationName: string; organisationNameNormalized: string; townCity?: string | null; typeRating: string | null; route: string | null }>();
-    for (const record of currentRecords) {
-      const normalized = normalizeName(record.organisationName);
-      const town = (record.townCity || "").toLowerCase().trim();
-      const key = town ? `${normalized}::${town}` : normalized;
-      currentMap.set(key, {
-        organisationName: record.organisationName,
-        organisationNameNormalized: normalized,
-        townCity: record.townCity || null,
-        typeRating: record.typeRating || null,
-        route: record.route || null,
-      });
-    }
+    const todayMap = buildTodayRecords(currentRecords);
 
-    const detectedChanges = detectChanges(previousSnapshot, currentMap);
+    const detectedChanges = await reconcile(canonicalMap, todayMap, today);
 
-    console.log(`[SponsorMonitorJob] Storing new snapshot for ${today} (${currentRecords.length} records)...`);
-    await storeSnapshot(currentRecords, today);
     await rebuildSponsorIndex();
 
     const changeCounts: Record<string, number> = {};
@@ -188,8 +475,12 @@ export async function runSponsorMonitorJob(source: string = "cron"): Promise<{
     }
     result.changes = changeCounts;
 
-    if (detectedChanges.length > 0) {
-      console.log(`[SponsorMonitorJob] Saving ${detectedChanges.length} changes to database and dispatching notifications...`);
+    const alertableChanges = detectedChanges.filter(
+      (c) => c.changeType !== "NAME_CHANGE"
+    );
+
+    if (alertableChanges.length > 0) {
+      console.log(`[SponsorMonitorJob] Saving ${detectedChanges.length} changes (${alertableChanges.length} alertable) and dispatching notifications...`);
 
       for (const change of detectedChanges) {
         try {
@@ -204,12 +495,31 @@ export async function runSponsorMonitorJob(source: string = "cron"): Promise<{
             })
             .returning();
 
-          const notifResult = await notifyAffectedUsers(savedChange);
-          result.notificationsSent += notifResult.sent;
-          result.notificationsSkipped += notifResult.skipped;
-          result.notificationsFailed += notifResult.failed;
+          if (change.changeType !== "NAME_CHANGE") {
+            const notifResult = await notifyAffectedUsers(savedChange);
+            result.notificationsSent += notifResult.sent;
+            result.notificationsSkipped += notifResult.skipped;
+            result.notificationsFailed += notifResult.failed;
+          }
         } catch (err: any) {
           console.error(`[SponsorMonitorJob] Error processing change for "${change.organisationName}":`, err.message);
+        }
+      }
+    } else if (detectedChanges.length > 0) {
+      console.log(`[SponsorMonitorJob] ${detectedChanges.length} changes detected (all non-alertable, e.g. name corrections).`);
+      for (const change of detectedChanges) {
+        try {
+          await db
+            .insert(sponsorChanges)
+            .values({
+              organisationName: change.organisationName,
+              changeType: change.changeType,
+              previousValue: change.previousValue,
+              newValue: change.newValue,
+              snapshotDate: today,
+            });
+        } catch (err: any) {
+          console.error(`[SponsorMonitorJob] Error saving non-alertable change for "${change.organisationName}":`, err.message);
         }
       }
     } else {
