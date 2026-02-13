@@ -3,6 +3,8 @@ import { eq, and, gte, sql } from "drizzle-orm";
 import { companyWatches, notificationPreferences, notificationLog, users } from "@shared/schema";
 import type { SponsorChange } from "@shared/schema";
 import { normalizeName } from "./sponsorListFetcher";
+import { sendSMS, sendWhatsApp } from "../services/messaging";
+import { decryptPhone } from "./phoneCrypto";
 
 const MAX_NOTIFICATIONS_PER_DAY = 10;
 const FROM_ADDRESS = "Sponsor Monitor <alerts@checkbyai.net>";
@@ -48,6 +50,21 @@ async function sendViaResend(to: string, subject: string, html: string): Promise
 
 function escapeHtml(str: string): string {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function buildPlainTextAlert(changeType: string, companyName: string, previousValue?: string | null, newValue?: string | null): string {
+  switch (changeType) {
+    case "REMOVED":
+      return `URGENT: ${companyName} has been REMOVED from the UK sponsor licence register. If you hold a visa sponsored by this organisation, seek immigration advice immediately. checkbyai.net/sponsor-monitor`;
+    case "DOWNGRADED":
+      return `Alert: ${companyName} sponsor licence DOWNGRADED${previousValue && newValue ? ` from ${previousValue} to ${newValue}` : ""}. Compliance issues identified by Home Office. checkbyai.net/sponsor-monitor`;
+    case "UPGRADED":
+      return `Good news: ${companyName} sponsor licence UPGRADED${previousValue && newValue ? ` from ${previousValue} to ${newValue}` : ""}. Now fully compliant. checkbyai.net/sponsor-monitor`;
+    case "ADDED":
+      return `Update: ${companyName} has been ADDED to the UK sponsor licence register${newValue ? ` (${newValue})` : ""}. checkbyai.net/sponsor-monitor`;
+    default:
+      return `Sponsor licence change for ${companyName}: ${changeType}. checkbyai.net/sponsor-monitor`;
+  }
 }
 
 function buildEmailHtml(changeType: string, companyName: string, previousValue?: string | null, newValue?: string | null): { subject: string; html: string } {
@@ -150,7 +167,6 @@ async function getUserNotificationCountLast24h(userId: string): Promise<number> 
     .where(
       and(
         eq(notificationLog.userId, userId),
-        eq(notificationLog.channel, "email"),
         eq(notificationLog.status, "sent"),
         gte(notificationLog.sentAt, oneDayAgo)
       )
@@ -214,6 +230,13 @@ export async function notifyAffectedUsers(change: SponsorChange): Promise<{ sent
       change.newValue
     );
 
+    const plainText = buildPlainTextAlert(
+      change.changeType,
+      change.organisationName,
+      change.previousValue,
+      change.newValue
+    );
+
     const processedUsers = new Set<string>();
 
     for (const watch of activeWatches) {
@@ -250,30 +273,47 @@ export async function notifyAffectedUsers(change: SponsorChange): Promise<{ sent
           recipientEmail = userRecord[0]?.email || null;
         }
 
-        if (!emailEnabled) {
-          console.log(`[NotificationDispatcher] Email disabled for user ${watch.userId}`);
+        if (emailEnabled && recipientEmail) {
+          const result = await sendViaResend(recipientEmail, subject, html);
+          if (result.success) {
+            console.log(`[NotificationDispatcher] Email sent to ${recipientEmail} for "${change.organisationName}" (${change.changeType})`);
+            await logNotification(watch.userId, change.id, "email", "sent", result.providerMessageId);
+            stats.sent++;
+          } else {
+            console.error(`[NotificationDispatcher] Failed to send email to ${recipientEmail}: ${result.error}`);
+            await logNotification(watch.userId, change.id, "email", "failed", undefined, result.error);
+            stats.failed++;
+          }
+        } else if (!emailEnabled) {
           await logNotification(watch.userId, change.id, "email", "skipped", undefined, "Email notifications disabled by user");
-          stats.skipped++;
-          continue;
         }
 
-        if (!recipientEmail) {
-          console.log(`[NotificationDispatcher] No email address for user ${watch.userId}`);
-          await logNotification(watch.userId, change.id, "email", "failed", undefined, "No email address on file");
-          stats.failed++;
-          continue;
+        if (prefs.length > 0 && prefs[0].smsEnabled && prefs[0].smsVerified && prefs[0].smsNumber) {
+          const phoneNumber = decryptPhone(prefs[0].smsNumber);
+          const smsResult = await sendSMS(phoneNumber, plainText);
+          if (smsResult.success) {
+            console.log(`[NotificationDispatcher] SMS sent to ${phoneNumber} for "${change.organisationName}"`);
+            await logNotification(watch.userId, change.id, "sms", "sent", smsResult.providerMessageId);
+            stats.sent++;
+          } else {
+            console.error(`[NotificationDispatcher] SMS failed for ${phoneNumber}: ${smsResult.error}`);
+            await logNotification(watch.userId, change.id, "sms", "failed", undefined, smsResult.error);
+            stats.failed++;
+          }
         }
 
-        const result = await sendViaResend(recipientEmail, subject, html);
-
-        if (result.success) {
-          console.log(`[NotificationDispatcher] Email sent to ${recipientEmail} for "${change.organisationName}" (${change.changeType})`);
-          await logNotification(watch.userId, change.id, "email", "sent", result.providerMessageId);
-          stats.sent++;
-        } else {
-          console.error(`[NotificationDispatcher] Failed to send to ${recipientEmail}: ${result.error}`);
-          await logNotification(watch.userId, change.id, "email", "failed", undefined, result.error);
-          stats.failed++;
+        if (prefs.length > 0 && prefs[0].whatsappEnabled && prefs[0].whatsappVerified && prefs[0].whatsappNumber) {
+          const phoneNumber = decryptPhone(prefs[0].whatsappNumber);
+          const waResult = await sendWhatsApp(phoneNumber, plainText);
+          if (waResult.success) {
+            console.log(`[NotificationDispatcher] WhatsApp sent to ${phoneNumber} for "${change.organisationName}"`);
+            await logNotification(watch.userId, change.id, "whatsapp", "sent", waResult.providerMessageId);
+            stats.sent++;
+          } else {
+            console.error(`[NotificationDispatcher] WhatsApp failed for ${phoneNumber}: ${waResult.error}`);
+            await logNotification(watch.userId, change.id, "whatsapp", "failed", undefined, waResult.error);
+            stats.failed++;
+          }
         }
       } catch (err: any) {
         console.error(`[NotificationDispatcher] Error processing user ${watch.userId}:`, err);

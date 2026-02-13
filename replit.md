@@ -42,7 +42,9 @@ The system employs a dual-portal design. An Admin Portal facilitates the upload 
 - **Dynamic AI Knowledge Engine**: Trainable AI system that allows admins to add custom forensic rules and pattern-specific instructions. Global rules apply to all verifications; pattern-specific instructions apply when producer matches. AI explicitly cites admin rules in analysis output (e.g., "Per Admin Rule #3...").
 - **Human-in-the-Loop (HITL) Feedback**: Admins can override AI results by approving or marking documents as fake. When marking as fake, admins must provide reasoning. This feedback is injected into future AI analyses as "human expert corrections" to train the AI and prevent repeated mistakes. Visual "Admin Overridden" badges appear when admins disagree with AI.
 - **Multi-AI Fallback System**: Automatic failover between AI providers (OpenAI → Claude → DeepSeek) for reliable document analysis even if one provider is down.
-- **Sponsor Licence Monitor**: Tracks changes in the UK Home Office Register of Licensed Sponsors. Utility at `server/utils/sponsorListFetcher.ts` downloads and parses the CSV from gov.uk, with `normalizeName()` for company name matching. Database tables: `sponsor_list`, `company_watches`, `sponsor_changes`, `notification_preferences`, `notification_log`.
+- **Sponsor Licence Monitor**: Tracks changes in the UK Home Office Register of Licensed Sponsors. Utility at `server/utils/sponsorListFetcher.ts` downloads and parses the CSV from gov.uk, with `normalizeName()` for company name matching and composite keys (normalizedName::townCity) for duplicate handling. Database tables: `sponsor_list`, `company_watches`, `sponsor_changes`, `notification_preferences`, `notification_log`.
+- **Multi-Channel Notifications**: Email (Resend), SMS (Brevo transactional SMS), WhatsApp (Twilio). Phone numbers encrypted at rest using AES-256-GCM (`server/utils/phoneCrypto.ts`, requires `PHONE_ENCRYPTION_KEY` env var as 64 hex chars). Encrypted values prefixed with `enc:` for reliable identification. Phone verification via OTP required before enabling SMS/WhatsApp channels. Dispatcher at `server/utils/notificationDispatcher.ts`, messaging at `server/services/messaging.ts`.
+- **Watch Limits by Plan**: free=1, starter=5, pro=20, master=50, unlimited=-1.
 
 ## Verification Engine
 
@@ -144,6 +146,7 @@ Checkout uses Stripe Payment Links (not server-side Checkout Sessions). Each pla
 - `/api-docs` - B2B API documentation for immigration consultancies and HR platforms
 - `/history` - User verification history with audit trail
 - `/ai-guide` - AI Guide with pre-check red flags warning section
+- `/sponsor-changes` - Public page showing 7-day grouped view of sponsor licence changes
 
 ## Verification Receipt System
 Each verification now generates:

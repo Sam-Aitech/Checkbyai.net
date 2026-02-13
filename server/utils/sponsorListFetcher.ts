@@ -30,6 +30,11 @@ export function normalizeName(name: string): string {
     .trim();
 }
 
+function compositeKey(normalizedName: string, townCity?: string | null): string {
+  const town = (townCity || "").toLowerCase().trim();
+  return town ? `${normalizedName}::${town}` : normalizedName;
+}
+
 /**
  * Bulk inserts sponsor records into the database in batches.
  */
@@ -78,7 +83,8 @@ export async function getPreviousSnapshot(): Promise<Map<string, typeof sponsorL
 
   const map = new Map<string, typeof sponsorList.$inferSelect>();
   for (const record of records) {
-    map.set(record.organisationNameNormalized, record);
+    const key = compositeKey(record.organisationNameNormalized, record.townCity);
+    map.set(key, record);
   }
   return map;
 }
@@ -111,6 +117,7 @@ export interface SponsorChange {
 interface SnapshotEntry {
   organisationName: string;
   organisationNameNormalized: string;
+  townCity?: string | null;
   typeRating: string | null;
   route: string | null;
 }
@@ -142,8 +149,8 @@ export function detectChanges(
   const changes: SponsorChange[] = [];
   const warnings: string[] = [];
 
-  Array.from(previous.entries()).forEach(([normName, prevRecord]) => {
-    if (!current.has(normName)) {
+  Array.from(previous.entries()).forEach(([key, prevRecord]) => {
+    if (!current.has(key)) {
       changes.push({
         organisationName: prevRecord.organisationName,
         changeType: "REMOVED",
@@ -153,8 +160,8 @@ export function detectChanges(
     }
   });
 
-  Array.from(current.entries()).forEach(([normName, currRecord]) => {
-    if (!previous.has(normName)) {
+  Array.from(current.entries()).forEach(([key, currRecord]) => {
+    if (!previous.has(key)) {
       changes.push({
         organisationName: currRecord.organisationName,
         changeType: "ADDED",
@@ -164,8 +171,8 @@ export function detectChanges(
     }
   });
 
-  Array.from(previous.entries()).forEach(([normName, prevRecord]) => {
-    const currRecord = current.get(normName);
+  Array.from(previous.entries()).forEach(([key, prevRecord]) => {
+    const currRecord = current.get(key);
     if (!currRecord) return;
 
     const prevRating = (prevRecord.typeRating ?? "").trim();

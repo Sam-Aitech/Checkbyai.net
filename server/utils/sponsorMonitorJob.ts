@@ -162,12 +162,15 @@ export async function runSponsorMonitorJob(source: string = "cron"): Promise<{
       return result;
     }
 
-    const currentMap = new Map<string, { organisationName: string; organisationNameNormalized: string; typeRating: string | null; route: string | null }>();
+    const currentMap = new Map<string, { organisationName: string; organisationNameNormalized: string; townCity?: string | null; typeRating: string | null; route: string | null }>();
     for (const record of currentRecords) {
       const normalized = normalizeName(record.organisationName);
-      currentMap.set(normalized, {
+      const town = (record.townCity || "").toLowerCase().trim();
+      const key = town ? `${normalized}::${town}` : normalized;
+      currentMap.set(key, {
         organisationName: record.organisationName,
         organisationNameNormalized: normalized,
+        townCity: record.townCity || null,
         typeRating: record.typeRating || null,
         route: record.route || null,
       });

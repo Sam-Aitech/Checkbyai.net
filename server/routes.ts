@@ -14,8 +14,10 @@ import { z } from "zod";
 import { PDFAnalyzer } from "./services/pdfAnalyzer";
 import bcrypt from "bcrypt";
 import { rebuildSponsorIndex, searchSponsors, isIndexReady } from "./utils/sponsorSearch";
-import { normalizeName, downloadAndParseSponsorList, storeSnapshot, getLatestSnapshotDate } from "./utils/sponsorListFetcher";
+import { normalizeName, downloadAndParseSponsorList, storeSnapshot, getLatestSnapshotDate, getPreviousSnapshot, detectChanges } from "./utils/sponsorListFetcher";
 import { runSponsorMonitorJob, startSponsorMonitorCron, isJobRunning, getLastRunInfo } from "./utils/sponsorMonitorJob";
+import { encryptPhone, decryptPhone } from "./utils/phoneCrypto";
+import { sendSMS, sendWhatsApp } from "./services/messaging";
 
 const CHECKOUT_HMAC_SECRET = process.env.CHECKOUT_HMAC_SECRET || process.env.SESSION_SECRET || process.env.STRIPE_SECRET_KEY!;
 
@@ -778,6 +780,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     free: 1,
     starter: 5,
     pro: 20,
+    master: 50,
     unlimited: -1,
   };
 
@@ -1067,10 +1070,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         emailEnabled: prefs.emailEnabled,
         email: prefs.email,
         whatsappEnabled: prefs.whatsappEnabled,
-        whatsappNumber: prefs.whatsappNumber,
+        whatsappNumber: prefs.whatsappNumber ? decryptPhone(prefs.whatsappNumber) : null,
         whatsappVerified: prefs.whatsappVerified,
         smsEnabled: prefs.smsEnabled,
-        smsNumber: prefs.smsNumber,
+        smsNumber: prefs.smsNumber ? decryptPhone(prefs.smsNumber) : null,
         smsVerified: prefs.smsVerified,
       });
     } catch (error) {
@@ -1105,14 +1108,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .limit(1);
 
       if (whatsapp_enabled) {
-        const isVerified = existing.length > 0 && existing[0].whatsappVerified && existing[0].whatsappNumber === whatsapp_number;
+        const storedNumber = existing.length > 0 && existing[0].whatsappNumber ? decryptPhone(existing[0].whatsappNumber) : null;
+        const isVerified = existing.length > 0 && existing[0].whatsappVerified && storedNumber === whatsapp_number;
         if (!isVerified) {
           return res.status(400).json({ message: "Please verify your WhatsApp number before enabling WhatsApp notifications." });
         }
       }
 
       if (sms_enabled) {
-        const isVerified = existing.length > 0 && existing[0].smsVerified && existing[0].smsNumber === sms_number;
+        const storedNumber = existing.length > 0 && existing[0].smsNumber ? decryptPhone(existing[0].smsNumber) : null;
+        const isVerified = existing.length > 0 && existing[0].smsVerified && storedNumber === sms_number;
         if (!isVerified) {
           return res.status(400).json({ message: "Please verify your SMS number before enabling SMS notifications." });
         }
@@ -1123,9 +1128,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         emailEnabled: email_enabled ?? true,
         email: req.user.email || null,
         whatsappEnabled: whatsapp_enabled ?? false,
-        whatsappNumber: whatsapp_number || null,
+        whatsappNumber: whatsapp_number ? encryptPhone(whatsapp_number) : null,
         smsEnabled: sms_enabled ?? false,
-        smsNumber: sms_number || null,
+        smsNumber: sms_number ? encryptPhone(sms_number) : null,
         updatedAt: new Date(),
       };
 
@@ -1174,7 +1179,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         otpRateLimit.set(rateLimitKey, { count: 1, resetAt: Date.now() + OTP_RATE_WINDOW });
       }
 
-      console.log(`[NotificationOTP] Code for ${channel} ${phone_number} (user ${req.user.id}): ${code}`);
+      const otpMessage = `Your CheckByAI verification code is: ${code}. It expires in 10 minutes.`;
+
+      let deliveryResult;
+      try {
+        if (channel === 'sms') {
+          deliveryResult = await sendSMS(phone_number, otpMessage);
+        } else {
+          deliveryResult = await sendWhatsApp(phone_number, otpMessage);
+        }
+      } catch (sendErr: any) {
+        console.error(`[NotificationOTP] Error sending OTP via ${channel}:`, sendErr.message);
+        phoneOtpStore.delete(key);
+        return res.status(502).json({ message: `Failed to deliver verification code via ${channel}. Please check the number and try again.` });
+      }
+
+      if (!deliveryResult.success) {
+        console.error(`[NotificationOTP] ${channel} delivery failed for ${phone_number}: ${deliveryResult.error}`);
+        phoneOtpStore.delete(key);
+        return res.status(502).json({ message: `Failed to deliver verification code via ${channel}. Please check the number and try again.` });
+      }
+
+      console.log(`[NotificationOTP] Code sent via ${channel} to ${phone_number} (user ${req.user.id})`);
 
       res.json({ message: `Verification code sent to ${phone_number} via ${channel}.` });
     } catch (error) {
@@ -1224,9 +1250,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(notificationPreferences.userId, userId))
         .limit(1);
 
+      const encryptedNumber = encryptPhone(phone_number);
       const updateFields = channel === 'whatsapp'
-        ? { whatsappNumber: phone_number, whatsappVerified: true, updatedAt: new Date() }
-        : { smsNumber: phone_number, smsVerified: true, updatedAt: new Date() };
+        ? { whatsappNumber: encryptedNumber, whatsappVerified: true, updatedAt: new Date() }
+        : { smsNumber: encryptedNumber, smsVerified: true, updatedAt: new Date() };
 
       if (existing.length > 0) {
         await db
@@ -1831,6 +1858,79 @@ Format your response in clear, professional markdown.`;
     } catch (error) {
       console.error("Error cleaning up sponsor snapshots:", error);
       res.status(500).json({ message: "Failed to clean up old snapshots." });
+    }
+  });
+
+  // Public sponsor changes endpoint (last 7 days, grouped by date)
+  app.get('/api/sponsor-changes', async (req, res) => {
+    try {
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const changes = await db
+        .select({
+          id: sponsorChanges.id,
+          organisationName: sponsorChanges.organisationName,
+          changeType: sponsorChanges.changeType,
+          previousValue: sponsorChanges.previousValue,
+          newValue: sponsorChanges.newValue,
+          detectedAt: sponsorChanges.detectedAt,
+          snapshotDate: sponsorChanges.snapshotDate,
+        })
+        .from(sponsorChanges)
+        .where(gte(sponsorChanges.detectedAt, sevenDaysAgo))
+        .orderBy(desc(sponsorChanges.detectedAt))
+        .limit(500);
+
+      const grouped: Record<string, typeof changes> = {};
+      for (const change of changes) {
+        const dateKey = change.snapshotDate || (change.detectedAt ? new Date(change.detectedAt).toISOString().split('T')[0] : 'unknown');
+        if (!grouped[dateKey]) grouped[dateKey] = [];
+        grouped[dateKey].push(change);
+      }
+
+      res.json({ changes, grouped, totalCount: changes.length });
+    } catch (error) {
+      console.error("Error fetching public sponsor changes:", error);
+      res.status(500).json({ message: "Failed to fetch sponsor changes." });
+    }
+  });
+
+  // Admin test endpoint for simulated detection cycle
+  app.post('/api/admin/sponsor-monitor/test', isAdmin, async (req: any, res) => {
+    try {
+      const { organisationName, changeType, previousValue, newValue } = req.body;
+
+      if (!organisationName || !changeType) {
+        return res.status(400).json({ message: "organisationName and changeType are required." });
+      }
+
+      const validTypes = ["REMOVED", "ADDED", "DOWNGRADED", "UPGRADED", "ROUTE_CHANGE"];
+      if (!validTypes.includes(changeType)) {
+        return res.status(400).json({ message: `changeType must be one of: ${validTypes.join(", ")}` });
+      }
+
+      const today = new Date().toISOString().split("T")[0];
+      const [savedChange] = await db
+        .insert(sponsorChanges)
+        .values({
+          organisationName,
+          changeType,
+          previousValue: previousValue || null,
+          newValue: newValue || null,
+          snapshotDate: today,
+        })
+        .returning();
+
+      const { notifyAffectedUsers } = await import("./utils/notificationDispatcher");
+      const notifResult = await notifyAffectedUsers(savedChange);
+
+      res.json({
+        message: "Test change created and notifications dispatched.",
+        change: savedChange,
+        notifications: notifResult,
+      });
+    } catch (error) {
+      console.error("Error running sponsor monitor test:", error);
+      res.status(500).json({ message: "Failed to run test detection cycle." });
     }
   });
 
