@@ -278,8 +278,9 @@ export const notificationLog = pgTable(
     userId: varchar("user_id").references(() => users.id).notNull(),
     changeId: integer("change_id").references(() => sponsorChanges.id).notNull(),
     channel: varchar("channel").notNull(), // 'email', 'whatsapp', 'sms'
-    status: varchar("status").notNull().default("queued"), // 'queued', 'sent', 'delivered', 'failed'
+    status: varchar("status").notNull().default("queued"), // 'queued', 'sent', 'delivered', 'failed', 'skipped'
     sentAt: timestamp("sent_at"),
+    deliverAfter: timestamp("deliver_after"), // null = immediate, set = delayed delivery
     providerMessageId: varchar("provider_message_id"),
     errorDetails: text("error_details"),
   },
@@ -287,6 +288,7 @@ export const notificationLog = pgTable(
     index("idx_notification_log_user_id").on(table.userId),
     index("idx_notification_log_change_id").on(table.changeId),
     index("idx_notification_log_status").on(table.status),
+    index("idx_notification_log_deliver_after").on(table.deliverAfter),
   ]
 );
 

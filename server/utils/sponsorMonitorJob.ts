@@ -11,7 +11,7 @@ import {
   type SponsorRecord,
 } from "./sponsorListFetcher";
 import { rebuildSponsorIndex } from "./sponsorSearch";
-import { notifyAffectedUsers } from "./notificationDispatcher";
+import { notifyAffectedUsers, processDelayedNotifications } from "./notificationDispatcher";
 
 let isRunning = false;
 
@@ -266,7 +266,15 @@ export function startSponsorMonitorCron(): void {
     timezone: "UTC",
   });
 
-  console.log("[SponsorMonitorJob] Cron job scheduled: daily at 00:30 UTC");
+  cron.schedule("0 * * * *", () => {
+    processDelayedNotifications().catch((err) => {
+      console.error("[NotificationQueue] Error processing delayed notifications:", err);
+    });
+  }, {
+    timezone: "UTC",
+  });
+
+  console.log("[SponsorMonitorJob] Cron jobs scheduled: daily monitor at 00:30 UTC, delayed notifications hourly");
 }
 
 export function isJobRunning(): boolean {

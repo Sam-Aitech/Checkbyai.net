@@ -155,6 +155,13 @@ interface NotificationPrefs {
   smsVerified: boolean;
 }
 
+interface TierConfig {
+  plan: string;
+  watchLimit: number;
+  channels: string[];
+  alertTiming: string;
+}
+
 function PhoneVerificationField({
   channel,
   label,
@@ -164,7 +171,8 @@ function PhoneVerificationField({
   phoneNumber,
   onPhoneChange,
   verified,
-  isPaidUser,
+  channelAllowed,
+  requiredPlan,
 }: {
   channel: "whatsapp" | "sms";
   label: string;
@@ -174,7 +182,8 @@ function PhoneVerificationField({
   phoneNumber: string;
   onPhoneChange: (v: string) => void;
   verified: boolean;
-  isPaidUser: boolean;
+  channelAllowed: boolean;
+  requiredPlan: string;
 }) {
   const [otpSent, setOtpSent] = useState(false);
   const [otpCode, setOtpCode] = useState("");
@@ -240,20 +249,20 @@ function PhoneVerificationField({
             }
             onToggle(v);
           }}
-          disabled={!isPaidUser}
+          disabled={!channelAllowed}
         />
       </div>
 
-      {!isPaidUser && (
+      {!channelAllowed && (
         <p className="text-xs text-muted-foreground ml-7">
-          Available on paid plans only.{" "}
+          Requires {requiredPlan} plan or higher.{" "}
           <a href="/pricing" className="underline hover:no-underline text-primary">
             Upgrade
           </a>
         </p>
       )}
 
-      {isPaidUser && (
+      {channelAllowed && (
         <div className="ml-7 space-y-2">
           <div className="flex items-center gap-2">
             <Input
@@ -262,7 +271,7 @@ function PhoneVerificationField({
               value={phoneNumber}
               onChange={(e) => onPhoneChange(e.target.value)}
               className="max-w-[220px] h-9 text-sm"
-              disabled={!isPaidUser}
+              disabled={!channelAllowed}
             />
             {verified ? (
               <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
@@ -892,9 +901,36 @@ export default function SponsorMonitor() {
   );
 }
 
+const STATUS_TO_TIER: Record<string, string> = {
+  free: "free",
+  starter: "starter",
+  pro: "unlimited",
+  unlimited: "unlimited",
+  enterprise: "enterprise",
+};
+
+const TIER_CHANNELS: Record<string, string[]> = {
+  free: ["email"],
+  starter: ["email"],
+  pro: ["email", "whatsapp"],
+  unlimited: ["email", "whatsapp", "sms"],
+  enterprise: ["email", "whatsapp", "sms"],
+};
+
+const TIER_ALERT_TIMING: Record<string, string> = {
+  free: "Next morning (8am UTC)",
+  starter: "Same day (6pm UTC)",
+  pro: "Immediate",
+  unlimited: "Immediate",
+  enterprise: "Immediate",
+};
+
 function NotificationSettings({ user }: { user: any }) {
   const { toast } = useToast();
-  const isPaidUser = user?.subscriptionStatus !== "free";
+  const rawStatus = user?.subscriptionStatus || "free";
+  const resolvedTier = STATUS_TO_TIER[rawStatus] || "free";
+  const allowedChannels = TIER_CHANNELS[resolvedTier] || TIER_CHANNELS.free;
+  const alertTiming = TIER_ALERT_TIMING[resolvedTier] || TIER_ALERT_TIMING.free;
 
   const { data: prefs, isLoading: prefsLoading } = useQuery<NotificationPrefs>({
     queryKey: ["/api/notification-preferences"],
@@ -974,6 +1010,20 @@ function NotificationSettings({ user }: { user: any }) {
         <h2 className="text-xl font-bold text-foreground">Notification Settings</h2>
       </div>
 
+      <div className="flex items-center gap-2 mb-4 px-1 py-2 rounded-lg bg-muted/50 border border-border/50">
+        <Clock className="w-4 h-4 text-primary flex-shrink-0" />
+        <p className="text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">Alert timing:</span>{" "}
+          {alertTiming}
+          {resolvedTier === "free" && (
+            <span> — <a href="/pricing" className="underline hover:no-underline text-primary">upgrade for faster alerts</a></span>
+          )}
+          {resolvedTier === "starter" && (
+            <span> — <a href="/pricing" className="underline hover:no-underline text-primary">upgrade to Pro for immediate alerts</a></span>
+          )}
+        </p>
+      </div>
+
       <Card>
         <CardContent className="py-6 space-y-6">
           <div className="space-y-3">
@@ -1017,7 +1067,8 @@ function NotificationSettings({ user }: { user: any }) {
               markDirty();
             }}
             verified={prefs?.whatsappVerified ?? false}
-            isPaidUser={isPaidUser}
+            channelAllowed={allowedChannels.includes("whatsapp")}
+            requiredPlan="Pro"
           />
 
           <div className="border-t border-border/50" />
@@ -1037,7 +1088,8 @@ function NotificationSettings({ user }: { user: any }) {
               markDirty();
             }}
             verified={prefs?.smsVerified ?? false}
-            isPaidUser={isPaidUser}
+            channelAllowed={allowedChannels.includes("sms")}
+            requiredPlan="Unlimited"
           />
 
           <div className="border-t border-border/50" />

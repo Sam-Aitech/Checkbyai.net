@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
-import { Check, X, Shield, Zap, Clock, Star, LogIn, CreditCard, Infinity, UserCheck } from 'lucide-react';
+import { Check, X, Shield, Zap, Clock, Star, LogIn, CreditCard, Infinity, UserCheck, Building2, Bell, Eye, MessageSquare } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useScrollReveal, spring, fadeUp, staggerItem, buttonInteraction, tapScale } from '@/lib/animations';
 import { useInView } from 'react-intersection-observer';
@@ -47,6 +47,8 @@ const plans: PricingPlan[] = [
       'Forensic metadata extraction',
       'Instant results',
       'Credits never expire',
+      'Watch 5 companies',
+      'Same-day sponsor alerts',
     ],
     notIncluded: [
       'Priority support',
@@ -69,6 +71,9 @@ const plans: PricingPlan[] = [
       'Instant results',
       'Credits never expire',
       '20% savings vs Starter',
+      'Watch 20 companies',
+      'Immediate sponsor alerts',
+      'WhatsApp notifications',
     ],
     notIncluded: [
       'Expert human review',
@@ -90,6 +95,10 @@ const plans: PricingPlan[] = [
       'Priority support',
       'Perfect for high volume',
       'Cancel anytime',
+      'Unlimited company watches',
+      'Immediate alerts',
+      'All notification channels',
+      'Weekly reports',
     ],
   },
   {
@@ -199,6 +208,213 @@ function PricingCard({ plan, index, isLoggedIn, loading, onSelect }: {
           )}
         </motion.button>
       </div>
+    </motion.div>
+  );
+}
+
+const sponsorTiers = [
+  {
+    name: 'Free',
+    price: 'Included with free account',
+    watchLimit: '1 company',
+    channels: 'Email only',
+    alertTiming: '24hr delay (next morning)',
+    features: [
+      { label: 'Company watching', included: true },
+      { label: 'Email notifications', included: true },
+      { label: 'WhatsApp notifications', included: false },
+      { label: 'SMS notifications', included: false },
+      { label: 'Immediate alerts', included: false },
+      { label: 'API access', included: false },
+      { label: 'Weekly summary reports', included: false },
+      { label: 'Bulk CSV upload', included: false },
+      { label: 'Custom webhooks', included: false },
+    ],
+  },
+  {
+    name: 'Starter',
+    price: 'Included with £24.99 package',
+    watchLimit: 'Up to 5 companies',
+    channels: 'Email',
+    alertTiming: 'Same-day alerts',
+    features: [
+      { label: 'Company watching', included: true },
+      { label: 'Email notifications', included: true },
+      { label: 'WhatsApp notifications', included: false },
+      { label: 'SMS notifications', included: false },
+      { label: 'Immediate alerts', included: false },
+      { label: 'API access', included: false },
+      { label: 'Weekly summary reports', included: false },
+      { label: 'Bulk CSV upload', included: false },
+      { label: 'Custom webhooks', included: false },
+    ],
+  },
+  {
+    name: 'Pro',
+    price: 'Included with £39.99 package',
+    watchLimit: 'Up to 20 companies',
+    channels: 'Email + WhatsApp',
+    alertTiming: 'Immediate alerts',
+    features: [
+      { label: 'Company watching', included: true },
+      { label: 'Email notifications', included: true },
+      { label: 'WhatsApp notifications', included: true },
+      { label: 'SMS notifications', included: false },
+      { label: 'Immediate alerts', included: true },
+      { label: 'API access', included: false },
+      { label: 'Weekly summary reports', included: false },
+      { label: 'Bulk CSV upload', included: false },
+      { label: 'Custom webhooks', included: false },
+    ],
+  },
+  {
+    name: 'Unlimited',
+    price: 'Included with £99.99/month',
+    watchLimit: 'Unlimited companies',
+    channels: 'Email + WhatsApp + SMS',
+    alertTiming: 'Immediate alerts',
+    features: [
+      { label: 'Company watching', included: true },
+      { label: 'Email notifications', included: true },
+      { label: 'WhatsApp notifications', included: true },
+      { label: 'SMS notifications', included: true },
+      { label: 'Immediate alerts', included: true },
+      { label: 'API access', included: true },
+      { label: 'Weekly summary reports', included: true },
+      { label: 'Bulk CSV upload', included: false },
+      { label: 'Custom webhooks', included: false },
+    ],
+  },
+  {
+    name: 'Enterprise',
+    price: 'Custom pricing',
+    watchLimit: 'Unlimited companies',
+    channels: 'Email + WhatsApp + SMS',
+    alertTiming: 'Immediate alerts',
+    isEnterprise: true,
+    features: [
+      { label: 'Company watching', included: true },
+      { label: 'Email notifications', included: true },
+      { label: 'WhatsApp notifications', included: true },
+      { label: 'SMS notifications', included: true },
+      { label: 'Immediate alerts', included: true },
+      { label: 'API access', included: true },
+      { label: 'Weekly summary reports', included: true },
+      { label: 'Bulk CSV upload', included: true },
+      { label: 'Custom webhooks', included: true },
+    ],
+    extraFeatures: ['Dedicated account manager', 'Compliance reporting'],
+  },
+];
+
+function SponsorMonitorSection() {
+  const sectionReveal = useScrollReveal();
+
+  return (
+    <motion.div
+      ref={sectionReveal.ref}
+      initial={fadeUp.initial}
+      animate={sectionReveal.inView ? fadeUp.animate : fadeUp.initial}
+      transition={spring}
+      className="max-w-7xl mx-auto mb-16"
+    >
+      <div className="text-center mb-10">
+        <div className="w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4">
+          <Building2 className="w-7 h-7 text-foreground" />
+        </div>
+        <h2 className="text-3xl md:text-4xl editorial-heading text-foreground mb-3">
+          Sponsor Monitor
+        </h2>
+        <p className="text-lg text-muted-foreground max-w-2xl mx-auto editorial-body">
+          Track changes to the UK Home Office Register of Licensed Sponsors. Included with all packages.
+        </p>
+      </div>
+
+      <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {sponsorTiers.map((tier, index) => (
+          <SponsorTierCard key={tier.name} tier={tier} index={index} />
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
+function SponsorTierCard({ tier, index }: { tier: typeof sponsorTiers[0]; index: number }) {
+  const [ref, inView] = useInView({ triggerOnce: true, threshold: 0.1 });
+
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y: 24 }}
+      animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
+      transition={{ ...spring, delay: index * 0.08 }}
+      className={`relative overflow-hidden flex flex-col theme-card bg-card ${
+        tier.name === 'Enterprise' ? 'border-primary' : ''
+      }`}
+    >
+      {tier.name === 'Enterprise' && (
+        <div className="absolute top-3 right-3">
+          <span className="editorial-caption bg-primary text-primary-foreground px-2 py-1 rounded-full text-xs">
+            Custom
+          </span>
+        </div>
+      )}
+
+      <div className="p-5 pb-3">
+        <h3 className="text-lg font-bold text-foreground mb-1">{tier.name}</h3>
+        <p className="text-xs text-muted-foreground">{tier.price}</p>
+      </div>
+
+      <div className="px-5 pb-3 space-y-3">
+        <div className="flex items-center gap-2 text-sm text-foreground">
+          <Eye className="w-4 h-4 flex-shrink-0 text-muted-foreground" />
+          <span>{tier.watchLimit}</span>
+        </div>
+        <div className="flex items-center gap-2 text-sm text-foreground">
+          <MessageSquare className="w-4 h-4 flex-shrink-0 text-muted-foreground" />
+          <span>{tier.channels}</span>
+        </div>
+        <div className="flex items-center gap-2 text-sm text-foreground">
+          <Clock className="w-4 h-4 flex-shrink-0 text-muted-foreground" />
+          <span>{tier.alertTiming}</span>
+        </div>
+      </div>
+
+      <div className="px-5 pb-4 flex-grow">
+        <div className="border-t border-border pt-3">
+          <ul className="space-y-1.5">
+            {tier.features.map((feature, idx) => (
+              <li key={idx} className="flex items-center gap-2 text-xs">
+                {feature.included ? (
+                  <Check className="w-3.5 h-3.5 flex-shrink-0 text-foreground" />
+                ) : (
+                  <X className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground/50" />
+                )}
+                <span className={feature.included ? 'text-foreground' : 'text-muted-foreground/50'}>
+                  {feature.label}
+                </span>
+              </li>
+            ))}
+            {'extraFeatures' in tier && tier.extraFeatures?.map((feat: string, idx: number) => (
+              <li key={`extra-${idx}`} className="flex items-center gap-2 text-xs">
+                <Check className="w-3.5 h-3.5 flex-shrink-0 text-foreground" />
+                <span className="text-foreground">{feat}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+
+      {'isEnterprise' in tier && tier.isEnterprise && (
+        <div className="p-5 pt-0 mt-auto">
+          <a
+            href="mailto:support@cosverify.uk?subject=Enterprise%20Sponsor%20Monitor%20Enquiry"
+            className="block w-full py-2.5 px-4 text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 rounded-full transition-colors text-center"
+          >
+            Contact Us
+          </a>
+        </div>
+      )}
     </motion.div>
   );
 }
@@ -423,6 +639,8 @@ export default function Pricing() {
               />
             ))}
           </div>
+
+          <SponsorMonitorSection />
 
           <motion.div
             ref={whyReveal.ref}

@@ -776,16 +776,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Company Watch Endpoints
   // ==========================================
 
-  const WATCH_LIMITS: Record<string, number> = {
-    free: 1,
-    starter: 5,
-    pro: 20,
-    master: 50,
-    unlimited: -1,
-  };
+  const { getWatchLimit: getWatchLimitFromTier, getTierConfig, isChannelAllowed } = await import("./utils/tierConfig");
 
   function getWatchLimit(subscriptionStatus: string | null): number {
-    return WATCH_LIMITS[subscriptionStatus || "free"] ?? WATCH_LIMITS.free;
+    return getWatchLimitFromTier(subscriptionStatus);
   }
 
   app.post('/api/watches', isAuthenticated, async (req: any, res) => {
@@ -1101,6 +1095,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Please provide an SMS number to enable SMS notifications." });
       }
 
+      const userPlan = req.user.subscriptionStatus || "free";
+      if (whatsapp_enabled && !isChannelAllowed(userPlan, "whatsapp")) {
+        return res.status(403).json({ message: "WhatsApp notifications are available on Pro plan and above. Please upgrade to enable this channel." });
+      }
+      if (sms_enabled && !isChannelAllowed(userPlan, "sms")) {
+        return res.status(403).json({ message: "SMS notifications are available on Unlimited plan and above. Please upgrade to enable this channel." });
+      }
+
       const existing = await db
         .select()
         .from(notificationPreferences)
@@ -1150,6 +1152,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/tier-config', isAuthenticated, async (req: any, res) => {
+    try {
+      const userPlan = req.user.subscriptionStatus || "free";
+      const config = getTierConfig(userPlan);
+      res.json({
+        plan: userPlan,
+        watchLimit: config.watchLimit,
+        channels: config.channels,
+        alertTiming: config.alertTiming,
+        apiAccess: config.apiAccess,
+        weeklyReports: config.weeklyReports,
+        csvUpload: config.csvUpload,
+        webhooks: config.webhooks,
+      });
+    } catch (error) {
+      console.error("Error fetching tier config:", error);
+      res.status(500).json({ message: "Failed to fetch tier configuration." });
+    }
+  });
+
   app.post('/api/notification-preferences/verify-phone', isAuthenticated, async (req: any, res) => {
     try {
       const { phone_number, channel } = req.body;
@@ -1159,6 +1181,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (!channel || !['whatsapp', 'sms'].includes(channel)) {
         return res.status(400).json({ message: "Channel must be 'whatsapp' or 'sms'." });
+      }
+
+      const userPlan = req.user.subscriptionStatus || "free";
+      if (!isChannelAllowed(userPlan, channel as "whatsapp" | "sms")) {
+        const minPlan = channel === 'whatsapp' ? 'Pro' : 'Unlimited';
+        return res.status(403).json({ message: `${channel === 'whatsapp' ? 'WhatsApp' : 'SMS'} notifications require ${minPlan} plan or above.` });
       }
 
       cleanupExpiredOtps();

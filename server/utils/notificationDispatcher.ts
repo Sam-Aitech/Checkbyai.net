@@ -1,10 +1,11 @@
 import { db } from "../db";
-import { eq, and, gte, sql } from "drizzle-orm";
+import { eq, and, gte, lte, sql, isNull } from "drizzle-orm";
 import { companyWatches, notificationPreferences, notificationLog, users } from "@shared/schema";
 import type { SponsorChange } from "@shared/schema";
 import { normalizeName } from "./sponsorListFetcher";
 import { sendSMS, sendWhatsApp } from "../services/messaging";
 import { decryptPhone } from "./phoneCrypto";
+import { getTierConfig, getDeliverAfter, isChannelAllowed } from "./tierConfig";
 
 const MAX_NOTIFICATIONS_PER_DAY = 10;
 const FROM_ADDRESS = "Sponsor Monitor <alerts@checkbyai.net>";
@@ -180,7 +181,8 @@ async function logNotification(
   channel: string,
   status: string,
   providerMessageId?: string,
-  errorDetails?: string
+  errorDetails?: string,
+  deliverAfter?: Date | null
 ) {
   try {
     await db.insert(notificationLog).values({
@@ -189,6 +191,7 @@ async function logNotification(
       channel,
       status,
       sentAt: status === "sent" ? new Date() : null,
+      deliverAfter: deliverAfter || null,
       providerMessageId: providerMessageId || null,
       errorDetails: errorDetails || null,
     });
@@ -197,8 +200,65 @@ async function logNotification(
   }
 }
 
-export async function notifyAffectedUsers(change: SponsorChange): Promise<{ sent: number; skipped: number; failed: number }> {
-  const stats = { sent: 0, skipped: 0, failed: 0 };
+async function sendNotificationViaChannel(
+  channel: "email" | "sms" | "whatsapp",
+  userId: string,
+  changeId: number,
+  email: string | null,
+  smsNumber: string | null,
+  whatsappNumber: string | null,
+  subject: string,
+  html: string,
+  plainText: string,
+  stats: { sent: number; skipped: number; failed: number }
+) {
+  if (channel === "email") {
+    if (!email) {
+      await logNotification(userId, changeId, "email", "failed", undefined, "No email address on file");
+      stats.failed++;
+      return;
+    }
+    const result = await sendViaResend(email, subject, html);
+    if (result.success) {
+      console.log(`[NotificationDispatcher] Email sent to ${email}`);
+      await logNotification(userId, changeId, "email", "sent", result.providerMessageId);
+      stats.sent++;
+    } else {
+      console.error(`[NotificationDispatcher] Email failed to ${email}: ${result.error}`);
+      await logNotification(userId, changeId, "email", "failed", undefined, result.error);
+      stats.failed++;
+    }
+  } else if (channel === "sms") {
+    if (!smsNumber) return;
+    const phone = decryptPhone(smsNumber);
+    const result = await sendSMS(phone, plainText);
+    if (result.success) {
+      console.log(`[NotificationDispatcher] SMS sent to ${phone}`);
+      await logNotification(userId, changeId, "sms", "sent", result.providerMessageId);
+      stats.sent++;
+    } else {
+      console.error(`[NotificationDispatcher] SMS failed to ${phone}: ${result.error}`);
+      await logNotification(userId, changeId, "sms", "failed", undefined, result.error);
+      stats.failed++;
+    }
+  } else if (channel === "whatsapp") {
+    if (!whatsappNumber) return;
+    const phone = decryptPhone(whatsappNumber);
+    const result = await sendWhatsApp(phone, plainText);
+    if (result.success) {
+      console.log(`[NotificationDispatcher] WhatsApp sent to ${phone}`);
+      await logNotification(userId, changeId, "whatsapp", "sent", result.providerMessageId);
+      stats.sent++;
+    } else {
+      console.error(`[NotificationDispatcher] WhatsApp failed to ${phone}: ${result.error}`);
+      await logNotification(userId, changeId, "whatsapp", "failed", undefined, result.error);
+      stats.failed++;
+    }
+  }
+}
+
+export async function notifyAffectedUsers(change: SponsorChange): Promise<{ sent: number; skipped: number; failed: number; queued: number }> {
+  const stats = { sent: 0, skipped: 0, failed: 0, queued: 0 };
 
   try {
     const normalizedOrg = normalizeName(change.organisationName);
@@ -252,6 +312,21 @@ export async function notifyAffectedUsers(change: SponsorChange): Promise<{ sent
           continue;
         }
 
+        const userRecord = await db
+          .select({ email: users.email, subscriptionStatus: users.subscriptionStatus })
+          .from(users)
+          .where(eq(users.id, watch.userId))
+          .limit(1);
+
+        if (userRecord.length === 0) {
+          stats.failed++;
+          continue;
+        }
+
+        const userPlan = userRecord[0].subscriptionStatus || "free";
+        const tierConfig = getTierConfig(userPlan);
+        const deliverAfter = getDeliverAfter(userPlan);
+
         const prefs = await db
           .select()
           .from(notificationPreferences)
@@ -259,60 +334,32 @@ export async function notifyAffectedUsers(change: SponsorChange): Promise<{ sent
           .limit(1);
 
         const emailEnabled = prefs.length === 0 || prefs[0].emailEnabled;
+        let recipientEmail = prefs.length > 0 && prefs[0].email ? prefs[0].email : userRecord[0].email;
 
-        let recipientEmail: string | null = null;
-
-        if (prefs.length > 0 && prefs[0].email) {
-          recipientEmail = prefs[0].email;
-        } else {
-          const userRecord = await db
-            .select({ email: users.email })
-            .from(users)
-            .where(eq(users.id, watch.userId))
-            .limit(1);
-          recipientEmail = userRecord[0]?.email || null;
-        }
-
-        if (emailEnabled && recipientEmail) {
-          const result = await sendViaResend(recipientEmail, subject, html);
-          if (result.success) {
-            console.log(`[NotificationDispatcher] Email sent to ${recipientEmail} for "${change.organisationName}" (${change.changeType})`);
-            await logNotification(watch.userId, change.id, "email", "sent", result.providerMessageId);
-            stats.sent++;
-          } else {
-            console.error(`[NotificationDispatcher] Failed to send email to ${recipientEmail}: ${result.error}`);
-            await logNotification(watch.userId, change.id, "email", "failed", undefined, result.error);
-            stats.failed++;
+        if (deliverAfter) {
+          for (const channel of tierConfig.channels) {
+            if (channel === "email" && emailEnabled && recipientEmail) {
+              await logNotification(watch.userId, change.id, "email", "queued", undefined, undefined, deliverAfter);
+              stats.queued++;
+            } else if (channel === "whatsapp" && prefs.length > 0 && prefs[0].whatsappEnabled && prefs[0].whatsappVerified && prefs[0].whatsappNumber) {
+              await logNotification(watch.userId, change.id, "whatsapp", "queued", undefined, undefined, deliverAfter);
+              stats.queued++;
+            } else if (channel === "sms" && prefs.length > 0 && prefs[0].smsEnabled && prefs[0].smsVerified && prefs[0].smsNumber) {
+              await logNotification(watch.userId, change.id, "sms", "queued", undefined, undefined, deliverAfter);
+              stats.queued++;
+            }
           }
-        } else if (!emailEnabled) {
-          await logNotification(watch.userId, change.id, "email", "skipped", undefined, "Email notifications disabled by user");
+          console.log(`[NotificationDispatcher] Queued notifications for ${userPlan} user ${watch.userId} (deliver after ${deliverAfter.toISOString()})`);
+          continue;
         }
 
-        if (prefs.length > 0 && prefs[0].smsEnabled && prefs[0].smsVerified && prefs[0].smsNumber) {
-          const phoneNumber = decryptPhone(prefs[0].smsNumber);
-          const smsResult = await sendSMS(phoneNumber, plainText);
-          if (smsResult.success) {
-            console.log(`[NotificationDispatcher] SMS sent to ${phoneNumber} for "${change.organisationName}"`);
-            await logNotification(watch.userId, change.id, "sms", "sent", smsResult.providerMessageId);
-            stats.sent++;
-          } else {
-            console.error(`[NotificationDispatcher] SMS failed for ${phoneNumber}: ${smsResult.error}`);
-            await logNotification(watch.userId, change.id, "sms", "failed", undefined, smsResult.error);
-            stats.failed++;
-          }
-        }
-
-        if (prefs.length > 0 && prefs[0].whatsappEnabled && prefs[0].whatsappVerified && prefs[0].whatsappNumber) {
-          const phoneNumber = decryptPhone(prefs[0].whatsappNumber);
-          const waResult = await sendWhatsApp(phoneNumber, plainText);
-          if (waResult.success) {
-            console.log(`[NotificationDispatcher] WhatsApp sent to ${phoneNumber} for "${change.organisationName}"`);
-            await logNotification(watch.userId, change.id, "whatsapp", "sent", waResult.providerMessageId);
-            stats.sent++;
-          } else {
-            console.error(`[NotificationDispatcher] WhatsApp failed for ${phoneNumber}: ${waResult.error}`);
-            await logNotification(watch.userId, change.id, "whatsapp", "failed", undefined, waResult.error);
-            stats.failed++;
+        for (const channel of tierConfig.channels) {
+          if (channel === "email" && emailEnabled) {
+            await sendNotificationViaChannel("email", watch.userId, change.id, recipientEmail, null, null, subject, html, plainText, stats);
+          } else if (channel === "whatsapp" && prefs.length > 0 && prefs[0].whatsappEnabled && prefs[0].whatsappVerified && prefs[0].whatsappNumber) {
+            await sendNotificationViaChannel("whatsapp", watch.userId, change.id, null, null, prefs[0].whatsappNumber, subject, html, plainText, stats);
+          } else if (channel === "sms" && prefs.length > 0 && prefs[0].smsEnabled && prefs[0].smsVerified && prefs[0].smsNumber) {
+            await sendNotificationViaChannel("sms", watch.userId, change.id, null, prefs[0].smsNumber, null, subject, html, plainText, stats);
           }
         }
       } catch (err: any) {
@@ -322,10 +369,124 @@ export async function notifyAffectedUsers(change: SponsorChange): Promise<{ sent
       }
     }
 
-    console.log(`[NotificationDispatcher] Dispatch complete for "${change.organisationName}": ${stats.sent} sent, ${stats.skipped} skipped, ${stats.failed} failed`);
+    console.log(`[NotificationDispatcher] Dispatch complete for "${change.organisationName}": ${stats.sent} sent, ${stats.queued} queued, ${stats.skipped} skipped, ${stats.failed} failed`);
   } catch (err) {
     console.error("[NotificationDispatcher] Fatal error in notifyAffectedUsers:", err);
   }
 
   return stats;
+}
+
+export async function processDelayedNotifications(): Promise<{ delivered: number; failed: number }> {
+  const result = { delivered: 0, failed: 0 };
+  const now = new Date();
+
+  try {
+    const queuedNotifications = await db
+      .select({
+        logId: notificationLog.id,
+        userId: notificationLog.userId,
+        changeId: notificationLog.changeId,
+        channel: notificationLog.channel,
+      })
+      .from(notificationLog)
+      .where(
+        and(
+          eq(notificationLog.status, "queued"),
+          lte(notificationLog.deliverAfter, now)
+        )
+      )
+      .limit(100);
+
+    if (queuedNotifications.length === 0) return result;
+
+    console.log(`[NotificationDispatcher] Processing ${queuedNotifications.length} delayed notification(s)...`);
+
+    for (const notif of queuedNotifications) {
+      try {
+        const changeRecords = await db
+          .select()
+          .from((await import("@shared/schema")).sponsorChanges)
+          .where(eq((await import("@shared/schema")).sponsorChanges.id, notif.changeId))
+          .limit(1);
+
+        if (changeRecords.length === 0) {
+          await db.update(notificationLog).set({ status: "failed", errorDetails: "Change record not found" }).where(eq(notificationLog.id, notif.logId));
+          result.failed++;
+          continue;
+        }
+
+        const change = changeRecords[0];
+        const { subject, html } = buildEmailHtml(change.changeType, change.organisationName, change.previousValue, change.newValue);
+        const plainText = buildPlainTextAlert(change.changeType, change.organisationName, change.previousValue, change.newValue);
+
+        const prefs = await db
+          .select()
+          .from(notificationPreferences)
+          .where(eq(notificationPreferences.userId, notif.userId))
+          .limit(1);
+
+        const userRecord = await db
+          .select({ email: users.email })
+          .from(users)
+          .where(eq(users.id, notif.userId))
+          .limit(1);
+
+        const recipientEmail = prefs.length > 0 && prefs[0].email ? prefs[0].email : userRecord[0]?.email;
+
+        let success = false;
+        let providerMessageId: string | undefined;
+        let errorDetails: string | undefined;
+
+        if (notif.channel === "email" && recipientEmail) {
+          const sendResult = await sendViaResend(recipientEmail, subject, html);
+          success = sendResult.success;
+          providerMessageId = sendResult.providerMessageId;
+          errorDetails = sendResult.error;
+        } else if (notif.channel === "sms" && prefs.length > 0 && prefs[0].smsNumber) {
+          const phone = decryptPhone(prefs[0].smsNumber);
+          const sendResult = await sendSMS(phone, plainText);
+          success = sendResult.success;
+          providerMessageId = sendResult.providerMessageId;
+          errorDetails = sendResult.error;
+        } else if (notif.channel === "whatsapp" && prefs.length > 0 && prefs[0].whatsappNumber) {
+          const phone = decryptPhone(prefs[0].whatsappNumber);
+          const sendResult = await sendWhatsApp(phone, plainText);
+          success = sendResult.success;
+          providerMessageId = sendResult.providerMessageId;
+          errorDetails = sendResult.error;
+        } else {
+          errorDetails = "No recipient details available";
+        }
+
+        if (success) {
+          await db.update(notificationLog).set({
+            status: "sent",
+            sentAt: new Date(),
+            providerMessageId: providerMessageId || null,
+          }).where(eq(notificationLog.id, notif.logId));
+          result.delivered++;
+        } else {
+          await db.update(notificationLog).set({
+            status: "failed",
+            errorDetails: errorDetails || "Delivery failed",
+          }).where(eq(notificationLog.id, notif.logId));
+          result.failed++;
+        }
+      } catch (err: any) {
+        console.error(`[NotificationDispatcher] Error delivering queued notification ${notif.logId}:`, err.message);
+        await db.update(notificationLog).set({
+          status: "failed",
+          errorDetails: err.message || "Internal delivery error",
+        }).where(eq(notificationLog.id, notif.logId));
+        result.failed++;
+      }
+    }
+
+    console.log(`[NotificationDispatcher] Delayed delivery complete: ${result.delivered} delivered, ${result.failed} failed`);
+  } catch (err) {
+    console.error("[NotificationDispatcher] Fatal error in processDelayedNotifications:", err);
+  }
+
+  return result;
 }
