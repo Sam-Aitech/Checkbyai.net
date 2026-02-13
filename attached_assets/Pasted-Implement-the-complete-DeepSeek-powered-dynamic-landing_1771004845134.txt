@@ -1,0 +1,31 @@
+Implement the complete DeepSeek-powered dynamic landing page system for the Sponsor Licence Monitor in one comprehensive build. Execute these steps in order:
+
+Step 1: Database Schema
+Add a new table daily_digest using Drizzle ORM with columns: id (serial primary key), snapshot_date (date, not null, unique), added_count (integer not null), updated_count (integer not null), removed_count (integer not null), headline_generated (text not null), headline_variants (jsonb array of 3 variant objects), generated_at (timestamp default now), displayed_on_landing (boolean default false), selected_variant_index (integer default 0), and ai_model (text default 'deepseek-chat'). Run the migration immediately.
+
+Step 2: AI Service Layer
+Create services/aiDigest.ts. Install axios if needed. Implement generateHeadline(rawData) function that calls DeepSeek API at https://api.deepseek.com/chat/completions using model deepseek-chat, temperature 0.7, max_tokens 500. The prompt must request 3 headline variants in JSON format with fields: headline (under 12 words), subheadline (6-8 words), emotion, and focus. Implement validateHeadline(variant, rawData) to verify numbers match actual counts and sector claims (healthcare/care/NHS) only appear if 2+ companies match. Implement deterministicHeadline(rawData) as fallback returning "Yesterday: [removed] removed, [added] added, [updated] updated". Use environment variable DEEPSEEK_API_KEY from Replit Secrets.
+
+Step 3: Cron Job Enhancement
+Modify the existing daily sponsor monitor cron job (00:35 UTC). After detecting changes, count: addedCount (ADDED type), updatedCount (UPGRADED/DOWNGRADED/ROUTE_CHANGE/NAME_CHANGED types), removedCount (REMOVED type). Fetch first 10 removed and 5 added company names for context. Call generateHeadline. If validation passes, store headline and all 3 variants in daily_digest, set displayed_on_landing=true for this record and false for all others. If validation fails or API errors, use deterministicHeadline instead. Log success to console.
+
+Step 4: API Endpoint
+Create GET /api/daily-digest/current (public, no auth). Query the most recent daily_digest where displayed_on_landing=true. If none found, return 404. Fetch from sponsor_changes table: first 5 companies each for ADDED, UPDATED (any update type), and REMOVED for that snapshot date. Return JSON with: date, timestamp, counts object, headline, headlineVariants array, selectedVariantIndex, and companies object containing added/updated/removed arrays with name/townCity/typeRating. Set Cache-Control headers for 1-hour cache with stale-while-revalidate.
+
+Step 5: Frontend Component
+Create LandingDigest.tsx component using TanStack Query to fetch /api/daily-digest/current. Display header "Updated Licences on [date] at [time]". Show headline_generated prominently in large semibold text (text-2xl md:text-3xl) with fade-in animation. Create responsive three-column grid: Added (green Plus icon, green-600 count), Updated (blue RefreshCw icon, blue-600 count), Removed (red AlertTriangle icon, red-600 count, show "High risk" badge if >10). Each column lists first 5 company names. Added/Updated columns have "View all" text links. Removed column has "Protect yourself" CTA button linking to /monitor. Use bg-slate-50 container with border border-slate-200 rounded-lg. Stack columns vertically on mobile with Removed first.
+
+Step 6: Landing Page Integration
+Import and place LandingDigest component on the main landing page (/ route) between the hero section and pricing section. Add section heading "Live Register Monitor" with subtext "Real-time tracking of UK sponsor licence changes" above the component. Ensure it renders within max-w-6xl container.
+
+Step 7: Security & Validation
+Sanitize all company names in the AI prompt: remove backticks, quotes, control characters, truncate to 100 chars. Implement HMAC signature helper signDigest(digestData) using process.env.DIGEST_SIGNING_KEY and include signature in API response. Add rate limiting: 100 requests per minute per IP on the digest endpoint. Add audit logging table ai_generation_logs or console.log entries tracking: timestamp, snapshot_date, headline_generated, validation_passed, model_used.
+
+Step 8: Error Handling & Fallbacks
+If DeepSeek API fails or times out after 10 seconds, automatically use deterministicHeadline and continue. If API returns 404 (no digest yet), show "Today's update processing..." with skeleton loaders. If data is stale (>30 hours old), show amber warning badge "Last updated [X] hours ago". Create admin endpoint POST /api/admin/daily-digest/refresh (admin only) to manually trigger headline generation for testing.
+
+Step 9: A/B Testing Foundation
+Ensure headline_variants stores all 3 AI-generated options. Randomly select index 0, 1, or 2 with equal probability when saving, storing in selected_variant_index. Pass this index through to frontend. When user clicks "Protect yourself", append ?variant=[index] to the URL for future conversion tracking analysis.
+
+Step 10: Environment & Polish
+Add to Replit Secrets: DEEPSEEK_API_KEY and DIGEST_SIGNING_KEY. Add optional LANDING_DIGEST_ENABLED boolean (default true) to allow quick disable. If disabled, show static placeholder "Live updates resuming shortly". Ensure mobile responsive stacking works correctly. Verify Framer Motion count-up animation triggers when data loads. Test complete flow by manually triggering admin refresh and verifying landing page displays the dynamic headline with correct counts and company lists.
