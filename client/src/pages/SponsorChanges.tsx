@@ -75,11 +75,11 @@ export default function SponsorChanges() {
   return (
     <PageLayout>
       <SEOHead
-        title="Sponsor Licence Changes | CheckByAI"
-        description="Track recent changes to the UK Home Office Register of Licensed Sponsors. See which companies have been added, removed, upgraded, or downgraded in the last 7 days."
+        title="UK Sponsor Licence Revocations Today | Live Register Updates | CheckByAI"
+        description="Which UK sponsor licences were revoked today? See live changes from the Home Office register — additions, removals, downgrades — updated daily."
         canonicalUrl="https://checkbyai.net/sponsor-changes"
-        ogTitle="UK Sponsor Licence Changes: Last 7 Days"
-        ogDescription="Real-time monitoring of the UK sponsor licence register. Stay informed about companies being added, removed, or having their licence status changed."
+        ogTitle="Today's Sponsor Licence Changes | Who Lost Their Licence?"
+        ogDescription="Live daily updates from the UK sponsor licence register. See which employers lost their licence today."
         breadcrumbs={[
           { name: "Home", url: "https://checkbyai.net/" },
           { name: "Sponsor Changes", url: "https://checkbyai.net/sponsor-changes" }

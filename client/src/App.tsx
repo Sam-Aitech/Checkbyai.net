@@ -21,6 +21,9 @@ const ApiDocs = lazy(() => import("@/pages/ApiDocs"));
 const VerificationHistory = lazy(() => import("@/pages/VerificationHistory"));
 const SponsorMonitor = lazy(() => import("@/pages/SponsorMonitor"));
 const SponsorChanges = lazy(() => import("@/pages/SponsorChanges"));
+const CheckFakeCoS = lazy(() => import("@/pages/CheckFakeCoS"));
+const WhatToDoFakeCoS = lazy(() => import("@/pages/WhatToDoFakeCoS"));
+const About = lazy(() => import("@/pages/About"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 // Minimal loading component for route transitions
@@ -54,6 +57,9 @@ function Router() {
         <Route path="/history" component={VerificationHistory} />
         <Route path="/sponsor-monitor" component={SponsorMonitor} />
         <Route path="/sponsor-changes" component={SponsorChanges} />
+        <Route path="/check-fake-cos" component={CheckFakeCoS} />
+        <Route path="/what-to-do-fake-cos" component={WhatToDoFakeCoS} />
+        <Route path="/about" component={About} />
         <Route component={NotFound} />
       </Switch>
     </Suspense>

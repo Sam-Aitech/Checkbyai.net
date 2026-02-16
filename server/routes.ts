@@ -136,10 +136,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       { path: '/about', priority: '0.6', changefreq: 'monthly' },
       { path: '/privacy', priority: '0.4', changefreq: 'yearly' },
       { path: '/data-security', priority: '0.4', changefreq: 'yearly' },
-      { path: '/guides/how-to-check-cos-genuine', priority: '0.8', changefreq: 'monthly' },
-      { path: '/guides/cos-scams-red-flags', priority: '0.8', changefreq: 'monthly' },
-      { path: '/guides/employers-guide-fake-cos', priority: '0.7', changefreq: 'monthly' },
-      { path: '/guides/what-to-do-fake-cos', priority: '0.7', changefreq: 'monthly' },
+      { path: '/check-fake-cos', priority: '0.8', changefreq: 'monthly' },
+      { path: '/what-to-do-fake-cos', priority: '0.8', changefreq: 'monthly' },
+      { path: '/guides/how-to-check-cos-genuine', priority: '0.6', changefreq: 'monthly' },
+      { path: '/guides/cos-scams-red-flags', priority: '0.6', changefreq: 'monthly' },
+      { path: '/guides/employers-guide-fake-cos', priority: '0.5', changefreq: 'monthly' },
+      { path: '/guides/what-to-do-fake-cos', priority: '0.5', changefreq: 'monthly' },
     ];
 
     const urlEntries = urls.map(u => `  <url>
@@ -208,8 +210,9 @@ Disallow: /uploads/`;
 - [Recent Changes](https://checkbyai.net/sponsor-changes): Daily updates to the UK sponsor register
 - [Notification Plans](https://checkbyai.net/pricing): Starter (£24.99/mo) and Pro (£49.99/mo) alert plans
 - [CoS Check Plans](https://checkbyai.net/cos-pricing): Document verification credit packages
-- [How to Check CoS](https://checkbyai.net/guides/how-to-check-cos-genuine): Guide to verifying Certificate of Sponsorship
-- [CoS Scams](https://checkbyai.net/guides/cos-scams-red-flags): Red flags for fake CoS documents
+- [5 Signs Your CoS Might Be Fake](https://checkbyai.net/check-fake-cos): How to spot a fake Certificate of Sponsorship
+- [Bought a Fake CoS?](https://checkbyai.net/what-to-do-fake-cos): What to do if you've been scammed with a fraudulent CoS
+- [About CheckByAI](https://checkbyai.net/about): Our mission to stop visa fraud
 - [Our Technology](https://checkbyai.net/technology): How our AI verification works
 
 ## About
@@ -280,44 +283,56 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
 
   const seoMetaMap: Record<string, { title: string; description: string }> = {
     '/': {
-      title: 'UK Sponsor Licence Monitor & CoS Verification | Instant Revocation Alerts | CheckByAI',
-      description: 'Get instant WhatsApp, email and SMS alerts when a UK sponsor licence is revoked. Monitor your employer\'s licence status. Plus AI-powered CoS verification.',
+      title: 'Is Your UK Sponsor Licence Safe? | Instant Revocation Alerts | CheckByAI',
+      description: 'Don\'t get caught out by a sponsor licence revocation. Get instant WhatsApp, email and SMS alerts the moment your employer\'s licence status changes. Plus verify any Certificate of Sponsorship is genuine.',
     },
     '/sponsor-monitor': {
-      title: 'Sponsor Licence Monitor | Instant UK Sponsor Revocation Alerts | CheckByAI',
-      description: 'Get instant email, WhatsApp and SMS alerts when a UK sponsor licence is revoked, suspended or downgraded. Monitor the Home Office register automatically.',
+      title: 'Is Your Employer\'s Sponsor Licence Still Valid? | Free Check | CheckByAI',
+      description: 'Check any UK employer\'s sponsor licence status for free. Get instant alerts if it\'s revoked, suspended or downgraded — before it affects your visa.',
     },
     '/pricing': {
-      title: 'Notification Engine Pricing | UK Sponsor Licence Alerts from £24.99/mo | CheckByAI',
-      description: 'Get real-time UK sponsor licence revocation alerts. Starter plan £24.99/mo for 2 companies. Pro plan £49.99/mo for 5 companies with SMS and immediate alerts.',
+      title: 'Protect Your Visa | Sponsor Licence Alerts from £24.99/mo | CheckByAI',
+      description: 'Never be blindsided by a sponsor licence revocation. Get instant WhatsApp and email alerts. Starter £24.99/mo (2 companies), Pro £49.99/mo (5 companies, SMS + immediate alerts).',
     },
     '/cos-pricing': {
-      title: 'CoS Verification Pricing | AI Document Check Credits | CheckByAI',
-      description: 'AI-powered Certificate of Sponsorship verification credits. Detect fake CoS documents with forensic analysis. Plans from £24.99.',
+      title: 'Verify Your CoS is Genuine | Fake Document Detection from £24.99 | CheckByAI',
+      description: 'Worried your Certificate of Sponsorship might be fake? Verify it instantly with forensic AI analysis. Detect edited documents, forged metadata, and suspicious formatting.',
     },
     '/sponsor-changes': {
-      title: 'UK Sponsor Licence Changes Today | Live Register Updates | CheckByAI',
-      description: 'Track daily changes to the UK Home Office Register of Licensed Sponsors. See which companies have been added, removed, upgraded, or downgraded.',
+      title: 'UK Sponsor Licence Revocations Today | Live Register Updates | CheckByAI',
+      description: 'Which UK sponsor licences were revoked today? See live changes from the Home Office register — additions, removals, downgrades — updated daily.',
     },
     '/dashboard': {
-      title: 'Upload & Verify Certificate of Sponsorship | UK CoS Checker | CheckByAI',
-      description: 'Upload your Certificate of Sponsorship for instant AI verification. Detect fake or edited CoS documents with forensic metadata analysis.',
+      title: 'Verify Your Certificate of Sponsorship | Detect Fake CoS Documents | CheckByAI',
+      description: 'Upload your Certificate of Sponsorship and find out if it\'s genuine in under 60 seconds. Our forensic AI detects fakes, edits, and suspicious formatting. Your document is deleted immediately after checking.',
     },
     '/technology': {
-      title: 'Our AI Verification Technology | How CheckByAI Works',
-      description: 'Learn how CheckByAI uses forensic AI analysis, metadata extraction, and machine learning to verify UK Certificate of Sponsorship documents.',
+      title: 'How We Detect Fake Documents | Forensic AI Technology | CheckByAI',
+      description: 'Learn how our forensic AI catches fake Certificates of Sponsorship that humans miss. Metadata extraction, pattern analysis, and machine learning — explained.',
     },
     '/ai-guide': {
-      title: 'AI Document Verification Guide | How AI Detects Fake Documents | CheckByAI',
-      description: 'Understand how artificial intelligence detects forged and edited documents through metadata analysis, pattern recognition, and forensic techniques.',
+      title: 'How AI Catches Fake Visa Documents | Detection Guide | CheckByAI',
+      description: 'Understand how artificial intelligence detects forged visa documents through metadata forensics, pattern recognition, and document fingerprinting.',
     },
     '/cos-guide': {
-      title: 'Certificate of Sponsorship Guide | What is a CoS & How to Verify | CheckByAI',
-      description: 'Complete guide to UK Certificates of Sponsorship. Learn what a CoS is, how to verify it\'s genuine, and what to do if you suspect fraud.',
+      title: 'What Is a Certificate of Sponsorship? | Verification Guide | CheckByAI',
+      description: 'Everything you need to know about UK Certificates of Sponsorship. How to spot a fake CoS, what to check, and how to verify yours is genuine.',
     },
     '/login': {
-      title: 'Sign In | CheckByAI - UK Sponsor Licence Monitor',
-      description: 'Sign in to your CheckByAI account to access sponsor licence monitoring, alerts, and CoS verification tools.',
+      title: 'Sign In | CheckByAI — Protect Your UK Visa',
+      description: 'Sign in to manage your sponsor licence alerts and verify Certificates of Sponsorship.',
+    },
+    '/check-fake-cos': {
+      title: '5 Signs Your Certificate of Sponsorship Might Be Fake | CheckByAI',
+      description: 'How to spot a fake UK Certificate of Sponsorship. Learn the 5 warning signs of a fraudulent CoS document and what to do if you suspect yours isn\'t genuine.',
+    },
+    '/what-to-do-fake-cos': {
+      title: 'Bought a Fake CoS? Here\'s What To Do Next | CheckByAI',
+      description: 'If you\'ve paid for a fake Certificate of Sponsorship, act fast. Step-by-step guide: report to Action Fraud, contact an immigration solicitor, and recover your money.',
+    },
+    '/about': {
+      title: 'About CheckByAI | Our Mission to Stop Visa Fraud',
+      description: 'CheckByAI was built to protect visa applicants and employers from fake Certificates of Sponsorship. Learn about our mission, technology, and commitment to data privacy.',
     },
   };
 

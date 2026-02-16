@@ -51,11 +51,12 @@ export default function Footer() {
             <h4 className="editorial-caption mb-6 text-white/50">Resources</h4>
             <ul className="space-y-3">
               {[
+                { href: "/check-fake-cos", label: "Spot a Fake CoS" },
+                { href: "/what-to-do-fake-cos", label: "Bought a Fake CoS?" },
                 { href: "/cos-guide", label: "CoS Guide" },
-                { href: "/ai-guide", label: "AI Guide" },
                 { href: "/technology", label: "Our Technology" },
                 { href: "/about", label: "About Us" },
-                { href: "/privacy", label: "Privacy Policy" },
+                { href: "/privacy", label: "Privacy" },
                 { href: "/data-security", label: "Data Security" },
               ].map(link => (
                 <li key={link.href}>
@@ -88,9 +89,12 @@ export default function Footer() {
               </p>
             </div>
           </div>
-          <div className="text-center">
+          <div className="text-center space-y-2">
             <p className="text-xs text-white/30 font-medium tracking-wide">
               &copy; {new Date().getFullYear()} Check By AI. All rights reserved.
+            </p>
+            <p className="text-xs text-white/25">
+              CheckByAI is not affiliated with the UK Home Office or UK Visas and Immigration (UKVI).
             </p>
           </div>
         </div>

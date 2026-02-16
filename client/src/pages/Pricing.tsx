@@ -224,11 +224,11 @@ export default function Pricing() {
   return (
     <PageLayout>
       <SEOHead
-        title="Notification Engine Pricing | UK Sponsor Licence Alerts from £24.99/mo | CheckByAI"
-        description="Get real-time UK sponsor licence revocation alerts via WhatsApp, email and SMS. Starter plan £24.99/mo for 2 companies. Pro plan £49.99/mo for 5 companies with immediate alerts."
+        title="Protect Your Visa | Sponsor Licence Alerts from £24.99/mo | CheckByAI"
+        description="Never be blindsided by a sponsor licence revocation. Get instant WhatsApp and email alerts. Starter £24.99/mo (2 companies), Pro £49.99/mo (5 companies, SMS + immediate alerts)."
         canonicalUrl="https://checkbyai.net/pricing"
-        ogTitle="UK Sponsor Licence Alert Plans | From £24.99/mo"
-        ogDescription="Monitor your employer's sponsor licence and get instant alerts when it changes. Choose Starter or Pro plan."
+        ogTitle="Protect Your Visa | Sponsor Alerts from £24.99/mo"
+        ogDescription="Instant alerts when your employer's sponsor licence changes. Don't risk your visa status."
         keywords="sponsor licence alerts pricing, UK visa monitoring subscription, sponsor revocation alert plans, WhatsApp sponsor alerts"
         breadcrumbs={[
           { name: "Home", url: "https://checkbyai.net/" },

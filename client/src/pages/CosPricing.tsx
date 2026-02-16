@@ -286,11 +286,11 @@ export default function CosPricing() {
   return (
     <PageLayout>
       <SEOHead
-        title="CoS Verification Pricing | AI Document Check from £24.99 | CheckByAI"
-        description="AI-powered Certificate of Sponsorship verification. Detect fake CoS documents with forensic metadata analysis. Starter 50 credits, Pro 100 credits, Unlimited monthly checking."
+        title="Verify Your CoS is Genuine | Fake Document Detection from £24.99 | CheckByAI"
+        description="Worried your Certificate of Sponsorship might be fake? Verify it instantly with forensic AI analysis. Detect edited documents, forged metadata, and suspicious formatting."
         canonicalUrl="https://checkbyai.net/cos-pricing"
-        ogTitle="CoS Verification Credits | From £24.99"
-        ogDescription="Verify UK Certificate of Sponsorship documents with AI forensic analysis. Multiple credit packages available."
+        ogTitle="Don't Trust a Fake CoS | Verify from £24.99"
+        ogDescription="Worried your Certificate of Sponsorship is fake? Upload it for instant forensic verification."
         keywords="CoS verification pricing, certificate of sponsorship check cost, fake CoS detection, UK visa document verification"
         breadcrumbs={[
           { name: "Home", url: "https://checkbyai.net/" },

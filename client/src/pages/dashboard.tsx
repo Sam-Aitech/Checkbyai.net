@@ -4,12 +4,12 @@ import PageLayout from "@/components/PageLayout";
 
 export default function DashboardPage() {
   const dashboardSEO = {
-    title: "Upload & Verify Certificate of Sponsorship | UK CoS Checker",
-    description: "Upload your UK Certificate of Sponsorship and get instant AI-powered verification. Detect fake CoS documents with confidence scores and detailed authenticity reports. Fast, private, and accurate.",
+    title: "Verify Your Certificate of Sponsorship | Detect Fake CoS Documents | CheckByAI",
+    description: "Upload your Certificate of Sponsorship and find out if it's genuine in under 60 seconds. Our forensic AI detects fakes, edits, and suspicious formatting. Your document is deleted immediately after checking.",
     keywords: "verify Certificate of Sponsorship, UK CoS checker, upload CoS document, fake CoS detection, AI CoS verification, UK visa document check, sponsor verification",
     canonicalUrl: "https://checkbyai.net/dashboard",
-    ogTitle: "Verify Your Certificate of Sponsorship | AI CoS Checker",
-    ogDescription: "Upload and verify your Certificate of Sponsorship instantly with AI-powered authentication. Protect yourself from fake documents and visa scams.",
+    ogTitle: "Is Your CoS Genuine? | Upload & Verify Instantly",
+    ogDescription: "Upload your Certificate of Sponsorship for instant verification. Detect fakes before it's too late.",
     structuredData: {
       "@context": "https://schema.org",
       "@graph": [

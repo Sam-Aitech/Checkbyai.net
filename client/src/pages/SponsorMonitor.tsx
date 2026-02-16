@@ -844,11 +844,11 @@ export default function SponsorMonitor() {
   return (
     <PageLayout hideNav hideFooter>
       <SEOHead
-        title="Sponsor Licence Monitor | Instant UK Sponsor Revocation Alerts | CheckByAI"
-        description="Get instant email, WhatsApp and SMS alerts when a UK sponsor licence is revoked, suspended or downgraded. Monitor the Home Office register automatically."
+        title="Is Your Employer's Sponsor Licence Still Valid? | Free Check | CheckByAI"
+        description="Check any UK employer's sponsor licence status for free. Get instant alerts if it's revoked, suspended or downgraded — before it affects your visa."
         canonicalUrl="https://checkbyai.net/sponsor-monitor"
-        ogTitle="Sponsor Licence Monitor | Instant UK Sponsor Revocation Alerts | CheckByAI"
-        ogDescription="Get instant email, WhatsApp and SMS alerts when a UK sponsor licence is revoked, suspended or downgraded."
+        ogTitle="Is Your Employer's Sponsor Licence Still Valid? | Free Check | CheckByAI"
+        ogDescription="Check any UK employer's sponsor licence status for free. Get instant alerts if it's revoked, suspended or downgraded — before it affects your visa."
         breadcrumbs={[
           { name: "Home", url: "https://checkbyai.net/" },
           { name: "Sponsor Monitor", url: "https://checkbyai.net/sponsor-monitor" }
