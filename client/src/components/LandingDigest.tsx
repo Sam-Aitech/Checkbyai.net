@@ -8,6 +8,7 @@ import { Link } from "wouter";
 
 interface DigestData {
   available: boolean;
+  type: "overview" | "daily";
   date: string;
   headline: string;
   emotion: string;
@@ -89,8 +90,9 @@ export default function LandingDigest() {
 
   if (!data?.available) return null;
 
-  const { headline, emotion, counts, date } = data;
+  const { headline, emotion, counts, date, type } = data;
   const total = counts.added + counts.updated + counts.removed;
+  const hasChanges = type === "daily";
   const formattedDate = new Date(date + "T00:00:00").toLocaleDateString("en-GB", {
     weekday: "long",
     day: "numeric",
@@ -129,29 +131,56 @@ export default function LandingDigest() {
               {headline}
             </h2>
             <p className="text-muted-foreground mt-2 text-sm">
-              {total.toLocaleString()} total changes detected in the UK Home Office Register
+              {hasChanges
+                ? `${total.toLocaleString()} total changes detected in the UK Home Office Register`
+                : `${counts.added.toLocaleString()} sponsors actively monitored on the UK Home Office Register`}
             </p>
           </div>
 
           <div className="grid grid-cols-3 gap-6 sm:gap-12 mb-8">
-            <AnimatedCounter
-              value={counts.removed}
-              label="Revoked"
-              icon={<TrendingDown className="w-5 h-5 text-red-500" />}
-              color="bg-red-500/10"
-            />
-            <AnimatedCounter
-              value={counts.updated}
-              label="Updated"
-              icon={<RefreshCw className="w-5 h-5 text-amber-500" />}
-              color="bg-amber-500/10"
-            />
-            <AnimatedCounter
-              value={counts.added}
-              label="New Licences"
-              icon={<TrendingUp className="w-5 h-5 text-emerald-500" />}
-              color="bg-emerald-500/10"
-            />
+            {hasChanges ? (
+              <>
+                <AnimatedCounter
+                  value={counts.removed}
+                  label="Revoked"
+                  icon={<TrendingDown className="w-5 h-5 text-red-500" />}
+                  color="bg-red-500/10"
+                />
+                <AnimatedCounter
+                  value={counts.updated}
+                  label="Updated"
+                  icon={<RefreshCw className="w-5 h-5 text-amber-500" />}
+                  color="bg-amber-500/10"
+                />
+                <AnimatedCounter
+                  value={counts.added}
+                  label="New Licences"
+                  icon={<TrendingUp className="w-5 h-5 text-emerald-500" />}
+                  color="bg-emerald-500/10"
+                />
+              </>
+            ) : (
+              <>
+                <AnimatedCounter
+                  value={counts.added}
+                  label="Active Licences"
+                  icon={<TrendingUp className="w-5 h-5 text-emerald-500" />}
+                  color="bg-emerald-500/10"
+                />
+                <AnimatedCounter
+                  value={counts.removed}
+                  label="Revoked"
+                  icon={<TrendingDown className="w-5 h-5 text-red-500" />}
+                  color="bg-red-500/10"
+                />
+                <AnimatedCounter
+                  value={counts.updated}
+                  label="Changes Today"
+                  icon={<RefreshCw className="w-5 h-5 text-amber-500" />}
+                  color="bg-amber-500/10"
+                />
+              </>
+            )}
           </div>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">

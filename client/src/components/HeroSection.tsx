@@ -11,6 +11,7 @@ import { Link, useLocation } from 'wouter'
 import logoImg from "@assets/Checkbyai.net_(250_x_80_px)_(1)_1770958528706.png"
 import CreditCounter from '@/components/CreditCounter'
 import Footer from '@/components/Footer'
+import LandingDigest from '@/components/LandingDigest'
 
 const AnimatedBackground = lazy(() => import('./AnimatedBackground'))
 const Enhanced3DDemo = lazy(() => import('./Enhanced3DDemo'))
@@ -123,7 +124,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
           <div className="relative z-10 max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
             <nav className="flex justify-between items-center py-4 mb-6">
               <Link href="/" className="flex items-center gap-2.5">
-                <img src={logoImg} alt="CheckByAi.net" className="h-9 w-auto" width={250} height={80} fetchPriority="high" />
+                <img src={logoImg} alt="CheckByAi.net" className="h-9 w-auto" width={250} height={80} />
               </Link>
               <div className="hidden md:flex items-center gap-1">
                 {[
@@ -225,6 +226,8 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
           </div>
         </div>
       </div>
+
+      <LandingDigest />
 
       <section className="py-16 sm:py-20 bg-background">
         <div className="max-w-3xl mx-auto px-6 text-center">

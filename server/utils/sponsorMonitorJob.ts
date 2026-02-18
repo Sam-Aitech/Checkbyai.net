@@ -624,7 +624,82 @@ export function getLastRunInfo(): LastRunInfo | null {
   return lastRunInfo;
 }
 
+async function seedInitialDigest(): Promise<void> {
+  try {
+    const existing = await db.select({ id: dailyDigest.id }).from(dailyDigest).limit(1);
+    if (existing.length > 0) {
+      console.log("[SponsorMonitorJob] Daily digest already has data, skipping seed.");
+      return;
+    }
+
+    const stats = await db
+      .select({
+        total: sql<number>`count(*)::int`,
+        active: sql<number>`count(*) filter (where ${sponsorCanonical.status} = 'ACTIVE')::int`,
+        revoked: sql<number>`count(*) filter (where ${sponsorCanonical.status} = 'REMOVED')::int`,
+      })
+      .from(sponsorCanonical);
+
+    const { total, active, revoked } = stats[0] || { total: 0, active: 0, revoked: 0 };
+    if (total === 0) {
+      console.log("[SponsorMonitorJob] No sponsor data found, cannot seed digest.");
+      return;
+    }
+
+    const today = new Date().toISOString().split("T")[0];
+
+    const headline = `${active.toLocaleString()} UK Sponsors Under Watch`;
+    const variants = [
+      {
+        headline: `${active.toLocaleString()} UK Sponsors Tracked`,
+        subheadline: `Monitoring the full Home Office register`,
+        emotion: "informative",
+        focus: "overview",
+      },
+      {
+        headline: `${active.toLocaleString()} Active Sponsor Licences`,
+        subheadline: `Checked nightly for revocations and changes`,
+        emotion: "neutral",
+        focus: "overview",
+      },
+      {
+        headline: `Tracking ${active.toLocaleString()} UK Sponsors`,
+        subheadline: `Real-time monitoring of the official register`,
+        emotion: "informative",
+        focus: "overview",
+      },
+    ];
+
+    await db.insert(dailyDigest).values({
+      snapshotDate: today,
+      addedCount: active,
+      updatedCount: 0,
+      removedCount: revoked,
+      headlineGenerated: headline,
+      headlineVariants: variants,
+      displayedOnLanding: true,
+      selectedVariantIndex: 0,
+      aiModel: "deterministic-seed",
+    }).onConflictDoUpdate({
+      target: dailyDigest.snapshotDate,
+      set: {
+        headlineGenerated: headline,
+        headlineVariants: variants,
+        displayedOnLanding: true,
+      },
+    });
+
+    console.log(`[SponsorMonitorJob] Initial digest seeded: "${headline}" (${active} active, ${revoked} revoked sponsors)`);
+  } catch (err: any) {
+    console.error("[SponsorMonitorJob] Failed to seed initial digest:", err.message);
+  }
+}
+
 export function startSponsorMonitorCron(): void {
+  seedInitialDigest().catch((err) => {
+    console.error("[SponsorMonitorJob] Error in initial digest seed:", err);
+  });
+
   cron.schedule("30 0 * * *", () => {
     console.log("[SponsorMonitorJob] Cron trigger fired at", new Date().toISOString());
     runSponsorMonitorJob("cron").catch((err) => {

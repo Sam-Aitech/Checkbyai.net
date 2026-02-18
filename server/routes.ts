@@ -1126,8 +1126,11 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
         removed: digest.removedCount,
       });
 
+      const isSeed = digest.aiModel === "deterministic-seed";
+
       res.json({
         available: true,
+        type: isSeed ? "overview" : "daily",
         date: digest.snapshotDate,
         headline: selected.headline || digest.headlineGenerated,
         emotion: selected.emotion || "neutral",
@@ -1163,16 +1166,27 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
       const removedCompanies: string[] = [];
       const addedCompanies: string[] = [];
 
-      for (const c of latestChanges) {
-        if (c.changeType === "ADDED" || c.changeType === "NEW_LICENCE") {
-          addedCount += c.count;
-          if (addedCompanies.length < 5) addedCompanies.push(c.organisationName);
-        } else if (c.changeType === "REMOVED") {
-          removedCount += c.count;
-          if (removedCompanies.length < 10) removedCompanies.push(c.organisationName);
-        } else if (["UPGRADED", "DOWNGRADED", "ROUTE_CHANGE", "NAME_CHANGE"].includes(c.changeType)) {
-          updatedCount += c.count;
+      if (latestChanges.length > 0) {
+        for (const c of latestChanges) {
+          if (c.changeType === "ADDED" || c.changeType === "NEW_LICENCE") {
+            addedCount += c.count;
+            if (addedCompanies.length < 5) addedCompanies.push(c.organisationName);
+          } else if (c.changeType === "REMOVED") {
+            removedCount += c.count;
+            if (removedCompanies.length < 10) removedCompanies.push(c.organisationName);
+          } else if (["UPGRADED", "DOWNGRADED", "ROUTE_CHANGE", "NAME_CHANGE"].includes(c.changeType)) {
+            updatedCount += c.count;
+          }
         }
+      } else {
+        const stats = await db
+          .select({
+            active: sql<number>`count(*) filter (where ${sponsorCanonical.status} = 'ACTIVE')::int`,
+            revoked: sql<number>`count(*) filter (where ${sponsorCanonical.status} = 'REMOVED')::int`,
+          })
+          .from(sponsorCanonical);
+        addedCount = stats[0]?.active || 0;
+        removedCount = stats[0]?.revoked || 0;
       }
 
       const headlineResult = await generateHeadline({
