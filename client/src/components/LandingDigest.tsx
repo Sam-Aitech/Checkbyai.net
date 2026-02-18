@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { useInView } from "react-intersection-observer";
-import { TrendingDown, TrendingUp, RefreshCw, Bell, ArrowRight } from "lucide-react";
+import { TrendingDown, TrendingUp, RefreshCw, Bell, ArrowRight, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 
@@ -18,17 +18,18 @@ interface DigestData {
     updated: number;
     removed: number;
   };
+  activeSponsors: number;
   signature: string;
 }
 
-function AnimatedCounter({ value, label, icon, color }: { value: number; label: string; icon: React.ReactNode; color: string }) {
+function AnimatedCounter({ value, label, icon, color, large }: { value: number; label: string; icon: React.ReactNode; color: string; large?: boolean }) {
   const [ref, inView] = useInView({ triggerOnce: true, threshold: 0.3 });
   const [displayValue, setDisplayValue] = useState(0);
 
   useEffect(() => {
     if (!inView || value === 0) return;
     let start = 0;
-    const duration = 1200;
+    const duration = large ? 1800 : 1200;
     const step = Math.max(1, Math.floor(value / 60));
     const interval = setInterval(() => {
       start += step;
@@ -40,7 +41,29 @@ function AnimatedCounter({ value, label, icon, color }: { value: number; label: 
       }
     }, duration / 60);
     return () => clearInterval(interval);
-  }, [inView, value]);
+  }, [inView, value, large]);
+
+  if (large) {
+    return (
+      <motion.div
+        ref={ref}
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={inView ? { opacity: 1, scale: 1 } : {}}
+        transition={{ type: "spring", stiffness: 80, damping: 16, delay: 0.1 }}
+        className="text-center mb-6"
+      >
+        <div className="inline-flex items-center justify-center gap-3 mb-2">
+          <div className={`inline-flex items-center justify-center w-10 h-10 rounded-xl ${color}`}>
+            {icon}
+          </div>
+          <span className="text-4xl sm:text-5xl md:text-6xl font-extrabold bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent tabular-nums tracking-tight">
+            {displayValue.toLocaleString()}
+          </span>
+        </div>
+        <p className="text-sm sm:text-base text-muted-foreground font-medium">{label}</p>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div
@@ -75,6 +98,7 @@ export default function LandingDigest() {
       <section className="py-12 sm:py-16">
         <div className="max-w-4xl mx-auto px-4">
           <div className="animate-pulse space-y-4">
+            <div className="h-10 bg-muted rounded w-1/3 mx-auto" />
             <div className="h-6 bg-muted rounded w-2/3 mx-auto" />
             <div className="h-4 bg-muted rounded w-1/2 mx-auto" />
             <div className="flex justify-center gap-12 mt-8">
@@ -90,7 +114,7 @@ export default function LandingDigest() {
 
   if (!data?.available) return null;
 
-  const { headline, emotion, counts, date, type } = data;
+  const { headline, emotion, counts, date, type, activeSponsors } = data;
   const total = counts.added + counts.updated + counts.removed;
   const hasChanges = type === "daily";
   const formattedDate = new Date(date + "T00:00:00").toLocaleDateString("en-GB", {
@@ -123,21 +147,34 @@ export default function LandingDigest() {
             </span>
           </div>
 
-          <div className="text-center mb-8">
-            <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">
+          <div className="text-center mb-4">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground mb-4">
               {formattedDate}
             </p>
+
+            {activeSponsors > 0 && (
+              <AnimatedCounter
+                value={activeSponsors}
+                label="Active Licensed Sponsors on the UK Register"
+                icon={<Shield className="w-5 h-5 text-emerald-600" />}
+                color="bg-emerald-500/15"
+                large
+              />
+            )}
+
+            <div className="w-16 h-px bg-border mx-auto my-5" />
+
             <h2 className="text-2xl sm:text-3xl font-bold text-foreground leading-tight">
               {headline}
             </h2>
             <p className="text-muted-foreground mt-2 text-sm">
               {hasChanges
                 ? `${total.toLocaleString()} total changes detected in the UK Home Office Register`
-                : `${counts.added.toLocaleString()} sponsors actively monitored on the UK Home Office Register`}
+                : `Monitoring the complete UK Home Office Register of Licensed Sponsors`}
             </p>
           </div>
 
-          <div className="grid grid-cols-3 gap-6 sm:gap-12 mb-8">
+          <div className="grid grid-cols-3 gap-6 sm:gap-12 mb-8 mt-6">
             {hasChanges ? (
               <>
                 <AnimatedCounter

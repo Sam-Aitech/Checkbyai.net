@@ -1128,6 +1128,12 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
 
       const isSeed = digest.aiModel === "deterministic-seed";
 
+      const [activeResult] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(sponsorCanonical)
+        .where(eq(sponsorCanonical.status, "ACTIVE"));
+      const activeSponsors = activeResult?.count ?? 0;
+
       res.json({
         available: true,
         type: isSeed ? "overview" : "daily",
@@ -1140,6 +1146,7 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
           updated: digest.updatedCount,
           removed: digest.removedCount,
         },
+        activeSponsors,
         signature,
       });
     } catch (error) {
