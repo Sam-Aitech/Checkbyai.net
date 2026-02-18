@@ -33,7 +33,7 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
           <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
             <div className="flex justify-between items-center h-16">
               <Link href="/" className="flex items-center shrink-0">
-                <img src={logoImg} alt="CheckByAi.net" className="h-8 w-auto" />
+                <img src={logoImg} alt="CheckByAi.net" className="h-8 w-auto" width={250} height={80} />
               </Link>
 
               <div className="hidden lg:flex items-center gap-1">

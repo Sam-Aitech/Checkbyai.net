@@ -164,6 +164,8 @@ export default function LoginPage() {
                 src={logoImg} 
                 alt="CheckByAi.net Logo - AI-powered Certificate of Sponsorship Verification" 
                 className="h-16 w-auto sm:h-20"
+                width={250}
+                height={80}
                 loading="eager"
               />
             </div>

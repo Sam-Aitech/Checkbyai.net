@@ -65,11 +65,10 @@
     <link rel="manifest" href="/site.webmanifest" />
     
     <!-- Resource Hints for Performance -->
-    <!-- DNS Prefetch for external domains -->
+    <link rel="preconnect" href="https://www.youtube.com" crossorigin />
     <link rel="dns-prefetch" href="https://www.youtube.com" />
-    
-    <!-- Preload critical assets -->
-    <link rel="modulepreload" href="/src/main.tsx" />
+    <link rel="preconnect" href="https://replit.com" crossorigin />
+    <link rel="dns-prefetch" href="https://replit.com" />
     
     <!-- Optimize system font rendering -->
     <style>
@@ -80,7 +79,29 @@
       }
     </style>
     
-    <!-- Structured Data -->
+  </head>
+  <body>
+    <div id="root">
+      <!-- SEO content before React loads -->
+      <h1 style="font-size: 2.5rem; font-weight: bold; color: #1f2937; margin: 2rem; text-align: center;">
+        UK Certificate of Sponsorship Verification
+      </h1>
+      <p style="color: #6b7280; margin: 1rem 2rem; text-align: center;">
+        Free AI-powered <a href="/cos-check-ai" style="color: #2563eb; text-decoration: underline;">Certificate of Sponsorship checker</a> 
+        for <a href="/dashboard" style="color: #2563eb; text-decoration: underline;">UK Skilled Worker visa applicants</a>. 
+        Verify your CoS document meets <a href="/guides/how-to-check-cos-genuine" style="color: #2563eb; text-decoration: underline;">Home Office requirements</a> 
+        and detect <a href="/guides/cos-scams-red-flags" style="color: #2563eb; text-decoration: underline;">fake CoS documents</a> instantly.
+        This tool is designed exclusively for UK immigration documents.
+      </p>
+      <nav style="text-align: center; margin: 2rem;">
+        <a href="/" style="color: #2563eb; text-decoration: underline; margin: 0 1rem;">Home</a>
+        <a href="/dashboard" style="color: #2563eb; text-decoration: underline; margin: 0 1rem;">Verify UK CoS</a>
+        <a href="/cos-check-ai" style="color: #2563eb; text-decoration: underline; margin: 0 1rem;">How It Works</a>
+        <a href="/guides/how-to-check-cos-genuine" style="color: #2563eb; text-decoration: underline; margin: 0 1rem;">UK CoS Guides</a>
+      </nav>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script type="text/javascript" src="https://replit.com/public/js/replit-dev-banner.js" defer></script>
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -165,8 +186,6 @@
       }
     }
     </script>
-    
-    <!-- Organization/Software Application Schema -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -193,8 +212,6 @@
       }
     }
     </script>
-    
-    <!-- Organization Schema -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -219,29 +236,5 @@
       }
     }
     </script>
-  </head>
-  <body>
-    <div id="root">
-      <!-- SEO content before React loads -->
-      <h1 style="font-size: 2.5rem; font-weight: bold; color: #1f2937; margin: 2rem; text-align: center;">
-        UK Certificate of Sponsorship Verification
-      </h1>
-      <p style="color: #6b7280; margin: 1rem 2rem; text-align: center;">
-        Free AI-powered <a href="/cos-check-ai" style="color: #2563eb; text-decoration: underline;">Certificate of Sponsorship checker</a> 
-        for <a href="/dashboard" style="color: #2563eb; text-decoration: underline;">UK Skilled Worker visa applicants</a>. 
-        Verify your CoS document meets <a href="/guides/how-to-check-cos-genuine" style="color: #2563eb; text-decoration: underline;">Home Office requirements</a> 
-        and detect <a href="/guides/cos-scams-red-flags" style="color: #2563eb; text-decoration: underline;">fake CoS documents</a> instantly.
-        This tool is designed exclusively for UK immigration documents.
-      </p>
-      <nav style="text-align: center; margin: 2rem;">
-        <a href="/" style="color: #2563eb; text-decoration: underline; margin: 0 1rem;">Home</a>
-        <a href="/dashboard" style="color: #2563eb; text-decoration: underline; margin: 0 1rem;">Verify UK CoS</a>
-        <a href="/cos-check-ai" style="color: #2563eb; text-decoration: underline; margin: 0 1rem;">How It Works</a>
-        <a href="/guides/how-to-check-cos-genuine" style="color: #2563eb; text-decoration: underline; margin: 0 1rem;">UK CoS Guides</a>
-      </nav>
-    </div>
-    <script type="module" src="/src/main.tsx"></script>
-    <!-- This is a replit script which adds a banner on the top of the page when opened in development mode outside the replit environment -->
-    <script type="text/javascript" src="https://replit.com/public/js/replit-dev-banner.js"></script>
   </body>
 </html>

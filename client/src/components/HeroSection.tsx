@@ -67,8 +67,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
   const [hasSearched, setHasSearched] = useState(false)
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoaded(true), 300)
-    return () => clearTimeout(timer)
+    setIsLoaded(true)
   }, [])
 
   const handleSearchSubmit = async () => {
@@ -124,7 +123,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
           <div className="relative z-10 max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
             <nav className="flex justify-between items-center py-4 mb-6">
               <Link href="/" className="flex items-center gap-2.5">
-                <img src={logoImg} alt="CheckByAi.net" className="h-9 w-auto" />
+                <img src={logoImg} alt="CheckByAi.net" className="h-9 w-auto" width={250} height={80} fetchPriority="high" />
               </Link>
               <div className="hidden md:flex items-center gap-1">
                 {[
