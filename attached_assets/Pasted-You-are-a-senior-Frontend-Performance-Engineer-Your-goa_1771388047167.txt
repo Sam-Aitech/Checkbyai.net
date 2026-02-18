@@ -1,0 +1,46 @@
+You are a senior Frontend Performance Engineer. Your goal is to improve this site’s Mobile Lighthouse performance and Core Web Vitals WITHOUT changing the UI/UX or breaking functionality.
+
+Context (from Lighthouse screenshot): problems include Render-blocking requests (~1050ms), Forced reflow, LCP breakdown, Network dependency tree, Document request latency, and Improve image delivery.
+
+WORKFLOW (must follow exactly):
+1) Detect the stack (Next.js / React / Vite / plain HTML, etc.) and identify the main entry files (layout/index, app shell, router, bundler config).
+2) Run/replicate a baseline Lighthouse test (mobile, slow 4G) using available scripts/tools in the repo. Record baseline metrics: Performance score, FCP, LCP, CLS, TBT, TTI, total JS/CSS size, main thread time. Save them in a short markdown report at /docs/perf-baseline.md.
+3) Fix issues ITERATIVELY in small, safe commits. After each step:
+   - explain what you changed and why (1–2 paragraphs)
+   - list exact files modified
+   - rerun Lighthouse
+   - record before/after metrics in /docs/perf-progress.md
+   - stop if a change causes regression and revert it.
+
+PRIORITY FIXES (implement in this order):
+A) Eliminate render-blocking resources:
+   - Ensure all non-critical JS is loaded with defer/async; avoid blocking scripts in <head>.
+   - Move non-critical CSS to non-blocking loading (or split critical CSS vs rest).
+   - If using a framework: use dynamic import / code-splitting for below-the-fold components.
+   - Add preconnect/dns-prefetch for critical origins (fonts/CDN) only if actually used.
+B) Reduce LCP time:
+   - Identify the LCP element and optimize it: preloading if appropriate, reduce CSS/JS delaying it, optimize images (proper sizing, modern formats).
+   - Ensure hero image uses responsive sizes (srcset/sizes), compression, and is not lazy-loaded if it’s the LCP element.
+C) Fix forced reflow / layout thrashing:
+   - Find any JS that reads layout then writes layout in loops/scroll handlers.
+   - Batch DOM reads/writes, use requestAnimationFrame for animations, avoid synchronous measurements in critical path.
+D) Improve image delivery:
+   - Convert large images to WebP/AVIF where supported.
+   - Add width/height attributes to prevent layout shift.
+   - Ensure lazy-loading for below-the-fold images and proper caching headers if applicable.
+E) Reduce network dependency/latency:
+   - Remove unused third-party scripts or delay them until user interaction/after load.
+   - Enable compression (gzip/brotli) and long-lived caching for static assets if server-config exists (or add it if using Node/Express).
+   - Minimize number of critical requests on initial load.
+
+CONSTRAINTS:
+- Do not change visible design, copy, or layout except for imperceptible performance improvements.
+- Do not remove analytics/necessary scripts; instead, delay/load them after interactive if possible.
+- Keep changes minimal and explain any trade-offs.
+
+SUCCESS CRITERIA (targets):
+- Mobile Lighthouse Performance: +20 points or reach 90+ if feasible
+- LCP < 2.5s (or as close as possible), CLS < 0.1, reduce TBT
+- Remove/meaningfully reduce “Render-blocking requests” warning
+
+Start now by step (1): detect the stack and identify what is likely causing render-blocking resources. Then proceed with baseline measurement in step (2).
