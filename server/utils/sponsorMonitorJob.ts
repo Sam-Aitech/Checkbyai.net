@@ -1,7 +1,7 @@
 import cron from "node-cron";
 import stringSimilarity from "string-similarity";
 import { db } from "../db";
-import { sponsorCanonical, sponsorChanges, dailyDigest } from "@shared/schema";
+import { sponsorCanonical, sponsorChanges, dailyDigest, monitorJobRuns } from "@shared/schema";
 import { eq, and, ne, sql } from "drizzle-orm";
 import {
   downloadAndParseSponsorList,
@@ -494,6 +494,19 @@ export async function runSponsorMonitorJob(source: string = "cron"): Promise<{
 
     const today = new Date().toISOString().split("T")[0];
 
+    const existingRun = await db
+      .select({ id: monitorJobRuns.id, status: monitorJobRuns.status })
+      .from(monitorJobRuns)
+      .where(eq(monitorJobRuns.runDate, today))
+      .limit(1);
+
+    if (existingRun.length > 0 && existingRun[0].status === "success" && source === "cron") {
+      const msg = `Reconciliation already completed successfully for ${today}. Skipping duplicate cron run.`;
+      console.log(`[SponsorMonitorJob] ${msg}`);
+      result.success = true;
+      return { ...result, error: msg };
+    }
+
     console.log(`[SponsorMonitorJob] Storing snapshot for ${today} (${currentRecords.length} records)...`);
     await storeSnapshot(currentRecords, today);
 
@@ -519,51 +532,43 @@ export async function runSponsorMonitorJob(source: string = "cron"): Promise<{
     }
     result.changes = changeCounts;
 
-    const alertableChanges = detectedChanges.filter(
-      (c) => c.changeType !== "NAME_CHANGE"
-    );
-
-    if (alertableChanges.length > 0) {
-      console.log(`[SponsorMonitorJob] Saving ${detectedChanges.length} changes (${alertableChanges.length} alertable) and dispatching notifications...`);
-
-      for (const change of detectedChanges) {
+    if (detectedChanges.length > 0) {
+      console.log(`[SponsorMonitorJob] Saving ${detectedChanges.length} changes in batches...`);
+      const CHANGE_BATCH = 500;
+      const savedChanges: any[] = [];
+      
+      for (let i = 0; i < detectedChanges.length; i += CHANGE_BATCH) {
+        const batch = detectedChanges.slice(i, i + CHANGE_BATCH);
         try {
-          const [savedChange] = await db
-            .insert(sponsorChanges)
-            .values({
+          const inserted = await db.insert(sponsorChanges).values(
+            batch.map(change => ({
               organisationName: change.organisationName,
               changeType: change.changeType,
               previousValue: change.previousValue,
               newValue: change.newValue,
               snapshotDate: today,
-            })
-            .returning();
+            }))
+          ).returning();
+          savedChanges.push(...inserted);
+        } catch (err: any) {
+          console.error(`[SponsorMonitorJob] Error inserting change batch at ${i}:`, err.message);
+        }
+      }
+      console.log(`[SponsorMonitorJob] ${savedChanges.length} changes saved.`);
 
-          if (change.changeType !== "NAME_CHANGE") {
+      const alertableSaved = savedChanges.filter((c: any) => c.changeType !== "NAME_CHANGE");
+      if (alertableSaved.length > 0) {
+        console.log(`[SponsorMonitorJob] Dispatching notifications for ${alertableSaved.length} alertable changes...`);
+        for (const savedChange of alertableSaved) {
+          try {
             const notifResult = await notifyAffectedUsers(savedChange);
             result.notificationsSent += notifResult.sent;
             result.notificationsSkipped += notifResult.skipped;
             result.notificationsFailed += notifResult.failed;
+          } catch (err: any) {
+            console.error(`[SponsorMonitorJob] Notification error for "${savedChange.organisationName}":`, err.message);
+            result.notificationsFailed += 1;
           }
-        } catch (err: any) {
-          console.error(`[SponsorMonitorJob] Error processing change for "${change.organisationName}":`, err.message);
-        }
-      }
-    } else if (detectedChanges.length > 0) {
-      console.log(`[SponsorMonitorJob] ${detectedChanges.length} changes detected (all non-alertable, e.g. name corrections).`);
-      for (const change of detectedChanges) {
-        try {
-          await db
-            .insert(sponsorChanges)
-            .values({
-              organisationName: change.organisationName,
-              changeType: change.changeType,
-              previousValue: change.previousValue,
-              newValue: change.newValue,
-              snapshotDate: today,
-            });
-        } catch (err: any) {
-          console.error(`[SponsorMonitorJob] Error saving non-alertable change for "${change.organisationName}":`, err.message);
         }
       }
     } else {
@@ -627,6 +632,34 @@ export async function runSponsorMonitorJob(source: string = "cron"): Promise<{
       console.error("[SponsorMonitorJob] Failed to generate daily digest:", digestErr.message);
     }
 
+    await db.insert(monitorJobRuns).values({
+      runDate: today,
+      source,
+      status: "success",
+      recordsProcessed: result.recordsProcessed,
+      changesDetected: detectedChanges.length,
+      changeSummary: changeCounts,
+      notificationsSent: result.notificationsSent,
+      notificationsSkipped: result.notificationsSkipped,
+      notificationsFailed: result.notificationsFailed,
+      durationMs: Date.now() - startTime,
+      completedAt: new Date(),
+    }).onConflictDoUpdate({
+      target: monitorJobRuns.runDate,
+      set: {
+        source,
+        status: "success",
+        recordsProcessed: result.recordsProcessed,
+        changesDetected: detectedChanges.length,
+        changeSummary: changeCounts,
+        notificationsSent: result.notificationsSent,
+        notificationsSkipped: result.notificationsSkipped,
+        notificationsFailed: result.notificationsFailed,
+        durationMs: Date.now() - startTime,
+        completedAt: new Date(),
+      },
+    });
+
     console.log(`[SponsorMonitorJob] Cleaning up snapshots older than 90 days...`);
     await cleanupOldSnapshots(90);
 
@@ -648,6 +681,29 @@ export async function runSponsorMonitorJob(source: string = "cron"): Promise<{
     const errorMsg = `Unexpected error: ${err.message}`;
     console.error(`[SponsorMonitorJob] ${errorMsg}`, err);
     await sendAdminFailureAlert(errorMsg);
+      try {
+        const today = new Date().toISOString().split("T")[0];
+        await db.insert(monitorJobRuns).values({
+          runDate: today,
+          source,
+          status: "failed",
+          recordsProcessed: result.recordsProcessed,
+          changesDetected: 0,
+          durationMs: Date.now() - startTime,
+          errorMessage: err.message,
+          completedAt: new Date(),
+        }).onConflictDoUpdate({
+          target: monitorJobRuns.runDate,
+          set: {
+            status: "failed",
+            errorMessage: err.message,
+            durationMs: Date.now() - startTime,
+            completedAt: new Date(),
+          },
+        });
+      } catch (logErr) {
+        console.error("[SponsorMonitorJob] Failed to log job failure:", logErr);
+      }
     return { ...result, error: errorMsg };
   } finally {
     isRunning = false;

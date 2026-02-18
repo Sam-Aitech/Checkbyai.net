@@ -345,6 +345,23 @@ export const aiGenerationLogs = pgTable("ai_generation_logs", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const monitorJobRuns = pgTable("monitor_job_runs", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  runDate: date("run_date").notNull().unique(),
+  source: varchar("source").notNull(),
+  status: varchar("status").notNull(),
+  recordsProcessed: integer("records_processed").default(0),
+  changesDetected: integer("changes_detected").default(0),
+  changeSummary: jsonb("change_summary"),
+  notificationsSent: integer("notifications_sent").default(0),
+  notificationsSkipped: integer("notifications_skipped").default(0),
+  notificationsFailed: integer("notifications_failed").default(0),
+  durationMs: integer("duration_ms"),
+  errorMessage: text("error_message"),
+  startedAt: timestamp("started_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
 // Type exports
 export type DailyDigest = typeof dailyDigest.$inferSelect;
 export type AiGenerationLog = typeof aiGenerationLogs.$inferSelect;
@@ -426,3 +443,10 @@ export const insertNotificationLogSchema = createInsertSchema(notificationLog).o
   id: true,
 });
 export type InsertNotificationLog = z.infer<typeof insertNotificationLogSchema>;
+
+export const insertMonitorJobRunSchema = createInsertSchema(monitorJobRuns).omit({
+  id: true,
+  startedAt: true,
+});
+export type InsertMonitorJobRun = z.infer<typeof insertMonitorJobRunSchema>;
+export type MonitorJobRun = typeof monitorJobRuns.$inferSelect;
