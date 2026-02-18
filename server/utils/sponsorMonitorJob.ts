@@ -181,88 +181,131 @@ async function reconcile(
   const changes: SponsorChange[] = [];
   const matchedFingerprints = new Set<string>();
   const newRecordsToday: TodayRecord[] = [];
+  const matchedIds: number[] = [];
+  const individualUpdates: { id: number; todayRec: TodayRecord; canonical: CanonicalRecord }[] = [];
 
-  // Phase 1: Process today's records against canonical
+  // Phase 1: Compare today's records against canonical (in-memory first)
+  console.log(`[Reconciliation] Phase 1: Comparing ${todayMap.size} records against ${canonicalMap.size} canonical...`);
   for (const [fp, todayRec] of Array.from(todayMap.entries())) {
     const canonical = canonicalMap.get(fp);
 
     if (canonical) {
       matchedFingerprints.add(fp);
-
-      await db
-        .update(sponsorCanonical)
-        .set({
-          lastSeen: today,
-          consecutiveMisses: 0,
-          currentName: todayRec.organisationName,
-          typeRating: todayRec.typeRating || null,
-          route: todayRec.route || null,
-        })
-        .where(eq(sponsorCanonical.id, canonical.id));
+      matchedIds.push(canonical.id);
 
       const prevRating = (canonical.typeRating ?? "").trim();
       const currRating = (todayRec.typeRating ?? "").trim();
-      if (prevRating && currRating && prevRating !== currRating) {
-        const ratingChange = classifyRatingChange(prevRating, currRating);
-        if (ratingChange) {
+      const nameChanged = canonical.currentName !== todayRec.organisationName;
+      const ratingChanged = prevRating && currRating && prevRating !== currRating;
+      const routeChanged = (canonical.route ?? "").trim() !== (todayRec.route ?? "").trim();
+
+      if (nameChanged || ratingChanged || routeChanged) {
+        individualUpdates.push({ id: canonical.id, todayRec, canonical });
+
+        if (ratingChanged) {
+          const ratingChange = classifyRatingChange(prevRating, currRating);
+          if (ratingChange) {
+            changes.push({
+              organisationName: todayRec.organisationName,
+              changeType: ratingChange,
+              previousValue: prevRating,
+              newValue: currRating,
+            });
+          }
+        }
+
+        if (nameChanged) {
           changes.push({
             organisationName: todayRec.organisationName,
-            changeType: ratingChange,
-            previousValue: prevRating,
-            newValue: currRating,
+            changeType: "NAME_CHANGE",
+            previousValue: canonical.currentName,
+            newValue: todayRec.organisationName,
           });
         }
-      }
-
-      if (canonical.currentName !== todayRec.organisationName) {
-        const existingHistorical = canonical.historicalNames || [];
-        if (!existingHistorical.includes(canonical.currentName)) {
-          await db
-            .update(sponsorCanonical)
-            .set({
-              historicalNames: sql`array_append(${sponsorCanonical.historicalNames}, ${canonical.currentName})`,
-            })
-            .where(eq(sponsorCanonical.id, canonical.id));
-        }
-
-        changes.push({
-          organisationName: todayRec.organisationName,
-          changeType: "NAME_CHANGE",
-          previousValue: canonical.currentName,
-          newValue: todayRec.organisationName,
-        });
       }
     } else {
       newRecordsToday.push(todayRec);
     }
   }
 
-  // Phase 1b: Insert genuinely new records
-  for (const newRec of newRecordsToday) {
-    try {
-      await db.insert(sponsorCanonical).values({
-        fingerprint: newRec.fingerprint,
-        currentName: newRec.organisationName,
-        townCity: newRec.townCity || null,
-        typeRating: newRec.typeRating || null,
-        route: newRec.route || null,
-        status: "ACTIVE",
-        firstSeen: today,
-        lastSeen: today,
-        consecutiveMisses: 0,
-        historicalNames: [],
-      }).onConflictDoNothing();
-
-      changes.push({
-        organisationName: newRec.organisationName,
-        changeType: "NEW_LICENCE",
-        previousValue: null,
-        newValue: newRec.typeRating || null,
-      });
-    } catch (err: any) {
-      console.error(`[Reconciliation] Error inserting new canonical "${newRec.organisationName}":`, err.message);
+  // Phase 1a: Bulk update all matched records (lastSeen + consecutiveMisses reset)
+  console.log(`[Reconciliation] Phase 1a: Bulk updating ${matchedIds.length} matched records...`);
+  const BULK_BATCH = 1000;
+  for (let i = 0; i < matchedIds.length; i += BULK_BATCH) {
+    const batch = matchedIds.slice(i, i + BULK_BATCH);
+    const placeholders = batch.map((id) => sql`${id}`);
+    const arrayExpr = sql`ARRAY[${sql.join(placeholders, sql`, `)}]::int[]`;
+    await db.execute(sql`
+      UPDATE sponsor_canonical 
+      SET last_seen = ${today}, consecutive_misses = 0 
+      WHERE id = ANY(${arrayExpr})
+    `);
+    if ((i + BULK_BATCH) % 10000 === 0 || i + BULK_BATCH >= matchedIds.length) {
+      console.log(`[Reconciliation]   ...updated ${Math.min(i + BULK_BATCH, matchedIds.length)}/${matchedIds.length}`);
     }
   }
+
+  // Phase 1b: Individual updates for records with actual changes (name/rating)
+  console.log(`[Reconciliation] Phase 1b: ${individualUpdates.length} records with name/rating changes...`);
+  for (const { id, todayRec, canonical } of individualUpdates) {
+    await db
+      .update(sponsorCanonical)
+      .set({
+        currentName: todayRec.organisationName,
+        typeRating: todayRec.typeRating || null,
+        route: todayRec.route || null,
+      })
+      .where(eq(sponsorCanonical.id, id));
+
+    if (canonical.currentName !== todayRec.organisationName) {
+      const existingHistorical = canonical.historicalNames || [];
+      if (!existingHistorical.includes(canonical.currentName)) {
+        await db
+          .update(sponsorCanonical)
+          .set({
+            historicalNames: sql`array_append(${sponsorCanonical.historicalNames}, ${canonical.currentName})`,
+          })
+          .where(eq(sponsorCanonical.id, id));
+      }
+    }
+  }
+
+  // Phase 1c: Insert genuinely new records in batches
+  console.log(`[Reconciliation] Phase 1c: Inserting ${newRecordsToday.length} new records...`);
+  const INSERT_BATCH = 500;
+  let insertedCount = 0;
+  for (let i = 0; i < newRecordsToday.length; i += INSERT_BATCH) {
+    const batch = newRecordsToday.slice(i, i + INSERT_BATCH);
+    try {
+      const result = await db.insert(sponsorCanonical).values(
+        batch.map(newRec => ({
+          fingerprint: newRec.fingerprint,
+          currentName: newRec.organisationName,
+          townCity: newRec.townCity || null,
+          typeRating: newRec.typeRating || null,
+          route: newRec.route || null,
+          status: "ACTIVE",
+          firstSeen: today,
+          lastSeen: today,
+          consecutiveMisses: 0,
+          historicalNames: [] as string[],
+        }))
+      ).onConflictDoNothing().returning({ id: sponsorCanonical.id });
+
+      for (const newRec of batch.slice(0, result.length)) {
+        changes.push({
+          organisationName: newRec.organisationName,
+          changeType: "NEW_LICENCE",
+          previousValue: null,
+          newValue: newRec.typeRating || null,
+        });
+      }
+      insertedCount += result.length;
+    } catch (err: any) {
+      console.error(`[Reconciliation] Error inserting batch at ${i}:`, err.message);
+    }
+  }
+  console.log(`[Reconciliation] Phase 1c: ${insertedCount} of ${newRecordsToday.length} new records inserted.`);
 
   // Phase 2: Process missing records (in canonical but not in today's CSV)
   const missingRecords: CanonicalRecord[] = [];
