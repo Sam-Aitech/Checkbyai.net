@@ -794,6 +794,21 @@ async function seedInitialDigest(): Promise<void> {
   }
 }
 
+async function hasTodayJobSucceeded(): Promise<boolean | null> {
+  try {
+    const today = new Date().toISOString().split("T")[0];
+    const existing = await db
+      .select({ id: monitorJobRuns.id, status: monitorJobRuns.status })
+      .from(monitorJobRuns)
+      .where(and(eq(monitorJobRuns.runDate, today), eq(monitorJobRuns.status, "success")))
+      .limit(1);
+    return existing.length > 0;
+  } catch (err) {
+    console.error("[SponsorMonitorJob] Error checking today's job status:", err);
+    return null;
+  }
+}
+
 export function startSponsorMonitorCron(): void {
   seedInitialDigest().catch((err) => {
     console.error("[SponsorMonitorJob] Error in initial digest seed:", err);
@@ -808,6 +823,28 @@ export function startSponsorMonitorCron(): void {
     timezone: "UTC",
   });
 
+  cron.schedule("0 */4 * * *", async () => {
+    try {
+      if (isRunning) {
+        console.log("[SponsorMonitorJob] Backup trigger: job already running, skipping.");
+        return;
+      }
+      const alreadyRan = await hasTodayJobSucceeded();
+      if (alreadyRan === null) {
+        console.warn("[SponsorMonitorJob] Backup trigger: could not check job status (DB error), skipping.");
+        return;
+      }
+      if (!alreadyRan) {
+        console.log("[SponsorMonitorJob] Backup trigger: today's job has not completed successfully. Running now...");
+        await runSponsorMonitorJob("backup-trigger");
+      }
+    } catch (err) {
+      console.error("[SponsorMonitorJob] Backup trigger error:", err);
+    }
+  }, {
+    timezone: "UTC",
+  });
+
   cron.schedule("0 * * * *", () => {
     processDelayedNotifications().catch((err) => {
       console.error("[NotificationQueue] Error processing delayed notifications:", err);
@@ -816,7 +853,29 @@ export function startSponsorMonitorCron(): void {
     timezone: "UTC",
   });
 
-  console.log("[SponsorMonitorJob] Cron jobs scheduled: daily monitor at 00:30 UTC, delayed notifications hourly");
+  console.log("[SponsorMonitorJob] Cron jobs scheduled: daily monitor at 00:30 UTC, backup every 4h, delayed notifications hourly");
+
+  setTimeout(async () => {
+    try {
+      if (isRunning) {
+        console.log("[SponsorMonitorJob] Startup catch-up: job already running, skipping.");
+        return;
+      }
+      const alreadyRan = await hasTodayJobSucceeded();
+      if (alreadyRan === null) {
+        console.warn("[SponsorMonitorJob] Startup catch-up: could not check job status (DB error), skipping.");
+        return;
+      }
+      if (!alreadyRan) {
+        console.log("[SponsorMonitorJob] Startup catch-up: today's job has not run yet. Triggering now...");
+        await runSponsorMonitorJob("startup-catchup");
+      } else {
+        console.log("[SponsorMonitorJob] Startup catch-up: today's job already completed. No action needed.");
+      }
+    } catch (err) {
+      console.error("[SponsorMonitorJob] Startup catch-up error:", err);
+    }
+  }, 15000);
 }
 
 export function isJobRunning(): boolean {
