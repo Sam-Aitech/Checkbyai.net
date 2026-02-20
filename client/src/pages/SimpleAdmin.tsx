@@ -92,6 +92,7 @@ interface UserRecord {
   restrictionReason?: string;
   createdAt: string;
   dailyVerificationsUsed?: number;
+  verificationLimit?: number | null;
 }
 
 interface PaginatedUsers {
@@ -621,7 +622,7 @@ export default function SimpleAdmin() {
     const isConflict = adminStatus === 'fake' && aiResult === 'genuine';
 
     if (adminStatus === 'pending') {
-      return <Badge variant="outline" className="bg-slate-700 text-slate-300 border-slate-600">Pending Review</Badge>;
+      return <Badge variant="outline" className="bg-gray-100 text-gray-600 border-gray-300 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600">Pending Review</Badge>;
     }
     if (isConflict) {
       return (
@@ -966,10 +967,10 @@ export default function SimpleAdmin() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex items-center justify-center">
         <div className="text-center">
           <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-400">Loading...</p>
+          <p className="text-gray-500 dark:text-slate-400">Loading...</p>
         </div>
       </div>
     );
@@ -977,7 +978,7 @@ export default function SimpleAdmin() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center p-4">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
             <div className="flex justify-center mb-4">
@@ -985,16 +986,16 @@ export default function SimpleAdmin() {
                 <Shield className="w-12 h-12 text-red-500" />
               </div>
             </div>
-            <h1 className="text-3xl font-bold text-white mb-2">Forensic Command Center</h1>
-            <p className="text-slate-400">Secure OTP login for administrators</p>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Forensic Command Center</h1>
+            <p className="text-gray-500 dark:text-slate-400">Secure OTP login for administrators</p>
           </div>
 
-          <Card className="border-slate-700 bg-slate-800/50">
+          <Card className="border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800/50 shadow-lg">
             <CardHeader>
-              <CardTitle className="text-white">
+              <CardTitle className="text-gray-900 dark:text-white">
                 {loginStep === 'email' ? 'Admin Sign In' : 'Verify Your Identity'}
               </CardTitle>
-              <CardDescription className="text-slate-400">
+              <CardDescription className="text-gray-500 dark:text-slate-400">
                 {loginStep === 'email' 
                   ? 'Enter your admin email to receive a verification code'
                   : `Enter the 6-digit code sent to ${loginEmail}`
@@ -1011,7 +1012,7 @@ export default function SimpleAdmin() {
                   )}
 
                   <div className="space-y-2">
-                    <Label htmlFor="email" className="text-slate-200">Admin Email</Label>
+                    <Label htmlFor="email" className="text-gray-700 dark:text-slate-200">Admin Email</Label>
                     <Input
                       id="email"
                       type="email"
@@ -1019,7 +1020,7 @@ export default function SimpleAdmin() {
                       onChange={(e) => setLoginEmail(e.target.value)}
                       placeholder="Enter admin email address"
                       required
-                      className="bg-slate-700/50 border-slate-600 text-white"
+                      className="bg-gray-50 dark:bg-slate-700/50 border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white"
                       data-testid="input-admin-email"
                       autoComplete="email"
                     />
@@ -1049,7 +1050,7 @@ export default function SimpleAdmin() {
                   )}
 
                   <div className="space-y-2">
-                    <Label htmlFor="otp" className="text-slate-200">Verification Code</Label>
+                    <Label htmlFor="otp" className="text-gray-700 dark:text-slate-200">Verification Code</Label>
                     <Input
                       id="otp"
                       type="text"
@@ -1058,7 +1059,7 @@ export default function SimpleAdmin() {
                       placeholder="Enter 6-digit code"
                       required
                       maxLength={6}
-                      className="bg-slate-700/50 border-slate-600 text-white text-center text-xl tracking-widest"
+                      className="bg-gray-50 dark:bg-slate-700/50 border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white text-center text-xl tracking-widest"
                       data-testid="input-otp-code"
                       autoComplete="one-time-code"
                     />
@@ -1082,7 +1083,7 @@ export default function SimpleAdmin() {
                         setLoginError('');
                         setLoginSuccess('');
                       }}
-                      className="text-sm text-slate-400 hover:text-white transition-colors"
+                      className="text-sm text-gray-500 dark:text-slate-400 hover:text-white transition-colors"
                     >
                       Change email
                     </button>
@@ -1100,7 +1101,7 @@ export default function SimpleAdmin() {
             </CardContent>
           </Card>
           
-          <p className="text-center text-slate-500 text-sm mt-6">
+          <p className="text-center text-gray-400 dark:text-slate-500 text-sm mt-6">
             Authorized personnel only. Unauthorized access is prohibited.
           </p>
         </div>
@@ -1109,15 +1110,15 @@ export default function SimpleAdmin() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
       {/* System Health Header */}
-      <header className="bg-slate-800 border-b border-slate-700 px-6 py-3">
+      <header className="bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 shadow-sm px-6 py-3">
         <div className="flex justify-between items-center max-w-[1800px] mx-auto">
           <div className="flex items-center gap-3">
             <Shield className="w-8 h-8 text-red-500" />
             <div>
-              <h1 className="text-xl font-bold text-white">Forensic Command Center</h1>
-              <p className="text-sm text-slate-400">COS Verification Management</p>
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white">Forensic Command Center</h1>
+              <p className="text-sm text-gray-500 dark:text-slate-400">COS Verification Management</p>
             </div>
           </div>
           
@@ -1126,30 +1127,30 @@ export default function SimpleAdmin() {
             <div className="hidden lg:flex items-center gap-6 text-sm">
               <div className="flex items-center gap-2">
                 <Activity className={`w-4 h-4 ${systemHealth.database.status === 'healthy' ? 'text-green-400' : 'text-red-400'}`} />
-                <span className="text-slate-400">DB:</span>
-                <span className="text-slate-200">{systemHealth.database.connections} conn</span>
+                <span className="text-gray-500 dark:text-slate-400">DB:</span>
+                <span className="text-gray-700 dark:text-slate-200">{systemHealth.database.connections} conn</span>
               </div>
               <div className="flex items-center gap-2">
                 <Cpu className="w-4 h-4 text-blue-400" />
-                <span className="text-slate-400">Memory:</span>
-                <span className="text-slate-200">{systemHealth.memory.heapUsed}MB / {systemHealth.memory.heapTotal}MB</span>
+                <span className="text-gray-500 dark:text-slate-400">Memory:</span>
+                <span className="text-gray-700 dark:text-slate-200">{systemHealth.memory.heapUsed}MB / {systemHealth.memory.heapTotal}MB</span>
               </div>
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-purple-400" />
-                <span className="text-slate-400">Uptime:</span>
-                <span className="text-slate-200">{formatUptime(systemHealth.uptime)}</span>
+                <span className="text-gray-500 dark:text-slate-400">Uptime:</span>
+                <span className="text-gray-700 dark:text-slate-200">{formatUptime(systemHealth.uptime)}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Users className="w-4 h-4 text-cyan-400" />
-                <span className="text-slate-400">Users:</span>
-                <span className="text-slate-200">{systemHealth.stats.totalUsers} ({systemHealth.stats.proUsers} pro)</span>
+                <span className="text-gray-500 dark:text-slate-400">Users:</span>
+                <span className="text-gray-700 dark:text-slate-200">{systemHealth.stats.totalUsers} ({systemHealth.stats.proUsers} pro)</span>
               </div>
             </div>
           )}
 
           <div className="flex items-center gap-4">
-            <span className="text-slate-300 hidden sm:inline">{user?.email}</span>
-            <Button variant="outline" size="sm" onClick={handleLogout} className="border-slate-600 text-slate-300 hover:bg-slate-700" data-testid="button-logout">
+            <span className="text-gray-600 dark:text-slate-300 hidden sm:inline">{user?.email}</span>
+            <Button variant="outline" size="sm" onClick={handleLogout} className="border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700" data-testid="button-logout">
               <LogOut className="w-4 h-4 mr-2" />
               Logout
             </Button>
@@ -1160,57 +1161,57 @@ export default function SimpleAdmin() {
       <main className="max-w-[1800px] mx-auto p-6">
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <Card className="bg-slate-800 border-slate-700">
+          <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
             <CardContent className="pt-6">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-blue-500/10 rounded-lg">
                   <FileText className="w-6 h-6 text-blue-500" />
                 </div>
                 <div>
-                  <p className="text-sm text-slate-400">Trusted Patterns</p>
-                  <p className="text-2xl font-bold text-white">{stats?.trustedPatterns || 0}</p>
+                  <p className="text-sm text-gray-500 dark:text-slate-400">Trusted Patterns</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats?.trustedPatterns || 0}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-800 border-slate-700">
+          <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
             <CardContent className="pt-6">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-green-500/10 rounded-lg">
                   <CheckCircle className="w-6 h-6 text-green-500" />
                 </div>
                 <div>
-                  <p className="text-sm text-slate-400">Genuine Today</p>
-                  <p className="text-2xl font-bold text-white">{stats?.genuineVerified || 0}</p>
+                  <p className="text-sm text-gray-500 dark:text-slate-400">Genuine Today</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats?.genuineVerified || 0}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-800 border-slate-700">
+          <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
             <CardContent className="pt-6">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-yellow-500/10 rounded-lg">
                   <AlertTriangle className="w-6 h-6 text-yellow-500" />
                 </div>
                 <div>
-                  <p className="text-sm text-slate-400">Suspicious</p>
-                  <p className="text-2xl font-bold text-white">{stats?.suspiciousDetected || 0}</p>
+                  <p className="text-sm text-gray-500 dark:text-slate-400">Suspicious</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats?.suspiciousDetected || 0}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-800 border-slate-700">
+          <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
             <CardContent className="pt-6">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-purple-500/10 rounded-lg">
                   <TrendingUp className="w-6 h-6 text-purple-500" />
                 </div>
                 <div>
-                  <p className="text-sm text-slate-400">Total Today</p>
-                  <p className="text-2xl font-bold text-white">{stats?.verificationsToday || 0}</p>
+                  <p className="text-sm text-gray-500 dark:text-slate-400">Total Today</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats?.verificationsToday || 0}</p>
                 </div>
               </div>
             </CardContent>
@@ -1218,28 +1219,28 @@ export default function SimpleAdmin() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="bg-slate-800 border-slate-700">
-            <TabsTrigger value="logs" className="data-[state=active]:bg-slate-700">
+          <TabsList className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 shadow-sm p-1">
+            <TabsTrigger value="logs" className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 dark:data-[state=active]:bg-blue-900/30 dark:data-[state=active]:text-blue-400">
               <Eye className="w-4 h-4 mr-2" />
               Verification Logs
             </TabsTrigger>
-            <TabsTrigger value="users" className="data-[state=active]:bg-slate-700">
+            <TabsTrigger value="users" className="data-[state=active]:bg-purple-50 data-[state=active]:text-purple-700 dark:data-[state=active]:bg-purple-900/30 dark:data-[state=active]:text-purple-400">
               <Users className="w-4 h-4 mr-2" />
               Users
             </TabsTrigger>
-            <TabsTrigger value="patterns" className="data-[state=active]:bg-slate-700">
+            <TabsTrigger value="patterns" className="data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 dark:data-[state=active]:bg-emerald-900/30 dark:data-[state=active]:text-emerald-400">
               <FileText className="w-4 h-4 mr-2" />
               Trusted Patterns
             </TabsTrigger>
-            <TabsTrigger value="upload" className="data-[state=active]:bg-slate-700">
+            <TabsTrigger value="upload" className="data-[state=active]:bg-orange-50 data-[state=active]:text-orange-700 dark:data-[state=active]:bg-orange-900/30 dark:data-[state=active]:text-orange-400">
               <Upload className="w-4 h-4 mr-2" />
               Upload Pattern
             </TabsTrigger>
-            <TabsTrigger value="knowledge" className="data-[state=active]:bg-slate-700">
+            <TabsTrigger value="knowledge" className="data-[state=active]:bg-pink-50 data-[state=active]:text-pink-700 dark:data-[state=active]:bg-pink-900/30 dark:data-[state=active]:text-pink-400">
               <Brain className="w-4 h-4 mr-2" />
               AI Knowledge
             </TabsTrigger>
-            <TabsTrigger value="sponsor" className="data-[state=active]:bg-slate-700">
+            <TabsTrigger value="sponsor" className="data-[state=active]:bg-cyan-50 data-[state=active]:text-cyan-700 dark:data-[state=active]:bg-cyan-900/30 dark:data-[state=active]:text-cyan-400">
               <Radio className="w-4 h-4 mr-2" />
               Sponsor Monitor
             </TabsTrigger>
@@ -1247,32 +1248,32 @@ export default function SimpleAdmin() {
 
           {/* Verification Logs Tab */}
           <TabsContent value="logs">
-            <Card className="bg-slate-800 border-slate-700">
+            <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
               <CardHeader>
                 <div className="flex flex-col gap-4">
                   <div className="flex flex-col sm:flex-row justify-between gap-4">
                     <div>
-                      <CardTitle className="text-white">Verification Logs</CardTitle>
-                      <CardDescription className="text-slate-400">
+                      <CardTitle className="text-gray-900 dark:text-white">Verification Logs</CardTitle>
+                      <CardDescription className="text-gray-500 dark:text-slate-400">
                         {logs?.total || 0} total verifications
                       </CardDescription>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <div className="relative">
-                        <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
+                        <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-slate-400" />
                         <Input
                           placeholder="Search filename..."
                           value={logsSearch}
                           onChange={(e) => { setLogsSearch(e.target.value); setLogsPage(1); }}
-                          className="pl-9 w-48 bg-slate-700/50 border-slate-600 text-white"
+                          className="pl-9 w-48 bg-gray-50 dark:bg-slate-700/50 border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white"
                         />
                       </div>
                       <Select value={logsFilter} onValueChange={(v) => { setLogsFilter(v as any); setLogsPage(1); }}>
-                        <SelectTrigger className="w-32 bg-slate-700/50 border-slate-600 text-white">
+                        <SelectTrigger className="w-32 bg-gray-50 dark:bg-slate-700/50 border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white">
                           <Filter className="w-4 h-4 mr-2" />
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent className="bg-slate-800 border-slate-700">
+                        <SelectContent className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
                           <SelectItem value="all">All</SelectItem>
                           <SelectItem value="genuine">Genuine</SelectItem>
                           <SelectItem value="suspicious">Suspicious</SelectItem>
@@ -1284,7 +1285,7 @@ export default function SimpleAdmin() {
                         size="icon" 
                         onClick={loadLogs}
                         disabled={logsLoading}
-                        className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                        className="border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700"
                       >
                         <RefreshCw className={`w-4 h-4 ${logsLoading ? 'animate-spin' : ''}`} />
                       </Button>
@@ -1292,26 +1293,26 @@ export default function SimpleAdmin() {
                   </div>
                   {/* Date Range Filters */}
                   <div className="flex flex-wrap items-center gap-2">
-                    <Label className="text-slate-400 text-sm">From:</Label>
+                    <Label className="text-gray-500 dark:text-slate-400 text-sm">From:</Label>
                     <Input
                       type="date"
                       value={logsStartDate}
                       onChange={(e) => { setLogsStartDate(e.target.value); setLogsPage(1); }}
-                      className="w-40 bg-slate-700/50 border-slate-600 text-white"
+                      className="w-40 bg-gray-50 dark:bg-slate-700/50 border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white"
                     />
-                    <Label className="text-slate-400 text-sm">To:</Label>
+                    <Label className="text-gray-500 dark:text-slate-400 text-sm">To:</Label>
                     <Input
                       type="date"
                       value={logsEndDate}
                       onChange={(e) => { setLogsEndDate(e.target.value); setLogsPage(1); }}
-                      className="w-40 bg-slate-700/50 border-slate-600 text-white"
+                      className="w-40 bg-gray-50 dark:bg-slate-700/50 border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white"
                     />
                     {(logsStartDate || logsEndDate) && (
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => { setLogsStartDate(''); setLogsEndDate(''); setLogsPage(1); }}
-                        className="text-slate-400 hover:text-white"
+                        className="text-gray-500 dark:text-slate-400 hover:text-white"
                       >
                         Clear Dates
                       </Button>
@@ -1327,38 +1328,38 @@ export default function SimpleAdmin() {
                 ) : logs?.data.length === 0 ? (
                   <div className="text-center py-12">
                     <Eye className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-                    <p className="text-slate-400">No verification logs found</p>
-                    <p className="text-sm text-slate-500">Adjust your filters or wait for verifications</p>
+                    <p className="text-gray-500 dark:text-slate-400">No verification logs found</p>
+                    <p className="text-sm text-gray-400 dark:text-slate-500">Adjust your filters or wait for verifications</p>
                   </div>
                 ) : (
                   <>
                     <div className="overflow-x-auto">
                       <table className="w-full">
                         <thead>
-                          <tr className="border-b border-slate-700">
-                            <th className="text-left py-3 px-4 text-slate-400 font-medium">Time</th>
-                            <th className="text-left py-3 px-4 text-slate-400 font-medium">Filename</th>
-                            <th className="text-left py-3 px-4 text-slate-400 font-medium">AI Status</th>
-                            <th className="text-left py-3 px-4 text-slate-400 font-medium">Admin Review</th>
-                            <th className="text-left py-3 px-4 text-slate-400 font-medium">Producer</th>
-                            <th className="text-right py-3 px-4 text-slate-400 font-medium">Actions</th>
+                          <tr className="border-b border-gray-200 dark:border-slate-700">
+                            <th className="text-left py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">Time</th>
+                            <th className="text-left py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">Filename</th>
+                            <th className="text-left py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">AI Status</th>
+                            <th className="text-left py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">Admin Review</th>
+                            <th className="text-left py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">Producer</th>
+                            <th className="text-right py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">Actions</th>
                           </tr>
                         </thead>
                         <tbody>
                           {logs?.data.map((log) => (
                             <tr 
                               key={log.id} 
-                              className={`border-b border-slate-700/50 hover:bg-slate-700/30 cursor-pointer ${
+                              className={`border-b border-gray-100 dark:border-slate-700/50 hover:bg-gray-50 dark:hover:bg-slate-700/30 cursor-pointer ${
                                 (log as any).adminStatus === 'fake' && log.result === 'genuine' 
                                   ? 'ring-2 ring-red-500/50 bg-red-900/10' 
                                   : ''
                               }`}
                               onClick={() => setSelectedLog(log)}
                             >
-                              <td className="py-3 px-4 text-slate-300 text-sm">
+                              <td className="py-3 px-4 text-gray-600 dark:text-slate-300 text-sm">
                                 {new Date(log.verifiedAt).toLocaleString()}
                               </td>
-                              <td className="py-3 px-4 text-white font-medium max-w-[200px] truncate">
+                              <td className="py-3 px-4 text-gray-900 dark:text-white font-medium max-w-[200px] truncate">
                                 {log.filename}
                               </td>
                               <td className="py-3 px-4">
@@ -1367,7 +1368,7 @@ export default function SimpleAdmin() {
                               <td className="py-3 px-4">
                                 {getAdminStatusBadge(log)}
                               </td>
-                              <td className="py-3 px-4 text-slate-300 text-sm max-w-[150px] truncate">
+                              <td className="py-3 px-4 text-gray-600 dark:text-slate-300 text-sm max-w-[150px] truncate">
                                 {log.metadata?.producer || 'Unknown'}
                               </td>
                               <td className="py-3 px-4 text-right">
@@ -1400,7 +1401,7 @@ export default function SimpleAdmin() {
                                     size="sm"
                                     variant="outline"
                                     onClick={(e) => { e.stopPropagation(); runAiAnalysis(log); }}
-                                    className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                                    className="border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700"
                                   >
                                     <Sparkles className="w-4 h-4 mr-1" />
                                     Analyze
@@ -1415,8 +1416,8 @@ export default function SimpleAdmin() {
                     
                     {/* Pagination */}
                     {logs && logs.totalPages > 1 && (
-                      <div className="flex justify-between items-center mt-4 pt-4 border-t border-slate-700">
-                        <p className="text-sm text-slate-400">
+                      <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-200 dark:border-slate-700">
+                        <p className="text-sm text-gray-500 dark:text-slate-400">
                           Page {logs.page} of {logs.totalPages}
                         </p>
                         <div className="flex gap-2">
@@ -1425,7 +1426,7 @@ export default function SimpleAdmin() {
                             size="sm"
                             onClick={() => setLogsPage(p => Math.max(1, p - 1))}
                             disabled={logs.page === 1}
-                            className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                            className="border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700"
                           >
                             <ChevronLeft className="w-4 h-4" />
                           </Button>
@@ -1434,7 +1435,7 @@ export default function SimpleAdmin() {
                             size="sm"
                             onClick={() => setLogsPage(p => Math.min(logs.totalPages, p + 1))}
                             disabled={logs.page === logs.totalPages}
-                            className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                            className="border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700"
                           >
                             <ChevronRight className="w-4 h-4" />
                           </Button>
@@ -1449,23 +1450,23 @@ export default function SimpleAdmin() {
 
           {/* Users Tab */}
           <TabsContent value="users">
-            <Card className="bg-slate-800 border-slate-700">
+            <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
               <CardHeader>
                 <div className="flex flex-col sm:flex-row justify-between gap-4">
                   <div>
-                    <CardTitle className="text-white">User Management</CardTitle>
-                    <CardDescription className="text-slate-400">
+                    <CardTitle className="text-gray-900 dark:text-white">User Management</CardTitle>
+                    <CardDescription className="text-gray-500 dark:text-slate-400">
                       {users?.total || 0} registered users
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="relative">
-                      <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
+                      <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-slate-400" />
                       <Input
                         placeholder="Search users..."
                         value={usersSearch}
                         onChange={(e) => { setUsersSearch(e.target.value); setUsersPage(1); }}
-                        className="pl-9 w-48 bg-slate-700/50 border-slate-600 text-white"
+                        className="pl-9 w-48 bg-gray-50 dark:bg-slate-700/50 border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white"
                       />
                     </div>
                     <Button 
@@ -1473,7 +1474,7 @@ export default function SimpleAdmin() {
                       size="icon" 
                       onClick={loadUsers}
                       disabled={usersLoading}
-                      className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                      className="border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700"
                     >
                       <RefreshCw className={`w-4 h-4 ${usersLoading ? 'animate-spin' : ''}`} />
                     </Button>
@@ -1488,30 +1489,30 @@ export default function SimpleAdmin() {
                 ) : users?.data.length === 0 ? (
                   <div className="text-center py-12">
                     <Users className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-                    <p className="text-slate-400">No users found</p>
+                    <p className="text-gray-500 dark:text-slate-400">No users found</p>
                   </div>
                 ) : (
                   <>
                     <div className="overflow-x-auto">
                       <table className="w-full">
                         <thead>
-                          <tr className="border-b border-slate-700">
-                            <th className="text-left py-3 px-4 text-slate-400 font-medium">Email</th>
-                            <th className="text-left py-3 px-4 text-slate-400 font-medium">Role</th>
-                            <th className="text-left py-3 px-4 text-slate-400 font-medium">Status</th>
-                            <th className="text-left py-3 px-4 text-slate-400 font-medium">Limit</th>
-                            <th className="text-left py-3 px-4 text-slate-400 font-medium">Joined</th>
-                            <th className="text-right py-3 px-4 text-slate-400 font-medium">Actions</th>
+                          <tr className="border-b border-gray-200 dark:border-slate-700">
+                            <th className="text-left py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">Email</th>
+                            <th className="text-left py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">Role</th>
+                            <th className="text-left py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">Status</th>
+                            <th className="text-left py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">Limit</th>
+                            <th className="text-left py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">Joined</th>
+                            <th className="text-right py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">Actions</th>
                           </tr>
                         </thead>
                         <tbody>
                           {users?.data.map((u) => (
-                            <tr key={u.id} className="border-b border-slate-700/50 hover:bg-slate-700/30">
-                              <td className="py-3 px-4 text-white font-medium">
+                            <tr key={u.id} className="border-b border-gray-100 dark:border-slate-700/50 hover:bg-gray-50 dark:hover:bg-slate-700/30">
+                              <td className="py-3 px-4 text-gray-900 dark:text-white font-medium">
                                 {u.email || 'N/A'}
                               </td>
                               <td className="py-3 px-4">
-                                <Badge className={u.role === 'admin' ? 'bg-purple-500/20 text-purple-400' : 'bg-slate-500/20 text-slate-400'}>
+                                <Badge className={u.role === 'admin' ? 'bg-purple-500/20 text-purple-400' : 'bg-slate-500/20 text-gray-500 dark:text-slate-400'}>
                                   {u.role}
                                 </Badge>
                               </td>
@@ -1525,12 +1526,12 @@ export default function SimpleAdmin() {
                                 ) : u.subscriptionStatus === 'starter' ? (
                                   <Badge className="bg-blue-500/20 text-blue-400">Starter</Badge>
                                 ) : (
-                                  <Badge className="bg-slate-500/20 text-slate-400">Free</Badge>
+                                  <Badge className="bg-slate-500/20 text-gray-500 dark:text-slate-400">Free</Badge>
                                 )}
                               </td>
                               <td className="py-3 px-4">
                                 <select
-                                  className="bg-slate-700 border border-slate-600 text-white text-sm rounded px-2 py-1"
+                                  className="bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white text-sm rounded px-2 py-1"
                                   value={u.verificationLimit === null ? 'default' : u.verificationLimit === -1 ? 'unlimited' : String(u.verificationLimit)}
                                   onChange={async (e) => {
                                     const val = e.target.value;
@@ -1557,7 +1558,7 @@ export default function SimpleAdmin() {
                                   <option value="100">100 total</option>
                                 </select>
                               </td>
-                              <td className="py-3 px-4 text-slate-400 text-sm">
+                              <td className="py-3 px-4 text-gray-500 dark:text-slate-400 text-sm">
                                 {new Date(u.createdAt).toLocaleDateString()}
                               </td>
                               <td className="py-3 px-4 text-right">
@@ -1579,8 +1580,8 @@ export default function SimpleAdmin() {
                     </div>
                     
                     {users && users.totalPages > 1 && (
-                      <div className="flex justify-between items-center mt-4 pt-4 border-t border-slate-700">
-                        <p className="text-sm text-slate-400">
+                      <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-200 dark:border-slate-700">
+                        <p className="text-sm text-gray-500 dark:text-slate-400">
                           Page {users.page} of {users.totalPages}
                         </p>
                         <div className="flex gap-2">
@@ -1589,7 +1590,7 @@ export default function SimpleAdmin() {
                             size="sm"
                             onClick={() => setUsersPage(p => Math.max(1, p - 1))}
                             disabled={users.page === 1}
-                            className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                            className="border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700"
                           >
                             <ChevronLeft className="w-4 h-4" />
                           </Button>
@@ -1598,7 +1599,7 @@ export default function SimpleAdmin() {
                             size="sm"
                             onClick={() => setUsersPage(p => Math.min(users.totalPages, p + 1))}
                             disabled={users.page === users.totalPages}
-                            className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                            className="border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700"
                           >
                             <ChevronRight className="w-4 h-4" />
                           </Button>
@@ -1613,10 +1614,10 @@ export default function SimpleAdmin() {
 
           {/* Trusted Patterns Tab */}
           <TabsContent value="patterns">
-            <Card className="bg-slate-800 border-slate-700">
+            <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
               <CardHeader>
-                <CardTitle className="text-white">Trusted COS Patterns</CardTitle>
-                <CardDescription className="text-slate-400">
+                <CardTitle className="text-gray-900 dark:text-white">Trusted COS Patterns</CardTitle>
+                <CardDescription className="text-gray-500 dark:text-slate-400">
                   These documents are used as reference for verification
                 </CardDescription>
               </CardHeader>
@@ -1624,22 +1625,22 @@ export default function SimpleAdmin() {
                 {patterns.length === 0 ? (
                   <div className="text-center py-8">
                     <FileText className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-                    <p className="text-slate-400">No trusted patterns uploaded yet</p>
-                    <p className="text-sm text-slate-500">Upload genuine COS documents to establish patterns</p>
+                    <p className="text-gray-500 dark:text-slate-400">No trusted patterns uploaded yet</p>
+                    <p className="text-sm text-gray-400 dark:text-slate-500">Upload genuine COS documents to establish patterns</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
                     {patterns.map((pattern) => (
                       <div
                         key={pattern.id}
-                        className="p-4 bg-slate-700/50 rounded-lg"
+                        className="p-4 bg-gray-100 dark:bg-slate-700/50 rounded-lg"
                       >
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-3">
                             <FileText className="w-5 h-5 text-blue-400" />
                             <div>
-                              <p className="text-white font-medium">{pattern.filename}</p>
-                              <p className="text-sm text-slate-400">
+                              <p className="text-gray-900 dark:text-white font-medium">{pattern.filename}</p>
+                              <p className="text-sm text-gray-500 dark:text-slate-400">
                                 Uploaded: {new Date(pattern.uploadedAt).toLocaleDateString()}
                               </p>
                             </div>
@@ -1656,24 +1657,24 @@ export default function SimpleAdmin() {
                         </div>
                         
                         {pattern.metadata && (
-                          <div className="mt-3 pt-3 border-t border-slate-600">
-                            <p className="text-xs text-slate-500 uppercase tracking-wide mb-2">Forensic Metadata</p>
+                          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-600">
+                            <p className="text-xs text-gray-400 dark:text-slate-500 uppercase tracking-wide mb-2">Forensic Metadata</p>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
                               <div>
-                                <p className="text-slate-400">Producer</p>
-                                <p className="text-slate-200 truncate">{pattern.metadata.forensic?.producer || pattern.metadata.producer || 'Unknown'}</p>
+                                <p className="text-gray-500 dark:text-slate-400">Producer</p>
+                                <p className="text-gray-700 dark:text-slate-200 truncate">{pattern.metadata.forensic?.producer || pattern.metadata.producer || 'Unknown'}</p>
                               </div>
                               <div>
-                                <p className="text-slate-400">Creator</p>
-                                <p className="text-slate-200 truncate">{pattern.metadata.forensic?.creator || pattern.metadata.creator || 'Unknown'}</p>
+                                <p className="text-gray-500 dark:text-slate-400">Creator</p>
+                                <p className="text-gray-700 dark:text-slate-200 truncate">{pattern.metadata.forensic?.creator || pattern.metadata.creator || 'Unknown'}</p>
                               </div>
                               <div>
-                                <p className="text-slate-400">Created</p>
-                                <p className="text-slate-200 truncate">{pattern.metadata.forensic?.created || pattern.metadata.creationDate || 'Unknown'}</p>
+                                <p className="text-gray-500 dark:text-slate-400">Created</p>
+                                <p className="text-gray-700 dark:text-slate-200 truncate">{pattern.metadata.forensic?.created || pattern.metadata.creationDate || 'Unknown'}</p>
                               </div>
                               <div>
-                                <p className="text-slate-400">Fonts</p>
-                                <p className="text-slate-200">{pattern.metadata.forensic?.fontCount || pattern.metadata.fontCount || 0} fonts</p>
+                                <p className="text-gray-500 dark:text-slate-400">Fonts</p>
+                                <p className="text-gray-700 dark:text-slate-200">{pattern.metadata.forensic?.fontCount || pattern.metadata.fontCount || 0} fonts</p>
                               </div>
                             </div>
                             {pattern.metadata.forensic?.suspiciousIndicators && pattern.metadata.forensic.suspiciousIndicators.length > 0 && (
@@ -1693,19 +1694,19 @@ export default function SimpleAdmin() {
 
           {/* Upload Tab */}
           <TabsContent value="upload">
-            <Card className="bg-slate-800 border-slate-700">
+            <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
               <CardHeader>
-                <CardTitle className="text-white">Upload Genuine COS Document</CardTitle>
-                <CardDescription className="text-slate-400">
+                <CardTitle className="text-gray-900 dark:text-white">Upload Genuine COS Document</CardTitle>
+                <CardDescription className="text-gray-500 dark:text-slate-400">
                   Upload a genuine Certificate of Sponsorship with optional AI instructions
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {!uploadPreview ? (
-                  <div className="border-2 border-dashed border-slate-600 rounded-lg p-8 text-center">
-                    <Upload className="w-12 h-12 text-slate-500 mx-auto mb-4" />
-                    <p className="text-white mb-2">Drop a PDF file here or click to browse</p>
-                    <p className="text-sm text-slate-400 mb-4">Only PDF files are accepted</p>
+                  <div className="border-2 border-dashed border-gray-300 dark:border-slate-600 rounded-lg p-8 text-center">
+                    <Upload className="w-12 h-12 text-gray-400 dark:text-slate-500 mx-auto mb-4" />
+                    <p className="text-gray-900 dark:text-white mb-2">Drop a PDF file here or click to browse</p>
+                    <p className="text-sm text-gray-500 dark:text-slate-400 mb-4">Only PDF files are accepted</p>
                     <input
                       type="file"
                       accept=".pdf"
@@ -1725,41 +1726,41 @@ export default function SimpleAdmin() {
                   <div className="space-y-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h3 className="text-white font-medium">{uploadPreview.file.name}</h3>
-                        <p className="text-sm text-slate-400">{(uploadPreview.file.size / 1024).toFixed(1)} KB</p>
+                        <h3 className="text-gray-900 dark:text-white font-medium">{uploadPreview.file.name}</h3>
+                        <p className="text-sm text-gray-500 dark:text-slate-400">{(uploadPreview.file.size / 1024).toFixed(1)} KB</p>
                       </div>
                       <Button variant="ghost" size="sm" onClick={cancelUpload}>
                         <X className="w-4 h-4" />
                       </Button>
                     </div>
 
-                    <div className="bg-slate-900 rounded-lg p-4">
-                      <h4 className="text-sm font-medium text-slate-400 mb-2 flex items-center gap-2">
+                    <div className="bg-gray-100 dark:bg-slate-900 rounded-lg p-4">
+                      <h4 className="text-sm font-medium text-gray-500 dark:text-slate-400 mb-2 flex items-center gap-2">
                         <Database className="w-4 h-4" />
                         Extracted Metadata
                       </h4>
                       <div className="grid grid-cols-2 gap-2 text-sm">
                         <div>
-                          <span className="text-slate-500">Producer:</span>
-                          <span className="ml-2 text-white">{uploadPreview.metadata?.producer || 'Unknown'}</span>
+                          <span className="text-gray-400 dark:text-slate-500">Producer:</span>
+                          <span className="ml-2 text-gray-900 dark:text-white">{uploadPreview.metadata?.producer || 'Unknown'}</span>
                         </div>
                         <div>
-                          <span className="text-slate-500">Creator:</span>
-                          <span className="ml-2 text-white">{uploadPreview.metadata?.creator || 'Unknown'}</span>
+                          <span className="text-gray-400 dark:text-slate-500">Creator:</span>
+                          <span className="ml-2 text-gray-900 dark:text-white">{uploadPreview.metadata?.creator || 'Unknown'}</span>
                         </div>
                         <div>
-                          <span className="text-slate-500">Created:</span>
-                          <span className="ml-2 text-white">{uploadPreview.metadata?.creationDate || 'Unknown'}</span>
+                          <span className="text-gray-400 dark:text-slate-500">Created:</span>
+                          <span className="ml-2 text-gray-900 dark:text-white">{uploadPreview.metadata?.creationDate || 'Unknown'}</span>
                         </div>
                         <div>
-                          <span className="text-slate-500">Modified:</span>
-                          <span className="ml-2 text-white">{uploadPreview.metadata?.modificationDate || 'Unknown'}</span>
+                          <span className="text-gray-400 dark:text-slate-500">Modified:</span>
+                          <span className="ml-2 text-gray-900 dark:text-white">{uploadPreview.metadata?.modificationDate || 'Unknown'}</span>
                         </div>
                       </div>
                     </div>
 
                     <div>
-                      <Label className="text-white mb-2 flex items-center gap-2">
+                      <Label className="text-gray-900 dark:text-white mb-2 flex items-center gap-2">
                         <Brain className="w-4 h-4 text-purple-400" />
                         Forensic Instructions for AI (Optional)
                       </Label>
@@ -1767,9 +1768,9 @@ export default function SimpleAdmin() {
                         value={aiInstructions}
                         onChange={(e) => setAiInstructions(e.target.value)}
                         placeholder="Add specific notes about this document pattern. E.g., 'This department always uses Microsoft Word 365 as the producer' or 'Documents from this employer are always created on weekdays only.'"
-                        className="w-full h-32 p-3 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 resize-none"
+                        className="w-full h-32 p-3 bg-gray-50 dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg text-gray-900 dark:text-white placeholder-slate-500 resize-none"
                       />
-                      <p className="text-xs text-slate-500 mt-1">
+                      <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">
                         These instructions will be used by AI during document analysis to detect forgeries more accurately.
                       </p>
                     </div>
@@ -1778,7 +1779,7 @@ export default function SimpleAdmin() {
                       <Button onClick={confirmUpload} disabled={uploading} className="flex-1">
                         {uploading ? 'Uploading...' : 'Confirm & Add to Trusted Patterns'}
                       </Button>
-                      <Button variant="outline" onClick={cancelUpload} className="border-slate-600">
+                      <Button variant="outline" onClick={cancelUpload} className="border-gray-300 dark:border-slate-600">
                         Cancel
                       </Button>
                     </div>
@@ -1791,24 +1792,24 @@ export default function SimpleAdmin() {
           {/* AI Knowledge Tab */}
           <TabsContent value="knowledge">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card className="bg-slate-800 border-slate-700">
+              <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
                 <CardHeader>
-                  <CardTitle className="text-white flex items-center gap-2">
+                  <CardTitle className="text-gray-900 dark:text-white flex items-center gap-2">
                     <Plus className="w-5 h-5 text-green-400" />
                     Add Global AI Rule
                   </CardTitle>
-                  <CardDescription className="text-slate-400">
+                  <CardDescription className="text-gray-500 dark:text-slate-400">
                     Create rules that apply to ALL document verifications
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <Label className="text-white">Category</Label>
+                    <Label className="text-gray-900 dark:text-white">Category</Label>
                     <Select value={newRuleCategory} onValueChange={setNewRuleCategory}>
-                      <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                      <SelectTrigger className="bg-gray-50 dark:bg-slate-700 border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white">
                         <SelectValue placeholder="Select category" />
                       </SelectTrigger>
-                      <SelectContent className="bg-slate-800 border-slate-700">
+                      <SelectContent className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
                         <SelectItem value="date_check">Date Check</SelectItem>
                         <SelectItem value="producer_check">Producer Check</SelectItem>
                         <SelectItem value="metadata_check">Metadata Check</SelectItem>
@@ -1820,22 +1821,22 @@ export default function SimpleAdmin() {
                   </div>
 
                   <div>
-                    <Label className="text-white">Rule Text</Label>
+                    <Label className="text-gray-900 dark:text-white">Rule Text</Label>
                     <textarea
                       value={newRuleText}
                       onChange={(e) => setNewRuleText(e.target.value)}
                       placeholder="E.g., 'Always flag any document where the ModDate is on a Sunday as suspicious' or 'Trust documents with producer containing gov.uk'"
-                      className="w-full h-24 p-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 resize-none"
+                      className="w-full h-24 p-3 bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg text-gray-900 dark:text-white placeholder-slate-500 resize-none"
                     />
                   </div>
 
                   <div>
-                    <Label className="text-white">Priority (higher = more important)</Label>
+                    <Label className="text-gray-900 dark:text-white">Priority (higher = more important)</Label>
                     <Input
                       type="number"
                       value={newRulePriority}
                       onChange={(e) => setNewRulePriority(parseInt(e.target.value) || 0)}
-                      className="bg-slate-700 border-slate-600 text-white"
+                      className="bg-gray-50 dark:bg-slate-700 border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white"
                     />
                   </div>
 
@@ -1846,19 +1847,19 @@ export default function SimpleAdmin() {
                 </CardContent>
               </Card>
 
-              <Card className="bg-slate-800 border-slate-700">
+              <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
                 <CardHeader>
                   <div className="flex justify-between items-center">
                     <div>
-                      <CardTitle className="text-white flex items-center gap-2">
+                      <CardTitle className="text-gray-900 dark:text-white flex items-center gap-2">
                         <Brain className="w-5 h-5 text-purple-400" />
                         Active Rules
                       </CardTitle>
-                      <CardDescription className="text-slate-400">
+                      <CardDescription className="text-gray-500 dark:text-slate-400">
                         {globalRules.length} rules configured
                       </CardDescription>
                     </div>
-                    <Button variant="outline" size="icon" onClick={loadGlobalRules} disabled={rulesLoading} className="border-slate-600">
+                    <Button variant="outline" size="icon" onClick={loadGlobalRules} disabled={rulesLoading} className="border-gray-300 dark:border-slate-600">
                       <RefreshCw className={`w-4 h-4 ${rulesLoading ? 'animate-spin' : ''}`} />
                     </Button>
                   </div>
@@ -1866,7 +1867,7 @@ export default function SimpleAdmin() {
                 <CardContent>
                   <ScrollArea className="h-96">
                     {globalRules.length === 0 ? (
-                      <div className="text-center py-8 text-slate-400">
+                      <div className="text-center py-8 text-gray-500 dark:text-slate-400">
                         <Brain className="w-12 h-12 mx-auto mb-4 opacity-50" />
                         <p>No global rules configured yet</p>
                         <p className="text-sm">Add rules to train the AI</p>
@@ -1874,14 +1875,14 @@ export default function SimpleAdmin() {
                     ) : (
                       <div className="space-y-3">
                         {globalRules.map((rule) => (
-                          <div key={rule.id} className={`p-3 rounded-lg border ${rule.isActive ? 'bg-slate-700/50 border-slate-600' : 'bg-slate-900/50 border-slate-700 opacity-60'}`}>
+                          <div key={rule.id} className={`p-3 rounded-lg border ${rule.isActive ? 'bg-gray-50 dark:bg-slate-700/50 border-gray-200 dark:border-slate-600' : 'bg-gray-100 dark:bg-slate-900/50 border-gray-300 dark:border-slate-700 opacity-60'}`}>
                             <div className="flex items-start justify-between gap-2">
                               <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-1">
                                   <Badge variant="outline" className="text-xs">{rule.category}</Badge>
-                                  <span className="text-xs text-slate-500">Priority: {rule.priority}</span>
+                                  <span className="text-xs text-gray-400 dark:text-slate-500">Priority: {rule.priority}</span>
                                 </div>
-                                <p className="text-sm text-white">{rule.ruleText}</p>
+                                <p className="text-sm text-gray-900 dark:text-white">{rule.ruleText}</p>
                               </div>
                               <div className="flex items-center gap-1">
                                 <Button 
@@ -1911,15 +1912,15 @@ export default function SimpleAdmin() {
           <TabsContent value="sponsor">
             <div className="space-y-6">
               {/* Status Card */}
-              <Card className="bg-slate-800 border-slate-700">
+              <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
                 <CardHeader>
                   <div className="flex justify-between items-center">
                     <div>
-                      <CardTitle className="text-white flex items-center gap-2">
+                      <CardTitle className="text-gray-900 dark:text-white flex items-center gap-2">
                         <Radio className="w-5 h-5 text-blue-400" />
                         Sponsor Monitor Status
                       </CardTitle>
-                      <CardDescription className="text-slate-400">
+                      <CardDescription className="text-gray-500 dark:text-slate-400">
                         UK Home Office Register monitoring dashboard
                       </CardDescription>
                     </div>
@@ -1929,7 +1930,7 @@ export default function SimpleAdmin() {
                         variant="outline"
                         onClick={loadSponsorMonitorData}
                         disabled={sponsorStatusLoading}
-                        className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                        className="border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700"
                       >
                         <RefreshCw className={`w-4 h-4 mr-1 ${sponsorStatusLoading ? 'animate-spin' : ''}`} />
                         Refresh
@@ -1957,46 +1958,46 @@ export default function SimpleAdmin() {
                 </CardHeader>
                 <CardContent>
                   {sponsorStatusLoading && !sponsorStatus ? (
-                    <div className="flex items-center gap-2 text-slate-400 py-4">
+                    <div className="flex items-center gap-2 text-gray-500 dark:text-slate-400 py-4">
                       <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
                       Loading status...
                     </div>
                   ) : sponsorStatus ? (
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                      <div className="bg-slate-700/50 rounded-lg p-3">
-                        <p className="text-xs text-slate-400 mb-1">Last Run</p>
-                        <p className="text-sm font-medium text-white">
+                      <div className="bg-gray-100 dark:bg-slate-700/50 rounded-lg p-3">
+                        <p className="text-xs text-gray-500 dark:text-slate-400 mb-1">Last Run</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">
                           {sponsorStatus.lastRun?.date
                             ? new Date(sponsorStatus.lastRun.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
                             : 'Never'}
                         </p>
                         {sponsorStatus.lastRun?.date && (
-                          <p className="text-xs text-slate-500 mt-0.5">
+                          <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">
                             {new Date(sponsorStatus.lastRun.date).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
                           </p>
                         )}
                       </div>
-                      <div className="bg-slate-700/50 rounded-lg p-3">
-                        <p className="text-xs text-slate-400 mb-1">Last Result</p>
+                      <div className="bg-gray-100 dark:bg-slate-700/50 rounded-lg p-3">
+                        <p className="text-xs text-gray-500 dark:text-slate-400 mb-1">Last Result</p>
                         <Badge className={sponsorStatus.lastRun?.success !== false ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30'}>
                           {sponsorStatus.lastRun?.success !== false ? 'Success' : 'Failed'}
                         </Badge>
                       </div>
-                      <div className="bg-slate-700/50 rounded-lg p-3">
-                        <p className="text-xs text-slate-400 mb-1">Snapshot Records</p>
-                        <p className="text-lg font-bold text-white">{(sponsorStatus.snapshotRecordCount || 0).toLocaleString()}</p>
+                      <div className="bg-gray-100 dark:bg-slate-700/50 rounded-lg p-3">
+                        <p className="text-xs text-gray-500 dark:text-slate-400 mb-1">Snapshot Records</p>
+                        <p className="text-lg font-bold text-gray-900 dark:text-white">{(sponsorStatus.snapshotRecordCount || 0).toLocaleString()}</p>
                       </div>
-                      <div className="bg-slate-700/50 rounded-lg p-3">
-                        <p className="text-xs text-slate-400 mb-1">Active Watches</p>
-                        <p className="text-lg font-bold text-white">{sponsorStatus.activeWatchCount || 0}</p>
+                      <div className="bg-gray-100 dark:bg-slate-700/50 rounded-lg p-3">
+                        <p className="text-xs text-gray-500 dark:text-slate-400 mb-1">Active Watches</p>
+                        <p className="text-lg font-bold text-gray-900 dark:text-white">{sponsorStatus.activeWatchCount || 0}</p>
                       </div>
-                      <div className="bg-slate-700/50 rounded-lg p-3">
-                        <p className="text-xs text-slate-400 mb-1">Notifications (24h)</p>
-                        <p className="text-lg font-bold text-white">{sponsorStatus.notificationsSent24h || 0}</p>
+                      <div className="bg-gray-100 dark:bg-slate-700/50 rounded-lg p-3">
+                        <p className="text-xs text-gray-500 dark:text-slate-400 mb-1">Notifications (24h)</p>
+                        <p className="text-lg font-bold text-gray-900 dark:text-white">{sponsorStatus.notificationsSent24h || 0}</p>
                       </div>
                     </div>
                   ) : (
-                    <p className="text-slate-400 text-sm">No status data available.</p>
+                    <p className="text-gray-500 dark:text-slate-400 text-sm">No status data available.</p>
                   )}
                   {runResult && (
                     <Alert className="mt-4 bg-blue-500/10 border-blue-500/30">
@@ -2009,13 +2010,13 @@ export default function SimpleAdmin() {
               {/* Initialize / Storage Row */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Initialize Card */}
-                <Card className="bg-slate-800 border-slate-700">
+                <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
                   <CardHeader>
-                    <CardTitle className="text-white text-base flex items-center gap-2">
+                    <CardTitle className="text-gray-900 dark:text-white text-base flex items-center gap-2">
                       <Database className="w-4 h-4 text-emerald-400" />
                       Initialize Register
                     </CardTitle>
-                    <CardDescription className="text-slate-400">
+                    <CardDescription className="text-gray-500 dark:text-slate-400">
                       First-time setup: download the full sponsor register as baseline
                     </CardDescription>
                   </CardHeader>
@@ -2056,35 +2057,35 @@ export default function SimpleAdmin() {
                 </Card>
 
                 {/* Storage Stats Card */}
-                <Card className="bg-slate-800 border-slate-700">
+                <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
                   <CardHeader>
-                    <CardTitle className="text-white text-base flex items-center gap-2">
+                    <CardTitle className="text-gray-900 dark:text-white text-base flex items-center gap-2">
                       <HardDrive className="w-4 h-4 text-cyan-400" />
                       Database Storage
                     </CardTitle>
-                    <CardDescription className="text-slate-400">Sponsor register data usage</CardDescription>
+                    <CardDescription className="text-gray-500 dark:text-slate-400">Sponsor register data usage</CardDescription>
                   </CardHeader>
                   <CardContent>
                     {storageLoading && !storageStats ? (
-                      <div className="flex items-center gap-2 text-slate-400 py-2">
+                      <div className="flex items-center gap-2 text-gray-500 dark:text-slate-400 py-2">
                         <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
                         Loading...
                       </div>
                     ) : storageStats ? (
                       <div className="space-y-3">
                         <div className="grid grid-cols-2 gap-3">
-                          <div className="bg-slate-700/30 rounded-lg p-2.5">
-                            <p className="text-xs text-slate-400">Total Records</p>
-                            <p className="text-base font-bold text-white">{(storageStats.totalRecords || 0).toLocaleString()}</p>
+                          <div className="bg-gray-100 dark:bg-slate-700/30 rounded-lg p-2.5">
+                            <p className="text-xs text-gray-500 dark:text-slate-400">Total Records</p>
+                            <p className="text-base font-bold text-gray-900 dark:text-white">{(storageStats.totalRecords || 0).toLocaleString()}</p>
                           </div>
-                          <div className="bg-slate-700/30 rounded-lg p-2.5">
-                            <p className="text-xs text-slate-400">Snapshots</p>
-                            <p className="text-base font-bold text-white">{storageStats.snapshotCount || 0}</p>
+                          <div className="bg-gray-100 dark:bg-slate-700/30 rounded-lg p-2.5">
+                            <p className="text-xs text-gray-500 dark:text-slate-400">Snapshots</p>
+                            <p className="text-base font-bold text-gray-900 dark:text-white">{storageStats.snapshotCount || 0}</p>
                           </div>
                         </div>
                         {storageStats.earliestSnapshot && (
-                          <div className="text-xs text-slate-400">
-                            Date range: <span className="text-slate-300">{storageStats.earliestSnapshot}</span> to <span className="text-slate-300">{storageStats.latestSnapshot}</span>
+                          <div className="text-xs text-gray-500 dark:text-slate-400">
+                            Date range: <span className="text-gray-600 dark:text-slate-300">{storageStats.earliestSnapshot}</span> to <span className="text-gray-600 dark:text-slate-300">{storageStats.latestSnapshot}</span>
                           </div>
                         )}
                         {storageStats.snapshotCount > 1 && (
@@ -2093,7 +2094,7 @@ export default function SimpleAdmin() {
                             variant="outline"
                             onClick={() => setCleanupConfirmOpen(true)}
                             disabled={cleaningUp}
-                            className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                            className="border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700"
                           >
                             {cleaningUp ? (
                               <>
@@ -2110,46 +2111,46 @@ export default function SimpleAdmin() {
                         )}
                       </div>
                     ) : (
-                      <p className="text-slate-500 text-sm">No data available.</p>
+                      <p className="text-gray-400 dark:text-slate-500 text-sm">No data available.</p>
                     )}
                   </CardContent>
                 </Card>
               </div>
 
               {/* Recent Changes Table */}
-              <Card className="bg-slate-800 border-slate-700">
+              <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
                 <CardHeader>
-                  <CardTitle className="text-white text-base">Recent Changes</CardTitle>
-                  <CardDescription className="text-slate-400">Last 50 detected changes across all companies</CardDescription>
+                  <CardTitle className="text-gray-900 dark:text-white text-base">Recent Changes</CardTitle>
+                  <CardDescription className="text-gray-500 dark:text-slate-400">Last 50 detected changes across all companies</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {recentChangesLoading ? (
-                    <div className="flex items-center gap-2 text-slate-400 py-4">
+                    <div className="flex items-center gap-2 text-gray-500 dark:text-slate-400 py-4">
                       <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
                       Loading changes...
                     </div>
                   ) : recentChanges.length === 0 ? (
-                    <p className="text-slate-500 text-sm py-4">No changes detected yet.</p>
+                    <p className="text-gray-400 dark:text-slate-500 text-sm py-4">No changes detected yet.</p>
                   ) : (
                     <ScrollArea className="h-[400px]">
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead>
-                            <tr className="border-b border-slate-700">
-                              <th className="text-left text-slate-400 font-medium py-2 px-2">Date</th>
-                              <th className="text-left text-slate-400 font-medium py-2 px-2">Company</th>
-                              <th className="text-left text-slate-400 font-medium py-2 px-2">Change</th>
-                              <th className="text-left text-slate-400 font-medium py-2 px-2">Previous</th>
-                              <th className="text-left text-slate-400 font-medium py-2 px-2">New</th>
+                            <tr className="border-b border-gray-200 dark:border-slate-700">
+                              <th className="text-left text-gray-500 dark:text-slate-400 font-medium py-2 px-2">Date</th>
+                              <th className="text-left text-gray-500 dark:text-slate-400 font-medium py-2 px-2">Company</th>
+                              <th className="text-left text-gray-500 dark:text-slate-400 font-medium py-2 px-2">Change</th>
+                              <th className="text-left text-gray-500 dark:text-slate-400 font-medium py-2 px-2">Previous</th>
+                              <th className="text-left text-gray-500 dark:text-slate-400 font-medium py-2 px-2">New</th>
                             </tr>
                           </thead>
                           <tbody>
                             {recentChanges.map((change: any) => (
-                              <tr key={change.id} className="border-b border-slate-700/50 hover:bg-slate-700/30">
-                                <td className="py-2 px-2 text-slate-300 whitespace-nowrap">
+                              <tr key={change.id} className="border-b border-gray-100 dark:border-slate-700/50 hover:bg-gray-50 dark:hover:bg-slate-700/30">
+                                <td className="py-2 px-2 text-gray-600 dark:text-slate-300 whitespace-nowrap">
                                   {change.detectedAt ? new Date(change.detectedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : change.snapshotDate}
                                 </td>
-                                <td className="py-2 px-2 text-white font-medium max-w-[200px] truncate" title={change.organisationName}>
+                                <td className="py-2 px-2 text-gray-900 dark:text-white font-medium max-w-[200px] truncate" title={change.organisationName}>
                                   {change.organisationName}
                                 </td>
                                 <td className="py-2 px-2">
@@ -2158,15 +2159,15 @@ export default function SimpleAdmin() {
                                     change.changeType === 'DOWNGRADED' ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' :
                                     change.changeType === 'UPGRADED' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
                                     change.changeType === 'ADDED' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' :
-                                    'bg-slate-500/20 text-slate-400 border-slate-500/30'
+                                    'bg-slate-500/20 text-gray-500 dark:text-slate-400 border-slate-500/30'
                                   }>
                                     {change.changeType}
                                   </Badge>
                                 </td>
-                                <td className="py-2 px-2 text-slate-400 max-w-[150px] truncate" title={change.previousValue || '-'}>
+                                <td className="py-2 px-2 text-gray-500 dark:text-slate-400 max-w-[150px] truncate" title={change.previousValue || '-'}>
                                   {change.previousValue || '-'}
                                 </td>
-                                <td className="py-2 px-2 text-slate-400 max-w-[150px] truncate" title={change.newValue || '-'}>
+                                <td className="py-2 px-2 text-gray-500 dark:text-slate-400 max-w-[150px] truncate" title={change.newValue || '-'}>
                                   {change.newValue || '-'}
                                 </td>
                               </tr>
@@ -2181,30 +2182,30 @@ export default function SimpleAdmin() {
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Top Watched Companies */}
-                <Card className="bg-slate-800 border-slate-700">
+                <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
                   <CardHeader>
-                    <CardTitle className="text-white text-base flex items-center gap-2">
+                    <CardTitle className="text-gray-900 dark:text-white text-base flex items-center gap-2">
                       <TrendingUp className="w-4 h-4 text-amber-400" />
                       Top Watched Companies
                     </CardTitle>
-                    <CardDescription className="text-slate-400">Companies with the most watchers</CardDescription>
+                    <CardDescription className="text-gray-500 dark:text-slate-400">Companies with the most watchers</CardDescription>
                   </CardHeader>
                   <CardContent>
                     {topWatchedLoading ? (
-                      <div className="flex items-center gap-2 text-slate-400 py-4">
+                      <div className="flex items-center gap-2 text-gray-500 dark:text-slate-400 py-4">
                         <div className="w-5 h-5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
                         Loading...
                       </div>
                     ) : topWatched.length === 0 ? (
-                      <p className="text-slate-500 text-sm py-4">No companies being watched yet.</p>
+                      <p className="text-gray-400 dark:text-slate-500 text-sm py-4">No companies being watched yet.</p>
                     ) : (
                       <ScrollArea className="h-[300px]">
                         <div className="space-y-2">
                           {topWatched.map((company: any, idx: number) => (
-                            <div key={idx} className="flex items-center justify-between py-2 px-3 bg-slate-700/30 rounded-lg">
+                            <div key={idx} className="flex items-center justify-between py-2 px-3 bg-gray-100 dark:bg-slate-700/30 rounded-lg">
                               <div className="flex items-center gap-3">
-                                <span className="text-xs font-bold text-slate-500 w-5 text-right">#{idx + 1}</span>
-                                <span className="text-sm text-white font-medium truncate max-w-[200px]" title={company.organisationName}>
+                                <span className="text-xs font-bold text-gray-400 dark:text-slate-500 w-5 text-right">#{idx + 1}</span>
+                                <span className="text-sm text-gray-900 dark:text-white font-medium truncate max-w-[200px]" title={company.organisationName}>
                                   {company.organisationName}
                                 </span>
                               </div>
@@ -2220,22 +2221,22 @@ export default function SimpleAdmin() {
                 </Card>
 
                 {/* Notification Delivery Summary */}
-                <Card className="bg-slate-800 border-slate-700">
+                <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
                   <CardHeader>
-                    <CardTitle className="text-white text-base flex items-center gap-2">
+                    <CardTitle className="text-gray-900 dark:text-white text-base flex items-center gap-2">
                       <Bell className="w-4 h-4 text-purple-400" />
                       Notification Delivery (7 days)
                     </CardTitle>
-                    <CardDescription className="text-slate-400">Sent vs failed by channel</CardDescription>
+                    <CardDescription className="text-gray-500 dark:text-slate-400">Sent vs failed by channel</CardDescription>
                   </CardHeader>
                   <CardContent>
                     {notifStatsLoading ? (
-                      <div className="flex items-center gap-2 text-slate-400 py-4">
+                      <div className="flex items-center gap-2 text-gray-500 dark:text-slate-400 py-4">
                         <div className="w-5 h-5 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
                         Loading...
                       </div>
                     ) : notifStats.length === 0 ? (
-                      <p className="text-slate-500 text-sm py-4">No notifications sent in the last 7 days.</p>
+                      <p className="text-gray-400 dark:text-slate-500 text-sm py-4">No notifications sent in the last 7 days.</p>
                     ) : (
                       <div className="space-y-4">
                         {(() => {
@@ -2252,12 +2253,12 @@ export default function SimpleAdmin() {
                             const total = counts.sent + counts.failed;
                             const successRate = total > 0 ? Math.round((counts.sent / total) * 100) : 0;
                             return (
-                              <div key={channel} className="bg-slate-700/30 rounded-lg p-3">
+                              <div key={channel} className="bg-gray-100 dark:bg-slate-700/30 rounded-lg p-3">
                                 <div className="flex items-center justify-between mb-2">
-                                  <span className="text-sm font-medium text-white capitalize">{channel}</span>
-                                  <span className="text-xs text-slate-400">{successRate}% success</span>
+                                  <span className="text-sm font-medium text-gray-900 dark:text-white capitalize">{channel}</span>
+                                  <span className="text-xs text-gray-500 dark:text-slate-400">{successRate}% success</span>
                                 </div>
-                                <div className="w-full bg-slate-600 rounded-full h-2 mb-2">
+                                <div className="w-full bg-gray-200 dark:bg-slate-600 rounded-full h-2 mb-2">
                                   <div
                                     className="bg-green-500 h-2 rounded-full transition-all"
                                     style={{ width: `${successRate}%` }}
@@ -2283,28 +2284,28 @@ export default function SimpleAdmin() {
 
       {/* AI Analysis Side Panel */}
       <Sheet open={aiPanelOpen} onOpenChange={setAiPanelOpen}>
-        <SheetContent className="w-full sm:max-w-xl bg-slate-800 border-slate-700 text-white overflow-y-auto">
+        <SheetContent className="w-full sm:max-w-xl bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white overflow-y-auto">
           <SheetHeader>
-            <SheetTitle className="text-white flex items-center gap-2">
+            <SheetTitle className="text-gray-900 dark:text-white flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-purple-400" />
               AI Forensic Analysis
             </SheetTitle>
-            <SheetDescription className="text-slate-400">
+            <SheetDescription className="text-gray-500 dark:text-slate-400">
               {selectedLog?.filename} - {selectedLog?.result} ({selectedLog?.confidence}%)
             </SheetDescription>
           </SheetHeader>
           
           <div className="mt-6">
             {aiLoading && !aiAnalysis && (
-              <div className="flex items-center gap-3 text-slate-400">
+              <div className="flex items-center gap-3 text-gray-500 dark:text-slate-400">
                 <div className="w-5 h-5 border-2 border-purple-400 border-t-transparent rounded-full animate-spin"></div>
                 <span>Analyzing document...</span>
               </div>
             )}
             
             {aiAnalysis && (
-              <div className="prose prose-invert prose-sm max-w-none">
-                <div className="whitespace-pre-wrap text-slate-300 leading-relaxed">
+              <div className="prose dark:prose-invert prose-sm max-w-none">
+                <div className="whitespace-pre-wrap text-gray-600 dark:text-slate-300 leading-relaxed">
                   {aiAnalysis}
                   {aiLoading && <span className="animate-pulse">|</span>}
                 </div>
@@ -2314,33 +2315,33 @@ export default function SimpleAdmin() {
 
           {selectedLog && (
             <>
-              <div className="mt-8 pt-6 border-t border-slate-700">
-                <h4 className="text-sm font-medium text-slate-400 mb-3 flex items-center gap-2">
+              <div className="mt-8 pt-6 border-t border-gray-200 dark:border-slate-700">
+                <h4 className="text-sm font-medium text-gray-500 dark:text-slate-400 mb-3 flex items-center gap-2">
                   <Database className="w-4 h-4" />
                   Raw Metadata
                 </h4>
                 <ScrollArea className="h-48 rounded bg-slate-900 p-3">
-                  <pre className="text-xs text-slate-400 whitespace-pre-wrap">
+                  <pre className="text-xs text-gray-500 dark:text-slate-400 whitespace-pre-wrap">
                     {JSON.stringify(selectedLog.metadata, null, 2)}
                   </pre>
                 </ScrollArea>
               </div>
 
               {/* Teach AI Section */}
-              <div className="mt-6 pt-6 border-t border-slate-700">
-                <h4 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
+              <div className="mt-6 pt-6 border-t border-gray-200 dark:border-slate-700">
+                <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3 flex items-center gap-2">
                   <Brain className="w-4 h-4 text-purple-400" />
                   Teach AI from This Document
                 </h4>
-                <p className="text-xs text-slate-400 mb-3">
+                <p className="text-xs text-gray-500 dark:text-slate-400 mb-3">
                   Create a rule from this {selectedLog.result} document to help AI detect similar patterns.
                 </p>
                 <div className="space-y-3">
                   <Select value={teachAiCategory} onValueChange={setTeachAiCategory}>
-                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                    <SelectTrigger className="bg-gray-50 dark:bg-slate-700 border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white">
                       <SelectValue placeholder="Rule category" />
                     </SelectTrigger>
-                    <SelectContent className="bg-slate-800 border-slate-700">
+                    <SelectContent className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
                       <SelectItem value="red_flag">Red Flag</SelectItem>
                       <SelectItem value="date_check">Date Check</SelectItem>
                       <SelectItem value="producer_check">Producer Check</SelectItem>
@@ -2352,7 +2353,7 @@ export default function SimpleAdmin() {
                     value={teachAiInput}
                     onChange={(e) => setTeachAiInput(e.target.value)}
                     placeholder={`E.g., "Flag documents where producer is '${selectedLog.metadata?.producer || 'unknown'}' as ${selectedLog.result}"`}
-                    className="w-full h-20 p-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 resize-none"
+                    className="w-full h-20 p-2 bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg text-gray-900 dark:text-white text-sm placeholder-slate-500 resize-none"
                   />
                   <Button 
                     onClick={teachAi} 
@@ -2371,10 +2372,10 @@ export default function SimpleAdmin() {
 
       {/* Detail Modal for Log */}
       <Sheet open={selectedLog !== null && !aiPanelOpen} onOpenChange={(open) => !open && setSelectedLog(null)}>
-        <SheetContent className="w-full sm:max-w-lg bg-slate-800 border-slate-700 text-white overflow-y-auto">
+        <SheetContent className="w-full sm:max-w-lg bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white overflow-y-auto">
           <SheetHeader>
-            <SheetTitle className="text-white">Verification Details</SheetTitle>
-            <SheetDescription className="text-slate-400">
+            <SheetTitle className="text-gray-900 dark:text-white">Verification Details</SheetTitle>
+            <SheetDescription className="text-gray-500 dark:text-slate-400">
               {selectedLog?.filename}
             </SheetDescription>
           </SheetHeader>
@@ -2411,17 +2412,17 @@ export default function SimpleAdmin() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-slate-400">Verified At</p>
-                  <p className="text-slate-200">{new Date(selectedLog.verifiedAt).toLocaleString()}</p>
+                  <p className="text-sm text-gray-500 dark:text-slate-400">Verified At</p>
+                  <p className="text-gray-700 dark:text-slate-200">{new Date(selectedLog.verifiedAt).toLocaleString()}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-slate-400">IP Address</p>
-                  <p className="text-slate-200 font-mono text-sm">{selectedLog.ipAddress || 'N/A'}</p>
+                  <p className="text-sm text-gray-500 dark:text-slate-400">IP Address</p>
+                  <p className="text-gray-700 dark:text-slate-200 font-mono text-sm">{selectedLog.ipAddress || 'N/A'}</p>
                 </div>
               </div>
 
               <div>
-                <h4 className="text-sm font-medium text-slate-400 mb-2">Analysis Details</h4>
+                <h4 className="text-sm font-medium text-gray-500 dark:text-slate-400 mb-2">Analysis Details</h4>
                 <div className="space-y-2">
                   {selectedLog.analysisDetails?.checks?.map((check: any, idx: number) => (
                     <div 
@@ -2442,21 +2443,21 @@ export default function SimpleAdmin() {
                         ) : (
                           <AlertTriangle className="w-4 h-4 text-yellow-400" />
                         )}
-                        <span className="text-slate-200 font-medium">{check.name}</span>
+                        <span className="text-gray-700 dark:text-slate-200 font-medium">{check.name}</span>
                       </div>
-                      <p className="text-slate-400 mt-1 ml-6">{check.message}</p>
+                      <p className="text-gray-500 dark:text-slate-400 mt-1 ml-6">{check.message}</p>
                     </div>
                   ))}
                 </div>
               </div>
 
               <div>
-                <h4 className="text-sm font-medium text-slate-400 mb-2 flex items-center gap-2">
+                <h4 className="text-sm font-medium text-gray-500 dark:text-slate-400 mb-2 flex items-center gap-2">
                   <Database className="w-4 h-4" />
                   Raw Metadata
                 </h4>
                 <ScrollArea className="h-48 rounded bg-slate-900 p-3">
-                  <pre className="text-xs text-slate-400 whitespace-pre-wrap">
+                  <pre className="text-xs text-gray-500 dark:text-slate-400 whitespace-pre-wrap">
                     {JSON.stringify(selectedLog.metadata, null, 2)}
                   </pre>
                 </ScrollArea>
@@ -2468,30 +2469,30 @@ export default function SimpleAdmin() {
 
       {/* HITL Feedback Modal */}
       <Dialog open={feedbackModalOpen} onOpenChange={setFeedbackModalOpen}>
-        <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-md">
+        <DialogContent className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-400">
               <XCircle className="w-5 h-5" />
               Mark as Fake
             </DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-gray-500 dark:text-slate-400">
               You're overriding the AI's assessment. Please provide detailed reasoning so the AI can learn from this correction.
             </DialogDescription>
           </DialogHeader>
           
           {feedbackLog && (
             <div className="space-y-4">
-              <div className="p-3 bg-slate-700/50 rounded-lg">
-                <p className="text-sm text-slate-400">Document</p>
-                <p className="text-white font-medium">{feedbackLog.filename}</p>
+              <div className="p-3 bg-gray-100 dark:bg-slate-700/50 rounded-lg">
+                <p className="text-sm text-gray-500 dark:text-slate-400">Document</p>
+                <p className="text-gray-900 dark:text-white font-medium">{feedbackLog.filename}</p>
                 <div className="flex items-center gap-2 mt-2">
-                  <span className="text-sm text-slate-400">AI said:</span>
+                  <span className="text-sm text-gray-500 dark:text-slate-400">AI said:</span>
                   {getStatusBadge(feedbackLog.result, feedbackLog.confidence)}
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="reasoning" className="text-slate-200">
+                <Label htmlFor="reasoning" className="text-gray-700 dark:text-slate-200">
                   Reasoning Points <span className="text-red-400">*</span>
                 </Label>
                 <Textarea
@@ -2499,9 +2500,9 @@ export default function SimpleAdmin() {
                   placeholder="e.g., The font style on the header doesn't match official CoS templates. The producer field shows evidence of PDF editing software..."
                   value={feedbackReasoning}
                   onChange={(e) => setFeedbackReasoning(e.target.value)}
-                  className="min-h-[120px] bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500"
+                  className="min-h-[120px] bg-gray-50 dark:bg-slate-700/50 border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white placeholder:text-slate-500"
                 />
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-gray-400 dark:text-slate-500">
                   Your feedback will be used to train the AI and prevent future false positives.
                 </p>
               </div>
@@ -2512,7 +2513,7 @@ export default function SimpleAdmin() {
             <Button
               variant="outline"
               onClick={() => setFeedbackModalOpen(false)}
-              className="border-slate-600 text-slate-300 hover:bg-slate-700"
+              className="border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700"
             >
               Cancel
             </Button>
@@ -2529,13 +2530,13 @@ export default function SimpleAdmin() {
 
       {/* Sponsor Monitor Run Confirmation */}
       <Dialog open={runConfirmOpen} onOpenChange={setRunConfirmOpen}>
-        <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-md">
+        <DialogContent className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-blue-400">
               <Radio className="w-5 h-5" />
               Run Sponsor Monitor
             </DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-gray-500 dark:text-slate-400">
               This will download the latest Home Office register, compare it against the previous snapshot, and send real notifications to all users watching affected companies. Are you sure?
             </DialogDescription>
           </DialogHeader>
@@ -2543,7 +2544,7 @@ export default function SimpleAdmin() {
             <Button
               variant="outline"
               onClick={() => setRunConfirmOpen(false)}
-              className="border-slate-600 text-slate-300 hover:bg-slate-700"
+              className="border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700"
             >
               Cancel
             </Button>
@@ -2560,13 +2561,13 @@ export default function SimpleAdmin() {
 
       {/* Initialize Confirmation */}
       <Dialog open={initConfirmOpen} onOpenChange={setInitConfirmOpen}>
-        <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-md">
+        <DialogContent className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-emerald-400">
               <Database className="w-5 h-5" />
               Initialize Sponsor Register
             </DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-gray-500 dark:text-slate-400">
               This will download the complete UK Home Office Register of Licensed Sponsors and store it as the baseline snapshot. This is a one-time operation and may take several minutes depending on the file size.
             </DialogDescription>
           </DialogHeader>
@@ -2574,7 +2575,7 @@ export default function SimpleAdmin() {
             <Button
               variant="outline"
               onClick={() => setInitConfirmOpen(false)}
-              className="border-slate-600 text-slate-300 hover:bg-slate-700"
+              className="border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700"
             >
               Cancel
             </Button>
@@ -2591,13 +2592,13 @@ export default function SimpleAdmin() {
 
       {/* Cleanup Confirmation */}
       <Dialog open={cleanupConfirmOpen} onOpenChange={setCleanupConfirmOpen}>
-        <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-md">
+        <DialogContent className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-amber-400">
               <Trash2 className="w-5 h-5" />
               Clean Up Old Snapshots
             </DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-gray-500 dark:text-slate-400">
               This will delete all old sponsor register snapshots, keeping only the latest one. This frees up database storage but removes historical snapshot data. This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
@@ -2605,7 +2606,7 @@ export default function SimpleAdmin() {
             <Button
               variant="outline"
               onClick={() => setCleanupConfirmOpen(false)}
-              className="border-slate-600 text-slate-300 hover:bg-slate-700"
+              className="border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700"
             >
               Cancel
             </Button>

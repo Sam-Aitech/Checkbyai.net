@@ -2137,7 +2137,11 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
 
-      const { createChatCompletionWithFallback, getAvailableProviders } = await import('./services/aiService');
+      const { createChatCompletionWithFallback, getAvailableProviders, hasAnyProvider } = await import('./services/aiService');
+
+      if (!hasAnyProvider()) {
+        return res.status(503).json({ message: 'No AI providers are currently available. Please configure at least one AI integration.' });
+      }
 
       const systemPrompt = `You are a forensic document analyst specializing in UK Certificate of Sponsorship (COS) documents. 
 Analyze documents based on metadata AND the specific forensic knowledge base provided below.

@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { db } from "../db";
 import { aiGenerationLogs } from "@shared/schema";
+import { createChatCompletion, hasAnyProvider } from "./aiService";
 
 interface HeadlineVariant {
   headline: string;
@@ -80,9 +81,8 @@ function validateHeadline(variant: HeadlineVariant, data: RawDigestData): boolea
 }
 
 export async function generateHeadline(data: RawDigestData): Promise<GenerateResult> {
-  const apiKey = process.env.DEEPSEEK_API_KEY;
-  if (!apiKey) {
-    console.log("[AIDigest] No DEEPSEEK_API_KEY configured, using deterministic headline");
+  if (!hasAnyProvider()) {
+    console.log("[AIDigest] No AI providers configured, using deterministic headline");
     const result = deterministicHeadline(data);
     await logGeneration(data.snapshotDate, result.headline, true, "deterministic");
     return result;
@@ -116,64 +116,44 @@ Return ONLY valid JSON (no markdown):
 ]`;
 
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
+    const { content, provider } = await createChatCompletion(
+      [{ role: "user", content: prompt }],
+      { maxTokens: 500 }
+    );
 
-    const response = await fetch("https://api.deepseek.com/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "deepseek-chat",
-        temperature: 0.7,
-        max_tokens: 500,
-        messages: [{ role: "user", content: prompt }],
-      }),
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeout);
-
-    if (!response.ok) {
-      throw new Error(`DeepSeek API returned ${response.status}`);
-    }
-
-    const json = await response.json();
-    const content = json.choices?.[0]?.message?.content?.trim();
-    if (!content) throw new Error("Empty response from DeepSeek");
+    if (!content) throw new Error("Empty response from AI provider");
 
     const cleaned = content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
     const variants: HeadlineVariant[] = JSON.parse(cleaned);
 
     if (!Array.isArray(variants) || variants.length < 3) {
-      throw new Error("Expected 3 variants from DeepSeek");
+      throw new Error(`Expected 3 variants from ${provider}, got ${variants?.length || 0}`);
     }
 
     const validVariants = variants.slice(0, 3);
     const allValid = validVariants.every((v) => validateHeadline(v, data));
 
     if (!allValid) {
-      console.warn("[AIDigest] Validation failed for AI variants, using deterministic fallback");
+      console.warn(`[AIDigest] Validation failed for ${provider} variants, using deterministic fallback`);
       const fallback = deterministicHeadline(data);
-      await logGeneration(data.snapshotDate, fallback.headline, false, "deepseek-chat", "Validation failed");
+      await logGeneration(data.snapshotDate, fallback.headline, false, provider, "Validation failed");
       return fallback;
     }
 
     const headline = validVariants[0].headline;
-    await logGeneration(data.snapshotDate, headline, true, "deepseek-chat");
+    console.log(`[AIDigest] Successfully generated headline via ${provider}`);
+    await logGeneration(data.snapshotDate, headline, true, provider);
 
     return {
       headline,
       variants: validVariants,
-      model: "deepseek-chat",
+      model: provider,
       validationPassed: true,
     };
   } catch (err: any) {
-    console.error("[AIDigest] DeepSeek call failed:", err.message);
+    console.error("[AIDigest] AI headline generation failed:", err.message);
     const fallback = deterministicHeadline(data);
-    await logGeneration(data.snapshotDate, fallback.headline, false, "deepseek-chat", err.message);
+    await logGeneration(data.snapshotDate, fallback.headline, false, "fallback", err.message);
     return fallback;
   }
 }

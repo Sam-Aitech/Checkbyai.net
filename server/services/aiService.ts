@@ -49,10 +49,16 @@ if (process.env.AI_INTEGRATIONS_OPENROUTER_API_KEY) {
   });
 }
 
+console.log(`[AI Service] Initialized with ${providers.length} provider(s): ${providers.map(p => p.name).join(', ') || 'none'}`);
+
 export async function createChatCompletionWithFallback(
   messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
   options: { maxTokens?: number; stream?: boolean } = {}
 ): Promise<StreamResponse> {
+  if (providers.length === 0) {
+    throw new Error('No AI providers configured. Please configure at least one AI integration (OpenAI, Claude, or OpenRouter).');
+  }
+
   const { maxTokens = 2000, stream = true } = options;
   
   const errors: string[] = [];
@@ -78,13 +84,17 @@ export async function createChatCompletionWithFallback(
     }
   }
 
-  throw new Error(`All AI providers failed: ${errors.join('; ')}`);
+  throw new Error(`All ${providers.length} AI provider(s) failed: ${errors.join('; ')}`);
 }
 
 export async function createChatCompletion(
   messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
   options: { maxTokens?: number } = {}
 ): Promise<{ content: string; provider: string }> {
+  if (providers.length === 0) {
+    throw new Error('No AI providers configured. Please configure at least one AI integration (OpenAI, Claude, or OpenRouter).');
+  }
+
   const { maxTokens = 2000 } = options;
   
   const errors: string[] = [];
@@ -110,7 +120,7 @@ export async function createChatCompletion(
     }
   }
 
-  throw new Error(`All AI providers failed: ${errors.join('; ')}`);
+  throw new Error(`All ${providers.length} AI provider(s) failed: ${errors.join('; ')}`);
 }
 
 export function getAvailableProviders(): string[] {
