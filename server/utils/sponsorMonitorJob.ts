@@ -794,6 +794,11 @@ async function seedInitialDigest(): Promise<void> {
   }
 }
 
+function isWeekday(): boolean {
+  const day = new Date().getUTCDay();
+  return day >= 1 && day <= 5;
+}
+
 async function hasTodayJobSucceeded(): Promise<boolean | null> {
   try {
     const today = new Date().toISOString().split("T")[0];
@@ -814,7 +819,7 @@ export function startSponsorMonitorCron(): void {
     console.error("[SponsorMonitorJob] Error in initial digest seed:", err);
   });
 
-  cron.schedule("30 0 * * *", () => {
+  cron.schedule("30 0 * * 1-5", () => {
     console.log("[SponsorMonitorJob] Cron trigger fired at", new Date().toISOString());
     runSponsorMonitorJob("cron").catch((err) => {
       console.error("[SponsorMonitorJob] Unhandled error in cron execution:", err);
@@ -823,7 +828,7 @@ export function startSponsorMonitorCron(): void {
     timezone: "UTC",
   });
 
-  cron.schedule("0 */4 * * *", async () => {
+  cron.schedule("0 */4 * * 1-5", async () => {
     try {
       if (isRunning) {
         console.log("[SponsorMonitorJob] Backup trigger: job already running, skipping.");
@@ -853,10 +858,14 @@ export function startSponsorMonitorCron(): void {
     timezone: "UTC",
   });
 
-  console.log("[SponsorMonitorJob] Cron jobs scheduled: daily monitor at 00:30 UTC, backup every 4h, delayed notifications hourly");
+  console.log("[SponsorMonitorJob] Cron jobs scheduled: daily monitor at 00:30 UTC Mon-Fri, backup every 4h Mon-Fri, delayed notifications hourly");
 
   setTimeout(async () => {
     try {
+      if (!isWeekday()) {
+        console.log("[SponsorMonitorJob] Startup catch-up: weekend detected, skipping (no register published on weekends).");
+        return;
+      }
       if (isRunning) {
         console.log("[SponsorMonitorJob] Startup catch-up: job already running, skipping.");
         return;
