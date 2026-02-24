@@ -14,8 +14,11 @@ import {
 import { rebuildSponsorIndex } from "./sponsorSearch";
 import { notifyAffectedUsers, processDelayedNotifications } from "./notificationDispatcher";
 import { generateHeadline, type RawDigestData } from "../services/aiDigest";
+import { withRetry } from "./dbRetry";
 
 let isRunning = false;
+let lastRequestCheckTime = 0;
+const REQUEST_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 
 interface CanonicalRecord {
   id: number;
@@ -230,17 +233,19 @@ async function reconcile(
 
   // Phase 1a: Bulk update all matched records (lastSeen + consecutiveMisses reset)
   console.log(`[Reconciliation] Phase 1a: Bulk updating ${matchedIds.length} matched records...`);
-  const BULK_BATCH = 1000;
+  const BULK_BATCH = 500;
   for (let i = 0; i < matchedIds.length; i += BULK_BATCH) {
     const batch = matchedIds.slice(i, i + BULK_BATCH);
-    const placeholders = batch.map((id) => sql`${id}`);
-    const arrayExpr = sql`ARRAY[${sql.join(placeholders, sql`, `)}]::int[]`;
-    await db.execute(sql`
-      UPDATE sponsor_canonical 
-      SET last_seen = ${today}, consecutive_misses = 0 
-      WHERE id = ANY(${arrayExpr})
-    `);
-    if ((i + BULK_BATCH) % 10000 === 0 || i + BULK_BATCH >= matchedIds.length) {
+    await withRetry(async () => {
+      const placeholders = batch.map((id) => sql`${id}`);
+      const arrayExpr = sql`ARRAY[${sql.join(placeholders, sql`, `)}]::int[]`;
+      await db.execute(sql`
+        UPDATE sponsor_canonical 
+        SET last_seen = ${today}, consecutive_misses = 0 
+        WHERE id = ANY(${arrayExpr})
+      `);
+    }, `Phase1a bulk update batch at ${i}`);
+    if ((i + BULK_BATCH) % 5000 === 0 || i + BULK_BATCH >= matchedIds.length) {
       console.log(`[Reconciliation]   ...updated ${Math.min(i + BULK_BATCH, matchedIds.length)}/${matchedIds.length}`);
     }
   }
@@ -248,49 +253,53 @@ async function reconcile(
   // Phase 1b: Individual updates for records with actual changes (name/rating)
   console.log(`[Reconciliation] Phase 1b: ${individualUpdates.length} records with name/rating changes...`);
   for (const { id, todayRec, canonical } of individualUpdates) {
-    await db
-      .update(sponsorCanonical)
-      .set({
-        currentName: todayRec.organisationName,
-        typeRating: todayRec.typeRating || null,
-        route: todayRec.route || null,
-      })
-      .where(eq(sponsorCanonical.id, id));
+    await withRetry(async () => {
+      await db
+        .update(sponsorCanonical)
+        .set({
+          currentName: todayRec.organisationName,
+          typeRating: todayRec.typeRating || null,
+          route: todayRec.route || null,
+        })
+        .where(eq(sponsorCanonical.id, id));
 
-    if (canonical.currentName !== todayRec.organisationName) {
-      const existingHistorical = canonical.historicalNames || [];
-      if (!existingHistorical.includes(canonical.currentName)) {
-        await db
-          .update(sponsorCanonical)
-          .set({
-            historicalNames: sql`array_append(${sponsorCanonical.historicalNames}, ${canonical.currentName})`,
-          })
-          .where(eq(sponsorCanonical.id, id));
+      if (canonical.currentName !== todayRec.organisationName) {
+        const existingHistorical = canonical.historicalNames || [];
+        if (!existingHistorical.includes(canonical.currentName)) {
+          await db
+            .update(sponsorCanonical)
+            .set({
+              historicalNames: sql`array_append(${sponsorCanonical.historicalNames}, ${canonical.currentName})`,
+            })
+            .where(eq(sponsorCanonical.id, id));
+        }
       }
-    }
+    }, `Phase1b update ${todayRec.organisationName}`);
   }
 
   // Phase 1c: Insert genuinely new records in batches
   console.log(`[Reconciliation] Phase 1c: Inserting ${newRecordsToday.length} new records...`);
-  const INSERT_BATCH = 500;
+  const INSERT_BATCH = 250;
   let insertedCount = 0;
   for (let i = 0; i < newRecordsToday.length; i += INSERT_BATCH) {
     const batch = newRecordsToday.slice(i, i + INSERT_BATCH);
     try {
-      const result = await db.insert(sponsorCanonical).values(
-        batch.map(newRec => ({
-          fingerprint: newRec.fingerprint,
-          currentName: newRec.organisationName,
-          townCity: newRec.townCity || null,
-          typeRating: newRec.typeRating || null,
-          route: newRec.route || null,
-          status: "ACTIVE",
-          firstSeen: today,
-          lastSeen: today,
-          consecutiveMisses: 0,
-          historicalNames: [] as string[],
-        }))
-      ).onConflictDoNothing().returning({ id: sponsorCanonical.id });
+      const result = await withRetry(async () => {
+        return await db.insert(sponsorCanonical).values(
+          batch.map(newRec => ({
+            fingerprint: newRec.fingerprint,
+            currentName: newRec.organisationName,
+            townCity: newRec.townCity || null,
+            typeRating: newRec.typeRating || null,
+            route: newRec.route || null,
+            status: "ACTIVE",
+            firstSeen: today,
+            lastSeen: today,
+            consecutiveMisses: 0,
+            historicalNames: [] as string[],
+          }))
+        ).onConflictDoNothing().returning({ id: sponsorCanonical.id });
+      }, `Phase1c insert batch at ${i}`);
 
       for (const newRec of batch.slice(0, result.length)) {
         changes.push({
@@ -353,17 +362,19 @@ async function reconcile(
                 ? existingHistorical
                 : [...existingHistorical, missing.currentName];
 
-              await db
-                .update(sponsorCanonical)
-                .set({
-                  fingerprint: newRec.fingerprint,
-                  currentName: newRec.organisationName,
-                  lastSeen: today,
-                  consecutiveMisses: 0,
-                  historicalNames: updatedHistorical,
-                  typeRating: newRec.typeRating || missing.typeRating,
-                })
-                .where(eq(sponsorCanonical.id, missing.id));
+              await withRetry(async () => {
+                await db
+                  .update(sponsorCanonical)
+                  .set({
+                    fingerprint: newRec.fingerprint,
+                    currentName: newRec.organisationName,
+                    lastSeen: today,
+                    consecutiveMisses: 0,
+                    historicalNames: updatedHistorical,
+                    typeRating: newRec.typeRating || missing.typeRating,
+                  })
+                  .where(eq(sponsorCanonical.id, missing.id));
+              }, `Rename update ${missing.currentName}`);
 
               try {
                 await db
@@ -390,23 +401,27 @@ async function reconcile(
         }
 
         if (!renamed) {
-          await db
-            .update(sponsorCanonical)
-            .set({ consecutiveMisses: newMissCount })
-            .where(eq(sponsorCanonical.id, missing.id));
+          await withRetry(async () => {
+            await db
+              .update(sponsorCanonical)
+              .set({ consecutiveMisses: newMissCount })
+              .where(eq(sponsorCanonical.id, missing.id));
+          }, `First absence ${missing.currentName}`);
 
           console.log(
             `[Reconciliation] First absence for "${missing.currentName}", waiting for confirmation.`
           );
         }
       } else if (newMissCount >= 2) {
-        await db
-          .update(sponsorCanonical)
-          .set({
-            consecutiveMisses: newMissCount,
-            status: "NOT_LISTED",
-          })
-          .where(eq(sponsorCanonical.id, missing.id));
+        await withRetry(async () => {
+          await db
+            .update(sponsorCanonical)
+            .set({
+              consecutiveMisses: newMissCount,
+              status: "NOT_LISTED",
+            })
+            .where(eq(sponsorCanonical.id, missing.id));
+        }, `Confirmed removal ${missing.currentName}`);
 
         changes.push({
           organisationName: missing.currentName,
@@ -419,10 +434,12 @@ async function reconcile(
           `[Reconciliation] Confirmed removal: "${missing.currentName}" (missing ${newMissCount} consecutive days)`
         );
       } else {
-        await db
-          .update(sponsorCanonical)
-          .set({ consecutiveMisses: newMissCount })
-          .where(eq(sponsorCanonical.id, missing.id));
+        await withRetry(async () => {
+          await db
+            .update(sponsorCanonical)
+            .set({ consecutiveMisses: newMissCount })
+            .where(eq(sponsorCanonical.id, missing.id));
+        }, `Miss count update ${missing.currentName}`);
       }
     }
   }
@@ -508,9 +525,9 @@ export async function runSponsorMonitorJob(source: string = "cron"): Promise<{
     }
 
     console.log(`[SponsorMonitorJob] Storing snapshot for ${today} (${currentRecords.length} records)...`);
-    await storeSnapshot(currentRecords, today);
+    await withRetry(() => storeSnapshot(currentRecords, today), "Store snapshot");
 
-    const canonicalMap = await loadActiveCanonical();
+    const canonicalMap = await withRetry(() => loadActiveCanonical(), "Load canonical records");
 
     if (canonicalMap.size === 0) {
       console.log(`[SponsorMonitorJob] No canonical records found. This appears to be the first run.`);
@@ -632,21 +649,11 @@ export async function runSponsorMonitorJob(source: string = "cron"): Promise<{
       console.error("[SponsorMonitorJob] Failed to generate daily digest:", digestErr.message);
     }
 
-    await db.insert(monitorJobRuns).values({
-      runDate: today,
-      source,
-      status: "success",
-      recordsProcessed: result.recordsProcessed,
-      changesDetected: detectedChanges.length,
-      changeSummary: changeCounts,
-      notificationsSent: result.notificationsSent,
-      notificationsSkipped: result.notificationsSkipped,
-      notificationsFailed: result.notificationsFailed,
-      durationMs: Date.now() - startTime,
-      completedAt: new Date(),
-    }).onConflictDoUpdate({
-      target: monitorJobRuns.runDate,
-      set: {
+    const finalDuration = Date.now() - startTime;
+    const completionTime = new Date();
+    await withRetry(async () => {
+      await db.insert(monitorJobRuns).values({
+        runDate: today,
         source,
         status: "success",
         recordsProcessed: result.recordsProcessed,
@@ -655,10 +662,24 @@ export async function runSponsorMonitorJob(source: string = "cron"): Promise<{
         notificationsSent: result.notificationsSent,
         notificationsSkipped: result.notificationsSkipped,
         notificationsFailed: result.notificationsFailed,
-        durationMs: Date.now() - startTime,
-        completedAt: new Date(),
-      },
-    });
+        durationMs: finalDuration,
+        completedAt: completionTime,
+      }).onConflictDoUpdate({
+        target: monitorJobRuns.runDate,
+        set: {
+          source,
+          status: "success",
+          recordsProcessed: result.recordsProcessed,
+          changesDetected: detectedChanges.length,
+          changeSummary: changeCounts,
+          notificationsSent: result.notificationsSent,
+          notificationsSkipped: result.notificationsSkipped,
+          notificationsFailed: result.notificationsFailed,
+          durationMs: finalDuration,
+          completedAt: completionTime,
+        },
+      });
+    }, "Log job success");
 
     console.log(`[SponsorMonitorJob] Cleaning up snapshots older than 90 days...`);
     await cleanupOldSnapshots(90);
@@ -681,29 +702,33 @@ export async function runSponsorMonitorJob(source: string = "cron"): Promise<{
     const errorMsg = `Unexpected error: ${err.message}`;
     console.error(`[SponsorMonitorJob] ${errorMsg}`, err);
     await sendAdminFailureAlert(errorMsg);
-      try {
-        const today = new Date().toISOString().split("T")[0];
+    const failDuration = Date.now() - startTime;
+    const failTime = new Date();
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      await withRetry(async () => {
         await db.insert(monitorJobRuns).values({
           runDate: today,
           source,
           status: "failed",
           recordsProcessed: result.recordsProcessed,
           changesDetected: 0,
-          durationMs: Date.now() - startTime,
+          durationMs: failDuration,
           errorMessage: err.message,
-          completedAt: new Date(),
+          completedAt: failTime,
         }).onConflictDoUpdate({
           target: monitorJobRuns.runDate,
           set: {
             status: "failed",
             errorMessage: err.message,
-            durationMs: Date.now() - startTime,
-            completedAt: new Date(),
+            durationMs: failDuration,
+            completedAt: failTime,
           },
         });
-      } catch (logErr) {
-        console.error("[SponsorMonitorJob] Failed to log job failure:", logErr);
-      }
+      }, "Log job failure");
+    } catch (logErr) {
+      console.error("[SponsorMonitorJob] Failed to log job failure:", logErr);
+    }
     return { ...result, error: errorMsg };
   } finally {
     isRunning = false;
@@ -889,4 +914,32 @@ export function startSponsorMonitorCron(): void {
 
 export function isJobRunning(): boolean {
   return isRunning;
+}
+
+export async function checkAndTriggerIfNeeded(): Promise<void> {
+  const now = Date.now();
+  if (now - lastRequestCheckTime < REQUEST_CHECK_INTERVAL_MS) {
+    return;
+  }
+  lastRequestCheckTime = now;
+
+  try {
+    if (!isWeekday()) return;
+    if (isRunning) return;
+
+    const alreadyRan = await hasTodayJobSucceeded();
+    if (alreadyRan === null || alreadyRan) return;
+
+    const hour = new Date().getUTCHours();
+    if (hour < 1) {
+      return;
+    }
+
+    console.log("[SponsorMonitorJob] Request-triggered check: today's job has not run. Triggering now...");
+    runSponsorMonitorJob("request-trigger").catch((err) => {
+      console.error("[SponsorMonitorJob] Request-triggered job error:", err);
+    });
+  } catch (err) {
+    console.error("[SponsorMonitorJob] Request-triggered check error:", err);
+  }
 }

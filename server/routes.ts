@@ -16,7 +16,7 @@ import { PDFAnalyzer } from "./services/pdfAnalyzer";
 import bcrypt from "bcrypt";
 import { rebuildSponsorIndex, searchSponsors, isIndexReady } from "./utils/sponsorSearch";
 import { normalizeName, downloadAndParseSponsorList, storeSnapshot, getLatestSnapshotDate, generateFingerprint } from "./utils/sponsorListFetcher";
-import { runSponsorMonitorJob, startSponsorMonitorCron, isJobRunning, getLastRunInfo } from "./utils/sponsorMonitorJob";
+import { runSponsorMonitorJob, startSponsorMonitorCron, isJobRunning, getLastRunInfo, checkAndTriggerIfNeeded } from "./utils/sponsorMonitorJob";
 import { generateHeadline, signDigest, deterministicHeadline } from "./services/aiDigest";
 import { encryptPhone, decryptPhone } from "./utils/phoneCrypto";
 import { sendSMS, sendWhatsApp } from "./services/messaging";
@@ -116,6 +116,32 @@ function isSessionProcessed(sessionId: string): boolean {
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
+
+  // Request-triggered sponsor monitor check (runs at most once per hour, non-blocking)
+  app.use((req, res, next) => {
+    checkAndTriggerIfNeeded().catch(() => {});
+    next();
+  });
+
+  // Health endpoint for external uptime monitors (keeps server alive for cron windows)
+  app.get('/api/health', async (req, res) => {
+    const lastRun = getLastRunInfo();
+    const jobRunning = isJobRunning();
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      sponsorMonitor: {
+        running: jobRunning,
+        lastRun: lastRun ? {
+          date: lastRun.date,
+          success: lastRun.success,
+          recordsProcessed: lastRun.recordsProcessed,
+          changesDetected: lastRun.changesDetected,
+        } : null,
+      },
+    });
+  });
 
   // === SEO ROUTES (must be before Vite middleware) ===
 
