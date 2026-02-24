@@ -123,6 +123,106 @@ async function sendAdminFailureAlert(errorMessage: string): Promise<void> {
   }
 }
 
+async function sendAdminJobCompleteEmail(result: {
+  success: boolean;
+  recordsProcessed: number;
+  changesDetected?: number;
+  changeSummary?: Record<string, number>;
+  notificationsSent: number;
+  notificationsSkipped: number;
+  notificationsFailed: number;
+  error?: string;
+}, durationMs: number, source: string): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  const adminEmail = process.env.ADMIN_EMAIL;
+  if (!apiKey || !adminEmail) return;
+
+  const isSuccess = result.success;
+  const durationSec = (durationMs / 1000).toFixed(1);
+  const changeCount = result.changesDetected ?? 0;
+  const changeSummaryText = result.changeSummary && Object.keys(result.changeSummary).length > 0
+    ? Object.entries(result.changeSummary).map(([k, v]) => `${k}: ${v}`).join(", ")
+    : "None";
+
+  const statusColor = isSuccess ? "#16a34a" : "#dc2626";
+  const statusGradient = isSuccess
+    ? "linear-gradient(135deg, #059669 0%, #16a34a 100%)"
+    : "linear-gradient(135deg, #8B0000 0%, #CC0000 100%)";
+  const statusLabel = isSuccess ? "Completed Successfully" : "Failed";
+  const statusIcon = isSuccess ? "&#10004;" : "&#10008;";
+
+  const subject = isSuccess
+    ? `Sponsor Monitor: ${changeCount} change${changeCount !== 1 ? "s" : ""} detected (${durationSec}s)`
+    : `ALERT: Sponsor monitor job failed`;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <div style="background: ${statusGradient}; padding: 30px; border-radius: 10px 10px 0 0;">
+        <h1 style="color: #ffffff; margin: 0; text-align: center; font-size: 22px;">
+          ${statusIcon} Sponsor Monitor Job ${statusLabel}
+        </h1>
+      </div>
+      <div style="background: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+          <tr>
+            <td style="padding: 8px 12px; color: #666; border-bottom: 1px solid #f0f0f0;">Status</td>
+            <td style="padding: 8px 12px; color: ${statusColor}; font-weight: bold; border-bottom: 1px solid #f0f0f0;">${statusLabel}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 12px; color: #666; border-bottom: 1px solid #f0f0f0;">Trigger</td>
+            <td style="padding: 8px 12px; color: #333; border-bottom: 1px solid #f0f0f0;">${source}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 12px; color: #666; border-bottom: 1px solid #f0f0f0;">Duration</td>
+            <td style="padding: 8px 12px; color: #333; border-bottom: 1px solid #f0f0f0;">${durationSec}s</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 12px; color: #666; border-bottom: 1px solid #f0f0f0;">Records Processed</td>
+            <td style="padding: 8px 12px; color: #333; border-bottom: 1px solid #f0f0f0;">${result.recordsProcessed.toLocaleString()}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 12px; color: #666; border-bottom: 1px solid #f0f0f0;">Changes Detected</td>
+            <td style="padding: 8px 12px; color: ${changeCount > 0 ? "#2563eb" : "#333"}; font-weight: ${changeCount > 0 ? "bold" : "normal"}; border-bottom: 1px solid #f0f0f0;">${changeCount}</td>
+          </tr>
+          ${changeCount > 0 ? `<tr>
+            <td style="padding: 8px 12px; color: #666; border-bottom: 1px solid #f0f0f0;">Breakdown</td>
+            <td style="padding: 8px 12px; color: #333; border-bottom: 1px solid #f0f0f0;">${changeSummaryText}</td>
+          </tr>` : ""}
+          <tr>
+            <td style="padding: 8px 12px; color: #666; border-bottom: 1px solid #f0f0f0;">Notifications</td>
+            <td style="padding: 8px 12px; color: #333; border-bottom: 1px solid #f0f0f0;">${result.notificationsSent} sent, ${result.notificationsSkipped} skipped, ${result.notificationsFailed} failed</td>
+          </tr>
+        </table>
+        ${result.error ? `<div style="background: #fff3f3; padding: 15px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #CC0000;">
+          <p style="color: #333; font-size: 13px; margin: 0; font-family: monospace; white-space: pre-wrap;">${result.error.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>
+        </div>` : ""}
+        <p style="color: #999; font-size: 12px; margin-top: 16px; text-align: center;">
+          ${new Date().toISOString()} &middot; checkbyai.net
+        </p>
+      </div>
+    </div>`;
+
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        from: "Sponsor Monitor <alerts@checkbyai.net>",
+        to: [adminEmail],
+        subject,
+        html,
+      }),
+    });
+    if (!response.ok) {
+      console.error("[SponsorMonitorJob] Failed to send job completion email:", await response.text());
+    } else {
+      console.log(`[SponsorMonitorJob] Job ${isSuccess ? "success" : "failure"} email sent to ${adminEmail}`);
+    }
+  } catch (err) {
+    console.error("[SponsorMonitorJob] Error sending job completion email:", err);
+  }
+}
+
 async function downloadWithRetry(): Promise<SponsorRecord[]> {
   let lastError: Error | null = null;
 
