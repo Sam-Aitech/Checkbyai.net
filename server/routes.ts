@@ -538,6 +538,95 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
     }
   });
 
+  // Send simultaneous admin + user emails on subscription purchase
+  async function sendSubscriptionNotifications(
+    userId: string,
+    planName: string,
+    packageType: string,
+    sessionEmail?: string
+  ): Promise<void> {
+    const apiKey = process.env.RESEND_API_KEY;
+    const adminEmail = process.env.ADMIN_EMAIL;
+    if (!apiKey) return;
+
+    let userEmail = sessionEmail;
+    if (!userEmail) {
+      try {
+        const user = await storage.getUser(userId);
+        userEmail = user?.email;
+      } catch {}
+    }
+
+    const planDetails: Record<string, { credits: string; watches: string; timing: string; portal: string }> = {
+      starter:              { credits: "50 CoS checks",          watches: "—",             timing: "—",           portal: "/verify" },
+      pro:                  { credits: "100 CoS checks",         watches: "—",             timing: "—",           portal: "/verify" },
+      unlimited:            { credits: "Unlimited CoS checks",   watches: "10 companies",  timing: "Immediate",   portal: "/verify" },
+      notification_starter: { credits: "—",                      watches: "2 companies",   timing: "Same-day",    portal: "/sponsor-monitor" },
+      notification_pro:     { credits: "5 CoS checks/month",     watches: "5 companies",   timing: "Immediate",   portal: "/sponsor-monitor" },
+    };
+    const details = planDetails[packageType] || { credits: "—", watches: "—", timing: "—", portal: "/" };
+
+    const adminHtml = `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+        <div style="background:linear-gradient(135deg,#1d4ed8 0%,#3b82f6 100%);padding:28px;border-radius:10px 10px 0 0;">
+          <h1 style="color:#fff;margin:0;text-align:center;font-size:20px;">&#127881; New Subscriber</h1>
+        </div>
+        <div style="background:#fff;padding:28px;border:1px solid #e0e0e0;border-top:none;border-radius:0 0 10px 10px;">
+          <table style="width:100%;border-collapse:collapse;font-size:14px;">
+            <tr><td style="padding:8px 12px;color:#666;border-bottom:1px solid #f0f0f0;">Plan</td><td style="padding:8px 12px;color:#1d4ed8;font-weight:bold;border-bottom:1px solid #f0f0f0;">${planName}</td></tr>
+            <tr><td style="padding:8px 12px;color:#666;border-bottom:1px solid #f0f0f0;">Package Type</td><td style="padding:8px 12px;color:#333;border-bottom:1px solid #f0f0f0;">${packageType}</td></tr>
+            <tr><td style="padding:8px 12px;color:#666;border-bottom:1px solid #f0f0f0;">User Email</td><td style="padding:8px 12px;color:#333;border-bottom:1px solid #f0f0f0;">${userEmail || "unknown"}</td></tr>
+            <tr><td style="padding:8px 12px;color:#666;border-bottom:1px solid #f0f0f0;">User ID</td><td style="padding:8px 12px;color:#999;font-family:monospace;font-size:12px;border-bottom:1px solid #f0f0f0;">${userId}</td></tr>
+            <tr><td style="padding:8px 12px;color:#666;">Timestamp</td><td style="padding:8px 12px;color:#333;">${new Date().toISOString()}</td></tr>
+          </table>
+        </div>
+      </div>`;
+
+    const userHtml = `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+        <div style="background:linear-gradient(135deg,#059669 0%,#10b981 100%);padding:28px;border-radius:10px 10px 0 0;">
+          <h1 style="color:#fff;margin:0;text-align:center;font-size:20px;">&#10004; You're all set — ${planName}</h1>
+        </div>
+        <div style="background:#fff;padding:28px;border:1px solid #e0e0e0;border-top:none;border-radius:0 0 10px 10px;">
+          <p style="color:#333;font-size:15px;margin-top:0;">Thank you for subscribing! Here's what's now unlocked on your account:</p>
+          <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:20px;">
+            ${details.credits !== "—" ? `<tr><td style="padding:8px 12px;color:#666;border-bottom:1px solid #f0f0f0;">&#9989; Checks</td><td style="padding:8px 12px;color:#333;font-weight:bold;border-bottom:1px solid #f0f0f0;">${details.credits}</td></tr>` : ""}
+            ${details.watches !== "—" ? `<tr><td style="padding:8px 12px;color:#666;border-bottom:1px solid #f0f0f0;">&#128064; Watch list</td><td style="padding:8px 12px;color:#333;font-weight:bold;border-bottom:1px solid #f0f0f0;">${details.watches}</td></tr>` : ""}
+            ${details.timing !== "—" ? `<tr><td style="padding:8px 12px;color:#666;border-bottom:1px solid #f0f0f0;">&#9889; Alert speed</td><td style="padding:8px 12px;color:#333;font-weight:bold;border-bottom:1px solid #f0f0f0;">${details.timing}</td></tr>` : ""}
+          </table>
+          <div style="text-align:center;">
+            <a href="https://checkbyai.net${details.portal}" style="background:#1d4ed8;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:15px;display:inline-block;">Get Started</a>
+          </div>
+          <p style="color:#999;font-size:12px;margin-top:24px;text-align:center;">Questions? Reply to this email or visit checkbyai.net</p>
+        </div>
+      </div>`;
+
+    const sends: Promise<any>[] = [];
+
+    if (adminEmail) {
+      sends.push(
+        fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+          body: JSON.stringify({ from: "CheckByAI <alerts@checkbyai.net>", to: [adminEmail], subject: `New subscriber: ${planName} — ${userEmail || userId}`, html: adminHtml }),
+        }).catch(err => console.error("[Subscription] Admin email error:", err))
+      );
+    }
+
+    if (userEmail) {
+      sends.push(
+        fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+          body: JSON.stringify({ from: "CheckByAI <no-reply@checkbyai.net>", to: [userEmail], subject: `Welcome to ${planName} — you're all set`, html: userHtml }),
+        }).catch(err => console.error("[Subscription] User email error:", err))
+      );
+    }
+
+    await Promise.all(sends);
+    console.log(`[Subscription] Emails sent for ${packageType} — user: ${userEmail || userId}`);
+  }
+
   // Stripe webhook for subscription status updates
   app.post('/api/stripe-webhook', async (req, res) => {
     const sig = req.headers['stripe-signature'];
@@ -626,6 +715,7 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
         
         if (userId && packageType && session.payment_status === 'paid' && !isSessionProcessed(session.id)) {
           markSessionProcessed(session.id);
+          const sessionEmail = session.customer_details?.email || session.customer_email || undefined;
           if (packageType === 'starter') {
             await storage.addCredits(userId, 50);
             await storage.updateUserSubscription(userId, {
@@ -633,6 +723,7 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
               stripeSubscriptionId: session.subscription,
               stripeCustomerId: session.customer,
             });
+            sendSubscriptionNotifications(userId, 'CoS Check Starter', 'starter', sessionEmail).catch(() => {});
           } else if (packageType === 'pro') {
             await storage.addCredits(userId, 100);
             await storage.updateUserSubscription(userId, {
@@ -640,12 +731,14 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
               stripeSubscriptionId: session.subscription,
               stripeCustomerId: session.customer,
             });
+            sendSubscriptionNotifications(userId, 'CoS Check Pro', 'pro', sessionEmail).catch(() => {});
           } else if (packageType === 'unlimited') {
             await storage.updateUserSubscription(userId, {
               subscriptionStatus: 'unlimited',
               stripeSubscriptionId: session.subscription,
               stripeCustomerId: session.customer,
             });
+            sendSubscriptionNotifications(userId, 'CoS Check Unlimited', 'unlimited', sessionEmail).catch(() => {});
           } else if (packageType === 'master') {
             await storage.createPaidSubmission({
               email: session.customer_details?.email || '',
@@ -661,6 +754,7 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
               stripeSubscriptionId: session.subscription,
               stripeCustomerId: session.customer,
             });
+            sendSubscriptionNotifications(userId, 'Notification Engine Starter', 'notification_starter', sessionEmail).catch(() => {});
           } else if (packageType === 'notification_pro') {
             await storage.addCredits(userId, 5);
             await storage.updateUserSubscription(userId, {
@@ -668,6 +762,7 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
               stripeSubscriptionId: session.subscription,
               stripeCustomerId: session.customer,
             });
+            sendSubscriptionNotifications(userId, 'Notification Engine Pro', 'notification_pro', sessionEmail).catch(() => {});
           }
         }
         break;

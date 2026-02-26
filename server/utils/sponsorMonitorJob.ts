@@ -797,6 +797,12 @@ export async function runSponsorMonitorJob(source: string = "cron"): Promise<{
       `  Notifications: ${result.notificationsSent} sent, ${result.notificationsSkipped} skipped, ${result.notificationsFailed} failed`
     );
 
+    sendAdminJobCompleteEmail(
+      { success: true, recordsProcessed: result.recordsProcessed, changesDetected: detectedChanges.length, changeSummary: changeCounts, notificationsSent: result.notificationsSent, notificationsSkipped: result.notificationsSkipped, notificationsFailed: result.notificationsFailed },
+      Date.now() - startTime,
+      source
+    ).catch(() => {});
+
     return result;
   } catch (err: any) {
     const errorMsg = `Unexpected error: ${err.message}`;
@@ -829,6 +835,11 @@ export async function runSponsorMonitorJob(source: string = "cron"): Promise<{
     } catch (logErr) {
       console.error("[SponsorMonitorJob] Failed to log job failure:", logErr);
     }
+    sendAdminJobCompleteEmail(
+      { success: false, recordsProcessed: result.recordsProcessed, notificationsSent: result.notificationsSent, notificationsSkipped: result.notificationsSkipped, notificationsFailed: result.notificationsFailed, error: errorMsg },
+      failDuration,
+      source
+    ).catch(() => {});
     return { ...result, error: errorMsg };
   } finally {
     isRunning = false;

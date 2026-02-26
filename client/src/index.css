@@ -204,6 +204,14 @@
   scroll-behavior: smooth;
 }
 
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 .fas {
   font-family: "Font Awesome 6 Free";
   font-weight: 900;

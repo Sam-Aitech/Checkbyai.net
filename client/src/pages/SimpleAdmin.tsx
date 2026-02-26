@@ -1112,13 +1112,13 @@ export default function SimpleAdmin() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
       {/* System Health Header */}
-      <header className="bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 shadow-sm px-6 py-3">
+      <header className="bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 shadow-sm px-3 sm:px-6 py-2 sm:py-3 sticky top-0 z-10">
         <div className="flex justify-between items-center max-w-[1800px] mx-auto">
-          <div className="flex items-center gap-3">
-            <Shield className="w-8 h-8 text-red-500" />
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Shield className="w-6 h-6 sm:w-8 sm:h-8 text-red-500 shrink-0" />
             <div>
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">Forensic Command Center</h1>
-              <p className="text-sm text-gray-500 dark:text-slate-400">COS Verification Management</p>
+              <h1 className="text-base sm:text-xl font-bold text-gray-900 dark:text-white leading-tight">Forensic Command Center</h1>
+              <p className="text-xs sm:text-sm text-gray-500 dark:text-slate-400 hidden sm:block">COS Verification Management</p>
             </div>
           </div>
           
@@ -1148,103 +1148,105 @@ export default function SimpleAdmin() {
             </div>
           )}
 
-          <div className="flex items-center gap-4">
-            <span className="text-gray-600 dark:text-slate-300 hidden sm:inline">{user?.email}</span>
+          <div className="flex items-center gap-2 sm:gap-4">
+            <span className="text-gray-600 dark:text-slate-300 hidden sm:inline text-sm truncate max-w-[160px]">{user?.email}</span>
             <Button variant="outline" size="sm" onClick={handleLogout} className="border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700" data-testid="button-logout">
-              <LogOut className="w-4 h-4 mr-2" />
-              Logout
+              <LogOut className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Logout</span>
             </Button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-[1800px] mx-auto p-6">
+      <main className="max-w-[1800px] mx-auto p-3 sm:p-6">
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
           <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-blue-500/10 rounded-lg">
-                  <FileText className="w-6 h-6 text-blue-500" />
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 sm:p-3 bg-blue-500/10 rounded-lg shrink-0">
+                  <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500" />
                 </div>
-                <div>
-                  <p className="text-sm text-gray-500 dark:text-slate-400">Trusted Patterns</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats?.trustedPatterns || 0}</p>
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm text-gray-500 dark:text-slate-400 truncate">Trusted Patterns</p>
+                  <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">{stats?.trustedPatterns || 0}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-green-500/10 rounded-lg">
-                  <CheckCircle className="w-6 h-6 text-green-500" />
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 sm:p-3 bg-green-500/10 rounded-lg shrink-0">
+                  <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-green-500" />
                 </div>
-                <div>
-                  <p className="text-sm text-gray-500 dark:text-slate-400">Genuine Today</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats?.genuineVerified || 0}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-yellow-500/10 rounded-lg">
-                  <AlertTriangle className="w-6 h-6 text-yellow-500" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500 dark:text-slate-400">Suspicious</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats?.suspiciousDetected || 0}</p>
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm text-gray-500 dark:text-slate-400 truncate">Genuine Today</p>
+                  <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">{stats?.genuineVerified || 0}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-purple-500/10 rounded-lg">
-                  <TrendingUp className="w-6 h-6 text-purple-500" />
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 sm:p-3 bg-yellow-500/10 rounded-lg shrink-0">
+                  <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-500" />
                 </div>
-                <div>
-                  <p className="text-sm text-gray-500 dark:text-slate-400">Total Today</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats?.verificationsToday || 0}</p>
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm text-gray-500 dark:text-slate-400 truncate">Suspicious</p>
+                  <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">{stats?.suspiciousDetected || 0}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 sm:p-3 bg-purple-500/10 rounded-lg shrink-0">
+                  <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-purple-500" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm text-gray-500 dark:text-slate-400 truncate">Total Today</p>
+                  <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">{stats?.verificationsToday || 0}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 shadow-sm p-1">
-            <TabsTrigger value="logs" className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 dark:data-[state=active]:bg-blue-900/30 dark:data-[state=active]:text-blue-400">
-              <Eye className="w-4 h-4 mr-2" />
-              Verification Logs
-            </TabsTrigger>
-            <TabsTrigger value="users" className="data-[state=active]:bg-purple-50 data-[state=active]:text-purple-700 dark:data-[state=active]:bg-purple-900/30 dark:data-[state=active]:text-purple-400">
-              <Users className="w-4 h-4 mr-2" />
-              Users
-            </TabsTrigger>
-            <TabsTrigger value="patterns" className="data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 dark:data-[state=active]:bg-emerald-900/30 dark:data-[state=active]:text-emerald-400">
-              <FileText className="w-4 h-4 mr-2" />
-              Trusted Patterns
-            </TabsTrigger>
-            <TabsTrigger value="upload" className="data-[state=active]:bg-orange-50 data-[state=active]:text-orange-700 dark:data-[state=active]:bg-orange-900/30 dark:data-[state=active]:text-orange-400">
-              <Upload className="w-4 h-4 mr-2" />
-              Upload Pattern
-            </TabsTrigger>
-            <TabsTrigger value="knowledge" className="data-[state=active]:bg-pink-50 data-[state=active]:text-pink-700 dark:data-[state=active]:bg-pink-900/30 dark:data-[state=active]:text-pink-400">
-              <Brain className="w-4 h-4 mr-2" />
-              AI Knowledge
-            </TabsTrigger>
-            <TabsTrigger value="sponsor" className="data-[state=active]:bg-cyan-50 data-[state=active]:text-cyan-700 dark:data-[state=active]:bg-cyan-900/30 dark:data-[state=active]:text-cyan-400">
-              <Radio className="w-4 h-4 mr-2" />
-              Sponsor Monitor
-            </TabsTrigger>
-          </TabsList>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
+          <div className="overflow-x-auto -mx-3 sm:-mx-0 px-3 sm:px-0 scrollbar-hide">
+            <TabsList className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 shadow-sm p-1 flex w-max min-w-full sm:w-auto sm:min-w-0">
+              <TabsTrigger value="logs" className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 dark:data-[state=active]:bg-blue-900/30 dark:data-[state=active]:text-blue-400">
+                <Eye className="w-4 h-4 shrink-0" />
+                <span className="text-xs sm:text-sm">Logs</span>
+              </TabsTrigger>
+              <TabsTrigger value="users" className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap data-[state=active]:bg-purple-50 data-[state=active]:text-purple-700 dark:data-[state=active]:bg-purple-900/30 dark:data-[state=active]:text-purple-400">
+                <Users className="w-4 h-4 shrink-0" />
+                <span className="text-xs sm:text-sm">Users</span>
+              </TabsTrigger>
+              <TabsTrigger value="patterns" className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 dark:data-[state=active]:bg-emerald-900/30 dark:data-[state=active]:text-emerald-400">
+                <FileText className="w-4 h-4 shrink-0" />
+                <span className="text-xs sm:text-sm">Patterns</span>
+              </TabsTrigger>
+              <TabsTrigger value="upload" className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap data-[state=active]:bg-orange-50 data-[state=active]:text-orange-700 dark:data-[state=active]:bg-orange-900/30 dark:data-[state=active]:text-orange-400">
+                <Upload className="w-4 h-4 shrink-0" />
+                <span className="text-xs sm:text-sm">Upload</span>
+              </TabsTrigger>
+              <TabsTrigger value="knowledge" className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap data-[state=active]:bg-pink-50 data-[state=active]:text-pink-700 dark:data-[state=active]:bg-pink-900/30 dark:data-[state=active]:text-pink-400">
+                <Brain className="w-4 h-4 shrink-0" />
+                <span className="text-xs sm:text-sm">AI Rules</span>
+              </TabsTrigger>
+              <TabsTrigger value="sponsor" className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap data-[state=active]:bg-cyan-50 data-[state=active]:text-cyan-700 dark:data-[state=active]:bg-cyan-900/30 dark:data-[state=active]:text-cyan-400">
+                <Radio className="w-4 h-4 shrink-0" />
+                <span className="text-xs sm:text-sm">Sponsor</span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* Verification Logs Tab */}
           <TabsContent value="logs">
@@ -1402,9 +1404,10 @@ export default function SimpleAdmin() {
                                     variant="outline"
                                     onClick={(e) => { e.stopPropagation(); runAiAnalysis(log); }}
                                     className="border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700"
+                                    title="Analyze"
                                   >
-                                    <Sparkles className="w-4 h-4 mr-1" />
-                                    Analyze
+                                    <Sparkles className="w-4 h-4 sm:mr-1" />
+                                    <span className="hidden sm:inline">Analyze</span>
                                   </Button>
                                 </div>
                               </td>
@@ -1508,8 +1511,8 @@ export default function SimpleAdmin() {
                         <tbody>
                           {users?.data.map((u) => (
                             <tr key={u.id} className="border-b border-gray-100 dark:border-slate-700/50 hover:bg-gray-50 dark:hover:bg-slate-700/30">
-                              <td className="py-3 px-4 text-gray-900 dark:text-white font-medium">
-                                {u.email || 'N/A'}
+                              <td className="py-3 px-4 text-gray-900 dark:text-white font-medium max-w-[140px] sm:max-w-none">
+                                <span className="block truncate" title={u.email || 'N/A'}>{u.email || 'N/A'}</span>
                               </td>
                               <td className="py-3 px-4">
                                 <Badge className={u.role === 'admin' ? 'bg-purple-500/20 text-purple-400' : 'bg-slate-500/20 text-gray-500 dark:text-slate-400'}>
@@ -1914,7 +1917,7 @@ export default function SimpleAdmin() {
               {/* Status Card */}
               <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
                 <CardHeader>
-                  <div className="flex justify-between items-center">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                     <div>
                       <CardTitle className="text-gray-900 dark:text-white flex items-center gap-2">
                         <Radio className="w-5 h-5 text-blue-400" />
@@ -1924,7 +1927,7 @@ export default function SimpleAdmin() {
                         UK Home Office Register monitoring dashboard
                       </CardDescription>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 self-end sm:self-auto">
                       <Button
                         size="sm"
                         variant="outline"
@@ -1932,8 +1935,8 @@ export default function SimpleAdmin() {
                         disabled={sponsorStatusLoading}
                         className="border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700"
                       >
-                        <RefreshCw className={`w-4 h-4 mr-1 ${sponsorStatusLoading ? 'animate-spin' : ''}`} />
-                        Refresh
+                        <RefreshCw className={`w-4 h-4 sm:mr-1 ${sponsorStatusLoading ? 'animate-spin' : ''}`} />
+                        <span className="hidden sm:inline">Refresh</span>
                       </Button>
                       <Button
                         size="sm"
@@ -1943,13 +1946,13 @@ export default function SimpleAdmin() {
                       >
                         {runningJob || sponsorStatus?.jobRunning ? (
                           <>
-                            <div className="w-4 h-4 mr-1 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            Running...
+                            <div className="w-4 h-4 sm:mr-1 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            <span className="hidden sm:inline">Running...</span>
                           </>
                         ) : (
                           <>
-                            <Play className="w-4 h-4 mr-1" />
-                            Run Now
+                            <Play className="w-4 h-4 sm:mr-1" />
+                            <span className="hidden sm:inline">Run Now</span>
                           </>
                         )}
                       </Button>
