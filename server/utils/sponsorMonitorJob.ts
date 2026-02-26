@@ -560,7 +560,7 @@ async function reconcile(
   return changes;
 }
 
-export async function runSponsorMonitorJob(source: string = "cron"): Promise<{
+export async function runSponsorMonitorJob(source: string = "cron", notifyOnFailure = false): Promise<{
   success: boolean;
   recordsProcessed: number;
   changes: Record<string, number>;
@@ -596,7 +596,7 @@ export async function runSponsorMonitorJob(source: string = "cron"): Promise<{
     } catch (err: any) {
       const errorMsg = `CSV download failed after ${MAX_RETRIES} attempts: ${err.message}`;
       console.error(`[SponsorMonitorJob] ${errorMsg}`);
-      await sendAdminFailureAlert(errorMsg);
+      if (notifyOnFailure) await sendAdminFailureAlert(errorMsg);
       return { ...result, error: errorMsg };
     }
 
@@ -605,7 +605,7 @@ export async function runSponsorMonitorJob(source: string = "cron"): Promise<{
     if (currentRecords.length === 0) {
       const errorMsg = "CSV download returned 0 records. Aborting to prevent false mass-removal detection.";
       console.error(`[SponsorMonitorJob] ${errorMsg}`);
-      await sendAdminFailureAlert(errorMsg);
+      if (notifyOnFailure) await sendAdminFailureAlert(errorMsg);
       return { ...result, error: errorMsg };
     }
 
@@ -807,7 +807,7 @@ export async function runSponsorMonitorJob(source: string = "cron"): Promise<{
   } catch (err: any) {
     const errorMsg = `Unexpected error: ${err.message}`;
     console.error(`[SponsorMonitorJob] ${errorMsg}`, err);
-    await sendAdminFailureAlert(errorMsg);
+    if (notifyOnFailure) await sendAdminFailureAlert(errorMsg);
     const failDuration = Date.now() - startTime;
     const failTime = new Date();
     try {
@@ -835,11 +835,13 @@ export async function runSponsorMonitorJob(source: string = "cron"): Promise<{
     } catch (logErr) {
       console.error("[SponsorMonitorJob] Failed to log job failure:", logErr);
     }
-    sendAdminJobCompleteEmail(
-      { success: false, recordsProcessed: result.recordsProcessed, notificationsSent: result.notificationsSent, notificationsSkipped: result.notificationsSkipped, notificationsFailed: result.notificationsFailed, error: errorMsg },
-      failDuration,
-      source
-    ).catch(() => {});
+    if (notifyOnFailure) {
+      sendAdminJobCompleteEmail(
+        { success: false, recordsProcessed: result.recordsProcessed, notificationsSent: result.notificationsSent, notificationsSkipped: result.notificationsSkipped, notificationsFailed: result.notificationsFailed, error: errorMsg },
+        failDuration,
+        source
+      ).catch(() => {});
+    }
     return { ...result, error: errorMsg };
   } finally {
     isRunning = false;
@@ -977,7 +979,7 @@ export function startSponsorMonitorCron(): void {
       }
       if (!alreadyRan) {
         console.log("[SponsorMonitorJob] Backup trigger: today's job has not completed successfully. Running now...");
-        await runSponsorMonitorJob("backup-trigger");
+        await runSponsorMonitorJob("backup-trigger", true);
       }
     } catch (err) {
       console.error("[SponsorMonitorJob] Backup trigger error:", err);

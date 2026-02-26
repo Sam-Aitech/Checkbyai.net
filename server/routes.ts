@@ -2360,7 +2360,7 @@ Format your response in clear, professional markdown.`;
 
       res.json({ message: "Sponsor monitor job started. This may take several minutes." });
 
-      runSponsorMonitorJob("manual-admin").catch((err) => {
+      runSponsorMonitorJob("manual-admin", true).catch((err) => {
         console.error("[SponsorMonitorJob] Manual run error:", err);
       });
     } catch (error) {
