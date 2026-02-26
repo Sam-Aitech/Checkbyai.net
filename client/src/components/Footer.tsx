@@ -56,14 +56,22 @@ export default function Footer() {
                 { href: "/cos-guide", label: "CoS Guide" },
                 { href: "/technology", label: "Our Technology" },
                 { href: "/about", label: "About Us" },
-                { href: "/privacy", label: "Privacy" },
-                { href: "/terms.html", label: "Terms of Service" },
-                { href: "/data-security", label: "Data Security" },
               ].map(link => (
                 <li key={link.href}>
                   <Link href={link.href} className="text-sm text-white/70 hover:text-white transition-colors font-medium">
                     {link.label}
                   </Link>
+                </li>
+              ))}
+              {[
+                { href: "/privacy.html", label: "Privacy Policy" },
+                { href: "/terms.html", label: "Terms of Service" },
+                { href: "/data-security.html", label: "Data Security" },
+              ].map(link => (
+                <li key={link.href}>
+                  <a href={link.href} className="text-sm text-white/70 hover:text-white transition-colors font-medium">
+                    {link.label}
+                  </a>
                 </li>
               ))}
             </ul>
