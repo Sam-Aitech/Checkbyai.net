@@ -57,6 +57,7 @@ export default function Footer() {
                 { href: "/technology", label: "Our Technology" },
                 { href: "/about", label: "About Us" },
                 { href: "/privacy", label: "Privacy" },
+                { href: "/terms.html", label: "Terms of Service" },
                 { href: "/data-security", label: "Data Security" },
               ].map(link => (
                 <li key={link.href}>

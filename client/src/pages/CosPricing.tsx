@@ -105,10 +105,10 @@ const plans: PricingPlan[] = [
     features: [
       'Expert human review',
       '24-hour turnaround guarantee',
-      'Detailed analysis report',
+      'Detailed forensic analysis report',
       'Document authenticity assessment',
       'Employer verification check',
-      'Recommendations & next steps',
+      'Technical findings summary',
       'Email report delivery',
     ],
     bundleBadge: 'Bonus: 5-company notifications for 3 months',
@@ -186,6 +186,22 @@ function PricingCard({ plan, index, isLoggedIn, loading, onSelect }: {
               <Bell className="w-4 h-4 mt-0.5 flex-shrink-0" />
               <span>{plan.bundleBadge}</span>
             </div>
+          </div>
+        )}
+
+        {plan.packageType === 'master' && (
+          <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-700/50 rounded-lg">
+            <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
+              <strong>Important:</strong> Our expert review is a technical forensic assessment of document authenticity only. It does not constitute immigration advice. For immigration advice, consult an{' '}
+              <a
+                href="https://www.gov.uk/find-immigration-adviser"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:no-underline font-semibold"
+              >
+                OISC-registered adviser or solicitor
+              </a>.
+            </p>
           </div>
         )}
       </div>

@@ -312,6 +312,29 @@ export default function VerificationResults({ result, verificationId }: Verifica
         </CardContent>
       </Card>
 
+      <div className="px-4 py-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 rounded-xl">
+        <div className="flex items-start gap-2">
+          <Info className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-[11px] text-blue-800 dark:text-blue-300 leading-relaxed font-medium mb-1">
+              Technical Analysis Only — Not Legal or Immigration Advice
+            </p>
+            <p className="text-[11px] text-blue-700 dark:text-blue-400 leading-relaxed">
+              This is a forensic analysis of document metadata and structure only. It does not constitute legal or immigration advice and should not be used as the sole basis for any immigration decision. If you have concerns about a document, consult an{' '}
+              <a
+                href="https://www.gov.uk/find-immigration-adviser"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline font-semibold"
+              >
+                OISC-registered adviser or solicitor
+              </a>.
+              {' '}<a href="mailto:support@checkbyai.net?subject=Contest%20Verification%20Result" className="underline font-semibold">Contest this result</a>.
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="px-4 py-3 bg-primary/[0.03] dark:bg-primary/[0.06] border border-border rounded-xl">
         <div className="flex items-start gap-2">
           <Lock className="w-3.5 h-3.5 text-primary flex-shrink-0 mt-0.5" />

@@ -377,7 +377,7 @@ export default function Technology() {
                 <div className="p-6">
                   <div ref={statsRef} className="grid grid-cols-2 md:grid-cols-4 gap-6">
                     {[
-                      { value: "99.8%", label: "Detection Accuracy" },
+                      { value: "High", label: "Forensic Detection" },
                       { value: "<3s", label: "Processing Time" },
                       { value: "24/7", label: "Availability" },
                       { value: "10,000+", label: "Documents Verified" },
@@ -394,6 +394,9 @@ export default function Technology() {
                       </motion.div>
                     ))}
                   </div>
+                  <p className="text-xs text-muted-foreground mt-6 text-center italic leading-relaxed">
+                    Accuracy based on forensic metadata analysis of document structure and software signatures. Results should not be relied upon as the sole basis for any immigration decision.
+                  </p>
                 </div>
               </div>
             </ScrollSection>

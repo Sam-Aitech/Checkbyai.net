@@ -322,8 +322,8 @@ export default function AIGuide() {
                 <div className="p-6">
                   <div className="grid md:grid-cols-3 gap-6">
                     <div className="text-center">
-                      <p className="text-foreground editorial-heading text-4xl">99.8%</p>
-                      <p className="text-muted-foreground editorial-caption mt-1">Detection Accuracy</p>
+                      <p className="text-foreground editorial-heading text-4xl">High</p>
+                      <p className="text-muted-foreground editorial-caption mt-1">Forensic Detection</p>
                     </div>
                     <div className="text-center">
                       <p className="text-foreground editorial-heading text-4xl">&lt;3s</p>
@@ -334,6 +334,9 @@ export default function AIGuide() {
                       <p className="text-muted-foreground editorial-caption mt-1">Availability</p>
                     </div>
                   </div>
+                  <p className="text-xs text-muted-foreground mt-5 text-center italic leading-relaxed">
+                    Accuracy based on forensic metadata analysis. Results should not be relied upon as the sole basis for any immigration decision.
+                  </p>
                 </div>
               </div>
             </motion.div>
