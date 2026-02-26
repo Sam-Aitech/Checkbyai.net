@@ -46,7 +46,8 @@ export interface IStorage {
   updateDailyVerificationUsage(userId: string): Promise<User>;
   checkDailyLimit(userId: string): Promise<boolean>;
   updateUserVerificationLimit(userId: string, limit: number | null): Promise<User | undefined>;
-  
+  updateCosCheckApproval(userId: string, approved: boolean): Promise<void>;
+
   // Expert requests operations
   createExpertRequest(userId: string, stripeSessionId?: string): Promise<number>;
   
@@ -370,6 +371,16 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId))
       .returning();
     return updatedUser;
+  }
+
+  async updateCosCheckApproval(userId: string, approved: boolean): Promise<void> {
+    await db
+      .update(users)
+      .set({
+        cosCheckApproved: approved,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
   }
 
   // Expert requests operations

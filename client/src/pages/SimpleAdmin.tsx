@@ -90,6 +90,7 @@ interface UserRecord {
   subscriptionStatus: string;
   isRestricted?: boolean;
   restrictionReason?: string;
+  cosCheckApproved?: boolean;
   createdAt: string;
   dailyVerificationsUsed?: number;
   verificationLimit?: number | null;
@@ -1503,6 +1504,7 @@ export default function SimpleAdmin() {
                             <th className="text-left py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">Email</th>
                             <th className="text-left py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">Role</th>
                             <th className="text-left py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">Status</th>
+                            <th className="text-left py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">CoS Beta</th>
                             <th className="text-left py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">Limit</th>
                             <th className="text-left py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">Joined</th>
                             <th className="text-right py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">Actions</th>
@@ -1530,6 +1532,13 @@ export default function SimpleAdmin() {
                                   <Badge className="bg-blue-500/20 text-blue-400">Starter</Badge>
                                 ) : (
                                   <Badge className="bg-slate-500/20 text-gray-500 dark:text-slate-400">Free</Badge>
+                                )}
+                              </td>
+                              <td className="py-3 px-4">
+                                {u.cosCheckApproved ? (
+                                  <Badge className="bg-green-500/20 text-green-400">Approved</Badge>
+                                ) : (
+                                  <Badge className="bg-slate-500/20 text-gray-500 dark:text-slate-400">Pending</Badge>
                                 )}
                               </td>
                               <td className="py-3 px-4">
@@ -1566,14 +1575,40 @@ export default function SimpleAdmin() {
                               </td>
                               <td className="py-3 px-4 text-right">
                                 {u.role !== 'admin' && (
-                                  <Button
-                                    size="sm"
-                                    variant={u.isRestricted ? 'outline' : 'destructive'}
-                                    onClick={() => toggleUserRestriction(u.id, !u.isRestricted, 'Admin restriction')}
-                                    className={u.isRestricted ? 'border-green-600 text-green-400 hover:bg-green-500/10' : ''}
-                                  >
-                                    {u.isRestricted ? 'Unrestrict' : 'Restrict'}
-                                  </Button>
+                                  <div className="flex gap-2 justify-end">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={async () => {
+                                        try {
+                                          await fetch(`/api/admin/users/${u.id}/cos-approval`, {
+                                            method: 'PATCH',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ approved: !u.cosCheckApproved }),
+                                            credentials: 'include',
+                                          });
+                                          toast({
+                                            title: u.cosCheckApproved ? 'Beta access revoked' : 'Beta access approved',
+                                            description: u.cosCheckApproved ? 'User can no longer verify documents' : 'User will receive an email confirmation',
+                                          });
+                                          loadUsers();
+                                        } catch {
+                                          toast({ title: 'Failed to update beta access', variant: 'destructive' });
+                                        }
+                                      }}
+                                      className={u.cosCheckApproved ? 'border-red-500 text-red-400 hover:bg-red-500/10' : 'border-green-600 text-green-400 hover:bg-green-500/10'}
+                                    >
+                                      {u.cosCheckApproved ? 'Revoke' : 'Approve'}
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant={u.isRestricted ? 'outline' : 'destructive'}
+                                      onClick={() => toggleUserRestriction(u.id, !u.isRestricted, 'Admin restriction')}
+                                      className={u.isRestricted ? 'border-green-600 text-green-400 hover:bg-green-500/10' : ''}
+                                    >
+                                      {u.isRestricted ? 'Unrestrict' : 'Restrict'}
+                                    </Button>
+                                  </div>
                                 )}
                               </td>
                             </tr>

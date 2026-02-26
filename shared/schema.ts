@@ -50,6 +50,7 @@ export const users = pgTable("users", {
   totalVerificationsUsed: integer("total_verifications_used").default(0), // for tracking custom limits
   isRestricted: boolean("is_restricted").default(false),
   restrictionReason: text("restriction_reason"),
+  cosCheckApproved: boolean("cos_check_approved").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

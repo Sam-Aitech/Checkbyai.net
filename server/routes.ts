@@ -989,78 +989,61 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
   // Document verification route (supports both authenticated and anonymous users)
   app.post('/api/verify', upload.single('file'), async (req: any, res) => {
     try {
+      // Beta gate: CoS Check is invite-only
+      if (!req.isAuthenticated()) {
+        return res.status(403).json({
+          message: 'CoS Check is currently in closed beta. Please log in and request access.',
+          code: 'beta_login_required',
+        });
+      }
+
+      const betaUserId = req.user.id;
+      const betaUser = betaUserId ? await storage.getUser(betaUserId) : null;
+      if (!betaUser) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      if (!betaUser.cosCheckApproved) {
+        return res.status(403).json({
+          message: 'Your account is pending beta approval. An admin will review your request.',
+          code: 'beta_not_approved',
+        });
+      }
+
       if (!req.file) {
         return res.status(400).json({ message: 'No file uploaded' });
       }
 
-      let userId: string | undefined;
-      let hashedIp: string | undefined;
+      let userId: string | undefined = betaUserId;
       
       // Check authentication and limits
-      if (req.isAuthenticated()) {
-        // Authenticated users: check user-based limits
-        userId = req.user.id;
-        if (userId) {
-          const user = await storage.getUser(userId);
+      if (userId) {
+        const user = betaUser;
           
-          if (!user) {
-            return res.status(404).json({ message: 'User not found' });
-          }
+        const hasUnlimited = user.subscriptionStatus === 'unlimited' || user.subscriptionStatus === 'enterprise' || user.verificationLimit === -1;
           
-          const hasUnlimited = user.subscriptionStatus === 'unlimited' || user.subscriptionStatus === 'enterprise' || user.verificationLimit === -1;
-          
-          if (!hasUnlimited) {
-            // Priority 2: Check purchased credits
-            const credits = user.credits || 0;
+        if (!hasUnlimited) {
+          // Priority 2: Check purchased credits
+          const credits = user.credits || 0;
             
-            if (credits > 0) {
-              // Deduct one credit
-              await storage.deductCredits(userId, 1);
-            } else {
-              // Priority 3: Check daily free limit
-              const canVerify = await storage.checkDailyLimit(userId);
+          if (credits > 0) {
+            // Deduct one credit
+            await storage.deductCredits(userId, 1);
+          } else {
+            // Priority 3: Check daily free limit
+            const canVerify = await storage.checkDailyLimit(userId);
               
-              if (!canVerify) {
-                return res.status(429).json({ 
-                  message: 'Daily verification limit reached. Purchase credits or upgrade for unlimited verifications.',
-                  upgradeRequired: true,
-                  credits: 0
-                });
-              }
-              
-              // Update daily usage count for free tier users
-              await storage.updateDailyVerificationUsage(userId);
+            if (!canVerify) {
+              return res.status(429).json({ 
+                message: 'Daily verification limit reached. Purchase credits or upgrade for unlimited verifications.',
+                upgradeRequired: true,
+                credits: 0
+              });
             }
+              
+            // Update daily usage count for free tier users
+            await storage.updateDailyVerificationUsage(userId);
           }
         }
-      } else {
-        // Anonymous users: check IP-based rate limit (7 days)
-        const clientIp = getClientIp(req);
-        hashedIp = hashIpAddress(clientIp);
-        
-        const ipRecord = await storage.getIpVerification(hashedIp);
-        
-        if (ipRecord) {
-          const lastVerification = new Date(ipRecord.lastVerificationDate);
-          const now = new Date();
-          const daysSinceVerification = (now.getTime() - lastVerification.getTime()) / (1000 * 60 * 60 * 24);
-          
-          if (daysSinceVerification < 7) {
-            const daysRemaining = Math.ceil(7 - daysSinceVerification);
-            const hoursRemaining = Math.ceil((7 - daysSinceVerification) * 24);
-            
-            return res.status(429).json({
-              message: "Rate limit exceeded",
-              error: "You can only verify one document every 7 days",
-              daysRemaining,
-              hoursRemaining,
-              nextVerificationDate: new Date(lastVerification.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-            });
-          }
-        }
-        
-        // Record IP verification
-        await recordIpVerification(hashedIp);
       }
 
       // Generate document hash for audit trail
@@ -2860,6 +2843,65 @@ Format your response in clear, professional markdown.`;
     } catch (error) {
       console.error("Error updating user verification limit:", error);
       res.status(500).json({ message: "Failed to update verification limit" });
+    }
+  });
+
+  // Approve or revoke CoS Check beta access (admin only)
+  app.patch('/api/admin/users/:id/cos-approval', isAdmin, async (req: any, res) => {
+    try {
+      const userId = req.params.id;
+      const { approved } = req.body;
+
+      if (typeof approved !== 'boolean') {
+        return res.status(400).json({ message: 'approved must be a boolean' });
+      }
+
+      await storage.updateCosCheckApproval(userId, approved);
+      const updatedUser = await storage.getUser(userId);
+
+      if (!updatedUser) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      // Send approval email to user
+      if (approved && updatedUser.email) {
+        const apiKey = process.env.RESEND_API_KEY;
+        if (apiKey) {
+          const html = `
+            <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+              <div style="background:linear-gradient(135deg,#1d4ed8 0%,#3b82f6 100%);padding:28px;border-radius:10px 10px 0 0;">
+                <h1 style="color:#fff;margin:0;text-align:center;font-size:20px;">&#127381; CoS Check Beta Access Approved</h1>
+              </div>
+              <div style="background:#fff;padding:28px;border:1px solid #e0e0e0;border-top:none;border-radius:0 0 10px 10px;">
+                <p style="color:#333;font-size:15px;margin-top:0;">Great news — your account has been approved for <strong>CoS Check Beta</strong>.</p>
+                <p style="color:#333;font-size:15px;">You can now upload and verify Certificates of Sponsorship using our forensic AI detection system.</p>
+                <div style="text-align:center;margin:24px 0;">
+                  <a href="https://checkbyai.net/dashboard" style="background:#1d4ed8;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:15px;display:inline-block;">Start Verifying</a>
+                </div>
+                <p style="color:#999;font-size:12px;margin-top:24px;text-align:center;">Questions? Contact us at <a href="mailto:support@checkbyai.net" style="color:#1d4ed8;">support@checkbyai.net</a></p>
+              </div>
+            </div>`;
+          fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+            body: JSON.stringify({
+              from: "CheckByAI <no-reply@checkbyai.net>",
+              to: [updatedUser.email],
+              subject: "Your CoS Check beta access has been approved",
+              html,
+            }),
+          }).catch(err => console.error("[Beta Approval] Email error:", err));
+        }
+      }
+
+      res.json({
+        message: approved ? 'Beta access granted' : 'Beta access revoked',
+        userId,
+        cosCheckApproved: approved,
+      });
+    } catch (error) {
+      console.error("Error updating CoS Check approval:", error);
+      res.status(500).json({ message: "Failed to update beta approval" });
     }
   });
 
