@@ -104,7 +104,15 @@ app.use((req, res, next) => {
 });
 
 // Body parsing middleware (excluding multipart which multer handles)
-app.use(express.json({ limit: '10mb' }));
+// The verify callback captures the raw body for Stripe webhook signature verification
+app.use(express.json({
+  limit: '10mb',
+  verify: (req: any, _res, buf) => {
+    if (req.originalUrl && req.originalUrl.startsWith('/api/stripe-webhook')) {
+      req.rawBody = buf;
+    }
+  },
+}));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 app.use((req, res, next) => {

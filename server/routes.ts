@@ -6,10 +6,12 @@ import * as crypto from "crypto";
 import Stripe from "stripe";
 import { storage } from "./storage";
 import { db } from "./db";
-import { sql, eq, and, desc, inArray, gte } from "drizzle-orm";
+import { sql, eq, and, desc, inArray, gte, lt } from "drizzle-orm";
 import { setupAuth, isAuthenticated, isAdmin } from "./auth";
 import { checkIpRateLimit, recordIpVerification, getClientIp, hashIpAddress } from "./ipRateLimit";
-import { insertVerificationResultSchema, insertFeedbackSchema, companyWatches, sponsorList, sponsorCanonical, sponsorChanges, notificationPreferences, notificationLog, dailyDigest } from "@shared/schema";
+import { insertVerificationResultSchema, insertFeedbackSchema, companyWatches, sponsorList, sponsorCanonical, sponsorChanges, notificationPreferences, notificationLog, dailyDigest, users, verificationResults, processedCheckouts } from "@shared/schema";
+import { authLimiter } from "./middleware/rateLimiter";
+import { withRetry } from "./utils/dbRetry";
 import multer from "multer";
 import { z } from "zod";
 import { PDFAnalyzer } from "./services/pdfAnalyzer";
@@ -81,45 +83,33 @@ const upload = multer({
   },
 });
 
-const processedCheckoutSessions = new Map<string, number>();
-const IDEMPOTENCY_MAX_SIZE = 1000;
-const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
-
-function markSessionProcessed(sessionId: string) {
-  if (processedCheckoutSessions.size >= IDEMPOTENCY_MAX_SIZE) {
-    const now = Date.now();
-    const keysToDelete: string[] = [];
-    processedCheckoutSessions.forEach((timestamp, key) => {
-      if (now - timestamp > IDEMPOTENCY_TTL_MS) {
-        keysToDelete.push(key);
-      }
-    });
-    keysToDelete.forEach(k => processedCheckoutSessions.delete(k));
-    if (processedCheckoutSessions.size >= IDEMPOTENCY_MAX_SIZE) {
-      const oldest = processedCheckoutSessions.keys().next().value;
-      if (oldest) processedCheckoutSessions.delete(oldest);
-    }
-  }
-  processedCheckoutSessions.set(sessionId, Date.now());
+async function markSessionProcessed(sessionId: string): Promise<void> {
+  await db.insert(processedCheckouts).values({ sessionId }).onConflictDoNothing();
 }
 
-function isSessionProcessed(sessionId: string): boolean {
-  const timestamp = processedCheckoutSessions.get(sessionId);
-  if (!timestamp) return false;
-  if (Date.now() - timestamp > IDEMPOTENCY_TTL_MS) {
-    processedCheckoutSessions.delete(sessionId);
-    return false;
-  }
-  return true;
+async function isSessionProcessed(sessionId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ sessionId: processedCheckouts.sessionId })
+    .from(processedCheckouts)
+    .where(eq(processedCheckouts.sessionId, sessionId));
+  return !!row;
+}
+
+async function cleanupOldProcessedCheckouts(): Promise<void> {
+  const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000);
+  await db.delete(processedCheckouts).where(lt(processedCheckouts.processedAt, cutoff));
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
 
+  // Clean up old processed checkout records on startup (older than 48h)
+  cleanupOldProcessedCheckouts().catch((err) => console.error('[Startup] Failed to clean processed checkouts:', err));
+
   // Request-triggered sponsor monitor check (runs at most once per hour, non-blocking)
   app.use((req, res, next) => {
-    checkAndTriggerIfNeeded().catch(() => {});
+    checkAndTriggerIfNeeded().catch((err) => console.error('[SponsorMonitor] Trigger check failed:', err));
     next();
   });
 
@@ -416,7 +406,7 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
   });
 
   // Email/Password Login
-  app.post('/api/auth/login', async (req: any, res) => {
+  app.post('/api/auth/login', authLimiter, async (req: any, res) => {
     try {
       const { email, password } = req.body;
 
@@ -554,7 +544,9 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
       try {
         const user = await storage.getUser(userId);
         userEmail = user?.email;
-      } catch {}
+      } catch (err) {
+        console.error('[Subscription] Failed to fetch user email for notifications:', err);
+      }
     }
 
     const planDetails: Record<string, { credits: string; watches: string; timing: string; portal: string }> = {
@@ -633,7 +625,12 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
     let event;
 
     try {
-      event = stripe.webhooks.constructEvent(req.body, sig!, process.env.STRIPE_WEBHOOK_SECRET!);
+      const rawBody = (req as any).rawBody;
+      if (!rawBody) {
+        console.error('Webhook error: rawBody not available — ensure express.json verify callback is configured');
+        return res.status(400).send('Webhook raw body unavailable');
+      }
+      event = stripe.webhooks.constructEvent(rawBody, sig!, process.env.STRIPE_WEBHOOK_SECRET!);
     } catch (err: any) {
       console.error('Webhook signature verification failed:', err.message);
       return res.status(400).send('Webhook signature verification failed');
@@ -713,32 +710,41 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
           }
         }
         
-        if (userId && packageType && session.payment_status === 'paid' && !isSessionProcessed(session.id)) {
-          markSessionProcessed(session.id);
+        if (userId && packageType && session.payment_status === 'paid' && !(await isSessionProcessed(session.id))) {
+          await markSessionProcessed(session.id);
           const sessionEmail = session.customer_details?.email || session.customer_email || undefined;
           if (packageType === 'starter') {
-            await storage.addCredits(userId, 50);
-            await storage.updateUserSubscription(userId, {
-              subscriptionStatus: 'starter',
-              stripeSubscriptionId: session.subscription,
-              stripeCustomerId: session.customer,
-            });
-            sendSubscriptionNotifications(userId, 'CoS Check Starter', 'starter', sessionEmail).catch(() => {});
+            await withRetry(() => db.transaction(async (tx) => {
+              await tx.update(users).set({
+                credits: sql`COALESCE(${users.credits}, 0) + 50`,
+                subscriptionStatus: 'starter',
+                stripeSubscriptionId: session.subscription,
+                stripeCustomerId: session.customer,
+                updatedAt: new Date(),
+              }).where(eq(users.id, userId));
+            }), 'webhook-checkout-starter');
+            sendSubscriptionNotifications(userId, 'CoS Check Starter', 'starter', sessionEmail).catch((err) => console.error('[Subscription] Notification failed:', err));
           } else if (packageType === 'pro') {
-            await storage.addCredits(userId, 100);
-            await storage.updateUserSubscription(userId, {
-              subscriptionStatus: 'pro',
-              stripeSubscriptionId: session.subscription,
-              stripeCustomerId: session.customer,
-            });
-            sendSubscriptionNotifications(userId, 'CoS Check Pro', 'pro', sessionEmail).catch(() => {});
+            await withRetry(() => db.transaction(async (tx) => {
+              await tx.update(users).set({
+                credits: sql`COALESCE(${users.credits}, 0) + 100`,
+                subscriptionStatus: 'pro',
+                stripeSubscriptionId: session.subscription,
+                stripeCustomerId: session.customer,
+                updatedAt: new Date(),
+              }).where(eq(users.id, userId));
+            }), 'webhook-checkout-pro');
+            sendSubscriptionNotifications(userId, 'CoS Check Pro', 'pro', sessionEmail).catch((err) => console.error('[Subscription] Notification failed:', err));
           } else if (packageType === 'unlimited') {
-            await storage.updateUserSubscription(userId, {
-              subscriptionStatus: 'unlimited',
-              stripeSubscriptionId: session.subscription,
-              stripeCustomerId: session.customer,
-            });
-            sendSubscriptionNotifications(userId, 'CoS Check Unlimited', 'unlimited', sessionEmail).catch(() => {});
+            await withRetry(() => db.transaction(async (tx) => {
+              await tx.update(users).set({
+                subscriptionStatus: 'unlimited',
+                stripeSubscriptionId: session.subscription,
+                stripeCustomerId: session.customer,
+                updatedAt: new Date(),
+              }).where(eq(users.id, userId));
+            }), 'webhook-checkout-unlimited');
+            sendSubscriptionNotifications(userId, 'CoS Check Unlimited', 'unlimited', sessionEmail).catch((err) => console.error('[Subscription] Notification failed:', err));
           } else if (packageType === 'master') {
             await storage.createPaidSubmission({
               email: session.customer_details?.email || '',
@@ -749,20 +755,26 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
               phoneConsultationRequested: true,
             });
           } else if (packageType === 'notification_starter') {
-            await storage.updateUserSubscription(userId, {
-              subscriptionStatus: 'starter',
-              stripeSubscriptionId: session.subscription,
-              stripeCustomerId: session.customer,
-            });
-            sendSubscriptionNotifications(userId, 'Notification Engine Starter', 'notification_starter', sessionEmail).catch(() => {});
+            await withRetry(() => db.transaction(async (tx) => {
+              await tx.update(users).set({
+                subscriptionStatus: 'starter',
+                stripeSubscriptionId: session.subscription,
+                stripeCustomerId: session.customer,
+                updatedAt: new Date(),
+              }).where(eq(users.id, userId));
+            }), 'webhook-checkout-notification-starter');
+            sendSubscriptionNotifications(userId, 'Notification Engine Starter', 'notification_starter', sessionEmail).catch((err) => console.error('[Subscription] Notification failed:', err));
           } else if (packageType === 'notification_pro') {
-            await storage.addCredits(userId, 5);
-            await storage.updateUserSubscription(userId, {
-              subscriptionStatus: 'pro',
-              stripeSubscriptionId: session.subscription,
-              stripeCustomerId: session.customer,
-            });
-            sendSubscriptionNotifications(userId, 'Notification Engine Pro', 'notification_pro', sessionEmail).catch(() => {});
+            await withRetry(() => db.transaction(async (tx) => {
+              await tx.update(users).set({
+                credits: sql`COALESCE(${users.credits}, 0) + 5`,
+                subscriptionStatus: 'pro',
+                stripeSubscriptionId: session.subscription,
+                stripeCustomerId: session.customer,
+                updatedAt: new Date(),
+              }).where(eq(users.id, userId));
+            }), 'webhook-checkout-notification-pro');
+            sendSubscriptionNotifications(userId, 'Notification Engine Pro', 'notification_pro', sessionEmail).catch((err) => console.error('[Subscription] Notification failed:', err));
           }
         }
         break;
@@ -906,28 +918,37 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
         const sessionUserId = session.metadata?.userId;
         
         if (sessionUserId && sessionUserId === req.user.id) {
-          if (!isSessionProcessed(sessionId)) {
-            markSessionProcessed(sessionId);
+          if (!(await isSessionProcessed(sessionId))) {
+            await markSessionProcessed(sessionId);
             if (packageType === 'starter') {
-              await storage.addCredits(sessionUserId, 50);
-              await storage.updateUserSubscription(sessionUserId, {
-                subscriptionStatus: 'starter',
-                stripeSubscriptionId: session.subscription as string,
-                stripeCustomerId: session.customer as string,
-              });
+              await withRetry(() => db.transaction(async (tx) => {
+                await tx.update(users).set({
+                  credits: sql`COALESCE(${users.credits}, 0) + 50`,
+                  subscriptionStatus: 'starter',
+                  stripeSubscriptionId: session.subscription as string,
+                  stripeCustomerId: session.customer as string,
+                  updatedAt: new Date(),
+                }).where(eq(users.id, sessionUserId));
+              }), 'checkout-verify-starter');
             } else if (packageType === 'pro') {
-              await storage.addCredits(sessionUserId, 100);
-              await storage.updateUserSubscription(sessionUserId, {
-                subscriptionStatus: 'pro',
-                stripeSubscriptionId: session.subscription as string,
-                stripeCustomerId: session.customer as string,
-              });
+              await withRetry(() => db.transaction(async (tx) => {
+                await tx.update(users).set({
+                  credits: sql`COALESCE(${users.credits}, 0) + 100`,
+                  subscriptionStatus: 'pro',
+                  stripeSubscriptionId: session.subscription as string,
+                  stripeCustomerId: session.customer as string,
+                  updatedAt: new Date(),
+                }).where(eq(users.id, sessionUserId));
+              }), 'checkout-verify-pro');
             } else if (packageType === 'unlimited') {
-              await storage.updateUserSubscription(sessionUserId, {
-                subscriptionStatus: 'unlimited',
-                stripeSubscriptionId: session.subscription as string,
-                stripeCustomerId: session.customer as string,
-              });
+              await withRetry(() => db.transaction(async (tx) => {
+                await tx.update(users).set({
+                  subscriptionStatus: 'unlimited',
+                  stripeSubscriptionId: session.subscription as string,
+                  stripeCustomerId: session.customer as string,
+                  updatedAt: new Date(),
+                }).where(eq(users.id, sessionUserId));
+              }), 'checkout-verify-unlimited');
             } else if (packageType === 'master') {
               await storage.createPaidSubmission({
                 email: session.customer_details?.email || req.user.email || '',
@@ -938,18 +959,24 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
                 phoneConsultationRequested: true,
               });
             } else if (packageType === 'notification_starter') {
-              await storage.updateUserSubscription(sessionUserId, {
-                subscriptionStatus: 'starter',
-                stripeSubscriptionId: session.subscription as string,
-                stripeCustomerId: session.customer as string,
-              });
+              await withRetry(() => db.transaction(async (tx) => {
+                await tx.update(users).set({
+                  subscriptionStatus: 'starter',
+                  stripeSubscriptionId: session.subscription as string,
+                  stripeCustomerId: session.customer as string,
+                  updatedAt: new Date(),
+                }).where(eq(users.id, sessionUserId));
+              }), 'checkout-verify-notification-starter');
             } else if (packageType === 'notification_pro') {
-              await storage.addCredits(sessionUserId, 5);
-              await storage.updateUserSubscription(sessionUserId, {
-                subscriptionStatus: 'pro',
-                stripeSubscriptionId: session.subscription as string,
-                stripeCustomerId: session.customer as string,
-              });
+              await withRetry(() => db.transaction(async (tx) => {
+                await tx.update(users).set({
+                  credits: sql`COALESCE(${users.credits}, 0) + 5`,
+                  subscriptionStatus: 'pro',
+                  stripeSubscriptionId: session.subscription as string,
+                  stripeCustomerId: session.customer as string,
+                  updatedAt: new Date(),
+                }).where(eq(users.id, sessionUserId));
+              }), 'checkout-verify-notification-pro');
             }
           }
           
@@ -1015,23 +1042,21 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
 
       let userId: string | undefined = betaUserId;
       
-      // Check authentication and limits
+      // Determine deduction strategy but don't deduct yet (defer until after analysis)
+      let useCredits = false;
+      let useDailyLimit = false;
+
       if (userId) {
         const user = betaUser;
-          
         const hasUnlimited = user.subscriptionStatus === 'unlimited' || user.subscriptionStatus === 'enterprise' || user.verificationLimit === -1;
-          
+        
         if (!hasUnlimited) {
-          // Priority 2: Check purchased credits
           const credits = user.credits || 0;
-            
           if (credits > 0) {
-            // Deduct one credit
-            await storage.deductCredits(userId, 1);
+            useCredits = true;
           } else {
-            // Priority 3: Check daily free limit
+            // Check daily free limit before analysis (fast fail)
             const canVerify = await storage.checkDailyLimit(userId);
-              
             if (!canVerify) {
               return res.status(429).json({ 
                 message: 'Daily verification limit reached. Purchase credits or upgrade for unlimited verifications.',
@@ -1039,9 +1064,7 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
                 credits: 0
               });
             }
-              
-            // Update daily usage count for free tier users
-            await storage.updateDailyVerificationUsage(userId);
+            useDailyLimit = true;
           }
         }
       }
@@ -1060,18 +1083,40 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
       // Use the rule-based result from the analyzer
       const result = analysis.result;
 
-      // Store verification result with receipt and hash
-      const verificationId = await storage.createVerificationResult(
-        req.file.originalname,
-        result,
-        Math.floor(analysis.confidence),
-        metadata,
-        analysis,
-        req.ip,
-        userId,
-        receiptId,
-        documentHash
-      );
+      // Atomically deduct credit + store result (if one fails, both roll back)
+      const verificationId = await withRetry(() => db.transaction(async (tx) => {
+        if (useCredits && userId) {
+          await tx.update(users).set({
+            credits: sql`GREATEST(COALESCE(${users.credits}, 0) - 1, 0)`,
+            updatedAt: new Date(),
+          }).where(eq(users.id, userId));
+        } else if (useDailyLimit && userId) {
+          const today = new Date().toISOString().split('T')[0];
+          const [currentUser] = await tx.select({
+            dailyVerificationsUsed: users.dailyVerificationsUsed,
+            lastVerificationDate: users.lastVerificationDate,
+          }).from(users).where(eq(users.id, userId));
+          const usageToday = currentUser?.lastVerificationDate === today
+            ? (currentUser.dailyVerificationsUsed || 0) + 1 : 1;
+          await tx.update(users).set({
+            dailyVerificationsUsed: usageToday,
+            lastVerificationDate: today,
+            updatedAt: new Date(),
+          }).where(eq(users.id, userId));
+        }
+        const [verification] = await tx.insert(verificationResults).values({
+          userId,
+          filename: req.file!.originalname,
+          result,
+          confidence: Math.floor(analysis.confidence),
+          metadata,
+          analysisDetails: analysis,
+          ipAddress: req.ip,
+          receiptId,
+          documentHash,
+        }).returning();
+        return verification.id;
+      }), 'verify-result');
 
       res.json({
         id: verificationId,
@@ -1623,8 +1668,7 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
               db.update(companyWatches)
                 .set({ fingerprint: match.fingerprint })
                 .where(eq(companyWatches.id, watch.id))
-                .then(() => {})
-                .catch(() => {});
+                .catch((err) => console.error('[CompanyWatch] Failed to update fingerprint for watch id', watch.id, err));
             }
           }
 

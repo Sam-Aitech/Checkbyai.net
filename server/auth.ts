@@ -5,6 +5,7 @@ import type { Express, RequestHandler } from "express";
 import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
 import crypto from "crypto";
+import { otpLimiter } from "./middleware/rateLimiter";
 
 
 if (!process.env.REPLIT_DOMAINS) {
@@ -325,7 +326,7 @@ export async function setupAuth(app: Express) {
   }
 
   // Email OTP: Send verification code
-  app.post("/api/auth/email/send-otp", async (req, res) => {
+  app.post("/api/auth/email/send-otp", otpLimiter, async (req, res) => {
     try {
       const { email } = req.body;
       
@@ -369,7 +370,7 @@ export async function setupAuth(app: Express) {
   });
 
   // Email OTP: Verify code
-  app.post("/api/auth/email/verify-otp", async (req, res) => {
+  app.post("/api/auth/email/verify-otp", otpLimiter, async (req, res) => {
     try {
       const { email, code } = req.body;
       
@@ -422,7 +423,7 @@ export async function setupAuth(app: Express) {
   });
 
   // Admin OTP: Send verification code via Resend
-  app.post("/api/auth/admin/send-otp", async (req, res) => {
+  app.post("/api/auth/admin/send-otp", otpLimiter, async (req, res) => {
     try {
       const { email } = req.body;
       
@@ -472,7 +473,7 @@ export async function setupAuth(app: Express) {
   });
 
   // Admin OTP: Verify code and login
-  app.post("/api/auth/admin/verify-otp", async (req, res) => {
+  app.post("/api/auth/admin/verify-otp", otpLimiter, async (req, res) => {
     try {
       const { email, code } = req.body;
       

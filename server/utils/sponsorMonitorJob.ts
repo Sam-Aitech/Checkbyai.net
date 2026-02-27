@@ -485,7 +485,9 @@ async function reconcile(
                       ne(sponsorCanonical.id, missing.id),
                     )
                   );
-              } catch {}
+              } catch (err) {
+                console.error(`[SponsorMonitorJob] Failed to delete duplicate canonical record for fingerprint ${newRec.fingerprint}:`, err);
+              }
 
               changes.push({
                 organisationName: newRec.organisationName,
@@ -801,7 +803,7 @@ export async function runSponsorMonitorJob(source: string = "cron", notifyOnFail
       { success: true, recordsProcessed: result.recordsProcessed, changesDetected: detectedChanges.length, changeSummary: changeCounts, notificationsSent: result.notificationsSent, notificationsSkipped: result.notificationsSkipped, notificationsFailed: result.notificationsFailed },
       Date.now() - startTime,
       source
-    ).catch(() => {});
+    ).catch((err) => console.error('[SponsorMonitorJob] Failed to send admin job completion email:', err));
 
     return result;
   } catch (err: any) {
@@ -840,7 +842,7 @@ export async function runSponsorMonitorJob(source: string = "cron", notifyOnFail
         { success: false, recordsProcessed: result.recordsProcessed, notificationsSent: result.notificationsSent, notificationsSkipped: result.notificationsSkipped, notificationsFailed: result.notificationsFailed, error: errorMsg },
         failDuration,
         source
-      ).catch(() => {});
+      ).catch((err) => console.error('[SponsorMonitorJob] Failed to send admin failure alert email:', err));
     }
     return { ...result, error: errorMsg };
   } finally {

@@ -53,7 +53,10 @@ export const users = pgTable("users", {
   cosCheckApproved: boolean("cos_check_approved").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [
+  index("idx_users_stripe_customer_id").on(table.stripeCustomerId),
+  index("idx_users_role").on(table.role),
+]);
 
 // IP-based verification tracking (for anonymous users)
 export const ipVerifications = pgTable("ip_verifications", {
@@ -129,7 +132,10 @@ export const feedback = pgTable("feedback", {
   accuracy: varchar("accuracy"),
   suggestedResult: varchar("suggested_result"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  index("idx_feedback_verification_id").on(table.verificationId),
+  index("idx_feedback_user_id").on(table.userId),
+]);
 
 // Paid expert submissions table
 export const paidSubmissions = pgTable("paid_submissions", {
@@ -175,7 +181,11 @@ export const paidSubmissions = pgTable("paid_submissions", {
   
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [
+  index("idx_paid_submissions_stripe_session_id").on(table.stripeSessionId),
+  index("idx_paid_submissions_review_status").on(table.reviewStatus),
+  index("idx_paid_submissions_email").on(table.email),
+]);
 
 // Expert requests table for Master Package orders
 export const expertRequests = pgTable("expert_requests", {
@@ -192,6 +202,16 @@ export const expertRequests = pgTable("expert_requests", {
   completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_expert_requests_status").on(table.status),
+  index("idx_expert_requests_user_id").on(table.userId),
+  index("idx_expert_requests_stripe_session_id").on(table.stripeSessionId),
+]);
+
+// DB-backed idempotency for Stripe checkout sessions (prevents duplicate credit grants on restart)
+export const processedCheckouts = pgTable("processed_checkouts", {
+  sessionId: varchar("session_id").primaryKey(),
+  processedAt: timestamp("processed_at").defaultNow().notNull(),
 });
 
 // ==========================================
