@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useLocation, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,9 @@ import SEOHead from "@/components/SEOHead";
 import { motion, AnimatePresence } from "framer-motion";
 import logoImg from "@assets/Checkbyai.net_(250_x_80_px)_(1)_1770958528706.png";
 import { queryClient } from "@/lib/queryClient";
+import { Turnstile } from "@marsidev/react-turnstile";
+
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
 
 const fadeUp = {
   initial: { opacity: 0, y: 16 },
@@ -26,6 +29,8 @@ export default function LoginPage() {
   const [otpCode, setOtpCode] = useState("");
   const [step, setStep] = useState<"email" | "otp">("email");
   const [isLoading, setIsLoading] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileRef = useRef<any>(null);
 
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,6 +44,15 @@ export default function LoginPage() {
       return;
     }
 
+    if (TURNSTILE_SITE_KEY && !turnstileToken) {
+      toast({
+        title: "Please complete the CAPTCHA",
+        description: "Verify you're human before continuing",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -46,12 +60,14 @@ export default function LoginPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, turnstileToken }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
+        turnstileRef.current?.reset();
+        setTurnstileToken(null);
         throw new Error(data.message || "Failed to send verification code");
       }
 
@@ -211,10 +227,23 @@ export default function LoginPage() {
                       </div>
                     </div>
 
+                    {TURNSTILE_SITE_KEY && (
+                      <div className="flex justify-center">
+                        <Turnstile
+                          ref={turnstileRef}
+                          siteKey={TURNSTILE_SITE_KEY}
+                          onSuccess={setTurnstileToken}
+                          onExpire={() => setTurnstileToken(null)}
+                          onError={() => setTurnstileToken(null)}
+                          options={{ theme: "auto" }}
+                        />
+                      </div>
+                    )}
+
                     <Button 
                       type="submit" 
                       className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full font-semibold" 
-                      disabled={isLoading}
+                      disabled={isLoading || (!!TURNSTILE_SITE_KEY && !turnstileToken)}
                       data-testid="button-send-otp"
                     >
                       {isLoading ? (

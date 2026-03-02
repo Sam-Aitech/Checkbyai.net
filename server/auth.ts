@@ -328,10 +328,37 @@ export async function setupAuth(app: Express) {
   // Email OTP: Send verification code
   app.post("/api/auth/email/send-otp", otpLimiter, async (req, res) => {
     try {
-      const { email } = req.body;
+      const { email, turnstileToken } = req.body;
       
       if (!email || !email.includes("@")) {
         return res.status(400).json({ message: "Valid email required" });
+      }
+
+      // Cloudflare Turnstile CAPTCHA verification
+      // If TURNSTILE_SECRET_KEY is set, verify the token; skip in dev if key absent
+      const turnstileSecret = process.env.TURNSTILE_SECRET_KEY;
+      if (turnstileSecret) {
+        if (!turnstileToken) {
+          return res.status(400).json({ message: "CAPTCHA verification required" });
+        }
+        try {
+          const cfRes = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              secret: turnstileSecret,
+              response: turnstileToken,
+              remoteip: req.ip,
+            }),
+          });
+          const cfData = await cfRes.json() as { success: boolean };
+          if (!cfData.success) {
+            return res.status(400).json({ message: "CAPTCHA verification failed. Please try again." });
+          }
+        } catch (cfError) {
+          console.error("Turnstile verification error:", cfError);
+          return res.status(500).json({ message: "CAPTCHA verification unavailable. Please try again." });
+        }
       }
 
       // Generate OTP and set expiry (10 minutes)

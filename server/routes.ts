@@ -10,7 +10,7 @@ import { sql, eq, and, desc, inArray, gte, lt } from "drizzle-orm";
 import { setupAuth, isAuthenticated, isAdmin } from "./auth";
 import { checkIpRateLimit, recordIpVerification, getClientIp, hashIpAddress } from "./ipRateLimit";
 import { insertVerificationResultSchema, insertFeedbackSchema, companyWatches, sponsorList, sponsorCanonical, sponsorChanges, notificationPreferences, notificationLog, dailyDigest, users, verificationResults, processedCheckouts } from "@shared/schema";
-import { authLimiter } from "./middleware/rateLimiter";
+import { authLimiter, verifyLimiter } from "./middleware/rateLimiter";
 import { withRetry } from "./utils/dbRetry";
 import multer from "multer";
 import { z } from "zod";
@@ -1014,7 +1014,7 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
   });
 
   // Document verification route (supports both authenticated and anonymous users)
-  app.post('/api/verify', upload.single('file'), async (req: any, res) => {
+  app.post('/api/verify', verifyLimiter, upload.single('file'), async (req: any, res) => {
     try {
       // Beta gate: CoS Check is invite-only
       if (!req.isAuthenticated()) {
@@ -1474,10 +1474,16 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
 
   app.post('/api/watches', isAuthenticated, async (req: any, res) => {
     try {
-      const { organisation_name, town_city, fingerprint: fpParam } = req.body;
-      if (!organisation_name || typeof organisation_name !== 'string' || organisation_name.trim().length === 0) {
-        return res.status(400).json({ message: "Organisation name is required." });
+      const watchSchema = z.object({
+        organisation_name: z.string().trim().min(1, "Organisation name is required").max(300),
+        town_city: z.string().trim().max(200).optional(),
+        fingerprint: z.string().max(500).optional(),
+      });
+      const parsed = watchSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: parsed.error.errors.map(e => e.message).join(', ') });
       }
+      const { organisation_name, town_city, fingerprint: fpParam } = parsed.data;
 
       const userSub = req.user.subscriptionStatus || "free";
       if (userSub === "free" || !userSub) {
@@ -1828,7 +1834,18 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
   app.put('/api/notification-preferences', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const { email_enabled, whatsapp_enabled, whatsapp_number, sms_enabled, sms_number } = req.body;
+      const notifPrefSchema = z.object({
+        email_enabled: z.boolean().optional(),
+        whatsapp_enabled: z.boolean().optional(),
+        whatsapp_number: z.string().max(20).optional().nullable(),
+        sms_enabled: z.boolean().optional(),
+        sms_number: z.string().max(20).optional().nullable(),
+      });
+      const prefParsed = notifPrefSchema.safeParse(req.body);
+      if (!prefParsed.success) {
+        return res.status(400).json({ message: prefParsed.error.errors.map(e => e.message).join(', ') });
+      }
+      const { email_enabled, whatsapp_enabled, whatsapp_number, sms_enabled, sms_number } = prefParsed.data;
 
       if (whatsapp_number && !PHONE_REGEX.test(whatsapp_number)) {
         return res.status(400).json({ message: "Invalid WhatsApp number. Please provide a number starting with + followed by country code and digits (e.g. +447700900000)." });
@@ -2798,11 +2815,15 @@ Format your response in clear, professional markdown.`;
   // Trust producer from verification - Pattern Override
   app.post('/api/admin/trust-producer', isAdmin, async (req: any, res) => {
     try {
-      const { producer, verificationId } = req.body;
-      
-      if (!producer) {
-        return res.status(400).json({ message: 'Producer name is required' });
+      const trustProducerSchema = z.object({
+        producer: z.string().trim().min(1, "Producer name is required").max(500),
+        verificationId: z.number().int().optional(),
+      });
+      const tpParsed = trustProducerSchema.safeParse(req.body);
+      if (!tpParsed.success) {
+        return res.status(400).json({ message: tpParsed.error.errors.map(e => e.message).join(', ') });
       }
+      const { producer, verificationId } = tpParsed.data;
 
       // Get the verification to extract metadata
       const verification = await storage.getVerificationById(verificationId);
@@ -2867,7 +2888,14 @@ Format your response in clear, professional markdown.`;
   app.patch('/api/admin/users/:id/limit', isAdmin, async (req: any, res) => {
     try {
       const userId = req.params.id;
-      const { limit } = req.body; // null=default, -1=unlimited, positive=custom limit
+      const limitSchema = z.object({
+        limit: z.union([z.literal(null), z.literal(-1), z.number().int().positive()]),
+      });
+      const limitParsed = limitSchema.safeParse(req.body);
+      if (!limitParsed.success) {
+        return res.status(400).json({ message: "limit must be null, -1 (unlimited), or a positive integer" });
+      }
+      const { limit } = limitParsed.data;
       
       const updatedUser = await storage.updateUserVerificationLimit(userId, limit);
       

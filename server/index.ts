@@ -4,6 +4,25 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { storage } from "./storage";
 
+// T004: Startup validation — fail fast if critical env vars are missing
+const REQUIRED_ENV_VARS = [
+  "DATABASE_URL",
+  "SESSION_SECRET",
+  "ADMIN_EMAIL",
+  "PHONE_ENCRYPTION_KEY",
+  "IP_HASH_SALT",
+  "CHECKOUT_HMAC_SECRET",
+  "DIGEST_SIGNING_KEY",
+];
+
+const missingVars = REQUIRED_ENV_VARS.filter((v) => !process.env[v]);
+if (missingVars.length > 0) {
+  missingVars.forEach((v) => console.error(`CRITICAL: Missing required environment variable: ${v}`));
+  if (process.env.NODE_ENV === "production") {
+    process.exit(1);
+  }
+}
+
 async function seedAdminUser() {
   try {
     const adminEmail = process.env.ADMIN_EMAIL;
@@ -61,22 +80,62 @@ app.use((req, res, next) => {
   next();
 });
 
-// Security and Performance Headers
+// T001: Security and Performance Headers (including CSP, HSTS, Permissions-Policy)
 app.use((req, res, next) => {
-  // Security headers
+  const isProd = process.env.NODE_ENV === 'production';
+
+  // Basic security headers
   res.header('X-Content-Type-Options', 'nosniff');
   res.header('X-Frame-Options', 'DENY');
   res.header('X-XSS-Protection', '1; mode=block');
   res.header('Referrer-Policy', 'strict-origin-when-cross-origin');
-  
+
+  // HSTS — enforce HTTPS in production only
+  if (isProd) {
+    res.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+
+  // Permissions-Policy — restrict browser features
+  res.header(
+    'Permissions-Policy',
+    'camera=(), microphone=(), geolocation=(), payment=(self "https://js.stripe.com")'
+  );
+
+  // Content-Security-Policy
+  // Dev: relaxed to allow Vite HMR websocket and inline scripts
+  // Prod: tighter, no unsafe-eval
+  const scriptSrc = isProd
+    ? "'self' 'unsafe-inline' https://js.stripe.com"
+    : "'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com";
+  const connectSrc = isProd
+    ? "'self' https://api.stripe.com"
+    : "'self' https://api.stripe.com ws: wss:";
+
+  res.header(
+    'Content-Security-Policy',
+    [
+      `default-src 'self'`,
+      `script-src ${scriptSrc}`,
+      `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
+      `font-src 'self' https://fonts.gstatic.com data:`,
+      `img-src 'self' data: https:`,
+      `connect-src ${connectSrc}`,
+      `frame-src https://js.stripe.com https://hooks.stripe.com`,
+      `worker-src 'self' blob:`,
+      `object-src 'none'`,
+      `base-uri 'self'`,
+      `form-action 'self'`,
+    ].join('; ')
+  );
+
   // Performance headers for static assets
   if (req.url.match(/\.(jpg|jpeg|png|gif|ico|css|js|svg|woff|woff2|ttf|eot)$/)) {
     res.header('Cache-Control', 'public, max-age=31536000, immutable'); // 1 year
     res.header('Expires', new Date(Date.now() + 31536000000).toUTCString());
   }
   
-  // Disable directory listing and powered-by header
-  res.header('X-Powered-By', '');
+  // Disable powered-by header
+  res.removeHeader('X-Powered-By');
   
   // Block access to uploads folder (private documents)
   if (req.url.startsWith('/uploads/')) {
@@ -115,7 +174,8 @@ app.use(express.json({
     }
   },
 }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// T005: Use extended:false to prevent prototype pollution via nested object parsing
+app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
 app.use((req, res, next) => {
   const start = Date.now();
