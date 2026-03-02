@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +9,7 @@ import PageLayout from "@/components/PageLayout";
 import SEOHead from "@/components/SEOHead";
 import { motion, AnimatePresence } from "framer-motion";
 import logoImg from "@assets/Checkbyai.net_(250_x_80_px)_(1)_1770958528706.png";
+import { queryClient } from "@/lib/queryClient";
 
 const fadeUp = {
   initial: { opacity: 0, y: 16 },
@@ -19,6 +20,7 @@ const fadeUp = {
 
 export default function LoginPage() {
   const [, setLocation] = useLocation();
+  const search = useSearch();
   const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [otpCode, setOtpCode] = useState("");
@@ -102,8 +104,13 @@ export default function LoginPage() {
         title: "Welcome!",
         description: "You're now logged in.",
       });
-      
-      setLocation("/sponsor-monitor");
+
+      await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+
+      const params = new URLSearchParams(search);
+      const redirectTo = params.get("redirect");
+      const safeRedirect = redirectTo && redirectTo.startsWith("/") ? redirectTo : "/sponsor-monitor";
+      setLocation(safeRedirect);
     } catch (error: any) {
       toast({
         title: "Verification failed",

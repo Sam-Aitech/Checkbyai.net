@@ -23,6 +23,7 @@ async function seedAdminUser() {
         authProvider: "admin",
         role: "admin",
         isVerified: true,
+        cosCheckApproved: true,
       });
       log(`Admin user created: ${adminEmail} (OTP login only)`);
     } else {
@@ -30,6 +31,7 @@ async function seedAdminUser() {
         ...existingEmailAdmin,
         role: "admin",
         isVerified: true,
+        cosCheckApproved: true,
       });
       log(`Admin user updated: ${adminEmail}`);
     }

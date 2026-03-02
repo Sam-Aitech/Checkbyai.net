@@ -107,7 +107,7 @@ export default function COSDashboard() {
             CoS Check is currently in closed beta. Please log in or create an account to request access.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link href="/login" className="inline-flex items-center justify-center px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+            <Link href="/login?redirect=/dashboard" className="inline-flex items-center justify-center px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">
               Log In
             </Link>
             <Link href="/register" className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-semibold hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
@@ -123,8 +123,8 @@ export default function COSDashboard() {
     );
   }
 
-  // Beta gate — logged in but not yet approved
-  if (!authLoading && isAuthenticated && !user?.cosCheckApproved) {
+  // Beta gate — logged in but not yet approved (admins always bypass)
+  if (!authLoading && isAuthenticated && !user?.cosCheckApproved && user?.role !== 'admin') {
     return (
       <div className="bg-gray-50 dark:bg-gray-900 min-h-screen flex items-center justify-center px-4">
         <div className="max-w-md w-full text-center">
