@@ -594,15 +594,10 @@ export default function SimpleAdmin() {
       });
 
       if (res.ok) {
-        const data = await res.json();
-        if (data.isConflict) {
-          toast({ 
-            title: 'Conflict recorded', 
-            description: 'AI said Genuine, but you marked as Fake. This will train the AI.', 
-          });
-        } else {
-          toast({ title: 'Marked as fake', description: 'Your feedback has been recorded' });
-        }
+        toast({ 
+          title: 'Result overridden to Fake', 
+          description: 'The verification result has been updated and the admin reasoning has been added to the AI knowledge base permanently.', 
+        });
         setFeedbackModalOpen(false);
         loadLogs(); // Refresh logs
       } else {
@@ -1342,7 +1337,7 @@ export default function SimpleAdmin() {
                           <tr className="border-b border-gray-200 dark:border-slate-700">
                             <th className="text-left py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">Time</th>
                             <th className="text-left py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">Filename</th>
-                            <th className="text-left py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">AI Status</th>
+                            <th className="text-left py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">Result</th>
                             <th className="text-left py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">Admin Review</th>
                             <th className="text-left py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">Producer</th>
                             <th className="text-right py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">Actions</th>
@@ -1353,8 +1348,8 @@ export default function SimpleAdmin() {
                             <tr 
                               key={log.id} 
                               className={`border-b border-gray-100 dark:border-slate-700/50 hover:bg-gray-50 dark:hover:bg-slate-700/30 cursor-pointer ${
-                                (log as any).adminStatus === 'fake' && log.result === 'genuine' 
-                                  ? 'ring-2 ring-red-500/50 bg-red-900/10' 
+                                (log as any).adminStatus === 'fake'
+                                  ? 'bg-red-50/40 dark:bg-red-900/10' 
                                   : ''
                               }`}
                               onClick={() => setSelectedLog(log)}
@@ -1366,7 +1361,12 @@ export default function SimpleAdmin() {
                                 {log.filename}
                               </td>
                               <td className="py-3 px-4">
-                                {getStatusBadge(log.result, log.confidence)}
+                                <div className="flex flex-col gap-1">
+                                  {getStatusBadge(log.result, log.confidence)}
+                                  {(log as any).adminStatus === 'fake' && (
+                                    <span className="text-[10px] font-medium text-red-500 dark:text-red-400 uppercase tracking-wide">Admin override</span>
+                                  )}
+                                </div>
                               </td>
                               <td className="py-3 px-4">
                                 {getAdminStatusBadge(log)}

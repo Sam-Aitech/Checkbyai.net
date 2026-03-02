@@ -850,16 +850,22 @@ export class DatabaseStorage implements IStorage {
     adminReviewedBy: string;
     adminReviewedAt: Date;
     accuracyScore?: number | null;
+    overrideResult?: string;
   }): Promise<VerificationResult> {
+    const setFields: Record<string, any> = {
+      adminStatus: data.adminStatus,
+      adminFeedback: data.adminFeedback,
+      adminReviewedBy: data.adminReviewedBy,
+      adminReviewedAt: data.adminReviewedAt,
+      accuracyScore: data.accuracyScore,
+    };
+    // When admin overrides to fake, flip the official result immediately
+    if (data.overrideResult) {
+      setFields.result = data.overrideResult;
+    }
     const [result] = await db
       .update(verificationResults)
-      .set({
-        adminStatus: data.adminStatus,
-        adminFeedback: data.adminFeedback,
-        adminReviewedBy: data.adminReviewedBy,
-        adminReviewedAt: data.adminReviewedAt,
-        accuracyScore: data.accuracyScore,
-      })
+      .set(setFields)
       .where(eq(verificationResults.id, id))
       .returning();
     return result;

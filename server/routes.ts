@@ -3590,24 +3590,44 @@ Format your response in clear, professional markdown.`;
         return res.status(404).json({ message: 'Verification log not found' });
       }
 
-      // Update the verification with admin feedback
+      // Update the verification with admin feedback — flip result immediately when marking fake
       const updated = await storage.updateVerificationFeedback(id, {
         adminStatus,
         adminFeedback: adminFeedback || null,
         adminReviewedBy: req.user.id,
         adminReviewedAt: new Date(),
-        accuracyScore: accuracyScore || null,
+        accuracyScore: adminStatus === 'fake' ? 0 : (accuracyScore || null),
+        overrideResult: adminStatus === 'fake' ? 'fake' : undefined,
       });
 
-      // If admin marked as fake but AI said genuine, log the conflict
-      const aiResult = verification.result;
-      const isConflict = adminStatus === 'fake' && aiResult === 'genuine';
+      // Auto-create a permanent Global AI Rule from the admin's reasoning
+      if (adminStatus === 'fake' && adminFeedback?.trim()) {
+        try {
+          const overrideDate = new Date().toISOString().split('T')[0];
+          const originalResult = verification.result;
+          const originalConfidence = verification.confidence;
+          const producer = (verification.metadata as any)?.producer || 'Unknown';
+          const ruleText =
+            `CRITICAL ADMIN OVERRIDE [${overrideDate}]: Document initially verified as '${originalResult}' (${originalConfidence}% confidence) was confirmed FAKE by a human expert.\n` +
+            `Producer: ${producer}\n` +
+            `Admin reasoning: ${adminFeedback.trim()}\n` +
+            `Action required: Apply heightened scrutiny to documents with similar metadata patterns. Do not classify as Genuine without explicit justification.`;
+
+          await storage.createGlobalAiRule({
+            category: 'hitl-override',
+            ruleText,
+            priority: 100,
+            isActive: true,
+          });
+        } catch (ruleError) {
+          console.error('Failed to create AI rule from admin override (non-fatal):', ruleError);
+        }
+      }
 
       res.json({ 
         message: 'Feedback recorded',
         verification: updated,
-        isConflict,
-        conflictType: isConflict ? 'AI marked genuine, admin marked fake' : null
+        ruleAdded: adminStatus === 'fake' && !!adminFeedback?.trim(),
       });
     } catch (error) {
       console.error('Error updating verification feedback:', error);
