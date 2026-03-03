@@ -647,19 +647,27 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
         if (customerId) {
           const user = await storage.getUserByStripeCustomerId(customerId);
           if (user) {
+            const subPkgType = subscription.metadata?.packageType;
             if (subscription.status === 'active') {
-              const subPkgType = subscription.metadata?.packageType;
-              const subStatus = subPkgType === 'starter' ? 'starter' : subPkgType === 'pro' ? 'pro' : 'unlimited';
-              await storage.updateUserSubscription(user.id, {
-                subscriptionStatus: subStatus,
-                stripeSubscriptionId: subscription.id,
-                stripeCustomerId: customerId,
-              });
+              if (subPkgType === 'cos_check') {
+                await storage.updateCosCheckSubscription(user.id, true);
+              } else {
+                const subStatus = subPkgType === 'starter' ? 'starter' : subPkgType === 'pro' ? 'pro' : 'unlimited';
+                await storage.updateUserSubscription(user.id, {
+                  subscriptionStatus: subStatus,
+                  stripeSubscriptionId: subscription.id,
+                  stripeCustomerId: customerId,
+                });
+              }
             } else if (subscription.status === 'canceled' || subscription.status === 'unpaid' || event.type === 'customer.subscription.deleted') {
-              await storage.updateUserSubscription(user.id, {
-                subscriptionStatus: 'free',
-                stripeSubscriptionId: null,
-              });
+              if (subPkgType === 'cos_check') {
+                await storage.updateCosCheckSubscription(user.id, false);
+              } else {
+                await storage.updateUserSubscription(user.id, {
+                  subscriptionStatus: 'free',
+                  stripeSubscriptionId: null,
+                });
+              }
             }
           }
         }
@@ -775,6 +783,17 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
               }).where(eq(users.id, userId));
             }), 'webhook-checkout-notification-pro');
             sendSubscriptionNotifications(userId, 'Notification Engine Pro', 'notification_pro', sessionEmail).catch((err) => console.error('[Subscription] Notification failed:', err));
+          } else if (packageType === 'cos_check') {
+            await withRetry(() => db.transaction(async (tx) => {
+              await tx.update(users).set({
+                cosCheckSubscription: true,
+                cosCheckApproved: true,
+                ipExempt: true,
+                stripeCustomerId: session.customer,
+                updatedAt: new Date(),
+              }).where(eq(users.id, userId));
+            }), 'webhook-checkout-cos-check');
+            sendSubscriptionNotifications(userId, 'COS Check Subscription', 'cos_check', sessionEmail).catch((err) => console.error('[Subscription] Notification failed:', err));
           }
         }
         break;
@@ -1029,10 +1048,17 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
       if (!betaUser) {
         return res.status(404).json({ message: 'User not found' });
       }
-      if (!betaUser.cosCheckApproved) {
+
+      // Access gate: allow if any of the following is true
+      const isAdminUser = betaUser.role === 'admin';
+      const hasCosSubscription = betaUser.cosCheckSubscription === true;
+      const hasPaidPlanWithCos = ['pro', 'unlimited', 'enterprise'].includes(betaUser.subscriptionStatus || '');
+      const hasAdminApproval = betaUser.cosCheckApproved === true;
+
+      if (!isAdminUser && !hasCosSubscription && !hasPaidPlanWithCos && !hasAdminApproval) {
         return res.status(403).json({
-          message: 'Your account is pending beta approval. An admin will review your request.',
-          code: 'beta_not_approved',
+          message: 'Your account is pending COS Check access. Please contact support or upgrade your subscription.',
+          code: 'cos_access_denied',
         });
       }
 
@@ -1042,13 +1068,32 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
 
       let userId: string | undefined = betaUserId;
       
+      // Skip IP rate limit for exempt users (admin-approved or IP-exempt flag)
+      if (!betaUser.ipExempt && !isAdminUser) {
+        const clientIp = getClientIp(req);
+        const hashedIp = hashIpAddress(clientIp);
+        const ipRecord = await storage.getIpVerification(hashedIp);
+        if (ipRecord) {
+          const lastVerification = new Date(ipRecord.lastVerificationDate);
+          const now = new Date();
+          const daysSinceVerification = (now.getTime() - lastVerification.getTime()) / (1000 * 60 * 60 * 24);
+          if (daysSinceVerification < 1) {
+            return res.status(429).json({
+              message: 'You have already verified a document today. Upgrade or wait until tomorrow.',
+              code: 'ip_rate_limited',
+            });
+          }
+        }
+        (req as any).hashedIp = hashedIp;
+      }
+
       // Determine deduction strategy but don't deduct yet (defer until after analysis)
       let useCredits = false;
       let useDailyLimit = false;
 
       if (userId) {
         const user = betaUser;
-        const hasUnlimited = user.role === 'admin' || user.subscriptionStatus === 'unlimited' || user.subscriptionStatus === 'enterprise' || user.verificationLimit === -1;
+        const hasUnlimited = isAdminUser || hasCosSubscription || user.subscriptionStatus === 'unlimited' || user.subscriptionStatus === 'enterprise' || user.verificationLimit === -1;
         
         if (!hasUnlimited) {
           const credits = user.credits || 0;
@@ -2974,6 +3019,38 @@ Format your response in clear, professional markdown.`;
     } catch (error) {
       console.error("Error updating CoS Check approval:", error);
       res.status(500).json({ message: "Failed to update beta approval" });
+    }
+  });
+
+  // Set IP exemption for a user (admin only)
+  app.patch('/api/admin/users/:id/ip-exempt', isAdmin, async (req: any, res) => {
+    try {
+      const userId = req.params.id;
+      const { exempt } = req.body;
+      if (typeof exempt !== 'boolean') {
+        return res.status(400).json({ message: 'exempt must be a boolean' });
+      }
+      await storage.updateIpExempt(userId, exempt);
+      res.json({ message: exempt ? 'IP rate limit exemption granted' : 'IP rate limit exemption removed', userId, ipExempt: exempt });
+    } catch (error) {
+      console.error("Error updating IP exemption:", error);
+      res.status(500).json({ message: "Failed to update IP exemption" });
+    }
+  });
+
+  // Set COS check subscription for a user (admin only)
+  app.patch('/api/admin/users/:id/cos-subscription', isAdmin, async (req: any, res) => {
+    try {
+      const userId = req.params.id;
+      const { active } = req.body;
+      if (typeof active !== 'boolean') {
+        return res.status(400).json({ message: 'active must be a boolean' });
+      }
+      await storage.updateCosCheckSubscription(userId, active);
+      res.json({ message: active ? 'COS check subscription activated' : 'COS check subscription deactivated', userId, cosCheckSubscription: active });
+    } catch (error) {
+      console.error("Error updating COS check subscription:", error);
+      res.status(500).json({ message: "Failed to update COS check subscription" });
     }
   });
 

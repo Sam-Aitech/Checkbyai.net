@@ -7,11 +7,13 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import FileUpload from "./FileUpload";
 import type { StatsResponse, TrustedPattern, VerificationResult, AnalysisDocument } from "@shared/api-types";
 
-import { Database, CheckCircle, AlertTriangle, TrendingUp, Search, Trash2, Download, Plus, Lock, ShieldCheck, FileSearch, Code, Save, X, Eye, MessageSquare, Settings } from "lucide-react";
+import { Database, CheckCircle, AlertTriangle, TrendingUp, Search, Trash2, Download, Plus, Lock, ShieldCheck, FileSearch, Code, Save, X, Eye, MessageSquare, Settings, Users, Bell, FileCheck, WifiOff, Wifi, ChevronDown, ChevronUp, Ban, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import FeedbackAnalytics from "./FeedbackAnalytics";
 
 export default function AdminPortal() {
@@ -22,6 +24,13 @@ export default function AdminPortal() {
   const [analysisDocument, setAnalysisDocument] = useState<AnalysisDocument | null>(null);
   const [decisionNotes, setDecisionNotes] = useState("");
   const [adminCommands, setAdminCommands] = useState("");
+
+  // User Management state
+  const [userSearch, setUserSearch] = useState("");
+  const [userSearchInput, setUserSearchInput] = useState("");
+  const [userPage, setUserPage] = useState(1);
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [limitInputs, setLimitInputs] = useState<Record<string, string>>({});
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -69,6 +78,92 @@ export default function AdminPortal() {
   const { data: paidSubmissions = [] } = useQuery<PaidSubmission[]>({
     queryKey: ['/api/admin/paid-submissions'],
     enabled: isAuthenticated && isAdmin,
+  });
+
+  // User Management
+  interface AdminUser {
+    id: string;
+    email: string | null;
+    username: string | null;
+    firstName: string | null;
+    lastName: string | null;
+    role: string | null;
+    subscriptionStatus: string | null;
+    cosCheckApproved: boolean | null;
+    cosCheckSubscription: boolean | null;
+    ipExempt: boolean | null;
+    verificationLimit: number | null;
+    isRestricted: boolean | null;
+    credits: number | null;
+    createdAt: string | null;
+  }
+
+  interface PaginatedUsers {
+    data: AdminUser[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }
+
+  const { data: usersData, isLoading: usersLoading, refetch: refetchUsers } = useQuery<PaginatedUsers>({
+    queryKey: ['/api/admin/users', userPage, userSearch],
+    queryFn: () => {
+      const params = new URLSearchParams({ page: String(userPage), limit: '20' });
+      if (userSearch) params.set('search', userSearch);
+      return fetch(`/api/admin/users?${params}`, { credentials: 'include' }).then(r => r.json());
+    },
+    enabled: isAuthenticated && isAdmin && activeTab === 'users',
+  });
+
+  const cosApprovalMutation = useMutation({
+    mutationFn: ({ userId, approved }: { userId: string; approved: boolean }) =>
+      apiRequest('PATCH', `/api/admin/users/${userId}/cos-approval`, { approved }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      toast({ title: 'Updated', description: 'COS check access updated.' });
+    },
+    onError: () => toast({ title: 'Error', description: 'Failed to update COS access.', variant: 'destructive' }),
+  });
+
+  const ipExemptMutation = useMutation({
+    mutationFn: ({ userId, exempt }: { userId: string; exempt: boolean }) =>
+      apiRequest('PATCH', `/api/admin/users/${userId}/ip-exempt`, { exempt }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      toast({ title: 'Updated', description: 'IP exemption updated.' });
+    },
+    onError: () => toast({ title: 'Error', description: 'Failed to update IP exemption.', variant: 'destructive' }),
+  });
+
+  const cosSubscriptionMutation = useMutation({
+    mutationFn: ({ userId, active }: { userId: string; active: boolean }) =>
+      apiRequest('PATCH', `/api/admin/users/${userId}/cos-subscription`, { active }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      toast({ title: 'Updated', description: 'COS check subscription updated.' });
+    },
+    onError: () => toast({ title: 'Error', description: 'Failed to update COS subscription.', variant: 'destructive' }),
+  });
+
+  const verificationLimitMutation = useMutation({
+    mutationFn: ({ userId, limit }: { userId: string; limit: number | null }) =>
+      apiRequest('PATCH', `/api/admin/users/${userId}/limit`, { limit }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      toast({ title: 'Updated', description: 'Verification limit updated.' });
+    },
+    onError: () => toast({ title: 'Error', description: 'Failed to update limit.', variant: 'destructive' }),
+  });
+
+  const restrictUserMutation = useMutation({
+    mutationFn: ({ userId, restricted }: { userId: string; restricted: boolean }) =>
+      apiRequest('POST', `/api/admin/users/${userId}/restrict`, { restricted }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      toast({ title: 'Updated', description: 'User restriction updated.' });
+    },
+    onError: () => toast({ title: 'Error', description: 'Failed to update restriction.', variant: 'destructive' }),
   });
 
   const [selectedSubmission, setSelectedSubmission] = useState<PaidSubmission | null>(null);
@@ -474,6 +569,17 @@ export default function AdminPortal() {
               >
                 <CheckCircle className="w-4 h-4 inline mr-2" />
                 Paid Reviews
+              </button>
+              <button
+                onClick={() => setActiveTab("users")}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === "users"
+                    ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                    : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                }`}
+              >
+                <Users className="w-4 h-4 inline mr-2" />
+                User Management
               </button>
               <button
                 onClick={() => setActiveTab("settings")}
@@ -1077,6 +1183,335 @@ export default function AdminPortal() {
                 </CardContent>
               </Card>
             </div>
+          </div>
+        )}
+
+        {/* User Management Tab */}
+        {activeTab === "users" && (
+          <div>
+            <div className="text-center mb-8">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-3">
+                User Management
+              </h2>
+              <p className="text-sm sm:text-lg text-gray-600 dark:text-gray-400 max-w-3xl mx-auto">
+                Full control over user access, COS check permissions, subscriptions and IP exemptions
+              </p>
+            </div>
+
+            {/* Search + refresh */}
+            <div className="flex gap-3 mb-6">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input
+                  placeholder="Search by email or username..."
+                  value={userSearchInput}
+                  onChange={(e) => setUserSearchInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      setUserSearch(userSearchInput);
+                      setUserPage(1);
+                    }
+                  }}
+                  className="pl-9"
+                />
+              </div>
+              <Button
+                onClick={() => { setUserSearch(userSearchInput); setUserPage(1); }}
+                variant="default"
+              >
+                <Search className="w-4 h-4 mr-1" /> Search
+              </Button>
+              <Button variant="outline" onClick={() => refetchUsers()}>
+                <RefreshCw className="w-4 h-4" />
+              </Button>
+            </div>
+
+            {/* Legend */}
+            <div className="flex flex-wrap gap-3 mb-4 text-xs text-gray-500 dark:text-gray-400">
+              <span className="flex items-center gap-1"><Bell className="w-3 h-3 text-blue-500" /> Notification Engine subscription</span>
+              <span className="flex items-center gap-1"><FileCheck className="w-3 h-3 text-green-500" /> COS Check subscription</span>
+              <span className="flex items-center gap-1"><Wifi className="w-3 h-3 text-purple-500" /> IP Exempt (no daily IP limit)</span>
+              <span className="flex items-center gap-1"><CheckCircle className="w-3 h-3 text-emerald-500" /> Admin-approved COS access</span>
+            </div>
+
+            {usersLoading ? (
+              <div className="text-center py-12 text-gray-500">Loading users...</div>
+            ) : (
+              <>
+                <div className="space-y-3">
+                  {(usersData?.data || []).map((u) => {
+                    const isExpanded = expandedUserId === u.id;
+                    const displayName = u.firstName ? `${u.firstName} ${u.lastName || ''}`.trim() : u.username || u.email || u.id;
+                    const hasCosSubscription = u.cosCheckSubscription === true;
+                    const hasCosApproval = u.cosCheckApproved === true;
+                    const isIpExempt = u.ipExempt === true;
+                    const isRestricted = u.isRestricted === true;
+                    const notifTier = u.subscriptionStatus || 'free';
+                    const hasCosViaPlan = ['pro', 'unlimited', 'enterprise'].includes(notifTier);
+
+                    return (
+                      <div key={u.id} className={`border rounded-lg bg-white dark:bg-gray-800 ${isRestricted ? 'border-red-300 dark:border-red-700' : 'border-gray-200 dark:border-gray-700'}`}>
+                        {/* Row header */}
+                        <div
+                          className="flex items-center justify-between p-4 cursor-pointer"
+                          onClick={() => setExpandedUserId(isExpanded ? null : u.id)}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center shrink-0">
+                              <span className="text-sm font-bold text-blue-700 dark:text-blue-300">
+                                {(displayName[0] || '?').toUpperCase()}
+                              </span>
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-medium text-gray-900 dark:text-white truncate">{displayName}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{u.email || 'No email'}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                            {/* Subscription badges */}
+                            {notifTier !== 'free' && (
+                              <Badge variant="outline" className="text-blue-600 border-blue-300 text-xs hidden sm:flex items-center gap-1">
+                                <Bell className="w-3 h-3" /> {notifTier}
+                              </Badge>
+                            )}
+                            {(hasCosSubscription || hasCosViaPlan) && (
+                              <Badge variant="outline" className="text-green-600 border-green-300 text-xs hidden sm:flex items-center gap-1">
+                                <FileCheck className="w-3 h-3" /> COS
+                              </Badge>
+                            )}
+                            {hasCosApproval && !hasCosSubscription && !hasCosViaPlan && (
+                              <Badge variant="outline" className="text-emerald-600 border-emerald-300 text-xs hidden sm:flex items-center gap-1">
+                                <CheckCircle className="w-3 h-3" /> Approved
+                              </Badge>
+                            )}
+                            {isIpExempt && (
+                              <Badge variant="outline" className="text-purple-600 border-purple-300 text-xs hidden sm:flex items-center gap-1">
+                                <Wifi className="w-3 h-3" /> IP Exempt
+                              </Badge>
+                            )}
+                            {isRestricted && (
+                              <Badge variant="destructive" className="text-xs">Restricted</Badge>
+                            )}
+                            {u.role === 'admin' && (
+                              <Badge className="bg-gray-800 text-white text-xs">Admin</Badge>
+                            )}
+                            {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                          </div>
+                        </div>
+
+                        {/* Expanded controls */}
+                        {isExpanded && (
+                          <div className="border-t border-gray-200 dark:border-gray-700 p-4 space-y-5 bg-gray-50 dark:bg-gray-900 rounded-b-lg">
+                            {/* Subscription status overview */}
+                            <div className="grid grid-cols-2 gap-3 text-sm">
+                              <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+                                <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 mb-1">
+                                  <Bell className="w-3 h-3 text-blue-500" /> Notification Engine
+                                </p>
+                                <p className="font-semibold capitalize">{notifTier}</p>
+                              </div>
+                              <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+                                <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 mb-1">
+                                  <FileCheck className="w-3 h-3 text-green-500" /> COS Check Access
+                                </p>
+                                <p className="font-semibold">
+                                  {u.role === 'admin' ? 'Admin (unlimited)' :
+                                   hasCosSubscription ? 'Subscribed' :
+                                   hasCosViaPlan ? `Via ${notifTier} plan` :
+                                   hasCosApproval ? 'Admin approved' :
+                                   'None'}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+                                <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 mb-1">
+                                  <Wifi className="w-3 h-3 text-purple-500" /> IP Rate Limit
+                                </p>
+                                <p className="font-semibold">{isIpExempt || u.role === 'admin' ? 'Exempt' : 'Active'}</p>
+                              </div>
+                              <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Verification Limit</p>
+                                <p className="font-semibold">
+                                  {u.verificationLimit === -1 ? 'Unlimited' :
+                                   u.verificationLimit != null ? `${u.verificationLimit} total` :
+                                   'Default (1/day)'}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Controls — disabled for admin users */}
+                            {u.role !== 'admin' && (
+                              <div className="space-y-4">
+                                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Access Controls</h4>
+
+                                {/* COS Check Access */}
+                                <div className="flex items-center justify-between bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+                                  <div>
+                                    <p className="text-sm font-medium flex items-center gap-2">
+                                      <FileCheck className="w-4 h-4 text-green-500" />
+                                      COS Check Access
+                                    </p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                      Manually approve this user to use COS document checking. Also grants IP exemption.
+                                    </p>
+                                  </div>
+                                  <Switch
+                                    checked={hasCosApproval}
+                                    onCheckedChange={(checked) =>
+                                      cosApprovalMutation.mutate({ userId: u.id, approved: checked })
+                                    }
+                                    disabled={cosApprovalMutation.isPending}
+                                  />
+                                </div>
+
+                                {/* IP Exempt */}
+                                <div className="flex items-center justify-between bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+                                  <div>
+                                    <p className="text-sm font-medium flex items-center gap-2">
+                                      <Wifi className="w-4 h-4 text-purple-500" />
+                                      IP Rate Limit Exempt
+                                    </p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                      Bypass the daily IP-based verification limit for this user.
+                                    </p>
+                                  </div>
+                                  <Switch
+                                    checked={isIpExempt}
+                                    onCheckedChange={(checked) =>
+                                      ipExemptMutation.mutate({ userId: u.id, exempt: checked })
+                                    }
+                                    disabled={ipExemptMutation.isPending}
+                                  />
+                                </div>
+
+                                {/* COS Check Subscription */}
+                                <div className="flex items-center justify-between bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+                                  <div>
+                                    <p className="text-sm font-medium flex items-center gap-2">
+                                      <FileCheck className="w-4 h-4 text-blue-500" />
+                                      COS Check Subscription
+                                    </p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                      Mark user as having an active standalone COS check subscription (no admin approval needed).
+                                    </p>
+                                  </div>
+                                  <Switch
+                                    checked={hasCosSubscription}
+                                    onCheckedChange={(checked) =>
+                                      cosSubscriptionMutation.mutate({ userId: u.id, active: checked })
+                                    }
+                                    disabled={cosSubscriptionMutation.isPending}
+                                  />
+                                </div>
+
+                                {/* Verification Limit */}
+                                <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+                                  <p className="text-sm font-medium mb-2">Verification Limit</p>
+                                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                                    Set to <code>-1</code> for unlimited, leave blank for default (1/day), or enter a positive number for a custom total cap.
+                                  </p>
+                                  <div className="flex gap-2">
+                                    <Input
+                                      placeholder="e.g. -1, 10, blank=default"
+                                      value={limitInputs[u.id] ?? (u.verificationLimit == null ? '' : String(u.verificationLimit))}
+                                      onChange={(e) => setLimitInputs(prev => ({ ...prev, [u.id]: e.target.value }))}
+                                      className="flex-1 text-sm"
+                                    />
+                                    <Button
+                                      size="sm"
+                                      onClick={() => {
+                                        const raw = limitInputs[u.id] ?? '';
+                                        const limit = raw.trim() === '' ? null : parseInt(raw, 10);
+                                        if (raw.trim() !== '' && isNaN(limit as number)) {
+                                          toast({ title: 'Invalid', description: 'Enter a number, -1, or leave blank.', variant: 'destructive' });
+                                          return;
+                                        }
+                                        verificationLimitMutation.mutate({ userId: u.id, limit });
+                                      }}
+                                      disabled={verificationLimitMutation.isPending}
+                                    >
+                                      <Save className="w-3 h-3 mr-1" /> Save
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => verificationLimitMutation.mutate({ userId: u.id, limit: -1 })}
+                                      disabled={verificationLimitMutation.isPending}
+                                      title="Set unlimited"
+                                    >
+                                      Unlimited
+                                    </Button>
+                                  </div>
+                                </div>
+
+                                {/* Restrict user */}
+                                <div className="flex items-center justify-between bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+                                  <div>
+                                    <p className="text-sm font-medium flex items-center gap-2">
+                                      <Ban className="w-4 h-4 text-red-500" />
+                                      Restrict Account
+                                    </p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                      Block this user from accessing the platform entirely.
+                                    </p>
+                                  </div>
+                                  <Switch
+                                    checked={isRestricted}
+                                    onCheckedChange={(checked) =>
+                                      restrictUserMutation.mutate({ userId: u.id, restricted: checked })
+                                    }
+                                    disabled={restrictUserMutation.isPending}
+                                  />
+                                </div>
+                              </div>
+                            )}
+
+                            {u.role === 'admin' && (
+                              <p className="text-sm text-gray-500 dark:text-gray-400 italic">Admin accounts cannot be modified from this panel.</p>
+                            )}
+
+                            <p className="text-xs text-gray-400 dark:text-gray-600">
+                              Credits: {u.credits ?? 0} &bull; Member since: {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'Unknown'} &bull; ID: {u.id}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Pagination */}
+                {usersData && usersData.totalPages > 1 && (
+                  <div className="flex justify-center items-center gap-4 mt-6">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={userPage <= 1}
+                      onClick={() => setUserPage(p => p - 1)}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                      Page {userPage} of {usersData.totalPages} ({usersData.total} users)
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={userPage >= usersData.totalPages}
+                      onClick={() => setUserPage(p => p + 1)}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                )}
+
+                {usersData && usersData.total === 0 && (
+                  <div className="text-center py-12 text-gray-500">
+                    No users found{userSearch ? ` for "${userSearch}"` : ''}.
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
 

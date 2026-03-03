@@ -47,6 +47,8 @@ export interface IStorage {
   checkDailyLimit(userId: string): Promise<boolean>;
   updateUserVerificationLimit(userId: string, limit: number | null): Promise<User | undefined>;
   updateCosCheckApproval(userId: string, approved: boolean): Promise<void>;
+  updateIpExempt(userId: string, exempt: boolean): Promise<void>;
+  updateCosCheckSubscription(userId: string, active: boolean): Promise<void>;
 
   // Expert requests operations
   createExpertRequest(userId: string, stripeSessionId?: string): Promise<number>;
@@ -343,6 +345,9 @@ export class DatabaseStorage implements IStorage {
     
     if (user.subscriptionStatus === 'unlimited' || user.subscriptionStatus === 'enterprise') return true;
     
+    // COS check subscription = unlimited verifications
+    if (user.cosCheckSubscription) return true;
+    
     // Admin-assigned unlimited access (verificationLimit = -1)
     if (user.verificationLimit === -1) return true;
     
@@ -379,6 +384,27 @@ export class DatabaseStorage implements IStorage {
       .update(users)
       .set({
         cosCheckApproved: approved,
+        ipExempt: approved ? true : false,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+  }
+
+  async updateIpExempt(userId: string, exempt: boolean): Promise<void> {
+    await db
+      .update(users)
+      .set({
+        ipExempt: exempt,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+  }
+
+  async updateCosCheckSubscription(userId: string, active: boolean): Promise<void> {
+    await db
+      .update(users)
+      .set({
+        cosCheckSubscription: active,
         updatedAt: new Date(),
       })
       .where(eq(users.id, userId));

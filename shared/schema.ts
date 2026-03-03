@@ -51,6 +51,8 @@ export const users = pgTable("users", {
   isRestricted: boolean("is_restricted").default(false),
   restrictionReason: text("restriction_reason"),
   cosCheckApproved: boolean("cos_check_approved").default(false),
+  cosCheckSubscription: boolean("cos_check_subscription").default(false),
+  ipExempt: boolean("ip_exempt").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
