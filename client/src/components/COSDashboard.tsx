@@ -3,6 +3,7 @@ import { Link } from 'wouter';
 import FileUploadSimple from './FileUploadSimple';
 import Enhanced3DDemo from './Enhanced3DDemo';
 import { useAuth } from '@/hooks/useAuth';
+import { queryClient } from '@/lib/queryClient';
 
 interface VerificationResult {
   type: 'genuine' | 'suspicious' | 'fake';
@@ -28,6 +29,14 @@ export default function COSDashboard() {
   const [isLoading, setIsLoading] = useState(false);
   // Track free usage
   const [hasUsedFreeCheck, setHasUsedFreeCheck] = useState(false);
+
+  const [checkingStatus, setCheckingStatus] = useState(false);
+
+  const handleCheckApprovalStatus = async () => {
+    setCheckingStatus(true);
+    await queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+    setTimeout(() => setCheckingStatus(false), 1500);
+  };
 
   // Check if user has used their free verification today
   useEffect(() => {
@@ -144,6 +153,28 @@ export default function COSDashboard() {
           <p className="text-gray-500 dark:text-gray-500 text-sm mb-8">
             You'll receive an email at <strong>{user?.email || 'your registered address'}</strong> when you're approved.
           </p>
+          <button
+            onClick={handleCheckApprovalStatus}
+            disabled={checkingStatus || authLoading}
+            className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg font-semibold transition-colors mb-3"
+          >
+            {checkingStatus || authLoading ? (
+              <>
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Checking…
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Check approval status
+              </>
+            )}
+          </button>
           <a
             href="mailto:support@checkbyai.net?subject=CoS%20Check%20Beta%20Access%20Request"
             className="inline-flex items-center justify-center px-6 py-3 border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 rounded-lg font-semibold hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"

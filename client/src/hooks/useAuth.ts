@@ -6,8 +6,8 @@ export function useAuth() {
     queryKey: ["/api/auth/user"],
     retry: false,
     refetchInterval: false,
-    refetchOnWindowFocus: false,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: true,
+    staleTime: 60 * 1000, // 1 minute
     enabled: true, // Always try once
     throwOnError: false, // Don't throw on 401 errors
   });
