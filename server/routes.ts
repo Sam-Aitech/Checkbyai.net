@@ -1150,11 +1150,37 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
         };
         metadata = (priorAdminFlag.metadata as any) || {};
       } else {
-        // Normal AI analysis path
+        // Normal AI analysis path — load admin knowledge to feed into analysis
         const pdfAnalyzer = new PDFAnalyzer();
         const extractedMetadata = await pdfAnalyzer.extractMetadata(req.file.path);
         const trustedPatterns = await storage.getTrustedPatterns();
-        const analysisResult = await pdfAnalyzer.analyzeAgainstTrustedPatterns(extractedMetadata, trustedPatterns);
+
+        // Load admin-accumulated knowledge in parallel (non-fatal if missing)
+        const [activeRules, hitlFakes] = await Promise.all([
+          storage.getActiveGlobalAiRules().catch(() => []),
+          storage.getAdminFakeKnowledge(20).catch(() => []),
+        ]);
+
+        const adminContext = {
+          globalRules: activeRules.map((r: any) => ({
+            category: r.category,
+            ruleText: r.ruleText,
+            priority: r.priority,
+          })),
+          hitlKnowledge: hitlFakes.map((v: any) => ({
+            filename: v.filename,
+            result: v.result,
+            confidence: v.confidence,
+            adminFeedback: v.adminFeedback,
+            metadata: v.metadata,
+          })),
+        };
+
+        const analysisResult = await pdfAnalyzer.analyzeAgainstTrustedPatterns(
+          extractedMetadata,
+          trustedPatterns,
+          adminContext,
+        );
         result = analysisResult.result;
         analysis = analysisResult;
         metadata = {

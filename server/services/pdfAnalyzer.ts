@@ -678,7 +678,11 @@ export class PDFAnalyzer {
 
   async analyzeAgainstTrustedPatterns(
     metadata: PDFMetadata,
-    trustedPatterns: any[]
+    trustedPatterns: any[],
+    adminContext?: {
+      globalRules: Array<{ category: string; ruleText: string; priority: number }>;
+      hitlKnowledge: Array<{ filename: string; result: string; confidence: number; adminFeedback: string | null; metadata: any }>;
+    }
   ): Promise<VerificationAnalysis> {
     let bestMatch: any = null;
     let bestScore = 0;
@@ -696,6 +700,59 @@ export class PDFAnalyzer {
       metadata,
       bestMatch?.metadata || null
     );
+
+    // ── Admin Knowledge Injection ─────────────────────────────────────────
+    // Apply global AI rules and HITL overrides as additional scored checks.
+    // This runs AFTER the rule-based analysis so admin reasons always take effect.
+    if (adminContext && (adminContext.globalRules.length > 0 || adminContext.hitlKnowledge.length > 0)) {
+      const docProducer = (metadata.producer || '').toLowerCase();
+      const docCreator  = (metadata.creator  || '').toLowerCase();
+
+      // 1. Global AI rules — convert each active rule into an advisory check
+      for (const rule of adminContext.globalRules) {
+        // Heuristic keyword match: does the rule text mention patterns visible in this doc?
+        const ruleText  = rule.ruleText.toLowerCase();
+        const relevant  = ruleText.includes(docProducer) ||
+                          ruleText.includes(docCreator)  ||
+                          ruleText.includes('all documents') ||
+                          rule.category === 'hitl-override';
+
+        if (relevant) {
+          ruleResult.checks.push({
+            name: `Admin Rule [${rule.category}]`,
+            passed: false,
+            severity: 'critical',
+            message: `Admin directive: ${rule.ruleText.substring(0, 300)}`,
+          } as any);
+          // Each matching high-priority rule lowers the score significantly
+          (ruleResult as any).confidence = Math.max(0, ((ruleResult as any).confidence ?? 100) - Math.min(40, rule.priority / 3));
+        }
+      }
+
+      // 2. HITL — if human experts previously flagged docs with matching producer as fake, apply a penalty
+      for (const cas of adminContext.hitlKnowledge) {
+        const caseProducer = ((cas.metadata?.producer) || '').toLowerCase();
+        if (caseProducer && docProducer && docProducer.includes(caseProducer.split(' ')[0])) {
+          const reason = cas.adminFeedback || 'No reason provided';
+          ruleResult.checks.push({
+            name: 'Human Expert Correction (HITL)',
+            passed: false,
+            severity: 'critical',
+            message: `A human expert previously flagged a document with the same producer ("${cas.metadata?.producer}") as FAKE. Expert reason: ${reason}`,
+          } as any);
+          (ruleResult as any).confidence = Math.max(0, ((ruleResult as any).confidence ?? 100) - 30);
+        }
+      }
+
+      // Re-evaluate status based on any new critical failures injected above
+      const criticalFails = ruleResult.checks.filter((c: any) => !c.passed && c.severity === 'critical');
+      if (criticalFails.length > 0) {
+        (ruleResult as any).status = 'fake';
+      } else if (ruleResult.checks.filter((c: any) => !c.passed && c.severity === 'warning').length >= 2) {
+        (ruleResult as any).status = 'suspicious';
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────
     
     const details = {
       metadataVerification: {
