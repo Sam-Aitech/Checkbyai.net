@@ -1048,7 +1048,7 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
 
       if (userId) {
         const user = betaUser;
-        const hasUnlimited = user.subscriptionStatus === 'unlimited' || user.subscriptionStatus === 'enterprise' || user.verificationLimit === -1;
+        const hasUnlimited = user.role === 'admin' || user.subscriptionStatus === 'unlimited' || user.subscriptionStatus === 'enterprise' || user.verificationLimit === -1;
         
         if (!hasUnlimited) {
           const credits = user.credits || 0;
@@ -3632,6 +3632,21 @@ Format your response in clear, professional markdown.`;
     } catch (error) {
       console.error('Error updating verification feedback:', error);
       res.status(500).json({ message: 'Failed to update feedback' });
+    }
+  });
+
+  // Delete a verification log entry (admin only)
+  app.delete('/api/logs/:id', isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: 'Invalid ID' });
+      const log = await storage.getVerificationById(id);
+      if (!log) return res.status(404).json({ message: 'Log not found' });
+      await storage.deleteVerificationLog(id);
+      res.json({ message: 'Log deleted' });
+    } catch (error) {
+      console.error('Error deleting verification log:', error);
+      res.status(500).json({ message: 'Failed to delete log' });
     }
   });
 

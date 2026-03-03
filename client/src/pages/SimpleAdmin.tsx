@@ -183,6 +183,7 @@ export default function SimpleAdmin() {
   const [feedbackLog, setFeedbackLog] = useState<VerificationLog | null>(null);
   const [feedbackReasoning, setFeedbackReasoning] = useState('');
   const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [deleteConfirmLog, setDeleteConfirmLog] = useState<VerificationLog | null>(null);
   
   // Sponsor Monitor state
   const [sponsorStatus, setSponsorStatus] = useState<any>(null);
@@ -608,6 +609,23 @@ export default function SimpleAdmin() {
       toast({ title: 'Failed to submit feedback', variant: 'destructive' });
     } finally {
       setFeedbackLoading(false);
+    }
+  };
+
+  // Delete a verification log entry
+  const handleDeleteLog = async (log: VerificationLog) => {
+    try {
+      const res = await fetch(`/api/logs/${log.id}`, { method: 'DELETE', credentials: 'include' });
+      if (res.ok) {
+        toast({ title: 'Log deleted' });
+        setDeleteConfirmLog(null);
+        loadLogs();
+      } else {
+        const err = await res.json();
+        toast({ title: 'Failed to delete', description: err.message, variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: 'Failed to delete', variant: 'destructive' });
     }
   };
 
@@ -1409,6 +1427,15 @@ export default function SimpleAdmin() {
                                   >
                                     <Sparkles className="w-4 h-4 sm:mr-1" />
                                     <span className="hidden sm:inline">Analyze</span>
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={(e) => { e.stopPropagation(); setDeleteConfirmLog(log); }}
+                                    className="text-red-400 hover:bg-red-500/20 hover:text-red-300"
+                                    title="Delete log"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
                                   </Button>
                                 </div>
                               </td>
@@ -2504,6 +2531,36 @@ export default function SimpleAdmin() {
           )}
         </SheetContent>
       </Sheet>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteConfirmLog} onOpenChange={() => setDeleteConfirmLog(null)}>
+        <DialogContent className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-400">
+              <Trash2 className="w-5 h-5" />
+              Delete verification log
+            </DialogTitle>
+            <DialogDescription className="text-gray-500 dark:text-slate-400">
+              This will permanently remove the log for{' '}
+              <strong className="text-gray-900 dark:text-white">{deleteConfirmLog?.filename}</strong>.
+              This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteConfirmLog(null)}
+              className="border-gray-300 dark:border-slate-600 text-gray-700 dark:text-slate-300">
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteConfirmLog && handleDeleteLog(deleteConfirmLog)}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Delete permanently
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* HITL Feedback Modal */}
       <Dialog open={feedbackModalOpen} onOpenChange={setFeedbackModalOpen}>

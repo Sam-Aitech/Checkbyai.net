@@ -149,6 +149,7 @@ export interface IStorage {
     accuracyScore?: number | null;
   }): Promise<VerificationResult>;
   getAdminFakeKnowledge(limit?: number): Promise<VerificationResult[]>;
+  deleteVerificationLog(id: number): Promise<void>;
   getVerificationLogsWithHITL(page: number, limit: number, adminStatus?: string): Promise<{
     data: VerificationResult[];
     total: number;
@@ -878,6 +879,10 @@ export class DatabaseStorage implements IStorage {
       .where(eq(verificationResults.adminStatus, 'fake'))
       .orderBy(desc(verificationResults.adminReviewedAt))
       .limit(limit);
+  }
+
+  async deleteVerificationLog(id: number): Promise<void> {
+    await db.delete(verificationResults).where(eq(verificationResults.id, id));
   }
 
   async getVerificationLogsWithHITL(page: number, limit: number, adminStatus?: string): Promise<{
