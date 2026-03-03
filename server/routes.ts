@@ -1118,15 +1118,54 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
       const documentHash = generateDocumentHash(req.file.path);
       const receiptId = generateReceiptId();
 
-      // Use Node.js PDF analyzer instead of Python
-      const pdfAnalyzer = new PDFAnalyzer();
-      const metadata = await pdfAnalyzer.extractMetadata(req.file.path);
-      const trustedPatterns = await storage.getTrustedPatterns();
-      
-      const analysis = await pdfAnalyzer.analyzeAgainstTrustedPatterns(metadata, trustedPatterns);
-      
-      // Use the rule-based result from the analyzer
-      const result = analysis.result;
+      // ── Admin-override short-circuit ──────────────────────────────────────
+      // If an admin has previously reviewed this exact document (same hash)
+      // and marked it as fake with a reason, honour that verdict immediately —
+      // no AI re-analysis is run.
+      const priorAdminFlag = await storage.getAdminFlaggedVerificationByHash(documentHash);
+
+      let result: string;
+      let analysis: any;
+      let metadata: any;
+      let isAdminOverride = false;
+
+      if (priorAdminFlag) {
+        isAdminOverride = true;
+        result = 'fake';
+        const reason = priorAdminFlag.adminFeedback || 'Flagged as fake by a human reviewer.';
+        analysis = {
+          result: 'fake',
+          confidence: 99,
+          details: {
+            summary: `This document was previously reviewed by an administrator and confirmed fake. ${reason}`,
+          },
+          checks: [
+            {
+              name: 'Admin Human Review Override',
+              passed: false,
+              severity: 'critical',
+              message: `A human administrator has reviewed this exact document and determined it is NOT genuine. Reason: ${reason}`,
+            },
+          ],
+        };
+        metadata = (priorAdminFlag.metadata as any) || {};
+      } else {
+        // Normal AI analysis path
+        const pdfAnalyzer = new PDFAnalyzer();
+        const extractedMetadata = await pdfAnalyzer.extractMetadata(req.file.path);
+        const trustedPatterns = await storage.getTrustedPatterns();
+        const analysisResult = await pdfAnalyzer.analyzeAgainstTrustedPatterns(extractedMetadata, trustedPatterns);
+        result = analysisResult.result;
+        analysis = analysisResult;
+        metadata = {
+          producer: extractedMetadata.producer,
+          creator: extractedMetadata.creator,
+          created: extractedMetadata.creationDate,
+          modified: extractedMetadata.modificationDate,
+          fontCount: extractedMetadata.fontCount,
+        };
+      }
+      // ─────────────────────────────────────────────────────────────────────
 
       // Atomically deduct credit + store result (if one fails, both roll back)
       const verificationId = await withRetry(() => db.transaction(async (tx) => {
@@ -1149,17 +1188,25 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
             updatedAt: new Date(),
           }).where(eq(users.id, userId));
         }
-        const [verification] = await tx.insert(verificationResults).values({
+        const insertValues: any = {
           userId,
           filename: req.file!.originalname,
           result,
           confidence: Math.floor(analysis.confidence),
-          metadata,
+          metadata: isAdminOverride ? (priorAdminFlag!.metadata ?? {}) : metadata,
           analysisDetails: analysis,
           ipAddress: req.ip,
           receiptId,
           documentHash,
-        }).returning();
+        };
+        // Carry forward admin override fields so this record is also marked
+        if (isAdminOverride) {
+          insertValues.adminStatus = 'fake';
+          insertValues.adminFeedback = priorAdminFlag!.adminFeedback;
+          insertValues.adminReviewedBy = priorAdminFlag!.adminReviewedBy;
+          insertValues.adminReviewedAt = priorAdminFlag!.adminReviewedAt;
+        }
+        const [verification] = await tx.insert(verificationResults).values(insertValues).returning();
         return verification.id;
       }), 'verify-result');
 
@@ -1172,13 +1219,8 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
         details: analysis.details,
         checks: analysis.checks || [],
         forensicAnalysis: analysis.details?.forensicAnalysis || null,
-        metadata: {
-          producer: metadata.producer,
-          creator: metadata.creator,
-          created: metadata.creationDate,
-          modified: metadata.modificationDate,
-          fontCount: metadata.fontCount,
-        },
+        adminOverride: isAdminOverride,
+        metadata: isAdminOverride ? {} : metadata,
         timestamp: new Date().toISOString()
       });
 

@@ -93,6 +93,7 @@ export interface IStorage {
   ): Promise<number>;
   getVerificationsByUserId(userId: string, limit?: number): Promise<VerificationResult[]>;
   getVerificationByReceiptId(receiptId: string): Promise<VerificationResult | undefined>;
+  getAdminFlaggedVerificationByHash(documentHash: string): Promise<VerificationResult | undefined>;
   getRecentActivity(limit?: number): Promise<VerificationResult[]>;
   getVerificationById(id: number): Promise<VerificationResult | undefined>;
   getPaginatedVerificationLogs(options: {
@@ -604,6 +605,20 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(verificationResults)
       .where(eq(verificationResults.receiptId, receiptId));
+    return result;
+  }
+
+  async getAdminFlaggedVerificationByHash(documentHash: string): Promise<VerificationResult | undefined> {
+    const [result] = await db
+      .select()
+      .from(verificationResults)
+      .where(
+        sql`${verificationResults.documentHash} = ${documentHash}
+            AND ${verificationResults.adminStatus} = 'fake'
+            AND ${verificationResults.adminFeedback} IS NOT NULL`
+      )
+      .orderBy(desc(verificationResults.adminReviewedAt))
+      .limit(1);
     return result;
   }
 
