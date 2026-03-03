@@ -473,3 +473,11 @@ export const insertMonitorJobRunSchema = createInsertSchema(monitorJobRuns).omit
 });
 export type InsertMonitorJobRun = z.infer<typeof insertMonitorJobRunSchema>;
 export type MonitorJobRun = typeof monitorJobRuns.$inferSelect;
+
+// System-wide settings (admin-configurable key-value store)
+export const systemSettings = pgTable("system_settings", {
+  key: varchar("key").primaryKey().notNull(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export type SystemSetting = typeof systemSettings.$inferSelect;

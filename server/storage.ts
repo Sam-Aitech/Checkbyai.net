@@ -7,6 +7,7 @@ import {
   feedback,
   paidSubmissions,
   expertRequests,
+  systemSettings,
   type User,
   type UpsertUser,
   type IpVerification,
@@ -20,6 +21,7 @@ import {
   type PaidSubmission,
   type InsertPaidSubmission,
   type ExpertRequest,
+  type SystemSetting,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, gte, count, avg, sql, inArray } from "drizzle-orm";
@@ -49,6 +51,11 @@ export interface IStorage {
   updateCosCheckApproval(userId: string, approved: boolean): Promise<void>;
   updateIpExempt(userId: string, exempt: boolean): Promise<void>;
   updateCosCheckSubscription(userId: string, active: boolean): Promise<void>;
+
+  // System settings operations
+  getSystemSetting(key: string): Promise<string | null>;
+  setSystemSetting(key: string, value: string): Promise<void>;
+  getAllSystemSettings(): Promise<SystemSetting[]>;
 
   // Expert requests operations
   createExpertRequest(userId: string, stripeSessionId?: string): Promise<number>;
@@ -356,14 +363,17 @@ export class DatabaseStorage implements IStorage {
       return (user.totalVerificationsUsed || 0) < user.verificationLimit;
     }
     
-    // Default: 1 verification per day for free users
+    // Default: use global system setting for daily limit
     const today = new Date().toISOString().split('T')[0];
     
     // If last verification was not today, they can verify
     if (user.lastVerificationDate !== today) return true;
     
-    // Free users get 1 verification per day
-    return (user.dailyVerificationsUsed || 0) < 1;
+    // Read global default daily limit from system settings (default: 1)
+    const limitSetting = await this.getSystemSetting('defaultDailyLimit');
+    const defaultDailyLimit = limitSetting ? parseInt(limitSetting, 10) : 1;
+    if (defaultDailyLimit === -1) return true; // Global unlimited
+    return (user.dailyVerificationsUsed || 0) < defaultDailyLimit;
   }
 
   async updateUserVerificationLimit(userId: string, limit: number | null): Promise<User | undefined> {
@@ -408,6 +418,29 @@ export class DatabaseStorage implements IStorage {
         updatedAt: new Date(),
       })
       .where(eq(users.id, userId));
+  }
+
+  // System settings operations
+  async getSystemSetting(key: string): Promise<string | null> {
+    const [record] = await db
+      .select()
+      .from(systemSettings)
+      .where(eq(systemSettings.key, key));
+    return record?.value ?? null;
+  }
+
+  async setSystemSetting(key: string, value: string): Promise<void> {
+    await db
+      .insert(systemSettings)
+      .values({ key, value, updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: systemSettings.key,
+        set: { value, updatedAt: new Date() },
+      });
+  }
+
+  async getAllSystemSettings(): Promise<SystemSetting[]> {
+    return db.select().from(systemSettings);
   }
 
   // Expert requests operations

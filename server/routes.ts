@@ -3022,6 +3022,33 @@ Format your response in clear, professional markdown.`;
     }
   });
 
+  // Get all system settings (admin only)
+  app.get('/api/admin/system-settings', isAdmin, async (_req, res) => {
+    try {
+      const settings = await storage.getAllSystemSettings();
+      res.json(settings);
+    } catch (error) {
+      console.error("Error fetching system settings:", error);
+      res.status(500).json({ message: "Failed to fetch system settings" });
+    }
+  });
+
+  // Update a system setting (admin only)
+  app.patch('/api/admin/system-settings/:key', isAdmin, async (req: any, res) => {
+    try {
+      const { key } = req.params;
+      const { value } = req.body;
+      if (value === undefined || value === null) {
+        return res.status(400).json({ message: 'value is required' });
+      }
+      await storage.setSystemSetting(key, String(value));
+      res.json({ message: `Setting '${key}' updated`, key, value: String(value) });
+    } catch (error) {
+      console.error("Error updating system setting:", error);
+      res.status(500).json({ message: "Failed to update system setting" });
+    }
+  });
+
   // Set IP exemption for a user (admin only)
   app.patch('/api/admin/users/:id/ip-exempt', isAdmin, async (req: any, res) => {
     try {

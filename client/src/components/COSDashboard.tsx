@@ -20,7 +20,7 @@ interface VerificationResult {
 }
 
 export default function COSDashboard() {
-  const { user, isLoading: authLoading, isAuthenticated } = useAuth();
+  const { user, isLoading: authLoading, isAuthenticated, isAdmin } = useAuth();
   const [showFreeCheck, setShowFreeCheck] = useState(false);
   const [showDemo, setShowDemo] = useState(false);
   const [demoStep, setDemoStep] = useState(0);
@@ -38,8 +38,12 @@ export default function COSDashboard() {
     setTimeout(() => setCheckingStatus(false), 1500);
   };
 
-  // Check if user has used their free verification today
+  // Check if user has used their free verification today (skipped for admin)
   useEffect(() => {
+    if (isAdmin) {
+      setHasUsedFreeCheck(false);
+      return;
+    }
     const today = new Date().toDateString();
     const lastCheck = localStorage.getItem('lastFreeCheck');
     
@@ -48,10 +52,11 @@ export default function COSDashboard() {
     } else {
       setHasUsedFreeCheck(false);
     }
-  }, []);
+  }, [isAdmin]);
 
   const handleFileUpload = async (file: File) => {
-    // Mark free check as used
+    if (isAdmin) return;
+    // Mark free check as used for non-admin users
     const today = new Date().toDateString();
     localStorage.setItem('lastFreeCheck', today);
     setHasUsedFreeCheck(true);
@@ -512,18 +517,22 @@ export default function COSDashboard() {
             <div className="p-6">
               {!verificationResult ? (
                 <div>
-                  {!hasUsedFreeCheck ? (
+                  {(!hasUsedFreeCheck || isAdmin) ? (
                     <>
-                      <div className="mb-6 p-4 bg-green-50 rounded-lg border border-green-200">
+                      <div className={`mb-6 p-4 rounded-lg border ${isAdmin ? 'bg-blue-50 border-blue-200' : 'bg-green-50 border-green-200'}`}>
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isAdmin ? 'bg-blue-600' : 'bg-green-500'}`}>
                             <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                             </svg>
                           </div>
                           <div>
-                            <h3 className="font-semibold text-green-800">Free Verification Available</h3>
-                            <p className="text-green-700 text-sm">Upload your document to verify its authenticity instantly</p>
+                            <h3 className={`font-semibold ${isAdmin ? 'text-blue-800' : 'text-green-800'}`}>
+                              {isAdmin ? 'Admin — Unlimited Verification' : 'Free Verification Available'}
+                            </h3>
+                            <p className={`text-sm ${isAdmin ? 'text-blue-700' : 'text-green-700'}`}>
+                              {isAdmin ? 'No usage limits apply to your admin account' : 'Upload your document to verify its authenticity instantly'}
+                            </p>
                           </div>
                         </div>
                       </div>
@@ -533,6 +542,8 @@ export default function COSDashboard() {
                         onVerificationResult={handleVerificationResult}
                         onLoading={handleLoading}
                         onError={handleError}
+                        isAdmin={isAdmin}
+                        restrictToOneCheck={!isAdmin}
                       />
                     </>
                   ) : (

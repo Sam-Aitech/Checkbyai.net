@@ -32,6 +32,9 @@ export default function AdminPortal() {
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [limitInputs, setLimitInputs] = useState<Record<string, string>>({});
 
+  // System settings state
+  const [globalLimitInput, setGlobalLimitInput] = useState("");
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { isAuthenticated, isAdmin, isLoading, user } = useAuth();
@@ -78,6 +81,26 @@ export default function AdminPortal() {
   const { data: paidSubmissions = [] } = useQuery<PaidSubmission[]>({
     queryKey: ['/api/admin/paid-submissions'],
     enabled: isAuthenticated && isAdmin,
+  });
+
+  // System settings
+  interface SystemSetting { key: string; value: string; }
+  const { data: systemSettings = [] } = useQuery<SystemSetting[]>({
+    queryKey: ['/api/admin/system-settings'],
+    enabled: isAuthenticated && isAdmin,
+  });
+  const currentDailyLimit = systemSettings.find(s => s.key === 'defaultDailyLimit')?.value ?? '1';
+
+  const updateSettingMutation = useMutation({
+    mutationFn: ({ key, value }: { key: string; value: string }) =>
+      apiRequest('PATCH', `/api/admin/system-settings/${key}`, { value }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/system-settings'] });
+      toast({ title: 'Setting saved', description: 'The change takes effect immediately for all users.' });
+    },
+    onError: () => {
+      toast({ title: 'Error', description: 'Failed to save setting.', variant: 'destructive' });
+    },
   });
 
   // User Management
@@ -135,6 +158,11 @@ export default function AdminPortal() {
     },
     onError: () => toast({ title: 'Error', description: 'Failed to update IP exemption.', variant: 'destructive' }),
   });
+
+  // Sync globalLimitInput when settings load
+  useEffect(() => {
+    setGlobalLimitInput(currentDailyLimit);
+  }, [currentDailyLimit]);
 
   const cosSubscriptionMutation = useMutation({
     mutationFn: ({ userId, active }: { userId: string; active: boolean }) =>
@@ -1159,15 +1187,68 @@ export default function AdminPortal() {
           <div>
             <div className="text-center mb-8 sm:mb-12">
               <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-3 sm:mb-4">
-                Account Settings
+                System Settings
               </h2>
               <p className="text-sm sm:text-lg text-gray-600 dark:text-gray-400 max-w-3xl mx-auto px-2">
-                Manage your admin account security and preferences
+                Control global verification behaviour and admin account settings
               </p>
             </div>
-            
-            <div className="flex justify-center">
-              <Card className="max-w-md">
+
+            <div className="flex flex-col items-center gap-6">
+              {/* Global Verification Defaults */}
+              <Card className="w-full max-w-xl">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Settings className="w-5 h-5 text-blue-600" />
+                    System-Wide Verification Defaults
+                  </CardTitle>
+                  <CardDescription>
+                    These settings apply to all registered users who have not been given an individual limit.
+                    Changes take effect immediately for all current and future users.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-5">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Default Daily COS Check Limit
+                    </label>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Enter <strong>1</strong> for one check per day (default), <strong>-1</strong> for unlimited, or any positive integer for a custom cap.
+                    </p>
+                    <div className="flex gap-3">
+                      <Input
+                        type="number"
+                        min={-1}
+                        value={globalLimitInput}
+                        onChange={(e) => setGlobalLimitInput(e.target.value)}
+                        className="w-36"
+                        placeholder="e.g. 1"
+                      />
+                      <Button
+                        onClick={() => {
+                          const parsed = parseInt(globalLimitInput, 10);
+                          if (isNaN(parsed) || (parsed !== -1 && parsed < 1)) {
+                            toast({ title: 'Invalid value', description: 'Enter -1 for unlimited or a positive integer.', variant: 'destructive' });
+                            return;
+                          }
+                          updateSettingMutation.mutate({ key: 'defaultDailyLimit', value: String(parsed) });
+                        }}
+                        disabled={updateSettingMutation.isPending}
+                      >
+                        {updateSettingMutation.isPending ? 'Saving…' : 'Save'}
+                      </Button>
+                    </div>
+                    <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                      <span className="inline-block px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800 font-mono">
+                        Current: {currentDailyLimit === '-1' ? 'Unlimited' : `${currentDailyLimit} / day`}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Admin Authentication card */}
+              <Card className="w-full max-w-xl">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     Admin Authentication
