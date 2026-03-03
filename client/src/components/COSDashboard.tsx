@@ -21,6 +21,14 @@ interface VerificationResult {
 
 export default function COSDashboard() {
   const { user, isLoading: authLoading, isAuthenticated, isAdmin } = useAuth();
+
+  // Users with any form of elevated access bypass the localStorage daily gate
+  const hasElevatedAccess =
+    isAdmin ||
+    user?.cosCheckApproved === true ||
+    user?.cosCheckSubscription === true ||
+    (user?.verificationLimit !== null && user?.verificationLimit !== undefined);
+
   const [showFreeCheck, setShowFreeCheck] = useState(false);
   const [showDemo, setShowDemo] = useState(false);
   const [demoStep, setDemoStep] = useState(0);
@@ -38,9 +46,9 @@ export default function COSDashboard() {
     setTimeout(() => setCheckingStatus(false), 1500);
   };
 
-  // Check if user has used their free verification today (skipped for admin)
+  // Check if user has used their free verification today (skipped for elevated access)
   useEffect(() => {
-    if (isAdmin) {
+    if (hasElevatedAccess) {
       setHasUsedFreeCheck(false);
       return;
     }
@@ -52,11 +60,11 @@ export default function COSDashboard() {
     } else {
       setHasUsedFreeCheck(false);
     }
-  }, [isAdmin]);
+  }, [hasElevatedAccess]);
 
   const handleFileUpload = async (file: File) => {
-    if (isAdmin) return;
-    // Mark free check as used for non-admin users
+    if (hasElevatedAccess) return;
+    // Mark free check as used for standard free users only
     const today = new Date().toDateString();
     localStorage.setItem('lastFreeCheck', today);
     setHasUsedFreeCheck(true);
@@ -517,9 +525,15 @@ export default function COSDashboard() {
             <div className="p-6">
               {!verificationResult ? (
                 <div>
-                  {(!hasUsedFreeCheck || isAdmin) ? (
+                  {(!hasUsedFreeCheck || hasElevatedAccess) ? (
                     <>
-                      <div className={`mb-6 p-4 rounded-lg border ${isAdmin ? 'bg-blue-50 border-blue-200' : 'bg-green-50 border-green-200'}`}>
+                      <div className={`mb-6 p-4 rounded-lg border ${
+                        isAdmin
+                          ? 'bg-blue-50 border-blue-200'
+                          : hasElevatedAccess
+                            ? 'bg-green-50 border-green-200'
+                            : 'bg-green-50 border-green-200'
+                      }`}>
                         <div className="flex items-center gap-3">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isAdmin ? 'bg-blue-600' : 'bg-green-500'}`}>
                             <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -528,10 +542,18 @@ export default function COSDashboard() {
                           </div>
                           <div>
                             <h3 className={`font-semibold ${isAdmin ? 'text-blue-800' : 'text-green-800'}`}>
-                              {isAdmin ? 'Admin — Unlimited Verification' : 'Free Verification Available'}
+                              {isAdmin
+                                ? 'Admin — Unlimited Verification'
+                                : hasElevatedAccess
+                                  ? 'Approved Access — Your checks are ready'
+                                  : 'Free Verification Available'}
                             </h3>
                             <p className={`text-sm ${isAdmin ? 'text-blue-700' : 'text-green-700'}`}>
-                              {isAdmin ? 'No usage limits apply to your admin account' : 'Upload your document to verify its authenticity instantly'}
+                              {isAdmin
+                                ? 'No usage limits apply to your admin account'
+                                : hasElevatedAccess
+                                  ? 'Upload your COS document to verify its authenticity'
+                                  : 'Upload your document to verify its authenticity instantly'}
                             </p>
                           </div>
                         </div>
@@ -543,7 +565,7 @@ export default function COSDashboard() {
                         onLoading={handleLoading}
                         onError={handleError}
                         isAdmin={isAdmin}
-                        restrictToOneCheck={!isAdmin}
+                        restrictToOneCheck={!hasElevatedAccess}
                       />
                     </>
                   ) : (
