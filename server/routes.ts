@@ -2917,6 +2917,43 @@ Format your response in clear, professional markdown.`;
       const { restricted, reason } = req.body;
       
       await storage.updateUserRestriction(userId, restricted, reason);
+
+      const targetUser = await storage.getUser(userId);
+      const apiKey = process.env.RESEND_API_KEY;
+      if (apiKey && targetUser?.email) {
+        const html = restricted
+          ? `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+              <div style="background:linear-gradient(135deg,#dc2626 0%,#ef4444 100%);padding:28px;border-radius:10px 10px 0 0;">
+                <h1 style="color:#fff;margin:0;text-align:center;font-size:20px;">Account Restricted</h1>
+              </div>
+              <div style="background:#fff;padding:28px;border:1px solid #e0e0e0;border-top:none;border-radius:0 0 10px 10px;">
+                <p style="color:#333;font-size:15px;margin-top:0;">Your CheckByAI account has been restricted${reason ? `: <strong>${reason}</strong>` : '.'}</p>
+                <p style="color:#333;font-size:15px;">If you believe this is a mistake, please contact us at <a href="mailto:support@checkbyai.net" style="color:#1d4ed8;">support@checkbyai.net</a>.</p>
+              </div>
+            </div>`
+          : `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+              <div style="background:linear-gradient(135deg,#16a34a 0%,#22c55e 100%);padding:28px;border-radius:10px 10px 0 0;">
+                <h1 style="color:#fff;margin:0;text-align:center;font-size:20px;">Account Restriction Removed</h1>
+              </div>
+              <div style="background:#fff;padding:28px;border:1px solid #e0e0e0;border-top:none;border-radius:0 0 10px 10px;">
+                <p style="color:#333;font-size:15px;margin-top:0;">Good news — the restriction on your CheckByAI account has been lifted. You now have full access again.</p>
+                <div style="text-align:center;margin:24px 0;">
+                  <a href="https://checkbyai.net/dashboard" style="background:#16a34a;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:15px;display:inline-block;">Go to Dashboard</a>
+                </div>
+                <p style="color:#999;font-size:12px;margin-top:24px;text-align:center;">Questions? <a href="mailto:support@checkbyai.net" style="color:#1d4ed8;">support@checkbyai.net</a></p>
+              </div>
+            </div>`;
+        fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+          body: JSON.stringify({
+            from: "CheckByAI <noreply@checkbyai.net>",
+            to: [targetUser.email],
+            subject: restricted ? "Your CheckByAI account has been restricted" : "Your CheckByAI account restriction has been removed",
+            html,
+          }),
+        }).catch(err => console.error("[Restrict] Email error:", err));
+      }
       
       res.json({ 
         message: restricted ? 'User has been restricted' : 'User restriction removed',
@@ -2951,6 +2988,35 @@ Format your response in clear, professional markdown.`;
       let limitDescription = 'Default (1/day)';
       if (limit === -1) limitDescription = 'Unlimited';
       else if (limit !== null && limit > 0) limitDescription = `${limit} verifications`;
+
+      const apiKey = process.env.RESEND_API_KEY;
+      if (apiKey && updatedUser.email) {
+        const html = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+          <div style="background:linear-gradient(135deg,#1d4ed8 0%,#3b82f6 100%);padding:28px;border-radius:10px 10px 0 0;">
+            <h1 style="color:#fff;margin:0;text-align:center;font-size:20px;">Verification Limit Updated</h1>
+          </div>
+          <div style="background:#fff;padding:28px;border:1px solid #e0e0e0;border-top:none;border-radius:0 0 10px 10px;">
+            <p style="color:#333;font-size:15px;margin-top:0;">Your COS verification limit has been updated by an administrator.</p>
+            <div style="background:#f0f4ff;padding:16px;border-radius:8px;margin:16px 0;text-align:center;">
+              <span style="font-size:22px;font-weight:bold;color:#1d4ed8;">${limitDescription}</span>
+            </div>
+            <div style="text-align:center;margin:24px 0;">
+              <a href="https://checkbyai.net/dashboard" style="background:#1d4ed8;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:15px;display:inline-block;">Go to Dashboard</a>
+            </div>
+            <p style="color:#999;font-size:12px;margin-top:24px;text-align:center;">Questions? <a href="mailto:support@checkbyai.net" style="color:#1d4ed8;">support@checkbyai.net</a></p>
+          </div>
+        </div>`;
+        fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+          body: JSON.stringify({
+            from: "CheckByAI <noreply@checkbyai.net>",
+            to: [updatedUser.email],
+            subject: "Your COS verification limit has been updated",
+            html,
+          }),
+        }).catch(err => console.error("[Limit] Email error:", err));
+      }
       
       res.json({ 
         message: `Verification limit set to: ${limitDescription}`,
@@ -2980,34 +3046,43 @@ Format your response in clear, professional markdown.`;
         return res.status(404).json({ message: 'User not found' });
       }
 
-      // Send approval email to user
-      if (approved && updatedUser.email) {
+      // Send email to user on approval or revocation
+      if (updatedUser.email) {
         const apiKey = process.env.RESEND_API_KEY;
         if (apiKey) {
-          const html = `
-            <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
-              <div style="background:linear-gradient(135deg,#1d4ed8 0%,#3b82f6 100%);padding:28px;border-radius:10px 10px 0 0;">
-                <h1 style="color:#fff;margin:0;text-align:center;font-size:20px;">&#127381; CoS Check Beta Access Approved</h1>
-              </div>
-              <div style="background:#fff;padding:28px;border:1px solid #e0e0e0;border-top:none;border-radius:0 0 10px 10px;">
-                <p style="color:#333;font-size:15px;margin-top:0;">Great news — your account has been approved for <strong>CoS Check Beta</strong>.</p>
-                <p style="color:#333;font-size:15px;">You can now upload and verify Certificates of Sponsorship using our forensic AI detection system.</p>
-                <div style="text-align:center;margin:24px 0;">
-                  <a href="https://checkbyai.net/dashboard" style="background:#1d4ed8;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:15px;display:inline-block;">Start Verifying</a>
+          const html = approved
+            ? `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+                <div style="background:linear-gradient(135deg,#1d4ed8 0%,#3b82f6 100%);padding:28px;border-radius:10px 10px 0 0;">
+                  <h1 style="color:#fff;margin:0;text-align:center;font-size:20px;">&#127381; CoS Check Access Approved</h1>
                 </div>
-                <p style="color:#999;font-size:12px;margin-top:24px;text-align:center;">Questions? Contact us at <a href="mailto:support@checkbyai.net" style="color:#1d4ed8;">support@checkbyai.net</a></p>
-              </div>
-            </div>`;
+                <div style="background:#fff;padding:28px;border:1px solid #e0e0e0;border-top:none;border-radius:0 0 10px 10px;">
+                  <p style="color:#333;font-size:15px;margin-top:0;">Great news — your account has been approved for <strong>CoS Check</strong>.</p>
+                  <p style="color:#333;font-size:15px;">You can now upload and verify Certificates of Sponsorship using our forensic AI detection system.</p>
+                  <div style="text-align:center;margin:24px 0;">
+                    <a href="https://checkbyai.net/dashboard" style="background:#1d4ed8;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:15px;display:inline-block;">Start Verifying</a>
+                  </div>
+                  <p style="color:#999;font-size:12px;margin-top:24px;text-align:center;">Questions? <a href="mailto:support@checkbyai.net" style="color:#1d4ed8;">support@checkbyai.net</a></p>
+                </div>
+              </div>`
+            : `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+                <div style="background:linear-gradient(135deg,#6b7280 0%,#9ca3af 100%);padding:28px;border-radius:10px 10px 0 0;">
+                  <h1 style="color:#fff;margin:0;text-align:center;font-size:20px;">CoS Check Access Removed</h1>
+                </div>
+                <div style="background:#fff;padding:28px;border:1px solid #e0e0e0;border-top:none;border-radius:0 0 10px 10px;">
+                  <p style="color:#333;font-size:15px;margin-top:0;">Your CoS Check access has been removed by an administrator.</p>
+                  <p style="color:#333;font-size:15px;">If you believe this is a mistake, please contact us at <a href="mailto:support@checkbyai.net" style="color:#1d4ed8;">support@checkbyai.net</a>.</p>
+                </div>
+              </div>`;
           fetch("https://api.resend.com/emails", {
             method: "POST",
             headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
             body: JSON.stringify({
-              from: "CheckByAI <no-reply@checkbyai.net>",
+              from: "CheckByAI <noreply@checkbyai.net>",
               to: [updatedUser.email],
-              subject: "Your CoS Check beta access has been approved",
+              subject: approved ? "Your CoS Check access has been approved" : "Your CoS Check access has been removed",
               html,
             }),
-          }).catch(err => console.error("[Beta Approval] Email error:", err));
+          }).catch(err => console.error("[CoS Approval] Email error:", err));
         }
       }
 
@@ -3074,10 +3149,67 @@ Format your response in clear, professional markdown.`;
         return res.status(400).json({ message: 'active must be a boolean' });
       }
       await storage.updateCosCheckSubscription(userId, active);
+
+      const targetUser = await storage.getUser(userId);
+      const apiKey = process.env.RESEND_API_KEY;
+      if (apiKey && targetUser?.email) {
+        const html = active
+          ? `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+              <div style="background:linear-gradient(135deg,#059669 0%,#10b981 100%);padding:28px;border-radius:10px 10px 0 0;">
+                <h1 style="color:#fff;margin:0;text-align:center;font-size:20px;">&#127881; COS Check Subscription Activated</h1>
+              </div>
+              <div style="background:#fff;padding:28px;border:1px solid #e0e0e0;border-top:none;border-radius:0 0 10px 10px;">
+                <p style="color:#333;font-size:15px;margin-top:0;">Your <strong>COS Check subscription</strong> has been activated. You now have full access to COS document verification.</p>
+                <div style="text-align:center;margin:24px 0;">
+                  <a href="https://checkbyai.net/dashboard" style="background:#059669;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:15px;display:inline-block;">Start Verifying</a>
+                </div>
+                <p style="color:#999;font-size:12px;margin-top:24px;text-align:center;">Questions? <a href="mailto:support@checkbyai.net" style="color:#1d4ed8;">support@checkbyai.net</a></p>
+              </div>
+            </div>`
+          : `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+              <div style="background:linear-gradient(135deg,#6b7280 0%,#9ca3af 100%);padding:28px;border-radius:10px 10px 0 0;">
+                <h1 style="color:#fff;margin:0;text-align:center;font-size:20px;">COS Check Subscription Deactivated</h1>
+              </div>
+              <div style="background:#fff;padding:28px;border:1px solid #e0e0e0;border-top:none;border-radius:0 0 10px 10px;">
+                <p style="color:#333;font-size:15px;margin-top:0;">Your COS Check subscription has been deactivated.</p>
+                <p style="color:#333;font-size:15px;">If you have questions, please contact us at <a href="mailto:support@checkbyai.net" style="color:#1d4ed8;">support@checkbyai.net</a>.</p>
+              </div>
+            </div>`;
+        fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+          body: JSON.stringify({
+            from: "CheckByAI <noreply@checkbyai.net>",
+            to: [targetUser.email],
+            subject: active ? "Your COS Check subscription has been activated" : "Your COS Check subscription has been deactivated",
+            html,
+          }),
+        }).catch(err => console.error("[COS Subscription] Email error:", err));
+      }
+
       res.json({ message: active ? 'COS check subscription activated' : 'COS check subscription deactivated', userId, cosCheckSubscription: active });
     } catch (error) {
       console.error("Error updating COS check subscription:", error);
       res.status(500).json({ message: "Failed to update COS check subscription" });
+    }
+  });
+
+  // Delete a user (admin only — cannot delete admin accounts)
+  app.delete('/api/admin/users/:id', isAdmin, async (req: any, res) => {
+    try {
+      const userId = req.params.id;
+      const targetUser = await storage.getUser(userId);
+      if (!targetUser) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      if (targetUser.role === 'admin') {
+        return res.status(403).json({ message: 'Admin accounts cannot be deleted' });
+      }
+      await storage.deleteUser(userId);
+      res.json({ message: 'User deleted successfully', userId });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({ message: "Failed to delete user" });
     }
   });
 

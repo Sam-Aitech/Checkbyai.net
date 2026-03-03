@@ -51,6 +51,7 @@ export interface IStorage {
   updateCosCheckApproval(userId: string, approved: boolean): Promise<void>;
   updateIpExempt(userId: string, exempt: boolean): Promise<void>;
   updateCosCheckSubscription(userId: string, active: boolean): Promise<void>;
+  deleteUser(userId: string): Promise<void>;
 
   // System settings operations
   getSystemSetting(key: string): Promise<string | null>;
@@ -418,6 +419,10 @@ export class DatabaseStorage implements IStorage {
         updatedAt: new Date(),
       })
       .where(eq(users.id, userId));
+  }
+
+  async deleteUser(userId: string): Promise<void> {
+    await db.delete(users).where(eq(users.id, userId));
   }
 
   // System settings operations

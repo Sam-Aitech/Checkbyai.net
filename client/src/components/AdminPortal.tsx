@@ -14,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import FeedbackAnalytics from "./FeedbackAnalytics";
 
 export default function AdminPortal() {
@@ -34,6 +35,9 @@ export default function AdminPortal() {
 
   // System settings state
   const [globalLimitInput, setGlobalLimitInput] = useState("");
+
+  // Delete user confirmation state
+  const [userToDelete, setUserToDelete] = useState<{ id: string; name: string } | null>(null);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -189,9 +193,22 @@ export default function AdminPortal() {
       apiRequest('POST', `/api/admin/users/${userId}/restrict`, { restricted }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
-      toast({ title: 'Updated', description: 'User restriction updated.' });
+      toast({ title: 'Updated', description: 'User restriction updated. Email sent to user.' });
     },
     onError: () => toast({ title: 'Error', description: 'Failed to update restriction.', variant: 'destructive' }),
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: (userId: string) => apiRequest('DELETE', `/api/admin/users/${userId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      setUserToDelete(null);
+      toast({ title: 'User deleted', description: 'The user account has been permanently removed.' });
+    },
+    onError: () => {
+      setUserToDelete(null);
+      toast({ title: 'Error', description: 'Failed to delete user.', variant: 'destructive' });
+    },
   });
 
   const [selectedSubmission, setSelectedSubmission] = useState<PaidSubmission | null>(null);
@@ -1551,15 +1568,50 @@ export default function AdminPortal() {
                               <p className="text-sm text-gray-500 dark:text-gray-400 italic">Admin accounts cannot be modified from this panel.</p>
                             )}
 
-                            <p className="text-xs text-gray-400 dark:text-gray-600">
-                              Credits: {u.credits ?? 0} &bull; Member since: {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'Unknown'} &bull; ID: {u.id}
-                            </p>
+                            <div className="flex items-center justify-between mt-1">
+                              <p className="text-xs text-gray-400 dark:text-gray-600">
+                                Credits: {u.credits ?? 0} &bull; Member since: {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'Unknown'} &bull; ID: {u.id}
+                              </p>
+                              {u.role !== 'admin' && (
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  className="h-7 text-xs gap-1"
+                                  onClick={() => setUserToDelete({ id: u.id, name: displayName })}
+                                  disabled={deleteUserMutation.isPending}
+                                >
+                                  <Trash2 className="w-3 h-3" /> Delete User
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         )}
                       </div>
                     );
                   })}
                 </div>
+
+                {/* Delete user confirmation dialog */}
+                <AlertDialog open={!!userToDelete} onOpenChange={(open) => { if (!open) setUserToDelete(null); }}>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete User Account</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Are you sure you want to permanently delete <strong>{userToDelete?.name}</strong>? This action cannot be undone and will remove all their data.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel disabled={deleteUserMutation.isPending}>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-red-600 hover:bg-red-700 text-white"
+                        disabled={deleteUserMutation.isPending}
+                        onClick={() => userToDelete && deleteUserMutation.mutate(userToDelete.id)}
+                      >
+                        {deleteUserMutation.isPending ? 'Deleting…' : 'Delete Permanently'}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
 
                 {/* Pagination */}
                 {usersData && usersData.totalPages > 1 && (
