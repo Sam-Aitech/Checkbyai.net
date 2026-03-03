@@ -4,11 +4,11 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { storage } from "./storage";
 
-// T004: Startup validation — fail fast if critical env vars are missing
+// Startup validation — fail fast if truly critical env vars are missing
+// ADMIN_EMAIL is intentionally excluded: the app handles its absence gracefully (admin emails disabled)
 const REQUIRED_ENV_VARS = [
   "DATABASE_URL",
   "SESSION_SECRET",
-  "ADMIN_EMAIL",
   "PHONE_ENCRYPTION_KEY",
   "IP_HASH_SALT",
   "CHECKOUT_HMAC_SECRET",
