@@ -44,3 +44,5 @@ integrations = ["javascript_log_in_with_replit:1.0.0", "javascript_database:1.0.
 
 [userenv.shared]
 ADMIN_EMAIL = "ptel437@gmail.com"
+git remote add origin https://github.com/Sam-Aitech/Checkbyai.net.git    
+git push -u origin main  
