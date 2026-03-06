@@ -24,9 +24,6 @@ export default function Dashboard() {
   const [error, setError] = useState('');
 
   const handleFileUpload = (uploadedFile: File) => {
-    console.log('=== DASHBOARD HANDLEFILEUPLOAD DEBUG ===');
-    console.log('Received file - now handled by FileUpload component directly');
-    
     setFile(uploadedFile);
     setResult(null);
     setError('');

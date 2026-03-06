@@ -120,8 +120,6 @@ const KNOWN_GENUINE_PRODUCERS = [
 export class PDFAnalyzer {
   async extractMetadata(filePath: string): Promise<PDFMetadata> {
     try {
-      console.log(`=== PDF FORENSIC ANALYZER: Extracting metadata from ${filePath} ===`);
-      
       const buffer = await fs.promises.readFile(filePath);
       const pdfString = buffer.toString('binary');
       

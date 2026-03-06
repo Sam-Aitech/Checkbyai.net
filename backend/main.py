@@ -265,12 +265,6 @@ async def verify_cos(file: UploadFile = File(...)):
         # Extract metadata using AI engine
         metadata = await ai_engine.extract_metadata(temp_path)
         
-        print(f"=== EXTRACTED METADATA DEBUG ===")
-        print(f"Metadata keys: {list(metadata.keys())}")
-        if 'xmp_tags' in metadata:
-            print(f"XMP tags found: {metadata['xmp_tags']}")
-        else:
-            print("No XMP tags in metadata")
         
         # Remove temporary file
         os.remove(temp_path)
