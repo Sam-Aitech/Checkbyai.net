@@ -10,6 +10,7 @@ packages = ["freetype", "glibcLocales", "gumbo", "harfbuzz", "imagemagick", "jbi
 deploymentTarget = "autoscale"
 build = ["npm", "run", "build"]
 run = ["npm", "run", "start"]
+publicDir = "dist/public"
 
 [[ports]]
 localPort = 5000
