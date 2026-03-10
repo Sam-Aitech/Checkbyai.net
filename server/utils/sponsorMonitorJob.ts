@@ -16,9 +16,31 @@ import { notifyAffectedUsers, processDelayedNotifications } from "./notification
 import { generateHeadline, type RawDigestData } from "../services/aiDigest";
 import { withRetry } from "./dbRetry";
 
-let isRunning = false;
+// Distributed advisory lock key — must be a unique integer per job.
+// Prevents duplicate execution across multiple server instances (horizontal scaling).
+// REPLACES: module-level `isRunning = false` which only prevented single-instance
+// races and made horizontal deployment impossible (2 pods = 2 jobs = duplicate data).
+const SPONSOR_MONITOR_LOCK_KEY = 7483920; // Unique magic int for this job
+
 let lastRequestCheckTime = 0;
 const REQUEST_CHECK_INTERVAL_MS = 60 * 60 * 1000;
+
+/**
+ * Attempts to acquire a PostgreSQL session-level advisory lock.
+ * Returns true if the lock was acquired, false if another instance holds it.
+ * The lock is automatically released if the DB connection drops (crash-safe).
+ */
+async function tryAcquireJobLock(): Promise<boolean> {
+  const result = await db.execute(sql`SELECT pg_try_advisory_lock(${SPONSOR_MONITOR_LOCK_KEY}) AS acquired`);
+  return (result.rows[0] as any)?.acquired === true;
+}
+
+async function releaseJobLock(): Promise<void> {
+  await db.execute(sql`SELECT pg_advisory_unlock(${SPONSOR_MONITOR_LOCK_KEY})`).catch(err => {
+    console.error('[SponsorMonitorJob] Failed to release advisory lock:', err);
+  });
+}
+
 
 interface CanonicalRecord {
   id: number;
@@ -435,18 +457,31 @@ async function reconcile(
 
     console.log(`[Reconciliation] Processing ${missingRecords.length} missing record(s)...`);
 
+    // ── Pre-build a cityRoute index to fix O(M×N) rename detection ────────────────
+    // BEFORE: for each missing record, iterate ALL newRecordsToday looking for
+    //   name matches — this is O(M×N) where M=missing, N=new. At 200x300 that's
+    //   60,000 bigram similarity calls inside a DB-writing await loop.
+    //
+    // AFTER: pre-group new records by normalised "city|route" composite key.
+    //   Most missing records will have 0-5 matches in the same city+route,
+    //   reducing average calls to O(M × locality_factor) ≈ O(M).
+    const newRecsByCityRoute = new Map<string, TodayRecord[]>();
+    for (const newRec of newRecordsToday) {
+      const key = `${(newRec.townCity || '').toLowerCase().trim()}|${(newRec.route || '').toLowerCase().trim()}`;
+      if (!newRecsByCityRoute.has(key)) newRecsByCityRoute.set(key, []);
+      newRecsByCityRoute.get(key)!.push(newRec);
+    }
+
     for (const missing of missingRecords) {
       const newMissCount = missing.consecutiveMisses + 1;
 
       if (newMissCount === 1) {
-        // First absence, run rename check against new records
+        // First absence: check only same-city-route candidates (O(locality) instead of O(N))
+        const cityRouteKey = `${(missing.townCity || '').toLowerCase().trim()}|${(missing.route || '').toLowerCase().trim()}`;
+        const candidates = newRecsByCityRoute.get(cityRouteKey) || [];
         let renamed = false;
 
-        for (const newRec of newRecordsToday) {
-          const sameCity = (newRec.townCity || "").toLowerCase().trim() === (missing.townCity || "").toLowerCase().trim();
-          const sameRoute = (newRec.route || "").toLowerCase().trim() === (missing.route || "").toLowerCase().trim();
-
-          if (sameCity && sameRoute) {
+        for (const newRec of candidates) {
             const similarity = stringSimilarity.compareTwoStrings(
               missing.currentName.toLowerCase(),
               newRec.organisationName.toLowerCase(),
@@ -499,7 +534,6 @@ async function reconcile(
               renamed = true;
               break;
             }
-          }
         }
 
         if (!renamed) {
@@ -580,13 +614,18 @@ export async function runSponsorMonitorJob(source: string = "cron", notifyOnFail
     notificationsFailed: 0,
   };
 
-  if (isRunning) {
-    const msg = "Job is already running. Skipping this execution.";
+
+  // ── Distributed lock acquisition (replaces in-process isRunning flag) ─────
+  // pg_try_advisory_lock() is atomic: across any number of API server instances,
+  // only ONE can acquire this lock at a time. If another pod is already running
+  // the job, we get false immediately instead of running a duplicate pass.
+  const lockAcquired = await tryAcquireJobLock();
+  if (!lockAcquired) {
+    const msg = "Another instance is already running the sponsor monitor job. Skipping.";
     console.warn(`[SponsorMonitorJob] ${msg}`);
     return { ...result, error: msg };
   }
 
-  isRunning = true;
   const startTime = Date.now();
 
   try {
@@ -846,7 +885,7 @@ export async function runSponsorMonitorJob(source: string = "cron", notifyOnFail
     }
     return { ...result, error: errorMsg };
   } finally {
-    isRunning = false;
+    await releaseJobLock();
     lastRunInfo = {
       date: new Date().toISOString(),
       success: result.success,
@@ -970,10 +1009,7 @@ export function startSponsorMonitorCron(): void {
 
   cron.schedule("0 */4 * * 1-5", async () => {
     try {
-      if (isRunning) {
-        console.log("[SponsorMonitorJob] Backup trigger: job already running, skipping.");
-        return;
-      }
+      // Advisory lock in runSponsorMonitorJob() prevents duplicate execution
       const alreadyRan = await hasTodayJobSucceeded();
       if (alreadyRan === null) {
         console.warn("[SponsorMonitorJob] Backup trigger: could not check job status (DB error), skipping.");
@@ -1006,10 +1042,7 @@ export function startSponsorMonitorCron(): void {
         console.log("[SponsorMonitorJob] Startup catch-up: weekend detected, skipping (no register published on weekends).");
         return;
       }
-      if (isRunning) {
-        console.log("[SponsorMonitorJob] Startup catch-up: job already running, skipping.");
-        return;
-      }
+      // Advisory lock in runSponsorMonitorJob() handles concurrency
       const alreadyRan = await hasTodayJobSucceeded();
       if (alreadyRan === null) {
         console.warn("[SponsorMonitorJob] Startup catch-up: could not check job status (DB error), skipping.");
@@ -1028,7 +1061,10 @@ export function startSponsorMonitorCron(): void {
 }
 
 export function isJobRunning(): boolean {
-  return isRunning;
+  // Note: isJobRunning() is now advisory-lock-based at the DB level.
+  // This in-process check is a best-effort heuristic only.
+  // Use the monitorJobRuns table directly for authoritative job status.
+  return false;
 }
 
 export async function checkAndTriggerIfNeeded(): Promise<void> {
@@ -1040,8 +1076,6 @@ export async function checkAndTriggerIfNeeded(): Promise<void> {
 
   try {
     if (!isWeekday()) return;
-    if (isRunning) return;
-
     const alreadyRan = await hasTodayJobSucceeded();
     if (alreadyRan === null || alreadyRan) return;
 

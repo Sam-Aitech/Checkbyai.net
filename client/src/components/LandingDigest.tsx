@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { useInView } from "react-intersection-observer";
-import { TrendingDown, TrendingUp, RefreshCw, Bell, ArrowRight, Shield } from "lucide-react";
+import { ArrowRight, Bell } from "lucide-react";
+import { ShieldMonitorIcon, AlertBellIcon, TripleChannelIcon } from "@/components/icons/CheckByAIIcons";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 
@@ -141,8 +142,8 @@ export default function LandingDigest() {
           className={`relative overflow-hidden rounded-2xl border bg-gradient-to-br ${borderStyle} p-8 sm:p-10`}
         >
           <div className="absolute top-4 right-4">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="badge-live">
+              <span className="badge-live-dot" />
               Live Data
             </span>
           </div>
@@ -156,13 +157,13 @@ export default function LandingDigest() {
               <AnimatedCounter
                 value={activeSponsors}
                 label="Active Licensed Sponsors on the UK Register"
-                icon={<Shield className="w-5 h-5 text-emerald-600" />}
+                icon={<ShieldMonitorIcon size={20} />}
                 color="bg-emerald-500/15"
                 large
               />
             )}
 
-            <div className="w-16 h-px bg-border mx-auto my-5" />
+            <div className="w-16 h-px mx-auto my-5 bg-gradient-to-r from-transparent via-border to-transparent" />
 
             <h2 className="text-2xl sm:text-3xl font-bold text-foreground leading-tight">
               {headline}
@@ -180,19 +181,19 @@ export default function LandingDigest() {
                 <AnimatedCounter
                   value={counts.removed}
                   label="Revoked"
-                  icon={<TrendingDown className="w-5 h-5 text-red-500" />}
+                  icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4 11H8v-2h8v2z" fill="#ef4444" opacity="0.8"/></svg>}
                   color="bg-red-500/10"
                 />
                 <AnimatedCounter
                   value={counts.updated}
                   label="Updated"
-                  icon={<RefreshCw className="w-5 h-5 text-amber-500" />}
+                  icon={<TripleChannelIcon size={20} />}
                   color="bg-amber-500/10"
                 />
                 <AnimatedCounter
                   value={counts.added}
                   label="New Licences"
-                  icon={<TrendingUp className="w-5 h-5 text-emerald-500" />}
+                  icon={<ShieldMonitorIcon size={20} />}
                   color="bg-emerald-500/10"
                 />
               </>
@@ -201,19 +202,19 @@ export default function LandingDigest() {
                 <AnimatedCounter
                   value={counts.added}
                   label="Active Licences"
-                  icon={<TrendingUp className="w-5 h-5 text-emerald-500" />}
+                  icon={<ShieldMonitorIcon size={20} />}
                   color="bg-emerald-500/10"
                 />
                 <AnimatedCounter
                   value={counts.removed}
                   label="Revoked"
-                  icon={<TrendingDown className="w-5 h-5 text-red-500" />}
+                  icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4 11H8v-2h8v2z" fill="#ef4444" opacity="0.8"/></svg>}
                   color="bg-red-500/10"
                 />
                 <AnimatedCounter
                   value={counts.updated}
                   label="Changes Today"
-                  icon={<RefreshCw className="w-5 h-5 text-amber-500" />}
+                  icon={<TripleChannelIcon size={20} />}
                   color="bg-amber-500/10"
                 />
               </>

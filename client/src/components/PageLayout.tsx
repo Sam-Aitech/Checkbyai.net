@@ -4,7 +4,7 @@ import UserProfile from "./UserProfile";
 import Footer from "./Footer";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import logoImg from "@assets/Checkbyai.net_(250_x_80_px)_(1)_1770958528706.png";
+import logoImg from "@assets/logo_material.png";
 
 interface PageLayoutProps {
   children: React.ReactNode;
@@ -33,17 +33,17 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
           <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
             <div className="flex justify-between items-center h-16">
               <Link href="/" className="flex items-center shrink-0">
-                <img src={logoImg} alt="CheckByAi.net" className="h-8 w-auto" width={250} height={80} />
+                <img src={logoImg} alt="CheckByAi.net" className="h-10 sm:h-12 w-auto object-contain" />
               </Link>
 
-              <div className="hidden lg:flex items-center gap-1">
+              <div className="hidden lg:flex items-center gap-2">
                 {navLinks.map((link) => (
                   <Link
                     key={link.href}
                     href={link.href}
-                    className={`px-4 py-2 text-sm font-medium transition-all duration-200 rounded-full ${
+                    className={`px-4 py-2 text-sm font-medium transition-all duration-200 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                       location === link.href
-                        ? "text-primary bg-primary/10"
+                        ? "text-primary bg-primary/20 font-semibold"
                         : "text-muted-foreground hover:text-foreground hover:bg-muted"
                     }`}
                   >
@@ -53,9 +53,14 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
               </div>
 
               <div className="flex items-center gap-3">
+                <div className="hidden sm:flex items-center mr-2">
+                  <Link href="/pricing" className="px-5 py-2 text-sm font-semibold text-white bg-primary hover:bg-primary/90 rounded-full shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
+                    Get Alerts
+                  </Link>
+                </div>
                 <UserProfile />
                 <button
-                  className="lg:hidden p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  className="lg:hidden p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                   onClick={() => setMobileOpen(!mobileOpen)}
                   aria-label="Toggle navigation menu"
                 >
@@ -80,9 +85,9 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
                       key={link.href}
                       href={link.href}
                       onClick={() => setMobileOpen(false)}
-                      className={`block px-4 py-3 text-sm font-medium rounded-xl transition-colors ${
+                      className={`block px-4 py-3 text-sm font-medium rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                         location === link.href
-                          ? "text-primary bg-primary/10"
+                          ? "text-primary bg-primary/20 font-semibold"
                           : "text-muted-foreground hover:text-foreground hover:bg-muted"
                       }`}
                     >
@@ -96,7 +101,20 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
         </nav>
       )}
 
-      <main className="flex-1">{children}</main>
+      <main className="flex-1">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={location}
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="w-full h-full"
+          >
+            {children}
+          </motion.div>
+        </AnimatePresence>
+      </main>
 
       {!hideFooter && <Footer />}
     </div>

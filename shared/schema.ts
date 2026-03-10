@@ -79,7 +79,12 @@ export const trustedPatterns = pgTable("trusted_patterns", {
   uploadedAt: timestamp("uploaded_at").defaultNow(),
   lastUpdated: timestamp("last_updated").defaultNow(),
   status: varchar("status").default("active"),
-});
+}, (table) => [
+  // NOTE: GIN indexes on metadata/patterns JSONB columns are applied via
+  // migrations/0001_gin_indexes_jsonb.sql (CREATE INDEX CONCURRENTLY).
+  // Drizzle ORM's DSL does not support jsonb_path_ops operator class syntax.
+  index("idx_tp_status").on(table.status),
+]);
 
 // Global AI rules table for instructions that apply to all documents
 export const globalAiRules = pgTable("global_ai_rules", {
@@ -120,6 +125,9 @@ export const verificationResults = pgTable(
     index("idx_verification_user_id").on(table.userId),
     index("idx_verification_result_date").on(table.result, table.verifiedAt),
     index("idx_verification_admin_status").on(table.adminStatus),
+    // NOTE: GIN indexes on metadata/analysis_details JSONB columns are defined in
+    // migrations/0001_gin_indexes_jsonb.sql. They reduce admin HITL query cost
+    // from O(N) full scan to O(log N) for JSONB key-path lookups.
   ]
 );
 
@@ -384,6 +392,70 @@ export const monitorJobRuns = pgTable("monitor_job_runs", {
   startedAt: timestamp("started_at").defaultNow(),
   completedAt: timestamp("completed_at"),
 });
+
+// ─── Phase C: Company Enrichment & Job Alerts ────────────────────────────────
+
+// Caches Companies House data scraped for each watched sponsor (7 day TTL)
+export const sponsorEnrichment = pgTable(
+  "sponsor_enrichment",
+  {
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+    fingerprint: varchar("fingerprint", { length: 500 }).notNull().unique(),
+    companyNumber: varchar("company_number", { length: 20 }),
+    natureOfBusiness: text("nature_of_business"),
+    registeredAddress: text("registered_address"),
+    websiteUrl: varchar("website_url", { length: 500 }),
+    scrapedAt: timestamp("scraped_at").defaultNow(),
+    scrapeStatus: varchar("scrape_status", { length: 20 }).notNull().default("pending"),
+    lastAttempted: timestamp("last_attempted"),
+  },
+  (table) => [
+    index("idx_enrichment_fingerprint").on(table.fingerprint),
+    index("idx_enrichment_scraped_at").on(table.scrapedAt),
+    index("idx_enrichment_status").on(table.scrapeStatus),
+  ],
+);
+
+// Stores deduplicated job listings found for watched sponsors across job boards
+export const jobListings = pgTable(
+  "job_listings",
+  {
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+    fingerprint: varchar("fingerprint", { length: 500 }).notNull(),
+    title: varchar("title", { length: 500 }).notNull(),
+    location: varchar("location", { length: 300 }),
+    salary: varchar("salary", { length: 200 }),
+    sourceBoard: varchar("source_board", { length: 50 }).notNull(),
+    sourceUrl: text("source_url").notNull(),
+    contentHash: varchar("content_hash", { length: 64 }).notNull().unique(),
+    firstSeen: timestamp("first_seen").defaultNow(),
+    lastSeen: timestamp("last_seen").defaultNow(),
+    isActive: boolean("is_active").notNull().default(true),
+  },
+  (table) => [
+    index("idx_jobs_fingerprint").on(table.fingerprint),
+    index("idx_jobs_first_seen").on(table.firstSeen),
+    index("idx_jobs_active").on(table.isActive),
+  ],
+);
+
+// Per-user per-company opt-in for job opening alerts (Pro plan only)
+export const jobAlertPreferences = pgTable(
+  "job_alert_preferences",
+  {
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+    userId: varchar("user_id", { length: 255 }).notNull(),
+    fingerprint: varchar("fingerprint", { length: 500 }).notNull(),
+    enabled: boolean("enabled").notNull().default(true),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (table) => [
+    index("idx_job_prefs_user_id").on(table.userId),
+    index("idx_job_prefs_fingerprint").on(table.fingerprint),
+    uniqueIndex("idx_job_prefs_unique").on(table.userId, table.fingerprint),
+  ],
+);
 
 // Type exports
 export type DailyDigest = typeof dailyDigest.$inferSelect;

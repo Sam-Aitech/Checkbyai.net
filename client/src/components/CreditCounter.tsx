@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import { CreditCard, Infinity } from 'lucide-react';
+import { Infinity } from 'lucide-react';
 import { getQueryFn } from '@/lib/queryClient';
+import { CreditCoinIcon } from '@/components/icons/CheckByAIIcons';
+import { motion } from 'framer-motion';
 
 interface CreditsData {
   credits: number;
@@ -37,7 +39,7 @@ export default function CreditCounter({ variant = 'default', className = '' }: C
   if (variant === 'compact') {
     return (
       <div className={`flex items-center gap-1 text-sm ${className}`}>
-        <CreditCard className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+        <CreditCoinIcon size={16} />
         {isUnlimited ? (
           <Infinity className="w-4 h-4 text-green-600 dark:text-green-400" />
         ) : (
@@ -48,19 +50,24 @@ export default function CreditCounter({ variant = 'default', className = '' }: C
   }
 
   return (
-    <div className={`flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg text-sm ${className}`}>
-      <CreditCard className="w-4 h-4" />
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ type: 'spring', stiffness: 160, damping: 18 }}
+      className={`shimmer-border inline-flex items-center gap-2 px-3.5 py-1.5 bg-blue-50/80 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 rounded-xl text-sm backdrop-blur-sm border border-blue-200/50 dark:border-blue-800/40 shadow-sm ${className}`}
+    >
+      <CreditCoinIcon size={16} />
       {isUnlimited ? (
         <span className="flex items-center gap-1">
           <Infinity className="w-4 h-4" />
-          <span className="font-medium">Unlimited</span>
+          <span className="font-semibold">Unlimited</span>
         </span>
       ) : (
         <span>
           <span className="font-bold">{credits}</span>
-          <span className="opacity-80 ml-1">credits</span>
+          <span className="opacity-70 ml-1 text-xs">credits</span>
         </span>
       )}
-    </div>
+    </motion.div>
   );
 }

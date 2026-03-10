@@ -1,14 +1,22 @@
+import { cn } from '@/lib/utils'
 import { useState, useEffect, Suspense, lazy } from 'react'
 import { motion } from 'framer-motion'
 import { useInView } from 'react-intersection-observer'
-import { Shield, Zap, Lock, Award, ArrowRight, Play, Bell, Activity, CheckCircle, XCircle, Timer, FileSearch, Wifi, AlertTriangle, ShieldCheck, Eye, Building2, Search, ChevronRight, MapPin, Loader2 } from 'lucide-react'
+import { Zap, Lock, ArrowRight, Play, Bell, Activity, CheckCircle, XCircle, AlertTriangle, ShieldCheck, Eye, Search, MapPin, Loader2 } from 'lucide-react'
+import { ShieldMonitorIcon, AlertBellIcon, DocumentVerifyIcon, TimelineClockIcon, EarlyWarningIcon, CreditCoinIcon,
+  HeroAlertIcon,
+  HeroTrackedIcon,
+  HeroGDPRLockIcon,
+  TripleChannelIcon,
+  UKLockIcon
+} from './icons/CheckByAIIcons';
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Link, useLocation } from 'wouter'
-import logoImg from "@assets/Checkbyai.net_(250_x_80_px)_(1)_1770958528706.png"
+import logoImg from "@assets/logo_material.png";
 import CreditCounter from '@/components/CreditCounter'
 import Footer from '@/components/Footer'
 import LandingDigest from '@/components/LandingDigest'
@@ -106,8 +114,8 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
 
     <div className="min-h-screen bg-background">
       <div className="bg-red-700 text-white">
-        <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2 text-center">
-          <Activity className="w-4 h-4 shrink-0 animate-pulse" />
+        <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2.5 text-center">
+          <span className="urgency-dot shrink-0" aria-hidden="true" />
           <p className="text-xs sm:text-sm font-medium">
             <span className="font-bold">URGENT:</span> 3 sponsor licences revoked in the last 48 hours. Are you monitoring your employer?
           </p>
@@ -124,7 +132,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
           <div className="relative z-10 max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
             <nav className="flex justify-between items-center py-4 mb-6">
               <Link href="/" className="flex items-center gap-2.5">
-                <img src={logoImg} alt="CheckByAi.net" className="h-9 w-auto" width={250} height={80} />
+                <img src={logoImg} alt="CheckByAi.net" className="h-10 sm:h-12 w-auto object-contain" />
               </Link>
               <div className="hidden md:flex items-center gap-1">
                 {[
@@ -161,7 +169,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
 
                 <motion.h1 initial={{ opacity: 0, y: 30 }} animate={isLoaded ? { opacity: 1, y: 0 } : {}} transition={{ ...spring, delay: 0.2 }} className="text-4xl sm:text-5xl lg:text-[3.4rem] editorial-heading text-white leading-[1.1]">
                   Your Sponsor Was Revoked{' '}
-                  <span className="text-red-400">Last Night.</span>
+                  <span className="text-gradient-red">Last Night.</span>
                   <br />
                   <span className="text-white/80">Nobody Told You.</span>
                 </motion.h1>
@@ -186,15 +194,23 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
 
                 <CreditCounter />
 
-                <motion.div initial={{ opacity: 0 }} animate={isLoaded ? { opacity: 1 } : {}} transition={{ ...springGentle, delay: 0.6 }} className="flex items-center gap-6 pt-1 flex-wrap">
+                <motion.div initial={{ opacity: 0 }} animate={isLoaded ? { opacity: 1 } : {}} transition={{ ...springGentle, delay: 0.6 }} className="flex items-center gap-4 sm:gap-6 pt-1 flex-wrap">
                   {[
-                    { icon: <Timer className="w-4 h-4" />, label: "Alerts in 30 min" },
-                    { icon: <Eye className="w-4 h-4" />, label: "47,823 sponsors tracked" },
-                    { icon: <Lock className="w-4 h-4" />, label: "UK GDPR" },
+                    { icon: <HeroAlertIcon className="w-5 h-5 flex-shrink-0" size={20} />, label: "Alerts in 30 min", colorClass: "text-red-200", borderClass: "border-red-500/20 bg-red-500/10 shadow-[0_0_15px_rgba(239,68,68,0.1)]" },
+                    { icon: <HeroTrackedIcon className="w-5 h-5 flex-shrink-0" size={20} />, label: "47,823 sponsors tracked", colorClass: "text-indigo-200", borderClass: "border-indigo-500/20 bg-indigo-500/10 shadow-[0_0_15px_rgba(99,102,241,0.1)]" },
+                    { icon: <HeroGDPRLockIcon className="w-5 h-5 flex-shrink-0" size={20} />, label: "UK GDPR", colorClass: "text-blue-200", borderClass: "border-blue-500/20 bg-blue-500/10 shadow-[0_0_15px_rgba(59,130,246,0.1)]" },
                   ].map((item, i) => (
-                    <div key={i} className="flex items-center gap-2 text-white/60">
-                      {item.icon}
-                      <span className="text-xs font-medium">{item.label}</span>
+                    <div key={i} className="flex items-center gap-2.5 text-white/90 hover:text-white transition-all duration-300 md:hover:-translate-y-0.5 group">
+                      <span className={cn(
+                        "p-2 rounded-xl border backdrop-blur-md transition-all duration-500",
+                        item.borderClass,
+                        "group-hover:brightness-125 group-hover:shadow-lg"
+                      )}>
+                        {item.icon}
+                      </span>
+                      <span className={cn("text-[13px] font-semibold tracking-wide drop-shadow-sm", item.colorClass)}>
+                        {item.label}
+                      </span>
                     </div>
                   ))}
                 </motion.div>
@@ -347,23 +363,29 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
-            <Card className="border-slate-200 dark:border-slate-800">
+            <Card className="border-slate-200 dark:border-slate-800 glow-red transition-all duration-300">
               <CardContent className="py-8 px-6">
-                <div className="w-12 h-12 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-5"><Timer className="w-6 h-6 text-red-600" /></div>
+                <div className="w-14 h-14 rounded-2xl bg-red-50 dark:bg-red-950/40 flex items-center justify-center mb-5 shadow-sm">
+                  <TimelineClockIcon size={30} />
+                </div>
                 <h3 className="text-lg font-bold text-foreground mb-3">The 12-Hour Advantage</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">The register updates at midnight. Letters are posted at 9 AM. Our WhatsApp alert hits your phone at 00:30. You have half a day to pivot before your employer even knows.</p>
               </CardContent>
             </Card>
-            <Card className="border-slate-200 dark:border-slate-800">
+            <Card className="border-slate-200 dark:border-slate-800 glow-amber transition-all duration-300">
               <CardContent className="py-8 px-6">
-                <div className="w-12 h-12 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mb-5"><FileSearch className="w-6 h-6 text-amber-600" /></div>
+                <div className="w-14 h-14 rounded-2xl bg-amber-50 dark:bg-amber-950/40 flex items-center justify-center mb-5 shadow-sm">
+                  <EarlyWarningIcon size={30} />
+                </div>
                 <h3 className="text-lg font-bold text-foreground mb-3">Spot Warning Signs Early</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">We track 90 days of history. See if your employer was downgraded to B-rating last month. A downgrade often comes before a full revocation.</p>
               </CardContent>
             </Card>
-            <Card className="border-slate-200 dark:border-slate-800">
+            <Card className="border-slate-200 dark:border-slate-800 glow-teal transition-all duration-300">
               <CardContent className="py-8 px-6">
-                <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-5"><Wifi className="w-6 h-6 text-blue-600" /></div>
+                <div className="w-14 h-14 rounded-2xl bg-teal-50 dark:bg-teal-950/40 flex items-center justify-center mb-5 shadow-sm">
+                  <TripleChannelIcon size={30} />
+                </div>
                 <h3 className="text-lg font-bold text-foreground mb-3">Triple-Channel Reliability</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">We send Email + WhatsApp + SMS simultaneously. If one channel fails, the others get through. This alert is too important to miss.</p>
               </CardContent>
@@ -489,9 +511,9 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
           </div>
 
           <div className="grid md:grid-cols-3 gap-6 mb-10">
-            <FeatureCard icon={<Shield className="w-5 h-5 text-primary" />} title="Home Office Compliance" description="Our AI analyzes your Certificate of Sponsorship against official document patterns. Detect fake CoS documents before submitting your visa." index={0} />
-            <FeatureCard icon={<Zap className="w-5 h-5 text-primary" />} title="Instant Verification" description="Get results in seconds. Upload your document and know immediately if it matches genuine Home Office formatting and metadata." index={1} />
-            <FeatureCard icon={<Lock className="w-5 h-5 text-primary" />} title="UK Data Protection" description="Processed under UK GDPR. We analyze metadata only. Documents are permanently deleted after verification. No data stored." index={2} />
+            <FeatureCard icon={<ShieldMonitorIcon size={20} />} title="Home Office Compliance" description="Our AI analyzes your Certificate of Sponsorship against official document patterns. Detect fake CoS documents before submitting your visa." index={0} />
+            <FeatureCard icon={<DocumentVerifyIcon size={20} />} title="Instant Verification" description="Get results in seconds. Upload your document and know immediately if it matches genuine Home Office formatting and metadata." index={1} />
+            <FeatureCard icon={<UKLockIcon size={20} />} title="UK Data Protection" description="Processed under UK GDPR. We analyze metadata only. Documents are permanently deleted after verification. No data stored." index={2} />
           </div>
 
           <div className="text-center">

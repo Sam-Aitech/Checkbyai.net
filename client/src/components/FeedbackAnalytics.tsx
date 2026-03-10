@@ -213,9 +213,15 @@ export default function FeedbackAnalytics() {
         <CardContent>
           <div className="space-y-4">
             {stats.recentFeedback.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                No feedback received yet
-              </p>
+              <div className="flex flex-col items-center justify-center py-12 px-4 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-900/20 my-2">
+                <div className="w-16 h-16 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center mb-4 shadow-sm border border-slate-100 dark:border-slate-700">
+                  <Star className="w-8 h-8 text-slate-300 dark:text-slate-600" />
+                </div>
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">Awaiting Feedback</h4>
+                <p className="text-xs text-gray-500 dark:text-slate-400 max-w-[220px]">
+                  No user feedback has been submitted to the dashboard yet.
+                </p>
+              </div>
             ) : (
               stats.recentFeedback.map((fb) => (
                 <div

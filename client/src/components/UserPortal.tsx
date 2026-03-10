@@ -97,8 +97,8 @@ export default function UserPortal() {
     <div>
       {/* Hero Section */}
       <div className="text-center mb-12">
-        <h2 className="text-3xl font-bold text-gray-900 mb-4">Verify Document Authenticity</h2>
-        <p className="text-lg text-gray-600 max-w-3xl mx-auto">
+        <h2 className="text-3xl font-bold text-foreground mb-4">Verify Document Authenticity</h2>
+        <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
           Upload your document for instant verification against our database of trusted patterns. 
           Our AI-powered system analyzes PDF metadata to detect genuine, edited, or fraudulent documents.
         </p>
@@ -107,11 +107,11 @@ export default function UserPortal() {
       {/* Main Verification Section */}
       <div className="grid lg:grid-cols-2 gap-8 mb-12">
         {/* Upload Section */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+        <div className="bg-card rounded-xl shadow-sm border border-border p-8">
           <div className="text-center mb-6">
             <CloudUpload className="h-12 w-12 text-primary mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Upload Document</h3>
-            <p className="text-gray-600">Drag and drop your PDF file or click to browse</p>
+            <h3 className="text-xl font-semibold text-foreground mb-2">Upload Document</h3>
+            <p className="text-muted-foreground">Drag and drop your PDF file or click to browse</p>
           </div>
 
           <FileUploadSimple 
@@ -125,8 +125,8 @@ export default function UserPortal() {
         </div>
 
         {/* Verification Process */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
-          <h3 className="text-xl font-semibold text-gray-900 mb-6">Verification Process</h3>
+        <div className="bg-card rounded-xl shadow-sm border border-border p-8">
+          <h3 className="text-xl font-semibold text-foreground mb-6">Verification Process</h3>
           
           <div className="space-y-4">
             {verificationSteps.map((step, index) => (
@@ -137,7 +137,7 @@ export default function UserPortal() {
                       ? 'bg-green-500 text-white scale-110' 
                       : step.status === 'processing'
                       ? 'bg-blue-500 text-white animate-pulse'
-                      : 'bg-gray-200 text-gray-500'
+                      : 'bg-muted text-muted-foreground'
                   }`}>
                     {step.status === 'completed' ? (
                       <CheckCircle className="w-5 h-5" />
@@ -152,8 +152,8 @@ export default function UserPortal() {
                 <div className="flex-grow">
                   <div className="flex items-center justify-between">
                     <h4 className={`font-medium transition-colors duration-300 ${
-                      step.status === 'completed' ? 'text-green-700' : 
-                      step.status === 'processing' ? 'text-blue-700' : 'text-gray-700'
+                      step.status === 'completed' ? 'text-green-700 dark:text-green-400' : 
+                      step.status === 'processing' ? 'text-blue-700 dark:text-blue-400' : 'text-foreground'
                     }`}>
                       {step.title}
                     </h4>
@@ -165,8 +165,8 @@ export default function UserPortal() {
                     )}
                   </div>
                   <p className={`text-sm mt-1 transition-colors duration-300 ${
-                    step.status === 'completed' ? 'text-green-600' : 
-                    step.status === 'processing' ? 'text-blue-600' : 'text-gray-500'
+                    step.status === 'completed' ? 'text-green-600 dark:text-green-300' : 
+                    step.status === 'processing' ? 'text-blue-600 dark:text-blue-300' : 'text-muted-foreground'
                   }`}>
                     {step.description}
                   </p>
@@ -177,25 +177,25 @@ export default function UserPortal() {
 
           {/* Results Section */}
           {!loading && verificationResult && (
-            <div className="mt-8 pt-6 border-t border-gray-200">
-              <h4 className="text-lg font-semibold text-gray-900 mb-4">Verification Results</h4>
+            <div className="mt-8 pt-6 border-t border-border">
+              <h4 className="text-lg font-semibold text-foreground mb-4">Verification Results</h4>
               <div className={`p-6 rounded-lg border-2 ${
                 verificationResult.type === 'genuine' 
-                  ? 'bg-green-50 border-green-200' 
+                  ? 'bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-800' 
                   : verificationResult.type === 'suspicious'
-                  ? 'bg-yellow-50 border-yellow-200'
-                  : 'bg-red-50 border-red-200'
+                  ? 'bg-yellow-50/50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-800'
+                  : 'bg-red-50/50 dark:bg-red-950/20 border-red-200 dark:border-red-800'
               }`}>
                 <div className="flex items-center space-x-3">
-                  {verificationResult.type === 'genuine' && <CheckCircle className="h-8 w-8 text-green-600" />}
-                  {verificationResult.type === 'suspicious' && <AlertTriangle className="h-8 w-8 text-yellow-600" />}
-                  {verificationResult.type === 'fake' && <XCircle className="h-8 w-8 text-red-600" />}
+                  {verificationResult.type === 'genuine' && <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-500" />}
+                  {verificationResult.type === 'suspicious' && <AlertTriangle className="h-8 w-8 text-yellow-600 dark:text-yellow-500" />}
+                  {verificationResult.type === 'fake' && <XCircle className="h-8 w-8 text-red-600 dark:text-red-500" />}
                   
                   <div>
-                    <h5 className="text-lg font-semibold">
+                    <h5 className="text-lg font-semibold text-foreground">
                       Document is {verificationResult.type.charAt(0).toUpperCase() + verificationResult.type.slice(1)}
                     </h5>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-muted-foreground">
                       {verificationResult.type === 'genuine' && 'This document appears to be authentic'}
                       {verificationResult.type === 'suspicious' && 'This document may have been modified'}
                       {verificationResult.type === 'fake' && 'This document appears to be fraudulent'}
@@ -205,8 +205,8 @@ export default function UserPortal() {
                 
                 {verificationResult.mismatchedFields && verificationResult.mismatchedFields.length > 0 && (
                   <div className="mt-4">
-                    <h6 className="font-medium text-gray-900 mb-2">Mismatched Fields:</h6>
-                    <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
+                    <h6 className="font-medium text-foreground mb-2">Mismatched Fields:</h6>
+                    <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
                       {verificationResult.mismatchedFields.map((field, index) => (
                         <li key={index}>{field}</li>
                       ))}
@@ -221,15 +221,15 @@ export default function UserPortal() {
 
       {/* Results Section - Clean display without confidence percentages */}
       {verificationResult && (
-        <div className="mt-6 p-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Verification Result</h3>
+        <div className="mt-6 p-6 bg-card rounded-lg border border-border">
+          <h3 className="text-lg font-semibold mb-4 text-foreground">Verification Result</h3>
           
           <div className="flex items-center gap-3 mb-4">
             <div className={`px-4 py-2 rounded-full text-base font-semibold transition-all duration-700 ease-in-out transform hover:scale-105 ${
               verificationResult.type === 'genuine' 
                 ? 'bg-gradient-to-r from-green-400 to-emerald-500 text-white shadow-lg shadow-green-500/25 animate-pulse'
                 : verificationResult.type === 'suspicious'
-                ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white shadow-lg shadow-yellow-500/25 animate-bounce'
+                ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white shadow-lg shadow-yellow-500/25 animate-pulse'
                 : 'bg-gradient-to-r from-red-400 to-rose-500 text-white shadow-lg shadow-red-500/25 animate-pulse'
             }`}>
               {verificationResult.type.charAt(0).toUpperCase() + verificationResult.type.slice(1)}

@@ -1,6 +1,6 @@
 import { SiYoutube } from 'react-icons/si';
 import { Link } from 'wouter';
-import logoImg from "@assets/Checkbyai.net_(250_x_80_px)_(1)_1770958528706.png";
+import logoImg from "@assets/logo_material.png";
 
 export default function Footer() {
   return (
@@ -10,7 +10,7 @@ export default function Footer() {
         <div className="py-16 grid grid-cols-1 md:grid-cols-4 gap-12">
           <div className="md:col-span-2">
             <div className="flex items-center gap-2.5 mb-6">
-              <img src={logoImg} alt="CheckByAi.net" className="h-10 w-auto" width={250} height={80} loading="lazy" />
+              <img src={logoImg} alt="CheckByAi.net" className="h-10 sm:h-12 w-auto object-contain" loading="lazy" />
             </div>
             <p className="text-sm editorial-body text-white/70 mb-8 max-w-md">
               UK sponsor licence monitoring with instant WhatsApp, email and SMS alerts. 
@@ -20,7 +20,7 @@ export default function Footer() {
               href="https://www.youtube.com/@CheckByAi"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-white/10 hover:bg-white/20 rounded-full text-xs font-medium tracking-wide transition-colors"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-white/10 hover:bg-white/20 hover:shadow-lg hover:shadow-red-500/15 rounded-full text-xs font-medium tracking-wide transition-all duration-200"
               aria-label="Visit our YouTube channel"
             >
               <SiYoutube className="w-4 h-4" />
@@ -29,7 +29,7 @@ export default function Footer() {
           </div>
 
           <div>
-            <h4 className="editorial-caption mb-6 text-white/50">Products</h4>
+            <h4 className="editorial-caption mb-6 text-white/65 tracking-widest">Products</h4>
             <ul className="space-y-3">
               {[
                 { href: "/sponsor-monitor", label: "Sponsor Monitor" },
@@ -48,7 +48,7 @@ export default function Footer() {
           </div>
 
           <div>
-            <h4 className="editorial-caption mb-6 text-white/50">Resources</h4>
+            <h4 className="editorial-caption mb-6 text-white/65 tracking-widest">Resources</h4>
             <ul className="space-y-3">
               {[
                 { href: "/check-fake-cos", label: "Spot a Fake CoS" },
@@ -78,14 +78,14 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="border-t border-white/10 py-8">
+        <div className="border-t-0 pt-8" style={{ borderTop: '1px solid transparent', backgroundImage: 'linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent)', backgroundSize: '100% 1px', backgroundRepeat: 'no-repeat', backgroundPosition: 'top' }}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
             <div>
               <h5 className="editorial-caption mb-3 text-white/40">Data Protection</h5>
               <p className="text-xs text-white/40 leading-relaxed">
-                Compliant with UK GDPR and the Data Protection Act 2018. We process document metadata only. 
-                Original documents are deleted immediately after verification. Free users: results are removed 
-                when you leave the site. Paid account holders: only verification results are retained, never 
+                Compliant with UK GDPR 🇬🇧 and the Data Protection Act 2018. We process document metadata only.
+                Original documents are deleted immediately after verification. Free users: results are removed
+                when you leave the site. Paid account holders: only verification results are retained, never
                 original documents. You have the right to request erasure of your data at any time.
               </p>
             </div>

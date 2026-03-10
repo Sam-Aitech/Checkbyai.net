@@ -1342,10 +1342,20 @@ export default function SimpleAdmin() {
                     <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
                   </div>
                 ) : logs?.data.length === 0 ? (
-                  <div className="text-center py-12">
-                    <Eye className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-                    <p className="text-gray-500 dark:text-slate-400">No verification logs found</p>
-                    <p className="text-sm text-gray-400 dark:text-slate-500">Adjust your filters or wait for verifications</p>
+                  <div className="flex flex-col items-center justify-center py-16 px-4 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/50 dark:bg-slate-900/20 mt-4">
+                    <div className="w-20 h-20 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center mb-6 shadow-xl shadow-slate-200/50 dark:shadow-none border border-slate-100 dark:border-slate-700 relative">
+                      <div className="absolute inset-0 bg-slate-100 dark:bg-slate-800 rounded-full animate-ping opacity-20" />
+                      <Eye className="w-10 h-10 text-slate-400" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">No Verification Logs Found</h3>
+                    <p className="text-gray-500 dark:text-slate-400 max-w-sm mx-auto mb-6">
+                      Adjust your date range filters or wait for new verifications to be processed by users.
+                    </p>
+                    {(logsStartDate || logsEndDate) && (
+                      <Button variant="outline" onClick={() => { setLogsStartDate(''); setLogsEndDate(''); setLogsPage(1); }} className="rounded-full">
+                        Clear Current Filters
+                      </Button>
+                    )}
                   </div>
                 ) : (
                   <>
@@ -1518,9 +1528,14 @@ export default function SimpleAdmin() {
                     <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
                   </div>
                 ) : users?.data.length === 0 ? (
-                  <div className="text-center py-12">
-                    <Users className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-                    <p className="text-gray-500 dark:text-slate-400">No users found</p>
+                  <div className="flex flex-col items-center justify-center py-16 px-4 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/50 dark:bg-slate-900/20 mt-4">
+                    <div className="w-20 h-20 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center mb-6 shadow-xl shadow-slate-200/50 dark:shadow-none border border-slate-100 dark:border-slate-700">
+                      <Users className="w-10 h-10 text-slate-400" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">No Users Found</h3>
+                    <p className="text-gray-500 dark:text-slate-400 max-w-sm mx-auto">
+                      Try adjusting your search terminology or clear the current search query.
+                    </p>
                   </div>
                 ) : (
                   <>
@@ -1688,10 +1703,23 @@ export default function SimpleAdmin() {
               </CardHeader>
               <CardContent>
                 {patterns.length === 0 ? (
-                  <div className="text-center py-8">
-                    <FileText className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-                    <p className="text-gray-500 dark:text-slate-400">No trusted patterns uploaded yet</p>
-                    <p className="text-sm text-gray-400 dark:text-slate-500">Upload genuine COS documents to establish patterns</p>
+                  <div className="flex flex-col items-center justify-center py-16 px-4 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/50 dark:bg-slate-900/20 mt-4">
+                    <div className="w-20 h-20 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center mb-6 shadow-xl shadow-blue-500/10 dark:shadow-none border border-blue-100 dark:border-slate-700 relative">
+                      <div className="absolute inset-0 bg-blue-100 dark:bg-slate-800 rounded-full animate-pulse blur-md opacity-50" />
+                      <FileText className="w-10 h-10 text-blue-500 relative z-10" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">No Trusted Patterns</h3>
+                    <p className="text-gray-500 dark:text-slate-400 max-w-md mx-auto mb-6">
+                      Upload genuine Certificate of Sponsorship documents to establish a baseline. The AI uses these patterns to detect anomalies in user submissions.
+                    </p>
+                    <Button onClick={() => {
+                        const tabs = document.querySelectorAll('[role="tab"]');
+                        const uploadTab = Array.from(tabs).find(t => t.textContent?.includes('Upload'));
+                        if (uploadTab) (uploadTab as HTMLElement).click();
+                      }} className="rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg shadow-blue-500/20 font-medium px-6">
+                      <Upload className="w-4 h-4 mr-2" />
+                      Upload First Pattern
+                    </Button>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -1932,10 +1960,14 @@ export default function SimpleAdmin() {
                 <CardContent>
                   <ScrollArea className="h-96">
                     {globalRules.length === 0 ? (
-                      <div className="text-center py-8 text-gray-500 dark:text-slate-400">
-                        <Brain className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                        <p>No global rules configured yet</p>
-                        <p className="text-sm">Add rules to train the AI</p>
+                      <div className="flex flex-col items-center justify-center py-12 px-4 text-center h-full">
+                        <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800/80 rounded-full flex items-center justify-center mb-6 ring-8 ring-slate-50 dark:ring-slate-900/50">
+                          <Brain className="w-10 h-10 text-purple-400" />
+                        </div>
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">No Global Rules Configured</h3>
+                        <p className="text-gray-500 dark:text-slate-400 max-w-sm mx-auto text-sm">
+                          Add custom rules to train the AI's forensic engine. Rules govern how anomalies are weighted and flagged.
+                        </p>
                       </div>
                     ) : (
                       <div className="space-y-3">
@@ -2195,7 +2227,13 @@ export default function SimpleAdmin() {
                       Loading changes...
                     </div>
                   ) : recentChanges.length === 0 ? (
-                    <p className="text-gray-400 dark:text-slate-500 text-sm py-4">No changes detected yet.</p>
+                    <div className="flex flex-col items-center justify-center py-10 px-4 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-900/20 my-4">
+                       <div className="w-12 h-12 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center mb-3 shadow-sm border border-slate-100 dark:border-slate-700">
+                         <Activity className="w-6 h-6 text-slate-400" />
+                       </div>
+                       <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">No Changes Detected</h4>
+                       <p className="text-xs text-gray-500 dark:text-slate-400 max-w-[250px]">All monitored companies are currently stable without any recent licence downgrades or revocations.</p>
+                    </div>
                   ) : (
                     <ScrollArea className="h-[400px]">
                       <div className="overflow-x-auto">
@@ -2262,7 +2300,13 @@ export default function SimpleAdmin() {
                         Loading...
                       </div>
                     ) : topWatched.length === 0 ? (
-                      <p className="text-gray-400 dark:text-slate-500 text-sm py-4">No companies being watched yet.</p>
+                      <div className="flex flex-col items-center justify-center py-12 px-4 text-center my-2">
+                        <div className="w-16 h-16 bg-amber-50 dark:bg-amber-950/30 rounded-full flex items-center justify-center mb-4">
+                          <TrendingUp className="w-8 h-8 text-amber-500/50" />
+                        </div>
+                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">No Active Watchers</h4>
+                        <p className="text-xs text-gray-500 dark:text-slate-400 max-w-[220px]">Users haven't added any companies to their monitoring watchlists yet.</p>
+                      </div>
                     ) : (
                       <ScrollArea className="h-[300px]">
                         <div className="space-y-2">
@@ -2301,7 +2345,13 @@ export default function SimpleAdmin() {
                         Loading...
                       </div>
                     ) : notifStats.length === 0 ? (
-                      <p className="text-gray-400 dark:text-slate-500 text-sm py-4">No notifications sent in the last 7 days.</p>
+                      <div className="flex flex-col items-center justify-center py-12 px-4 text-center my-2">
+                        <div className="w-16 h-16 bg-purple-50 dark:bg-purple-950/30 rounded-full flex items-center justify-center mb-4">
+                          <Bell className="w-8 h-8 text-purple-500/50" />
+                        </div>
+                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">No Notifications Sent</h4>
+                        <p className="text-xs text-gray-500 dark:text-slate-400 max-w-[220px]">No alerts have been dispatched across any communication channels in the last 7 days.</p>
+                      </div>
                     ) : (
                       <div className="space-y-4">
                         {(() => {

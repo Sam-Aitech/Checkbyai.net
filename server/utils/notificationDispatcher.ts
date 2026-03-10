@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { eq, and, gte, lte, sql, isNull } from "drizzle-orm";
+import { eq, and, gte, lte, sql, isNull, inArray } from "drizzle-orm";
 import { companyWatches, notificationPreferences, notificationLog, users } from "@shared/schema";
 import type { SponsorChange } from "@shared/schema";
 import { normalizeName } from "./sponsorListFetcher";
@@ -263,6 +263,7 @@ export async function notifyAffectedUsers(change: SponsorChange): Promise<{ sent
   try {
     const normalizedOrg = normalizeName(change.organisationName);
 
+    // ── Step 1: Find all affected watchers (single indexed query) ────────────
     const activeWatches = await db
       .select({
         watchId: companyWatches.id,
@@ -281,8 +282,57 @@ export async function notifyAffectedUsers(change: SponsorChange): Promise<{ sent
       return stats;
     }
 
-    console.log(`[NotificationDispatcher] Found ${activeWatches.length} active watch(es) for "${change.organisationName}" (change: ${change.changeType})`);
+    // Deduplicate users — one user may watch the same company multiple times
+    const uniqueUserIds = Array.from(new Set(activeWatches.map(w => w.userId)));
+    console.log(`[NotificationDispatcher] Found ${activeWatches.length} watch(es) for "${change.organisationName}" across ${uniqueUserIds.length} unique user(s) (change: ${change.changeType})`);
 
+    // ── Step 2: BATCH all 3 lookups into one parallel Promise.all() ─────────
+    // BEFORE (N+1 antipattern): for each watcher → await rateLimitCount,
+    //   await userRecord, await prefs = 3 sequential DB round-trips × N users
+    //   = 1,500 sequential queries for 500 watchers. Catastrophic under load.
+    //
+    // AFTER: 3 inArray() queries in parallel covering ALL users at once,
+    //   resolved via O(1) Map lookups in the loop = 4 DB queries TOTAL.
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const [recentLogCounts, userRecords, prefRecords] = await Promise.all([
+      // Batch rate-limit check: count sent notifications per user in last 24h
+      db
+        .select({
+          userId: notificationLog.userId,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(notificationLog)
+        .where(
+          and(
+            inArray(notificationLog.userId, uniqueUserIds),
+            eq(notificationLog.status, "sent"),
+            gte(notificationLog.sentAt, oneDayAgo)
+          )
+        )
+        .groupBy(notificationLog.userId),
+
+      // Batch user record fetch
+      db
+        .select({ id: users.id, email: users.email, subscriptionStatus: users.subscriptionStatus })
+        .from(users)
+        .where(inArray(users.id, uniqueUserIds)),
+
+      // Batch preferences fetch
+      db
+        .select()
+        .from(notificationPreferences)
+        .where(inArray(notificationPreferences.userId, uniqueUserIds)),
+    ]);
+
+    // Build O(1) lookup Maps from batch results
+    const rateLimitMap = new Map<string, number>(
+      recentLogCounts.map(r => [r.userId, r.count])
+    );
+    const userMap = new Map(userRecords.map(u => [u.id, u]));
+    const prefsMap = new Map(prefRecords.map(p => [p.userId, p]));
+
+    // ── Step 3: Build notification payloads once (not per-user) ─────────────
     const { subject, html } = buildEmailHtml(
       change.changeType,
       change.organisationName,
@@ -297,6 +347,7 @@ export async function notifyAffectedUsers(change: SponsorChange): Promise<{ sent
       change.newValue
     );
 
+    // ── Step 4: Dispatch loop — all data now in memory, zero extra DB calls ──
     const processedUsers = new Set<string>();
 
     for (const watch of activeWatches) {
@@ -304,7 +355,8 @@ export async function notifyAffectedUsers(change: SponsorChange): Promise<{ sent
       processedUsers.add(watch.userId);
 
       try {
-        const recentCount = await getUserNotificationCountLast24h(watch.userId);
+        // O(1) Map lookups instead of sequential awaits
+        const recentCount = rateLimitMap.get(watch.userId) ?? 0;
         if (recentCount >= MAX_NOTIFICATIONS_PER_DAY) {
           console.log(`[NotificationDispatcher] Rate limit reached for user ${watch.userId} (${recentCount}/${MAX_NOTIFICATIONS_PER_DAY} in 24h)`);
           await logNotification(watch.userId, change.id, "email", "skipped", undefined, "Rate limit: exceeded 10 notifications in 24 hours");
@@ -312,39 +364,29 @@ export async function notifyAffectedUsers(change: SponsorChange): Promise<{ sent
           continue;
         }
 
-        const userRecord = await db
-          .select({ email: users.email, subscriptionStatus: users.subscriptionStatus })
-          .from(users)
-          .where(eq(users.id, watch.userId))
-          .limit(1);
-
-        if (userRecord.length === 0) {
+        const userRecord = userMap.get(watch.userId);
+        if (!userRecord) {
           stats.failed++;
           continue;
         }
 
-        const userPlan = userRecord[0].subscriptionStatus || "free";
+        const userPlan = userRecord.subscriptionStatus || "free";
         const tierConfig = getTierConfig(userPlan);
         const deliverAfter = getDeliverAfter(userPlan);
 
-        const prefs = await db
-          .select()
-          .from(notificationPreferences)
-          .where(eq(notificationPreferences.userId, watch.userId))
-          .limit(1);
-
-        const emailEnabled = prefs.length === 0 || prefs[0].emailEnabled;
-        let recipientEmail = prefs.length > 0 && prefs[0].email ? prefs[0].email : userRecord[0].email;
+        const prefs = prefsMap.get(watch.userId) ?? null;
+        const emailEnabled = !prefs || prefs.emailEnabled;
+        const recipientEmail = prefs?.email ?? userRecord.email;
 
         if (deliverAfter) {
           for (const channel of tierConfig.channels) {
             if (channel === "email" && emailEnabled && recipientEmail) {
               await logNotification(watch.userId, change.id, "email", "queued", undefined, undefined, deliverAfter);
               stats.queued++;
-            } else if (channel === "whatsapp" && prefs.length > 0 && prefs[0].whatsappEnabled && prefs[0].whatsappVerified && prefs[0].whatsappNumber) {
+            } else if (channel === "whatsapp" && prefs?.whatsappEnabled && prefs?.whatsappVerified && prefs?.whatsappNumber) {
               await logNotification(watch.userId, change.id, "whatsapp", "queued", undefined, undefined, deliverAfter);
               stats.queued++;
-            } else if (channel === "sms" && prefs.length > 0 && prefs[0].smsEnabled && prefs[0].smsVerified && prefs[0].smsNumber) {
+            } else if (channel === "sms" && prefs?.smsEnabled && prefs?.smsVerified && prefs?.smsNumber) {
               await logNotification(watch.userId, change.id, "sms", "queued", undefined, undefined, deliverAfter);
               stats.queued++;
             }
@@ -356,10 +398,10 @@ export async function notifyAffectedUsers(change: SponsorChange): Promise<{ sent
         for (const channel of tierConfig.channels) {
           if (channel === "email" && emailEnabled) {
             await sendNotificationViaChannel("email", watch.userId, change.id, recipientEmail, null, null, subject, html, plainText, stats);
-          } else if (channel === "whatsapp" && prefs.length > 0 && prefs[0].whatsappEnabled && prefs[0].whatsappVerified && prefs[0].whatsappNumber) {
-            await sendNotificationViaChannel("whatsapp", watch.userId, change.id, null, null, prefs[0].whatsappNumber, subject, html, plainText, stats);
-          } else if (channel === "sms" && prefs.length > 0 && prefs[0].smsEnabled && prefs[0].smsVerified && prefs[0].smsNumber) {
-            await sendNotificationViaChannel("sms", watch.userId, change.id, null, prefs[0].smsNumber, null, subject, html, plainText, stats);
+          } else if (channel === "whatsapp" && prefs?.whatsappEnabled && prefs?.whatsappVerified && prefs?.whatsappNumber) {
+            await sendNotificationViaChannel("whatsapp", watch.userId, change.id, null, null, prefs.whatsappNumber, subject, html, plainText, stats);
+          } else if (channel === "sms" && prefs?.smsEnabled && prefs?.smsVerified && prefs?.smsNumber) {
+            await sendNotificationViaChannel("sms", watch.userId, change.id, null, prefs.smsNumber, null, subject, html, plainText, stats);
           }
         }
       } catch (err: any) {

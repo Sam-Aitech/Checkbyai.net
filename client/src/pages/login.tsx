@@ -4,12 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Mail, KeyRound, ArrowLeft, CheckCircle } from "lucide-react";
+import { Loader2, Mail, ArrowLeft, CheckCircle } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
 import SEOHead from "@/components/SEOHead";
 import { motion, AnimatePresence } from "framer-motion";
-import logoImg from "@assets/Checkbyai.net_(250_x_80_px)_(1)_1770958528706.png";
+import logoImg from "@assets/logo_material.png";
 import { queryClient } from "@/lib/queryClient";
+import BrandLogo from "@/components/BrandLogo";
 import { Turnstile } from "@marsidev/react-turnstile";
 
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
@@ -20,6 +21,70 @@ const fadeUp = {
   exit: { opacity: 0, y: -16 },
   transition: { type: "spring", stiffness: 100, damping: 15 },
 };
+
+// ─── Premium 6-digit OTP input component ─────────────────────────────────────
+function OTPBoxes({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const inputsRef = useRef<(HTMLInputElement | null)[]>([]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, idx: number) => {
+    if (e.key === 'Backspace') {
+      if (value[idx]) {
+        const next = value.split('');
+        next[idx] = '';
+        onChange(next.join(''));
+      } else if (idx > 0) {
+        inputsRef.current[idx - 1]?.focus();
+      }
+    } else if (e.key === 'ArrowLeft' && idx > 0) {
+      inputsRef.current[idx - 1]?.focus();
+    } else if (e.key === 'ArrowRight' && idx < 5) {
+      inputsRef.current[idx + 1]?.focus();
+    }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>, idx: number) => {
+    const digit = e.target.value.replace(/\D/g, '').slice(-1);
+    const chars = (value + '      ').split('').slice(0, 6);
+    chars[idx] = digit;
+    const newVal = chars.join('').trimEnd().slice(0, 6);
+    onChange(newVal);
+    if (digit && idx < 5) {
+      setTimeout(() => inputsRef.current[idx + 1]?.focus(), 0);
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    onChange(pasted);
+    const focusIdx = Math.min(pasted.length, 5);
+    setTimeout(() => inputsRef.current[focusIdx]?.focus(), 0);
+  };
+
+  return (
+    <div className="flex gap-2 sm:gap-3 justify-center" data-testid="input-otp">
+      {Array.from({ length: 6 }, (_, idx) => (
+        <input
+          key={idx}
+          id={`otp-${idx}`}
+          ref={(el) => { inputsRef.current[idx] = el; }}
+          type="text"
+          inputMode="numeric"
+          maxLength={1}
+          value={value[idx] || ''}
+          onChange={(e) => handleChange(e, idx)}
+          onKeyDown={(e) => handleKeyDown(e, idx)}
+          onPaste={idx === 0 ? handlePaste : undefined}
+          onFocus={(e) => e.target.select()}
+          className="otp-box"
+          placeholder="·"
+          autoComplete={idx === 0 ? 'one-time-code' : 'off'}
+          aria-label={`OTP digit ${idx + 1}`}
+        />
+      ))}
+    </div>
+  );
+}
 
 export default function LoginPage() {
   const [, setLocation] = useLocation();
@@ -179,7 +244,7 @@ export default function LoginPage() {
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: "spring", stiffness: 100, damping: 15 }}
-          className="w-full max-w-md theme-card bg-card p-0"
+          className="w-full max-w-md shimmer-border theme-card bg-card p-0"
         >
           <div className="text-center p-6 pb-0">
             <div className="flex justify-center mb-6">
@@ -192,7 +257,9 @@ export default function LoginPage() {
                 loading="eager"
               />
             </div>
-            <h1 className="text-2xl editorial-subheading text-foreground">Welcome to Check By AI</h1>
+            <div className="flex justify-center mt-2 mb-2">
+              <BrandLogo size="lg" variant="auto" />
+            </div>
             <p className="text-muted-foreground mt-2 text-sm">
               {step === "email" 
                 ? "Enter your email to receive a verification code" 
@@ -270,26 +337,13 @@ export default function LoginPage() {
                 >
                   <form onSubmit={handleVerifyOTP} className="space-y-4">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-                      <CheckCircle className="h-4 w-4 text-emerald-500" />
+                    <img src={logoImg} alt="CheckByAi" className="h-12 w-auto mb-6 object-contain" />
                       <span>Code sent to <strong className="text-foreground">{email}</strong></span>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="otp">Verification Code</Label>
-                      <div className="relative">
-                        <KeyRound className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="otp"
-                          type="text"
-                          placeholder="123456"
-                          value={otpCode}
-                          onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                          required
-                          maxLength={6}
-                          className="pl-10 text-center text-2xl tracking-widest font-mono rounded-xl"
-                          data-testid="input-otp"
-                        />
-                      </div>
+                      <Label htmlFor="otp-0">Verification Code</Label>
+                      <OTPBoxes value={otpCode} onChange={setOtpCode} />
                     </div>
 
                     <Button 
@@ -306,7 +360,7 @@ export default function LoginPage() {
                       ) : (
                         <>
                           <CheckCircle className="mr-2 h-4 w-4" />
-                          Verify & Login
+                          Verify &amp; Login
                         </>
                       )}
                     </Button>

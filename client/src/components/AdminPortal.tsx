@@ -14,7 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import FeedbackAnalytics from "./FeedbackAnalytics";
 
 export default function AdminPortal() {
@@ -569,72 +569,72 @@ export default function AdminPortal() {
           </div>
           
           {/* Navigation Tabs */}
-          <div className="border-b border-gray-200 dark:border-gray-700">
-            <nav className="-mb-px flex space-x-8">
+          <div className="border-b border-border">
+            <nav className="-mb-px flex space-x-8 overflow-x-auto whitespace-nowrap scrollbar-hide">
               <button
                 onClick={() => setActiveTab("dashboard")}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                className={`py-3 px-1 border-b-2 font-medium text-sm flex items-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                   activeTab === "dashboard"
-                    ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                    : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
                 }`}
               >
-                <Database className="w-4 h-4 inline mr-2" />
+                <Database className="w-4 h-4 mr-2" />
                 Dashboard
               </button>
               <button
                 onClick={() => setActiveTab("analysis")}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                className={`py-3 px-1 border-b-2 font-medium text-sm flex items-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                   activeTab === "analysis"
-                    ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                    : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
                 }`}
               >
-                <FileSearch className="w-4 h-4 inline mr-2" />
+                <FileSearch className="w-4 h-4 mr-2" />
                 Document Analysis
               </button>
               <button
                 onClick={() => setActiveTab("feedback")}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                className={`py-3 px-1 border-b-2 font-medium text-sm flex items-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                   activeTab === "feedback"
-                    ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                    : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
                 }`}
               >
-                <MessageSquare className="w-4 h-4 inline mr-2" />
+                <MessageSquare className="w-4 h-4 mr-2" />
                 User Feedback
               </button>
               <button
                 onClick={() => setActiveTab("paid-reviews")}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                className={`py-3 px-1 border-b-2 font-medium text-sm flex items-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                   activeTab === "paid-reviews"
-                    ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                    : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
                 }`}
               >
-                <CheckCircle className="w-4 h-4 inline mr-2" />
+                <CheckCircle className="w-4 h-4 mr-2" />
                 Paid Reviews
               </button>
               <button
                 onClick={() => setActiveTab("users")}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                className={`py-3 px-1 border-b-2 font-medium text-sm flex items-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                   activeTab === "users"
-                    ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                    : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
                 }`}
               >
-                <Users className="w-4 h-4 inline mr-2" />
+                <Users className="w-4 h-4 mr-2" />
                 User Management
               </button>
               <button
                 onClick={() => setActiveTab("settings")}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                className={`py-3 px-1 border-b-2 font-medium text-sm flex items-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                   activeTab === "settings"
-                    ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                    : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
                 }`}
               >
-                <Settings className="w-4 h-4 inline mr-2" />
+                <Settings className="w-4 h-4 mr-2" />
                 Settings
               </button>
             </nav>
@@ -642,7 +642,7 @@ export default function AdminPortal() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-16">
         {activeTab === "dashboard" && (
           <div>
             {/* Mobile-Optimized Admin Header */}
@@ -655,81 +655,98 @@ export default function AdminPortal() {
 
       {/* Mobile-Responsive Stats Dashboard */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-6">
+        <div className="bg-card rounded-xl shadow-md p-4 sm:p-6 transition-transform hover:-translate-y-1">
           <div className="flex items-center">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Database className="text-blue-600 h-4 w-4 sm:h-6 sm:w-6" />
+            <div className="p-2 sm:p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+              <Database className="text-blue-600 dark:text-blue-400 h-5 w-5 sm:h-6 sm:w-6" />
             </div>
-            <div className="ml-2 sm:ml-4 min-w-0">
-              <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Trusted Patterns</p>
-              <p className="text-lg sm:text-2xl font-semibold text-gray-900">{stats?.trustedPatterns || 0}</p>
+            <div className="ml-3 sm:ml-4 min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-muted-foreground truncate">Trusted Patterns</p>
+              <p className="text-xl sm:text-2xl font-bold text-foreground">{stats?.trustedPatterns || 0}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-6">
+        <div className="bg-card rounded-xl shadow-md p-4 sm:p-6 transition-transform hover:-translate-y-1">
           <div className="flex items-center">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <CheckCircle className="text-green-600 h-4 w-4 sm:h-6 sm:w-6" />
+            <div className="p-2 sm:p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
+              <CheckCircle className="text-green-600 dark:text-green-400 h-5 w-5 sm:h-6 sm:w-6" />
             </div>
-            <div className="ml-2 sm:ml-4 min-w-0">
-              <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Verifications Today</p>
-              <p className="text-lg sm:text-2xl font-semibold text-gray-900">{stats?.verificationsToday || 0}</p>
+            <div className="ml-3 sm:ml-4 min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-muted-foreground truncate">Verifications Today</p>
+              <p className="text-xl sm:text-2xl font-bold text-foreground">{stats?.verificationsToday || 0}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-6">
+        <div className="bg-card rounded-xl shadow-md p-4 sm:p-6 transition-transform hover:-translate-y-1">
           <div className="flex items-center">
-            <div className="p-2 bg-yellow-100 rounded-lg">
-              <AlertTriangle className="text-yellow-600 h-4 w-4 sm:h-6 sm:w-6" />
+            <div className="p-2 sm:p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
+              <AlertTriangle className="text-yellow-600 dark:text-yellow-400 h-5 w-5 sm:h-6 sm:w-6" />
             </div>
-            <div className="ml-2 sm:ml-4 min-w-0">
-              <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Suspicious Docs</p>
-              <p className="text-lg sm:text-2xl font-semibold text-gray-900">{stats?.suspiciousDocs || 0}</p>
+            <div className="ml-3 sm:ml-4 min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-muted-foreground truncate">Suspicious Docs</p>
+              <p className="text-xl sm:text-2xl font-bold text-foreground">{stats?.suspiciousDocs || 0}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-6">
+        <div className="bg-card rounded-xl shadow-md p-4 sm:p-6 transition-transform hover:-translate-y-1">
           <div className="flex items-center">
-            <div className="p-2 bg-gray-100 rounded-lg">
-              <TrendingUp className="text-gray-600 h-4 w-4 sm:h-6 sm:w-6" />
+            <div className="p-2 sm:p-3 bg-slate-100 dark:bg-slate-800 rounded-lg">
+              <TrendingUp className="text-slate-600 dark:text-slate-400 h-5 w-5 sm:h-6 sm:w-6" />
             </div>
-            <div className="ml-2 sm:ml-4 min-w-0">
-              <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Success Rate</p>
-              <p className="text-lg sm:text-2xl font-semibold text-gray-900">{stats?.successRate || '0'}%</p>
+            <div className="ml-3 sm:ml-4 min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-muted-foreground truncate">Success Rate</p>
+              <p className="text-xl sm:text-2xl font-bold text-foreground">{stats?.successRate || '0'}%</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Data Management Section */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
-        <div className="flex items-center justify-between">
+      <div className="bg-card rounded-xl shadow-md p-6 mb-8 border border-border">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Data Management</h3>
-            <p className="text-sm text-gray-600 mt-1">
+            <h3 className="text-lg font-bold text-foreground">Data Management</h3>
+            <p className="text-sm text-muted-foreground mt-1">
               Clear user verification data while preserving trusted patterns database
             </p>
           </div>
-          <Button
-            onClick={() => clearDataMutation.mutate()}
-            variant="destructive"
-            disabled={clearDataMutation.isPending}
-            className="flex items-center"
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            {clearDataMutation.isPending ? 'Clearing...' : 'Reset User Data'}
-          </Button>
+          
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="destructive"
+                className="flex items-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-2"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Reset User Data
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This action cannot be undone. This will permanently delete all verification data history and results. Trusted patterns will be preserved.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => clearDataMutation.mutate()} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  {clearDataMutation.isPending ? 'Clearing...' : 'Continue'}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 
       {/* Mobile-Responsive Admin Actions */}
       <div className="grid lg:grid-cols-2 gap-4 sm:gap-8">
         {/* Upload Genuine Documents */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-8">
-          <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4 sm:mb-6">Upload Genuine COS Documents</h3>
+        <div className="bg-card rounded-xl shadow-md border border-border p-4 sm:p-8">
+          <h3 className="text-lg sm:text-xl font-bold text-foreground mb-4 sm:mb-6">Upload Genuine COS Documents</h3>
           
           <FileUpload
             onFileUpload={handleFileUpload}
@@ -774,53 +791,71 @@ export default function AdminPortal() {
         </div>
 
         {/* Pattern Management */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
-          <h3 className="text-xl font-semibold text-gray-900 mb-6">Pattern Management</h3>
+        <div className="bg-card rounded-xl shadow-md border border-border p-5 sm:p-8 flex flex-col max-h-[600px]">
+          <h3 className="text-lg sm:text-xl font-bold text-foreground mb-6">Pattern Management</h3>
           
           {/* Search and Filter */}
           <div className="mb-6">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
                 type="text"
                 placeholder="Search patterns..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 bg-background"
               />
             </div>
           </div>
 
           {/* Pattern List */}
-          <div className="space-y-3 max-h-64 overflow-y-auto">
-            {filteredPatterns.map((pattern: any) => (
-              <div key={pattern.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <span className="fas fa-file-pdf text-red-500"></span>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{pattern.filename}</p>
-                    <p className="text-xs text-gray-500">Added {formatDate(pattern.uploadedAt)}</p>
+          <div className="overflow-y-auto flex-1 pr-2 space-y-3 scrollbar-hide relative">
+            {filteredPatterns.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 px-4 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/50 dark:bg-slate-900/20 my-4">
+                <div className="w-16 h-16 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center mb-4 shadow-xl shadow-slate-200/50 dark:shadow-none border border-slate-100 dark:border-slate-700">
+                  <FileSearch className="w-8 h-8 text-slate-400" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">No Patterns Found</h3>
+                {searchTerm ? (
+                  <p className="text-sm text-gray-500 dark:text-slate-400 max-w-[250px]">
+                    No trusted patterns match "{searchTerm}". Try adjusting your filters.
+                  </p>
+                ) : (
+                  <p className="text-sm text-gray-500 dark:text-slate-400 max-w-[250px]">
+                    You haven't added any trusted patterns yet.
+                  </p>
+                )}
+              </div>
+            ) : (
+              filteredPatterns.map((pattern: any) => (
+                <div key={pattern.id} className="flex items-center justify-between p-3 bg-muted/50 hover:bg-muted rounded-lg transition-colors border border-transparent hover:border-border">
+                  <div className="flex items-center space-x-3">
+                    <span className="fas fa-file-pdf text-red-500"></span>
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{pattern.filename}</p>
+                      <p className="text-xs text-muted-foreground">Added {formatDate(pattern.uploadedAt)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Badge variant={pattern.status === 'active' ? 'default' : 'secondary'}>
+                      {pattern.status}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => deletePatternMutation.mutate(pattern.id)}
+                      disabled={deletePatternMutation.isPending}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Badge variant={pattern.status === 'active' ? 'default' : 'secondary'}>
-                    {pattern.status}
-                  </Badge>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => deletePatternMutation.mutate(pattern.id)}
-                    disabled={deletePatternMutation.isPending}
-                  >
-                    <Trash2 className="h-4 w-4 text-red-500" />
-                  </Button>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
 
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <Button className="w-full" variant="outline">
+          <div className="mt-6 pt-6 border-t border-border">
+            <Button className="w-full text-foreground hover:bg-muted" variant="outline">
               <Download className="h-4 w-4 mr-2" />
               Export Pattern Database
             </Button>
@@ -829,8 +864,8 @@ export default function AdminPortal() {
       </div>
 
       {/* Recent Activity */}
-      <div className="mt-8 bg-white rounded-xl shadow-sm border border-gray-200 p-8">
-        <h3 className="text-xl font-semibold text-gray-900 mb-6">Recent Verification Activity</h3>
+      <div className="mt-8 bg-card rounded-xl shadow-md border border-border p-8">
+        <h3 className="text-xl font-bold text-foreground mb-6">Recent Verification Activity</h3>
         
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -1817,10 +1852,15 @@ export default function AdminPortal() {
             ) : (
               <div className="space-y-4">
                 {paidSubmissions.length === 0 ? (
-                  <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-xl">
-                    <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white">All caught up!</h3>
-                    <p className="text-gray-600 dark:text-gray-400">No pending submissions to review.</p>
+                  <div className="flex flex-col items-center justify-center py-16 px-4 text-center border-2 border-dashed border-emerald-200/50 dark:border-emerald-900/30 rounded-2xl bg-emerald-50/30 dark:bg-emerald-900/10">
+                    <div className="w-20 h-20 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center mb-6 shadow-xl shadow-emerald-500/10 dark:shadow-none border border-emerald-100 dark:border-emerald-900/50 relative">
+                      <div className="absolute inset-0 bg-emerald-100 dark:bg-emerald-900/40 rounded-full animate-ping opacity-30" />
+                      <CheckCircle className="w-10 h-10 text-emerald-500 relative z-10" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Inbox Zero</h3>
+                    <p className="text-gray-500 dark:text-slate-400 max-w-[280px]">
+                      Excellent work! You are all caught up. There are no pending expert review submissions waiting in the queue.
+                    </p>
                   </div>
                 ) : (
                   paidSubmissions.map((submission: PaidSubmission) => (

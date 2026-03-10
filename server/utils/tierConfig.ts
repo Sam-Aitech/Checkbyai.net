@@ -8,17 +8,21 @@ export interface TierConfig {
   weeklyReports: boolean;
   csvUpload: boolean;
   webhooks: boolean;
+  enrichedNotifications: boolean; // Company Intelligence block in email (Pro only)
+  jobAlerts: boolean;             // Job opening alert digest (Pro only)
 }
 
 export const TIER_CONFIGS: Record<PlanTier, TierConfig> = {
   free: {
     watchLimit: 1,
-    channels: ["email"],
+    channels: [],                    // Free = NO notifications
     alertTiming: "next-morning",
     apiAccess: false,
     weeklyReports: false,
     csvUpload: false,
     webhooks: false,
+    enrichedNotifications: false,
+    jobAlerts: false,
   },
   starter: {
     watchLimit: 2,
@@ -28,6 +32,8 @@ export const TIER_CONFIGS: Record<PlanTier, TierConfig> = {
     weeklyReports: false,
     csvUpload: false,
     webhooks: false,
+    enrichedNotifications: false,    // Starter = basic alert, no enrichment
+    jobAlerts: false,
   },
   pro: {
     watchLimit: 5,
@@ -37,6 +43,8 @@ export const TIER_CONFIGS: Record<PlanTier, TierConfig> = {
     weeklyReports: false,
     csvUpload: false,
     webhooks: false,
+    enrichedNotifications: true,     // Pro = enriched notification + job alerts
+    jobAlerts: true,
   },
   unlimited: {
     watchLimit: -1,
@@ -46,6 +54,8 @@ export const TIER_CONFIGS: Record<PlanTier, TierConfig> = {
     weeklyReports: true,
     csvUpload: false,
     webhooks: false,
+    enrichedNotifications: true,
+    jobAlerts: true,
   },
   enterprise: {
     watchLimit: -1,
@@ -55,6 +65,8 @@ export const TIER_CONFIGS: Record<PlanTier, TierConfig> = {
     weeklyReports: true,
     csvUpload: true,
     webhooks: true,
+    enrichedNotifications: true,
+    jobAlerts: true,
   },
 };
 
@@ -83,6 +95,21 @@ export function getWatchLimit(subscriptionStatus: string | null | undefined): nu
 
 export function isChannelAllowed(subscriptionStatus: string | null | undefined, channel: "email" | "sms" | "whatsapp"): boolean {
   return getTierConfig(subscriptionStatus).channels.includes(channel);
+}
+
+/** Returns true if this user should receive enriched company intelligence in notifications. */
+export function hasEnrichedNotifications(subscriptionStatus: string | null | undefined): boolean {
+  return getTierConfig(subscriptionStatus).enrichedNotifications;
+}
+
+/** Returns true if this user is eligible for job opening alert digests. */
+export function hasJobAlerts(subscriptionStatus: string | null | undefined): boolean {
+  return getTierConfig(subscriptionStatus).jobAlerts;
+}
+
+/** Returns true if user is on a paid plan that can receive any notifications at all. */
+export function canReceiveNotifications(subscriptionStatus: string | null | undefined): boolean {
+  return getTierConfig(subscriptionStatus).channels.length > 0;
 }
 
 export function getDeliverAfter(subscriptionStatus: string | null | undefined): Date | null {

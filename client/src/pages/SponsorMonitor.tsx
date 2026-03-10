@@ -7,7 +7,7 @@ import {
   AlertTriangle, Eye, Trash2, Clock, ArrowDown, ArrowUp, XCircle, PlusCircle, CalendarDays,
   Bell, Mail, MessageSquare, Phone, CheckCircle2, Send, Save, History, CheckCheck, XOctagon, Clock3,
   ExternalLink, Linkedin, CheckCircle, FileText, Lock, X, Zap, ShieldCheck, Smartphone,
-  ChevronDown, ChevronRight, Activity, Timer, FileSearch, Wifi, ArrowRight,
+  ChevronDown, ChevronRight, Activity, Timer, FileSearch, Wifi, ArrowRight, Briefcase,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import BrandLogo from "@/components/BrandLogo";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -340,7 +341,13 @@ function CompanyHistoryDialog({ fingerprint, companyName, open, onOpenChange, is
                   </div>
                 </div>
               ) : data.history.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">No recorded changes yet. This company has been stable since tracking began.</p>
+                <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
+                  <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800/50 rounded-full flex items-center justify-center mb-4 ring-8 ring-slate-50 dark:ring-slate-900/50">
+                    <ShieldCheck className="w-8 h-8 text-emerald-500" />
+                  </div>
+                  <h4 className="text-base font-semibold text-foreground mb-1">Clean Record</h4>
+                  <p className="text-sm text-muted-foreground max-w-[280px]">No recorded changes yet. This company has been perfectly stable since tracking began.</p>
+                </div>
               ) : (
                 <div className="relative pl-6">
                   <div className="absolute left-[9px] top-2 bottom-2 w-px bg-border" />
@@ -390,10 +397,10 @@ function HeroSection({ onScrollToSearch }: { onScrollToSearch: () => void }) {
     <section className="relative overflow-hidden bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-red-900/20 via-transparent to-transparent" />
       <div className="relative max-w-4xl mx-auto px-4 py-16 sm:py-24 text-center">
-        <p className="text-[11px] sm:text-xs font-bold tracking-[0.25em] uppercase text-red-400 mb-6">
+        <p className="text-[11px] sm:text-xs font-bold tracking-wide uppercase text-red-400 mb-6">
           UK Home Office Register Monitor
         </p>
-        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight leading-[1.1] mb-6">
+        <h1 className="text-3xl md:text-4xl font-bold tracking-tight leading-[1.1] mb-6">
           You Will Only Know Your Sponsor Was Revoked{" "}
           <span className="text-red-400">After It Is Too Late</span>
         </h1>
@@ -431,17 +438,17 @@ function ProofBar() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-0 sm:divide-x sm:divide-slate-700 text-center">
           <div className="px-4">
             <p className="text-2xl font-bold text-white">47,823</p>
-            <p className="text-xs text-slate-400 mt-0.5">Companies checked last night</p>
+            <p className="text-sm text-slate-300 mt-0.5">Companies checked last night</p>
           </div>
           <div className="px-4">
             <p className="text-2xl font-bold text-red-400">3 downgraded, 1 revoked</p>
-            <p className="text-xs text-slate-400 mt-0.5">Changes detected</p>
+            <p className="text-sm text-slate-300 mt-0.5">Changes detected</p>
           </div>
           <div className="px-4">
             <p className="text-2xl font-bold text-emerald-400">04:32 AM GMT</p>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-sm text-slate-300 mt-0.5">
               Alerts sent{" "}
-              <Link href="/sponsor-changes" className="underline hover:no-underline text-slate-300">View Recent Changes</Link>
+              <Link href="/sponsor-changes" className="underline hover:no-underline text-slate-200">View Recent Changes</Link>
             </p>
           </div>
         </div>
@@ -586,7 +593,7 @@ function PricingSection() {
         <p className="text-center text-muted-foreground mb-12">Keep your visa safe. Cancel anytime.</p>
 
         <div className="grid md:grid-cols-3 gap-5">
-          <Card className="border-amber-300/50 bg-amber-50/30 dark:bg-amber-950/10 dark:border-amber-800/30 opacity-80">
+          <Card className="border-amber-300/50 bg-amber-50/30 dark:bg-amber-950/10 dark:border-amber-800/30 grayscale-[40%]">
             <CardContent className="py-6">
               <p className="text-xs font-bold uppercase tracking-wider text-amber-600 mb-2">Search Only</p>
               <p className="text-3xl font-extrabold text-foreground mb-1">Free</p>
@@ -728,6 +735,7 @@ export default function SponsorMonitor() {
 
   const userPlan = user?.subscriptionStatus || "free";
   const isFreeUser = !isAuthenticated || userPlan === "free" || !userPlan;
+  const isProUser = isAuthenticated && (userPlan === "pro" || userPlan === "unlimited" || userPlan === "enterprise");
   const shouldSearch = debouncedQuery.trim().length >= 3;
   const [freeSearchResults, setFreeSearchResults] = useState<SponsorSearchResult[]>([]);
   const [freeSearchLoading, setFreeSearchLoading] = useState(false);
@@ -794,6 +802,23 @@ export default function SponsorMonitor() {
   });
 
   const activeWatches = watches?.filter((w) => w.isActive) ?? [];
+
+  // Job alert preferences (Pro users only)
+  const { data: jobAlertPrefs, isLoading: jobPrefsLoading } = useQuery<{fingerprint: string; enabled: boolean}[]>({
+    queryKey: ["/api/job-alert-preferences"],
+    enabled: isProUser,
+  });
+  const jobAlertPrefMap = new Map((jobAlertPrefs ?? []).map((p) => [p.fingerprint, p.enabled]));
+
+  const toggleJobAlertMutation = useMutation({
+    mutationFn: async ({ fingerprint, enabled }: { fingerprint: string; enabled: boolean }) => {
+      const res = await apiRequest("POST", "/api/job-alert-preferences", { fingerprint, enabled });
+      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.message || "Failed"); }
+      return res.json();
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/job-alert-preferences"] }); },
+    onError: (error: Error) => { toast({ title: "Could not update job alerts", description: error.message, variant: "destructive" }); },
+  });
 
   const addWatchMutation = useMutation({
     mutationFn: async (company: SponsorSearchResult) => {
@@ -894,9 +919,8 @@ export default function SponsorMonitor() {
 
       <nav className="sticky top-0 z-50 bg-slate-950/95 backdrop-blur-xl border-b border-slate-800">
         <div className="max-w-5xl mx-auto px-4 flex items-center justify-between h-14">
-          <Link href="/" className="flex items-center gap-2 shrink-0">
-            <div className="w-7 h-7 rounded-lg bg-white flex items-center justify-center"><Shield className="text-slate-900 w-3.5 h-3.5" /></div>
-            <span className="text-sm font-bold text-white">Check By AI</span>
+          <Link href="/" className="flex items-center shrink-0">
+            <BrandLogo variant="dark" />
           </Link>
           <div className="hidden sm:flex items-center gap-1">
             <Link href="/dashboard" className="px-3 py-1.5 text-sm text-slate-300 hover:text-white transition-colors rounded-lg hover:bg-white/5">Verify CoS</Link>
@@ -976,13 +1000,26 @@ export default function SponsorMonitor() {
           )}
 
           {effectiveResults && effectiveResults.length === 0 && shouldSearch && !effectiveLoading && !freeSearchLimitReached && (isAuthenticated || freeSearchDone) && (
-            <Card className="mt-4">
-              <CardContent className="py-8 text-center">
-                <Building2 className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
-                <p className="text-muted-foreground">No sponsors found matching "{debouncedQuery}"</p>
-                <p className="text-sm text-muted-foreground/60 mt-1">Try a different spelling or a shorter search term</p>
-              </CardContent>
-            </Card>
+            <div className="mt-8 text-center py-12 px-4 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/50 dark:bg-slate-900/20">
+              <div className="relative w-20 h-20 mx-auto mb-6">
+                <div className="absolute inset-0 bg-slate-200 dark:bg-slate-800 rounded-full animate-ping opacity-20" />
+                <div className="relative w-full h-full bg-white dark:bg-slate-800 rounded-full flex items-center justify-center shadow-lg shadow-slate-200/50 dark:shadow-none border border-slate-100 dark:border-slate-700">
+                  <Search className="w-8 h-8 text-slate-400" />
+                </div>
+              </div>
+              <h3 className="text-xl font-bold text-foreground mb-2">No Sponsors Found</h3>
+              <p className="text-muted-foreground max-w-sm mx-auto mb-6">
+                We couldn't find any exact matches for "{debouncedQuery}" in the UK Home Office register.
+              </p>
+              <div className="inline-flex flex-col items-start text-sm text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm text-left">
+                <span className="font-semibold text-foreground mb-2 flex items-center gap-2"><Activity className="w-4 h-4 text-primary" />Search Tips:</span>
+                <ul className="space-y-2">
+                  <li className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600 mt-1.5 shrink-0" />Check for spelling errors</li>
+                  <li className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600 mt-1.5 shrink-0" />Use fewer words (e.g., "Tech" instead of "Tech Solutions Ltd")</li>
+                  <li className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600 mt-1.5 shrink-0" />Try removing "Limited" or "Ltd"</li>
+                </ul>
+              </div>
+            </div>
           )}
 
           {hasSearchResults && (
@@ -1103,16 +1140,32 @@ export default function SponsorMonitor() {
             )}
 
             {!watchesLoading && !watchesError && activeWatches.length === 0 && (
-              <Card className="border-dashed">
-                <CardContent className="py-10 text-center">
-                  <Eye className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
-                  <h3 className="font-semibold text-foreground mb-1">No companies watched yet</h3>
-                  <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                    {isFreeUser ? "Upgrade to a paid plan to add companies to your watchlist." : "Search above to find a company and add it to your watchlist."}
-                  </p>
-                  {isFreeUser && <Button variant="default" size="sm" className="mt-4" onClick={() => setLocation("/pricing")}>View Plans</Button>}
-                </CardContent>
-              </Card>
+              <div className="text-center py-16 px-4 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl bg-slate-50/50 dark:bg-slate-900/20">
+                <div className="w-24 h-24 mx-auto mb-6 relative">
+                  <div className="absolute inset-0 bg-primary/10 rounded-full animate-pulse blur-xl" />
+                  <div className="relative w-full h-full bg-white dark:bg-slate-800 rounded-full flex items-center justify-center shadow-xl shadow-primary/5 border border-primary/10">
+                    <Eye className="w-10 h-10 text-primary" />
+                  </div>
+                </div>
+                <h3 className="text-2xl font-bold text-foreground mb-3">Your Watchlist is Empty</h3>
+                <p className="text-muted-foreground max-w-md mx-auto mb-8 leading-relaxed">
+                  {isFreeUser 
+                    ? "Don't get caught off guard by a sudden visa revocation. Upgrade to add companies to your watchlist and receive instant alerts."
+                    : "Search for your employer above and click 'Add to Watchlist'. We'll monitor their licence status every night and alert you if anything changes."}
+                </p>
+                {isFreeUser ? (
+                  <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/25 rounded-full font-bold px-8 h-12" onClick={() => setLocation("/pricing")}>
+                    <ShieldCheck className="w-5 h-5 mr-2" />View Premium Plans
+                  </Button>
+                ) : (
+                  <Button size="lg" variant="outline" className="rounded-full font-bold px-8 h-12 border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => {
+                    const searchInput = document.querySelector('input[type="text"]') as HTMLInputElement;
+                    if (searchInput) searchInput.focus();
+                  }}>
+                    <Search className="w-4 h-4 mr-2" />Start Searching
+                  </Button>
+                )}
+              </div>
             )}
 
             <AnimatePresence mode="popLayout">
@@ -1138,6 +1191,43 @@ export default function SponsorMonitor() {
                               <a href="https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary hover:underline"><ExternalLink className="w-3 h-3" /> Gov.uk</a>
                               <a href={`https://www.linkedin.com/search/results/companies/?keywords=${encodeURIComponent(watch.organisationName)}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary hover:underline"><Linkedin className="w-3 h-3" /> LinkedIn</a>
                             </div>
+
+                            {/* Job Alert Toggle — Pro users only */}
+                            {isProUser && watch.fingerprint && (
+                              <div className="mt-3 pt-3 border-t border-border/40">
+                                <div className="flex items-center justify-between gap-3">
+                                  <div className="flex items-center gap-2">
+                                    <Briefcase className="w-3.5 h-3.5 text-violet-500" />
+                                    <span className="text-xs font-medium text-foreground">Job Opening Alerts</span>
+                                    <Badge className="text-[9px] px-1.5 py-0 bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-950 dark:text-violet-300 dark:border-violet-800">Pro</Badge>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {toggleJobAlertMutation.isPending && toggleJobAlertMutation.variables?.fingerprint === watch.fingerprint
+                                      ? <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+                                      : null}
+                                    <Switch
+                                      id={`job-alert-${watch.id}`}
+                                      checked={jobAlertPrefMap.get(watch.fingerprint!) ?? false}
+                                      disabled={jobPrefsLoading || toggleJobAlertMutation.isPending}
+                                      onCheckedChange={(v) => toggleJobAlertMutation.mutate({ fingerprint: watch.fingerprint!, enabled: v })}
+                                    />
+                                  </div>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1.5 ml-5">
+                                  {jobAlertPrefMap.get(watch.fingerprint!) ? (
+                                    <span className="text-emerald-600 dark:text-emerald-400 font-medium">✓ Enabled — we'll email you new job openings nightly</span>
+                                  ) : (
+                                    "Get nightly digests of new job openings from LinkedIn, Indeed, CV-Library & more"
+                                  )}
+                                </p>
+                              </div>
+                            )}
+                            {!isProUser && isAuthenticated && !isFreeUser && watch.fingerprint && (
+                              <div className="mt-3 pt-3 border-t border-border/40 flex items-center gap-2 text-xs text-muted-foreground">
+                                <Lock className="w-3.5 h-3.5 text-slate-400" />
+                                <span>Job alerts: <a href="/pricing" className="text-primary underline hover:no-underline font-medium">Upgrade to Pro</a> to enable</span>
+                              </div>
+                            )}
                           </div>
                           <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-destructive shrink-0" disabled={isRemoving} onClick={() => removeWatchMutation.mutate(watch.id)}>
                             {isRemoving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}<span className="sr-only">Remove</span>
@@ -1190,10 +1280,7 @@ export default function SponsorMonitor() {
 
       <footer className="bg-slate-950 border-t border-slate-800 text-slate-400 py-8">
         <div className="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
-          <div className="flex items-center gap-2">
-            <Shield className="w-4 h-4" />
-            <span>Check By AI</span>
-          </div>
+            <BrandLogo variant="dark" showText size="sm" className="opacity-70 grayscale hover:grayscale-0 transition-all duration-300" />
           <div className="flex items-center gap-4">
             <Link href="/dashboard" className="hover:text-white transition-colors">Verify CoS</Link>
             <Link href="/pricing" className="hover:text-white transition-colors">Pricing</Link>

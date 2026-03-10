@@ -99,8 +99,12 @@ function NotificationPlanCard({ plan, index, isLoggedIn, loading, onSelect }: {
       )}
 
       <div className="p-6 pb-4">
-        <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mb-3">
-          <plan.icon className="w-6 h-6 text-foreground" />
+        <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 ${
+          plan.name.includes("Starter") ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400" :
+          plan.name.includes("Pro") ? "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400" :
+          "bg-primary/20 text-primary"
+        }`}>
+          <plan.icon className="w-6 h-6" />
         </div>
         <h3 className="text-xl font-bold text-foreground">
           {plan.name}

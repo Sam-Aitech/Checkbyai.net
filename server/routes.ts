@@ -9,7 +9,7 @@ import { db } from "./db";
 import { sql, eq, and, desc, inArray, gte, lt } from "drizzle-orm";
 import { setupAuth, isAuthenticated, isAdmin } from "./auth";
 import { checkIpRateLimit, recordIpVerification, getClientIp, hashIpAddress } from "./ipRateLimit";
-import { insertVerificationResultSchema, insertFeedbackSchema, companyWatches, sponsorList, sponsorCanonical, sponsorChanges, notificationPreferences, notificationLog, dailyDigest, users, verificationResults, processedCheckouts } from "@shared/schema";
+import { insertVerificationResultSchema, insertFeedbackSchema, companyWatches, sponsorList, sponsorCanonical, sponsorChanges, notificationPreferences, notificationLog, dailyDigest, users, verificationResults, processedCheckouts, jobAlertPreferences } from "@shared/schema";
 import { authLimiter, verifyLimiter } from "./middleware/rateLimiter";
 import { withRetry } from "./utils/dbRetry";
 import multer from "multer";
@@ -19,6 +19,11 @@ import bcrypt from "bcrypt";
 import { rebuildSponsorIndex, searchSponsors, isIndexReady } from "./utils/sponsorSearch";
 import { normalizeName, downloadAndParseSponsorList, storeSnapshot, getLatestSnapshotDate, generateFingerprint } from "./utils/sponsorListFetcher";
 import { runSponsorMonitorJob, startSponsorMonitorCron, isJobRunning, getLastRunInfo, checkAndTriggerIfNeeded } from "./utils/sponsorMonitorJob";
+import { startJobAlertScheduler } from "./utils/jobAlertJob";
+
+// Start background schedulers
+startJobAlertScheduler();
+
 import { generateHeadline, signDigest, deterministicHeadline } from "./services/aiDigest";
 import { encryptPhone, decryptPhone } from "./utils/phoneCrypto";
 import { sendSMS, sendWhatsApp } from "./services/messaging";
@@ -2050,6 +2055,58 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
       res.status(500).json({ message: "Failed to fetch tier configuration." });
     }
   });
+
+  // ─── Job Alert Preferences (Pro plan only) ───────────────────────────────────
+
+  app.get('/api/job-alert-preferences', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const plan = req.user.subscriptionStatus || 'free';
+      if (plan !== 'pro' && plan !== 'unlimited' && plan !== 'enterprise') {
+        return res.json([]);
+      }
+      const prefs = await db
+        .select()
+        .from(jobAlertPreferences)
+        .where(eq(jobAlertPreferences.userId, userId));
+      res.json(prefs);
+    } catch (err) {
+      console.error('Error fetching job alert preferences:', err);
+      res.status(500).json({ message: 'Failed to fetch job alert preferences.' });
+    }
+  });
+
+  app.post('/api/job-alert-preferences', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const plan = req.user.subscriptionStatus || 'free';
+      if (plan !== 'pro' && plan !== 'unlimited' && plan !== 'enterprise') {
+        return res.status(403).json({ message: 'Job alerts require a Pro plan. Please upgrade.' });
+      }
+      const schema = z.object({
+        fingerprint: z.string().min(1).max(500),
+        enabled: z.boolean(),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: 'Invalid request body.' });
+      }
+      const { fingerprint, enabled } = parsed.data;
+      await db
+        .insert(jobAlertPreferences)
+        .values({ userId, fingerprint, enabled, createdAt: new Date(), updatedAt: new Date() })
+        .onConflictDoUpdate({
+          target: [jobAlertPreferences.userId, jobAlertPreferences.fingerprint],
+          set: { enabled, updatedAt: new Date() },
+        });
+      res.json({ success: true, fingerprint, enabled });
+    } catch (err) {
+      console.error('Error saving job alert preference:', err);
+      res.status(500).json({ message: 'Failed to save preference.' });
+    }
+  });
+
+
 
   app.post('/api/notification-preferences/verify-phone', isAuthenticated, async (req: any, res) => {
     try {

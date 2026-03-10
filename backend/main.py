@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 
 from cos_verifier import COSVerifier
 from ai_engine import AIEngine
+from job_scraper import router as job_scraper_router
 
 # Performance-optimized FastAPI app
 app = FastAPI(
@@ -45,6 +46,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Register job scraper routes (POST /api/scrape-jobs)
+app.include_router(job_scraper_router)
+
 
 # Initialize AI comparison engine with caching
 @lru_cache(maxsize=1)
