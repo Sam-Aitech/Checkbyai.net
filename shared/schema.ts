@@ -229,6 +229,11 @@ export const processedCheckouts = pgTable("processed_checkouts", {
 // ==========================================
 
 // Canonical sponsor records — single source of truth for all sponsors
+// Status state machine:
+//   ACTIVE          — currently on register, established (grantedAt < today)
+//   NEWLY_GRANTED   — appeared in today's CSV, was not previously known
+//   GRACE_PERIOD    — absent from today's CSV for exactly 1 day (awaiting confirmation)
+//   REMOVED_REVOKED — absent 2+ consecutive days, confirmed removed from register
 export const sponsorCanonical = pgTable(
   "sponsor_canonical",
   {
@@ -238,9 +243,11 @@ export const sponsorCanonical = pgTable(
     townCity: text("town_city"),
     typeRating: text("type_rating"),
     route: text("route"),
-    status: text("status").notNull().default("ACTIVE"), // ACTIVE | NOT_LISTED
+    status: text("status").notNull().default("ACTIVE"), // ACTIVE | NEWLY_GRANTED | GRACE_PERIOD | REMOVED_REVOKED
     firstSeen: date("first_seen").notNull(),
     lastSeen: date("last_seen").notNull(),
+    grantedAt: date("granted_at").notNull(),            // date of first appearance on register
+    removedAt: timestamp("removed_at", { withTimezone: true }), // set when status → REMOVED_REVOKED
     consecutiveMisses: integer("consecutive_misses").notNull().default(0),
     historicalNames: text("historical_names").array().default([]),
   },
@@ -248,6 +255,7 @@ export const sponsorCanonical = pgTable(
     uniqueIndex("idx_sponsor_canonical_fingerprint").on(table.fingerprint),
     index("idx_sponsor_canonical_status").on(table.status),
     index("idx_sponsor_canonical_current_name").on(table.currentName),
+    index("idx_sponsor_canonical_granted_at").on(table.grantedAt),
   ]
 );
 
@@ -295,12 +303,15 @@ export const companyWatches = pgTable(
 );
 
 // Logs every detected change in the sponsor register
+// changeType values: NEW_LICENCE | RE_ACTIVATED | REMOVED_REVOKED |
+//                    UPGRADED | DOWNGRADED | ROUTE_CHANGE | NAME_CHANGE
 export const sponsorChanges = pgTable(
   "sponsor_changes",
   {
     id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
     organisationName: varchar("organisation_name").notNull(),
-    changeType: varchar("change_type").notNull(), // 'REMOVED', 'ADDED', 'DOWNGRADED', 'UPGRADED', 'ROUTE_CHANGE'
+    fingerprint: text("fingerprint"),              // direct link to sponsor_canonical.fingerprint
+    changeType: varchar("change_type").notNull(),
     previousValue: varchar("previous_value"),
     newValue: varchar("new_value"),
     detectedAt: timestamp("detected_at").defaultNow(),
@@ -308,6 +319,7 @@ export const sponsorChanges = pgTable(
   },
   (table) => [
     index("idx_sponsor_changes_org_name").on(table.organisationName),
+    index("idx_sponsor_changes_fingerprint").on(table.fingerprint),
     index("idx_sponsor_changes_snapshot_date").on(table.snapshotDate),
     index("idx_sponsor_changes_change_type").on(table.changeType),
   ]
@@ -470,7 +482,7 @@ export type Feedback = typeof feedback.$inferSelect;
 export type PaidSubmission = typeof paidSubmissions.$inferSelect;
 export type ExpertRequest = typeof expertRequests.$inferSelect;
 export type SponsorCanonicalEntry = typeof sponsorCanonical.$inferSelect;
-export type SponsorListEntry = typeof sponsorList.$inferSelect;
+export type SponsorListEntry = typeof sponsorList.$inferSelect;  // kept for admin snapshot routes
 export type CompanyWatch = typeof companyWatches.$inferSelect;
 export type SponsorChange = typeof sponsorChanges.$inferSelect;
 export type NotificationPreference = typeof notificationPreferences.$inferSelect;

@@ -80,13 +80,21 @@ export async function cleanupOldSnapshots(daysToKeep: number = 90): Promise<numb
   return deleted.length;
 }
 
-export type ChangeType = "REMOVED" | "ADDED" | "DOWNGRADED" | "UPGRADED" | "ROUTE_CHANGE" | "NAME_CHANGE" | "NEW_LICENCE";
+export type ChangeType =
+  | "NEW_LICENCE"     // company appears on register for the first time
+  | "RE_ACTIVATED"    // previously REMOVED_REVOKED, reappeared on register
+  | "REMOVED_REVOKED" // absent 2+ consecutive days, confirmed removed
+  | "UPGRADED"        // B-Rating → A-Rating
+  | "DOWNGRADED"      // A-Rating → B-Rating
+  | "ROUTE_CHANGE"    // route changed
+  | "NAME_CHANGE";    // organisation name changed
 
 export interface SponsorChange {
   organisationName: string;
   changeType: ChangeType;
   previousValue: string | null;
   newValue: string | null;
+  fingerprint?: string;  // links directly to sponsor_canonical.fingerprint
 }
 
 async function fetchWithTimeout(

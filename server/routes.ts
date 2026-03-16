@@ -16,7 +16,7 @@ import multer from "multer";
 import { z } from "zod";
 import { PDFAnalyzer } from "./services/pdfAnalyzer";
 import bcrypt from "bcrypt";
-import { rebuildSponsorIndex, searchSponsors, isIndexReady } from "./utils/sponsorSearch";
+import { rebuildSponsorIndex, searchSponsors, searchSponsorsFallback, ensureIndexReady, isIndexReady } from "./utils/sponsorSearch";
 import { normalizeName, downloadAndParseSponsorList, storeSnapshot, getLatestSnapshotDate, generateFingerprint } from "./utils/sponsorListFetcher";
 import { runSponsorMonitorJob, startSponsorMonitorCron, isJobRunning, getLastRunInfo, checkAndTriggerIfNeeded } from "./utils/sponsorMonitorJob";
 import { startJobAlertScheduler } from "./utils/jobAlertJob";
@@ -1352,14 +1352,13 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
         });
       }
 
-      if (!isIndexReady()) {
-        await rebuildSponsorIndex();
-        if (!isIndexReady()) {
-          return res.status(503).json({ message: "Sponsor search index is not yet available. Please try again shortly." });
-        }
-      }
+      // Attempt warm Fuse index first; fall back to pg_trgm if cold/empty.
+      // ensureIndexReady() deduplicates concurrent rebuild calls onto one DB fetch.
+      await ensureIndexReady();
+      const results = isIndexReady()
+        ? searchSponsors(q, 10)
+        : await searchSponsorsFallback(q, 10);
 
-      const results = searchSponsors(q, 10);
       freeSearchTracker.set(ip, Date.now());
       res.json({ results, freeSearchUsed: true });
     } catch (error) {
@@ -1510,14 +1509,12 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
         return res.status(400).json({ message: "Search query must be at least 3 characters long." });
       }
 
-      if (!isIndexReady()) {
-        await rebuildSponsorIndex();
-        if (!isIndexReady()) {
-          return res.status(503).json({ message: "Sponsor search index is not yet available. Please try again shortly." });
-        }
-      }
+      // Attempt warm Fuse index first; fall back to pg_trgm if cold/empty.
+      await ensureIndexReady();
+      const results = isIndexReady()
+        ? searchSponsors(q, 20)
+        : await searchSponsorsFallback(q, 20);
 
-      const results = searchSponsors(q, 20);
       res.json(results);
     } catch (error) {
       console.error("Error searching sponsors:", error);

@@ -2,11 +2,9 @@ import cron from "node-cron";
 import stringSimilarity from "string-similarity";
 import { db } from "../db";
 import { sponsorCanonical, sponsorChanges, dailyDigest, monitorJobRuns } from "@shared/schema";
-import { eq, and, ne, sql } from "drizzle-orm";
+import { eq, and, ne, inArray, sql } from "drizzle-orm";
 import {
   downloadAndParseSponsorList,
-  storeSnapshot,
-  cleanupOldSnapshots,
   generateFingerprint,
   type SponsorRecord,
   type SponsorChange,
@@ -49,9 +47,11 @@ interface CanonicalRecord {
   townCity: string | null;
   typeRating: string | null;
   route: string | null;
-  status: string;
+  status: string; // ACTIVE | NEWLY_GRANTED | GRACE_PERIOD | REMOVED_REVOKED
   firstSeen: string;
   lastSeen: string;
+  grantedAt: string;
+  removedAt: Date | null;
   consecutiveMisses: number;
   historicalNames: string[] | null;
 }
@@ -272,17 +272,37 @@ async function downloadWithRetry(): Promise<SponsorRecord[]> {
   throw lastError || new Error("CSV download failed after all retries");
 }
 
-async function loadActiveCanonical(): Promise<Map<string, CanonicalRecord>> {
+// ── Canonical data loaders ────────────────────────────────────────────────────
+
+/**
+ * Loads all LIVE canonical records (ACTIVE + NEWLY_GRANTED + GRACE_PERIOD).
+ * Used by the reconcile engine to classify today's CSV records.
+ * Excludes REMOVED_REVOKED — those are handled by loadRevokedFingerprints().
+ */
+async function loadLiveCanonical(): Promise<Map<string, CanonicalRecord>> {
   const records = await db
     .select()
     .from(sponsorCanonical)
-    .where(eq(sponsorCanonical.status, "ACTIVE"));
+    .where(inArray(sponsorCanonical.status, ["ACTIVE", "NEWLY_GRANTED", "GRACE_PERIOD"]));
 
   const map = new Map<string, CanonicalRecord>();
   for (const r of records) {
     map.set(r.fingerprint, r as CanonicalRecord);
   }
   return map;
+}
+
+/**
+ * Loads only the fingerprints of REMOVED_REVOKED records.
+ * Lightweight (SELECT fingerprint only) — used to detect re-activations
+ * when a previously revoked company reappears in today's CSV.
+ */
+async function loadRevokedFingerprints(): Promise<Set<string>> {
+  const rows = await db
+    .select({ fingerprint: sponsorCanonical.fingerprint })
+    .from(sponsorCanonical)
+    .where(eq(sponsorCanonical.status, "REMOVED_REVOKED"));
+  return new Set(rows.map((r) => r.fingerprint));
 }
 
 function buildTodayRecords(csvRecords: SponsorRecord[]): Map<string, TodayRecord> {
@@ -302,21 +322,49 @@ function buildTodayRecords(csvRecords: SponsorRecord[]): Map<string, TodayRecord
   return map;
 }
 
+/**
+ * 4-Phase bulk SQL reconciliation engine.
+ *
+ * Replaces the old row-by-row approach with bulk set-operations:
+ *
+ *  Phase 1  — Classify all today's CSV records against the live canonical map.
+ *             Emit attribute-change events (UPGRADED/DOWNGRADED/NAME_CHANGE).
+ *             Bulk-UPDATE matched records (lastSeen, reset consecutiveMisses,
+ *             promote NEWLY_GRANTED → ACTIVE where grantedAt < today).
+ *
+ *  Phase 2a — Re-activations: fingerprints in today's CSV that are in
+ *             REMOVED_REVOKED state → bulk-UPDATE to NEWLY_GRANTED.
+ *
+ *  Phase 2b — Genuinely new companies: bulk-INSERT as NEWLY_GRANTED with
+ *             grantedAt = today.
+ *
+ *  Phase 3a — First-absence: ACTIVE/NEWLY_GRANTED records NOT in today's CSV
+ *             → bulk-UPDATE consecutiveMisses=1, status=GRACE_PERIOD.
+ *             Rename detection runs here first (city+route locality index).
+ *
+ *  Phase 3b — Confirmed removal: GRACE_PERIOD records NOT in today's CSV
+ *             → bulk-UPDATE to REMOVED_REVOKED with removedAt timestamp.
+ */
 async function reconcile(
-  canonicalMap: Map<string, CanonicalRecord>,
+  liveMap: Map<string, CanonicalRecord>,
+  revokedSet: Set<string>,
   todayMap: Map<string, TodayRecord>,
   today: string,
 ): Promise<SponsorChange[]> {
   const changes: SponsorChange[] = [];
-  const matchedFingerprints = new Set<string>();
-  const newRecordsToday: TodayRecord[] = [];
   const matchedIds: number[] = [];
   const individualUpdates: { id: number; todayRec: TodayRecord; canonical: CanonicalRecord }[] = [];
+  const reactivationFps: string[] = [];
+  const reactivationRecords: TodayRecord[] = [];
+  const newRecords: TodayRecord[] = [];
 
-  // Phase 1: Compare today's records against canonical (in-memory first)
-  console.log(`[Reconciliation] Phase 1: Comparing ${todayMap.size} records against ${canonicalMap.size} canonical...`);
+  // ── Phase 1: Classify today's CSV records ────────────────────────────────
+  console.log(
+    `[Reconciliation] Phase 1: Classifying ${todayMap.size} CSV records ` +
+    `against ${liveMap.size} live + ${revokedSet.size} revoked canonical entries...`
+  );
   for (const [fp, todayRec] of Array.from(todayMap.entries())) {
-    const canonical = canonicalMap.get(fp);
+    const canonical = liveMap.get(fp);
 
     if (canonical) {
       matchedFingerprints.add(fp);
@@ -339,6 +387,7 @@ async function reconcile(
               changeType: ratingChange,
               previousValue: prevRating,
               newValue: currRating,
+              fingerprint: todayRec.fingerprint,
             });
           }
         }
@@ -349,16 +398,23 @@ async function reconcile(
             changeType: "NAME_CHANGE",
             previousValue: canonical.currentName,
             newValue: todayRec.organisationName,
+            fingerprint: todayRec.fingerprint,
           });
         }
       }
+    } else if (revokedSet.has(fp)) {
+      reactivationFps.push(fp);
+      reactivationRecords.push(todayRec);
     } else {
-      newRecordsToday.push(todayRec);
+      newRecords.push(todayRec);
     }
   }
 
-  // Phase 1a: Bulk update all matched records (lastSeen + consecutiveMisses reset)
-  console.log(`[Reconciliation] Phase 1a: Bulk updating ${matchedIds.length} matched records...`);
+  // ── Phase 1a: Bulk UPDATE matched records ────────────────────────────────
+  // Reset consecutiveMisses, update lastSeen.
+  // Also promotes NEWLY_GRANTED → ACTIVE when grantedAt < today
+  // (company was "new" yesterday, now established).
+  console.log(`[Reconciliation] Phase 1a: Bulk-updating ${matchedIds.length} matched records...`);
   const BULK_BATCH = 500;
   for (let i = 0; i < matchedIds.length; i += BULK_BATCH) {
     const batch = matchedIds.slice(i, i + BULK_BATCH);
@@ -366,8 +422,14 @@ async function reconcile(
       const placeholders = batch.map((id) => sql`${id}`);
       const arrayExpr = sql`ARRAY[${sql.join(placeholders, sql`, `)}]::int[]`;
       await db.execute(sql`
-        UPDATE sponsor_canonical 
-        SET last_seen = ${today}, consecutive_misses = 0 
+        UPDATE sponsor_canonical
+        SET
+          last_seen          = ${today},
+          consecutive_misses = 0,
+          status             = CASE
+            WHEN status = 'NEWLY_GRANTED' AND granted_at < ${today}::date THEN 'ACTIVE'
+            ELSE status
+          END
         WHERE id = ANY(${arrayExpr})
       `);
     }, `Phase1a bulk update batch at ${i}`);
@@ -376,16 +438,16 @@ async function reconcile(
     }
   }
 
-  // Phase 1b: Individual updates for records with actual changes (name/rating)
-  console.log(`[Reconciliation] Phase 1b: ${individualUpdates.length} records with name/rating changes...`);
+  // ── Phase 1b: Individual updates for attribute changes (name/rating/route) ─
+  console.log(`[Reconciliation] Phase 1b: ${individualUpdates.length} records with attribute changes...`);
   for (const { id, todayRec, canonical } of individualUpdates) {
     await withRetry(async () => {
       await db
         .update(sponsorCanonical)
         .set({
           currentName: todayRec.organisationName,
-          typeRating: todayRec.typeRating || null,
-          route: todayRec.route || null,
+          typeRating:  todayRec.typeRating || null,
+          route:       todayRec.route || null,
         })
         .where(eq(sponsorCanonical.id, id));
 
@@ -403,195 +465,227 @@ async function reconcile(
     }, `Phase1b update ${todayRec.organisationName}`);
   }
 
-  // Phase 1c: Insert genuinely new records in batches
-  console.log(`[Reconciliation] Phase 1c: Inserting ${newRecordsToday.length} new records...`);
+  // ── Phase 2a: Re-activations (REMOVED_REVOKED → NEWLY_GRANTED) ───────────
+  if (reactivationFps.length > 0) {
+    console.log(`[Reconciliation] Phase 2a: Re-activating ${reactivationFps.length} previously revoked companies...`);
+    for (let i = 0; i < reactivationFps.length; i += BULK_BATCH) {
+      const batch = reactivationFps.slice(i, i + BULK_BATCH);
+      await withRetry(async () => {
+        await db
+          .update(sponsorCanonical)
+          .set({
+            status:            "NEWLY_GRANTED",
+            lastSeen:          today,
+            grantedAt:         today,
+            consecutiveMisses: 0,
+            removedAt:         null,
+          })
+          .where(inArray(sponsorCanonical.fingerprint, batch));
+      }, `Phase2a re-activation batch ${i}`);
+    }
+    for (const r of reactivationRecords) {
+      changes.push({
+        organisationName: r.organisationName,
+        changeType:       "RE_ACTIVATED",
+        previousValue:    null,
+        newValue:         r.typeRating || null,
+        fingerprint:      r.fingerprint,
+      });
+    }
+  }
+
+  // ── Phase 2b: Insert genuinely new companies (NEWLY_GRANTED) ─────────────
+  console.log(`[Reconciliation] Phase 2b: Inserting ${newRecords.length} new companies as NEWLY_GRANTED...`);
   const INSERT_BATCH = 250;
   let insertedCount = 0;
-  for (let i = 0; i < newRecordsToday.length; i += INSERT_BATCH) {
-    const batch = newRecordsToday.slice(i, i + INSERT_BATCH);
+  for (let i = 0; i < newRecords.length; i += INSERT_BATCH) {
+    const batch = newRecords.slice(i, i + INSERT_BATCH);
     try {
       const result = await withRetry(async () => {
         return await db.insert(sponsorCanonical).values(
-          batch.map(newRec => ({
-            fingerprint: newRec.fingerprint,
-            currentName: newRec.organisationName,
-            townCity: newRec.townCity || null,
-            typeRating: newRec.typeRating || null,
-            route: newRec.route || null,
-            status: "ACTIVE",
-            firstSeen: today,
-            lastSeen: today,
+          batch.map((r) => ({
+            fingerprint:       r.fingerprint,
+            currentName:       r.organisationName,
+            townCity:          r.townCity || null,
+            typeRating:        r.typeRating || null,
+            route:             r.route || null,
+            status:            "NEWLY_GRANTED",
+            firstSeen:         today,
+            lastSeen:          today,
+            grantedAt:         today,
             consecutiveMisses: 0,
-            historicalNames: [] as string[],
+            historicalNames:   [] as string[],
           }))
         ).onConflictDoNothing().returning({ id: sponsorCanonical.id });
-      }, `Phase1c insert batch at ${i}`);
+      }, `Phase2b insert batch at ${i}`);
 
-      for (const newRec of batch.slice(0, result.length)) {
+      for (const r of batch.slice(0, result.length)) {
         changes.push({
-          organisationName: newRec.organisationName,
-          changeType: "NEW_LICENCE",
-          previousValue: null,
-          newValue: newRec.typeRating || null,
+          organisationName: r.organisationName,
+          changeType:       "NEW_LICENCE",
+          previousValue:    null,
+          newValue:         r.typeRating || null,
+          fingerprint:      r.fingerprint,
         });
       }
       insertedCount += result.length;
     } catch (err: any) {
-      console.error(`[Reconciliation] Error inserting batch at ${i}:`, err.message);
+      console.error(`[Reconciliation] Phase 2b error inserting batch at ${i}:`, err.message);
     }
   }
-  console.log(`[Reconciliation] Phase 1c: ${insertedCount} of ${newRecordsToday.length} new records inserted.`);
+  console.log(`[Reconciliation] Phase 2b: ${insertedCount}/${newRecords.length} new records inserted.`);
 
-  // Phase 2: Process missing records (in canonical but not in today's CSV)
-  const missingRecords: CanonicalRecord[] = [];
-  for (const [fp, canonical] of Array.from(canonicalMap.entries())) {
-    if (!matchedFingerprints.has(fp) && !todayMap.has(fp)) {
-      missingRecords.push(canonical);
-    }
+  // ── Phase 3: Missing records (live but absent from today's CSV) ──────────
+  const missingFps: string[] = [];
+  for (const fp of Array.from(liveMap.keys())) {
+    if (!todayMap.has(fp)) missingFps.push(fp);
   }
 
-  if (missingRecords.length > 0) {
-    const missingRatio = canonicalMap.size > 0 ? missingRecords.length / canonicalMap.size : 0;
-    if (missingRatio > 0.1 && missingRecords.length > 100) {
+  if (missingFps.length > 0) {
+    const missingRatio = liveMap.size > 0 ? missingFps.length / liveMap.size : 0;
+    if (missingRatio > 0.1 && missingFps.length > 100) {
       console.warn(
-        `[Reconciliation] WARNING: ${missingRecords.length} of ${canonicalMap.size} (${(missingRatio * 100).toFixed(1)}%) canonical records missing from today's CSV. ` +
-        `This may indicate a data format change. Processing normally but flagging for review.`
+        `[Reconciliation] WARNING: ${missingFps.length}/${liveMap.size} ` +
+        `(${(missingRatio * 100).toFixed(1)}%) live records absent from today's CSV. ` +
+        `Possible CSV format change — processing normally but flagging for review.`
       );
     }
 
-    console.log(`[Reconciliation] Processing ${missingRecords.length} missing record(s)...`);
+    // Separate first-absence (ACTIVE/NEWLY_GRANTED) from confirmed (GRACE_PERIOD)
+    const firstAbsenceFps = missingFps.filter((fp) => {
+      const r = liveMap.get(fp)!;
+      return r.status === "ACTIVE" || r.status === "NEWLY_GRANTED";
+    });
+    const confirmedRemovalFps = missingFps.filter((fp) => liveMap.get(fp)!.status === "GRACE_PERIOD");
 
-    // ── Pre-build a cityRoute index to fix O(M×N) rename detection ────────────────
-    // BEFORE: for each missing record, iterate ALL newRecordsToday looking for
-    //   name matches — this is O(M×N) where M=missing, N=new. At 200x300 that's
-    //   60,000 bigram similarity calls inside a DB-writing await loop.
-    //
-    // AFTER: pre-group new records by normalised "city|route" composite key.
-    //   Most missing records will have 0-5 matches in the same city+route,
-    //   reducing average calls to O(M × locality_factor) ≈ O(M).
+    // ── Rename detection (runs before Phase 3a, on first-absence only) ──────
+    // Groups new records by city+route to avoid O(M×N) similarity calls.
     const newRecsByCityRoute = new Map<string, TodayRecord[]>();
-    for (const newRec of newRecordsToday) {
-      const key = `${(newRec.townCity || '').toLowerCase().trim()}|${(newRec.route || '').toLowerCase().trim()}`;
+    for (const r of newRecords) {
+      const key = `${(r.townCity || "").toLowerCase().trim()}|${(r.route || "").toLowerCase().trim()}`;
       if (!newRecsByCityRoute.has(key)) newRecsByCityRoute.set(key, []);
-      newRecsByCityRoute.get(key)!.push(newRec);
+      newRecsByCityRoute.get(key)!.push(r);
     }
 
-    for (const missing of missingRecords) {
-      const newMissCount = missing.consecutiveMisses + 1;
+    const renameHandled = new Set<string>(); // fps handled by rename detection
 
-      if (newMissCount === 1) {
-        // First absence: check only same-city-route candidates (O(locality) instead of O(N))
-        const cityRouteKey = `${(missing.townCity || '').toLowerCase().trim()}|${(missing.route || '').toLowerCase().trim()}`;
-        const candidates = newRecsByCityRoute.get(cityRouteKey) || [];
-        let renamed = false;
+    for (const fp of firstAbsenceFps) {
+      const missing = liveMap.get(fp)!;
+      const key = `${(missing.townCity || "").toLowerCase().trim()}|${(missing.route || "").toLowerCase().trim()}`;
+      const candidates = newRecsByCityRoute.get(key) || [];
 
-        for (const newRec of candidates) {
-            const similarity = stringSimilarity.compareTwoStrings(
-              missing.currentName.toLowerCase(),
-              newRec.organisationName.toLowerCase(),
-            );
+      for (const candidate of candidates) {
+        const similarity = stringSimilarity.compareTwoStrings(
+          missing.currentName.toLowerCase(),
+          candidate.organisationName.toLowerCase(),
+        );
 
-            if (similarity >= RENAME_SIMILARITY_THRESHOLD) {
-              console.log(
-                `[Reconciliation] Rename detected: "${missing.currentName}" → "${newRec.organisationName}" (similarity: ${(similarity * 100).toFixed(1)}%)`
-              );
+        if (similarity >= RENAME_SIMILARITY_THRESHOLD) {
+          console.log(
+            `[Reconciliation] Rename detected: "${missing.currentName}" → ` +
+            `"${candidate.organisationName}" (${(similarity * 100).toFixed(1)}%)`
+          );
 
-              const existingHistorical = missing.historicalNames || [];
-              const updatedHistorical = existingHistorical.includes(missing.currentName)
-                ? existingHistorical
-                : [...existingHistorical, missing.currentName];
+          const existingHistorical = missing.historicalNames || [];
+          const updatedHistorical = existingHistorical.includes(missing.currentName)
+            ? existingHistorical
+            : [...existingHistorical, missing.currentName];
 
-              await withRetry(async () => {
-                await db
-                  .update(sponsorCanonical)
-                  .set({
-                    fingerprint: newRec.fingerprint,
-                    currentName: newRec.organisationName,
-                    lastSeen: today,
-                    consecutiveMisses: 0,
-                    historicalNames: updatedHistorical,
-                    typeRating: newRec.typeRating || missing.typeRating,
-                  })
-                  .where(eq(sponsorCanonical.id, missing.id));
-              }, `Rename update ${missing.currentName}`);
-
-              try {
-                await db
-                  .delete(sponsorCanonical)
-                  .where(
-                    and(
-                      eq(sponsorCanonical.fingerprint, newRec.fingerprint),
-                      ne(sponsorCanonical.id, missing.id),
-                    )
-                  );
-              } catch (err) {
-                console.error(`[SponsorMonitorJob] Failed to delete duplicate canonical record for fingerprint ${newRec.fingerprint}:`, err);
-              }
-
-              changes.push({
-                organisationName: newRec.organisationName,
-                changeType: "NAME_CHANGE",
-                previousValue: missing.currentName,
-                newValue: newRec.organisationName,
-              });
-
-              renamed = true;
-              break;
-            }
-        }
-
-        if (!renamed) {
           await withRetry(async () => {
             await db
               .update(sponsorCanonical)
-              .set({ consecutiveMisses: newMissCount })
+              .set({
+                fingerprint:       candidate.fingerprint,
+                currentName:       candidate.organisationName,
+                lastSeen:          today,
+                consecutiveMisses: 0,
+                historicalNames:   updatedHistorical,
+                typeRating:        candidate.typeRating || missing.typeRating,
+              })
               .where(eq(sponsorCanonical.id, missing.id));
-          }, `First absence ${missing.currentName}`);
+          }, `Rename ${missing.currentName} → ${candidate.organisationName}`);
 
-          console.log(
-            `[Reconciliation] First absence for "${missing.currentName}", waiting for confirmation.`
-          );
+          // Remove any duplicate row that may exist for the new fingerprint
+          try {
+            await db
+              .delete(sponsorCanonical)
+              .where(
+                and(
+                  eq(sponsorCanonical.fingerprint, candidate.fingerprint),
+                  ne(sponsorCanonical.id, missing.id),
+                )
+              );
+          } catch (err) {
+            console.error(`[Reconciliation] Could not remove duplicate for ${candidate.fingerprint}:`, err);
+          }
+
+          changes.push({
+            organisationName: candidate.organisationName,
+            changeType:       "NAME_CHANGE",
+            previousValue:    missing.currentName,
+            newValue:         candidate.organisationName,
+            fingerprint:      candidate.fingerprint,
+          });
+
+          renameHandled.add(fp);
+          break;
         }
-      } else if (newMissCount >= 2) {
+      }
+    }
+
+    // ── Phase 3a: First-absence → GRACE_PERIOD (bulk) ───────────────────────
+    const graceFps = firstAbsenceFps.filter((fp) => !renameHandled.has(fp));
+    if (graceFps.length > 0) {
+      console.log(`[Reconciliation] Phase 3a: ${graceFps.length} records → GRACE_PERIOD...`);
+      for (let i = 0; i < graceFps.length; i += BULK_BATCH) {
+        const batch = graceFps.slice(i, i + BULK_BATCH);
+        await withRetry(async () => {
+          await db
+            .update(sponsorCanonical)
+            .set({ consecutiveMisses: 1, status: "GRACE_PERIOD" })
+            .where(inArray(sponsorCanonical.fingerprint, batch));
+        }, `Phase3a grace period batch ${i}`);
+      }
+    }
+
+    // ── Phase 3b: Confirmed removal → REMOVED_REVOKED (bulk) ────────────────
+    if (confirmedRemovalFps.length > 0) {
+      console.log(`[Reconciliation] Phase 3b: ${confirmedRemovalFps.length} confirmed removals → REMOVED_REVOKED...`);
+      const removedAt = new Date();
+      for (let i = 0; i < confirmedRemovalFps.length; i += BULK_BATCH) {
+        const batch = confirmedRemovalFps.slice(i, i + BULK_BATCH);
         await withRetry(async () => {
           await db
             .update(sponsorCanonical)
             .set({
-              consecutiveMisses: newMissCount,
-              status: "NOT_LISTED",
+              consecutiveMisses: sql`${sponsorCanonical.consecutiveMisses} + 1`,
+              status:            "REMOVED_REVOKED",
+              removedAt,
             })
-            .where(eq(sponsorCanonical.id, missing.id));
-        }, `Confirmed removal ${missing.currentName}`);
-
+            .where(inArray(sponsorCanonical.fingerprint, batch));
+        }, `Phase3b removal batch ${i}`);
+      }
+      for (const fp of confirmedRemovalFps) {
+        const r = liveMap.get(fp)!;
         changes.push({
-          organisationName: missing.currentName,
-          changeType: "REMOVED",
-          previousValue: missing.typeRating,
-          newValue: null,
+          organisationName: r.currentName,
+          changeType:       "REMOVED_REVOKED",
+          previousValue:    r.typeRating,
+          newValue:         null,
+          fingerprint:      fp,
         });
-
-        console.log(
-          `[Reconciliation] Confirmed removal: "${missing.currentName}" (missing ${newMissCount} consecutive days)`
-        );
-      } else {
-        await withRetry(async () => {
-          await db
-            .update(sponsorCanonical)
-            .set({ consecutiveMisses: newMissCount })
-            .where(eq(sponsorCanonical.id, missing.id));
-        }, `Miss count update ${missing.currentName}`);
       }
     }
   }
 
-  // Summary
+  // ── Summary ───────────────────────────────────────────────────────────────
   const counts: Record<string, number> = {};
   for (const c of changes) counts[c.changeType] = (counts[c.changeType] || 0) + 1;
 
   console.log(
-    `[Reconciliation] Complete. Canonical: ${canonicalMap.size}, Today: ${todayMap.size}, ` +
-    `New: ${newRecordsToday.length}, Missing: ${missingRecords.length}, ` +
-    `Changes: ${changes.length} total` +
+    `[Reconciliation] Complete. Live: ${liveMap.size}, Today: ${todayMap.size}, ` +
+    `New: ${newRecords.length}, Reactivated: ${reactivationRecords.length}, ` +
+    `Missing: ${missingFps.length}, Changes: ${changes.length}` +
     (Object.keys(counts).length > 0
       ? ` (${Object.entries(counts).map(([k, v]) => `${k}: ${v}`).join(", ")})`
       : "")
@@ -669,22 +763,23 @@ export async function runSponsorMonitorJob(source: string = "cron", notifyOnFail
       return { ...result, error: msg };
     }
 
-    console.log(`[SponsorMonitorJob] Storing snapshot for ${today} (${currentRecords.length} records)...`);
-    await withRetry(() => storeSnapshot(currentRecords, today), "Store snapshot");
+    // Load live canonical (ACTIVE + NEWLY_GRANTED + GRACE_PERIOD)
+    // and revoked fingerprints for re-activation detection.
+    const [liveMap, revokedSet] = await Promise.all([
+      withRetry(() => loadLiveCanonical(),         "Load live canonical records"),
+      withRetry(() => loadRevokedFingerprints(),   "Load revoked fingerprints"),
+    ]);
 
-    const canonicalMap = await withRetry(() => loadActiveCanonical(), "Load canonical records");
-
-    if (canonicalMap.size === 0) {
-      console.log(`[SponsorMonitorJob] No canonical records found. This appears to be the first run.`);
-      console.log(`[SponsorMonitorJob] Run the migration endpoint (POST /api/admin/migrate-canonical) to populate canonical data from the latest snapshot.`);
-      await rebuildSponsorIndex();
-      result.success = true;
-      return result;
+    if (liveMap.size === 0) {
+      console.log(
+        `[SponsorMonitorJob] No live canonical records found — this is the first run. ` +
+        `All ${currentRecords.length} CSV records will be inserted as NEWLY_GRANTED.`
+      );
     }
 
     const todayMap = buildTodayRecords(currentRecords);
 
-    const detectedChanges = await reconcile(canonicalMap, todayMap, today);
+    const detectedChanges = await reconcile(liveMap, revokedSet, todayMap, today);
 
     await rebuildSponsorIndex();
 
@@ -705,10 +800,11 @@ export async function runSponsorMonitorJob(source: string = "cron", notifyOnFail
           const inserted = await db.insert(sponsorChanges).values(
             batch.map(change => ({
               organisationName: change.organisationName,
-              changeType: change.changeType,
-              previousValue: change.previousValue,
-              newValue: change.newValue,
-              snapshotDate: today,
+              fingerprint:      change.fingerprint ?? null,
+              changeType:       change.changeType,
+              previousValue:    change.previousValue,
+              newValue:         change.newValue,
+              snapshotDate:     today,
             }))
           ).returning();
           savedChanges.push(...inserted);
@@ -738,16 +834,17 @@ export async function runSponsorMonitorJob(source: string = "cron", notifyOnFail
     }
 
     try {
-      const addedCount = changeCounts["ADDED"] || changeCounts["NEW_LICENCE"] || 0;
-      const updatedCount = (changeCounts["UPGRADED"] || 0) + (changeCounts["DOWNGRADED"] || 0) + (changeCounts["ROUTE_CHANGE"] || 0) + (changeCounts["NAME_CHANGE"] || 0);
-      const removedCount = changeCounts["REMOVED"] || 0;
+      const addedCount   = (changeCounts["NEW_LICENCE"]    || 0) + (changeCounts["RE_ACTIVATED"] || 0);
+      const updatedCount = (changeCounts["UPGRADED"]       || 0) + (changeCounts["DOWNGRADED"]   || 0)
+                         + (changeCounts["ROUTE_CHANGE"]   || 0) + (changeCounts["NAME_CHANGE"]  || 0);
+      const removedCount = changeCounts["REMOVED_REVOKED"] || 0;
 
       const removedCompanies = detectedChanges
-        .filter((c) => c.changeType === "REMOVED")
+        .filter((c) => c.changeType === "REMOVED_REVOKED")
         .slice(0, 10)
         .map((c) => c.organisationName);
       const addedCompanies = detectedChanges
-        .filter((c) => c.changeType === "ADDED" || c.changeType === "NEW_LICENCE")
+        .filter((c) => c.changeType === "NEW_LICENCE" || c.changeType === "RE_ACTIVATED")
         .slice(0, 5)
         .map((c) => c.organisationName);
 
@@ -825,9 +922,6 @@ export async function runSponsorMonitorJob(source: string = "cron", notifyOnFail
         },
       });
     }, "Log job success");
-
-    console.log(`[SponsorMonitorJob] Cleaning up snapshots older than 90 days...`);
-    await cleanupOldSnapshots(90);
 
     result.success = true;
 
@@ -916,9 +1010,9 @@ async function seedInitialDigest(): Promise<void> {
 
     const stats = await db
       .select({
-        total: sql<number>`count(*)::int`,
-        active: sql<number>`count(*) filter (where ${sponsorCanonical.status} = 'ACTIVE')::int`,
-        revoked: sql<number>`count(*) filter (where ${sponsorCanonical.status} = 'REMOVED')::int`,
+        total:   sql<number>`count(*)::int`,
+        active:  sql<number>`count(*) filter (where ${sponsorCanonical.status} in ('ACTIVE','NEWLY_GRANTED'))::int`,
+        revoked: sql<number>`count(*) filter (where ${sponsorCanonical.status} = 'REMOVED_REVOKED')::int`,
       })
       .from(sponsorCanonical);
 
