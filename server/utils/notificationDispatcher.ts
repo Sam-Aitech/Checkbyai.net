@@ -1,6 +1,6 @@
 import { db } from "../db";
-import { eq, and, gte, lte, sql, isNull, inArray } from "drizzle-orm";
-import { companyWatches, notificationPreferences, notificationLog, users } from "@shared/schema";
+import { eq, and, gte, lte, sql, inArray } from "drizzle-orm";
+import { companyWatches, notificationPreferences, notificationLog, users, sponsorChanges } from "@shared/schema";
 import type { SponsorChange } from "@shared/schema";
 import { normalizeName } from "./sponsorListFetcher";
 import { sendSMS, sendWhatsApp } from "../services/messaging";
@@ -395,15 +395,18 @@ export async function notifyAffectedUsers(change: SponsorChange): Promise<{ sent
           continue;
         }
 
+        // Dispatch all channels in parallel — email/SMS/WhatsApp are independent I/O
+        const channelPromises: Promise<void>[] = [];
         for (const channel of tierConfig.channels) {
           if (channel === "email" && emailEnabled) {
-            await sendNotificationViaChannel("email", watch.userId, change.id, recipientEmail, null, null, subject, html, plainText, stats);
+            channelPromises.push(sendNotificationViaChannel("email", watch.userId, change.id, recipientEmail, null, null, subject, html, plainText, stats));
           } else if (channel === "whatsapp" && prefs?.whatsappEnabled && prefs?.whatsappVerified && prefs?.whatsappNumber) {
-            await sendNotificationViaChannel("whatsapp", watch.userId, change.id, null, null, prefs.whatsappNumber, subject, html, plainText, stats);
+            channelPromises.push(sendNotificationViaChannel("whatsapp", watch.userId, change.id, null, null, prefs.whatsappNumber, subject, html, plainText, stats));
           } else if (channel === "sms" && prefs?.smsEnabled && prefs?.smsVerified && prefs?.smsNumber) {
-            await sendNotificationViaChannel("sms", watch.userId, change.id, null, prefs.smsNumber, null, subject, html, plainText, stats);
+            channelPromises.push(sendNotificationViaChannel("sms", watch.userId, change.id, null, prefs.smsNumber, null, subject, html, plainText, stats));
           }
         }
+        await Promise.all(channelPromises);
       } catch (err: any) {
         console.error(`[NotificationDispatcher] Error processing user ${watch.userId}:`, err);
         await logNotification(watch.userId, change.id, "email", "failed", undefined, err.message || "Internal error");
@@ -444,37 +447,37 @@ export async function processDelayedNotifications(): Promise<{ delivered: number
 
     console.log(`[NotificationDispatcher] Processing ${queuedNotifications.length} delayed notification(s)...`);
 
+    // ── Batch all lookups upfront — replaces N+1 pattern (3 queries × N) ────
+    // BEFORE: for each notif → await change, await prefs, await user = 3N sequential queries
+    // AFTER: 3 parallel inArray() queries covering all notifs = 3 queries total
+    const uniqueChangeIds = [...new Set(queuedNotifications.map(n => n.changeId))];
+    const uniqueUserIds = [...new Set(queuedNotifications.map(n => n.userId))];
+
+    const [changeRecordsList, prefRecordsList, userRecordsList] = await Promise.all([
+      db.select().from(sponsorChanges).where(inArray(sponsorChanges.id, uniqueChangeIds)),
+      db.select().from(notificationPreferences).where(inArray(notificationPreferences.userId, uniqueUserIds)),
+      db.select({ id: users.id, email: users.email }).from(users).where(inArray(users.id, uniqueUserIds)),
+    ]);
+
+    const changeMap = new Map(changeRecordsList.map(c => [c.id, c]));
+    const prefsMap = new Map(prefRecordsList.map(p => [p.userId, p]));
+    const userMap = new Map(userRecordsList.map(u => [u.id, u]));
+
     for (const notif of queuedNotifications) {
       try {
-        const changeRecords = await db
-          .select()
-          .from((await import("@shared/schema")).sponsorChanges)
-          .where(eq((await import("@shared/schema")).sponsorChanges.id, notif.changeId))
-          .limit(1);
-
-        if (changeRecords.length === 0) {
+        const change = changeMap.get(notif.changeId);
+        if (!change) {
           await db.update(notificationLog).set({ status: "failed", errorDetails: "Change record not found" }).where(eq(notificationLog.id, notif.logId));
           result.failed++;
           continue;
         }
 
-        const change = changeRecords[0];
         const { subject, html } = buildEmailHtml(change.changeType, change.organisationName, change.previousValue, change.newValue);
         const plainText = buildPlainTextAlert(change.changeType, change.organisationName, change.previousValue, change.newValue);
 
-        const prefs = await db
-          .select()
-          .from(notificationPreferences)
-          .where(eq(notificationPreferences.userId, notif.userId))
-          .limit(1);
-
-        const userRecord = await db
-          .select({ email: users.email })
-          .from(users)
-          .where(eq(users.id, notif.userId))
-          .limit(1);
-
-        const recipientEmail = prefs.length > 0 && prefs[0].email ? prefs[0].email : userRecord[0]?.email;
+        const prefs = prefsMap.get(notif.userId) ?? null;
+        const userRecord = userMap.get(notif.userId);
+        const recipientEmail = prefs?.email ?? userRecord?.email;
 
         let success = false;
         let providerMessageId: string | undefined;
@@ -485,14 +488,14 @@ export async function processDelayedNotifications(): Promise<{ delivered: number
           success = sendResult.success;
           providerMessageId = sendResult.providerMessageId;
           errorDetails = sendResult.error;
-        } else if (notif.channel === "sms" && prefs.length > 0 && prefs[0].smsNumber) {
-          const phone = decryptPhone(prefs[0].smsNumber);
+        } else if (notif.channel === "sms" && prefs?.smsNumber) {
+          const phone = decryptPhone(prefs.smsNumber);
           const sendResult = await sendSMS(phone, plainText);
           success = sendResult.success;
           providerMessageId = sendResult.providerMessageId;
           errorDetails = sendResult.error;
-        } else if (notif.channel === "whatsapp" && prefs.length > 0 && prefs[0].whatsappNumber) {
-          const phone = decryptPhone(prefs[0].whatsappNumber);
+        } else if (notif.channel === "whatsapp" && prefs?.whatsappNumber) {
+          const phone = decryptPhone(prefs.whatsappNumber);
           const sendResult = await sendWhatsApp(phone, plainText);
           success = sendResult.success;
           providerMessageId = sendResult.providerMessageId;

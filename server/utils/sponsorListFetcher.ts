@@ -8,7 +8,7 @@ const GOV_UK_PAGE_URL =
   "https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers";
 
 const USER_AGENT =
-  "Mozilla/5.0 (compatible; COSVerificationBot/1.0; +https://cos-verify.replit.app)";
+  "Mozilla/5.0 (compatible; CheckByAI-SponsorBot/1.0; +https://checkbyai.net)";
 
 export interface SponsorRecord {
   organisationName: string;

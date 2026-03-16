@@ -76,7 +76,9 @@ interface LastRunInfo {
 
 let lastRunInfo: LastRunInfo | null = null;
 
-const RETRY_DELAY_MS = 30 * 60 * 1000;
+// Staged retry delays: 5 min then 15 min (total worst-case wait: 20 min vs old 60 min)
+// gov.uk transient errors (DNS, 503) recover in minutes, not half-hours.
+const RETRY_DELAYS_MS = [5 * 60 * 1000, 15 * 60 * 1000];
 const MAX_RETRIES = 3;
 const RENAME_SIMILARITY_THRESHOLD = 0.85;
 
@@ -259,8 +261,10 @@ async function downloadWithRetry(): Promise<SponsorRecord[]> {
       console.error(`[SponsorMonitorJob] CSV download attempt ${attempt} failed: ${err.message}`);
 
       if (attempt < MAX_RETRIES) {
-        console.log(`[SponsorMonitorJob] Waiting 30 minutes before retry...`);
-        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+        const delay = RETRY_DELAYS_MS[attempt - 1] ?? RETRY_DELAYS_MS[RETRY_DELAYS_MS.length - 1];
+        const delayMin = Math.round(delay / 60000);
+        console.log(`[SponsorMonitorJob] Waiting ${delayMin} minute(s) before retry...`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
   }
