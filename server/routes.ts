@@ -17,7 +17,7 @@ import { z } from "zod";
 import { PDFAnalyzer } from "./services/pdfAnalyzer";
 import bcrypt from "bcrypt";
 import { rebuildSponsorIndex, searchSponsors, searchSponsorsFallback, ensureIndexReady, isIndexReady } from "./utils/sponsorSearch";
-import { normalizeName, downloadAndParseSponsorList, storeSnapshot, getLatestSnapshotDate, generateFingerprint } from "./utils/sponsorListFetcher";
+import { normalizeName, downloadAndParseSponsorList, downloadAndStreamSponsorList, storeSnapshot, getLatestSnapshotDate, generateFingerprint } from "./utils/sponsorListFetcher";
 import { runSponsorMonitorJob, startSponsorMonitorCron, isJobRunning, getLastRunInfo, checkAndTriggerIfNeeded } from "./utils/sponsorMonitorJob";
 import { startJobAlertScheduler } from "./utils/jobAlertJob";
 
@@ -104,6 +104,84 @@ async function cleanupOldProcessedCheckouts(): Promise<void> {
   const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000);
   await db.delete(processedCheckouts).where(lt(processedCheckouts.processedAt, cutoff));
 }
+
+// ── Sponsor Monitor Initialize Job State ─────────────────────────────────────
+// In-memory tracking for the async initialize background job.
+// Module-level so it persists across requests within the same server process.
+
+type InitStage =
+  | "pending"
+  | "downloading"
+  | "inserting"
+  | "rebuilding_index"
+  | "done"
+  | "failed";
+
+interface InitJobState {
+  jobId: string;
+  stage: InitStage;
+  rowsInserted: number;
+  batchesComplete: number;
+  estimatedTotalBatches: number; // ~25 at batchSize=5000, used for % calculation
+  startedAt: number;             // Date.now()
+  completedAt: number | null;
+  error: string | null;
+  snapshotDate: string | null;
+}
+
+const activeInitJobs = new Map<string, InitJobState>();
+
+function scheduleInitJobCleanup(jobId: string): void {
+  // Remove state after 30 min to prevent unbounded memory growth
+  setTimeout(() => activeInitJobs.delete(jobId), 30 * 60 * 1000);
+}
+
+async function runInitJob(jobId: string, today: string): Promise<void> {
+  const state = activeInitJobs.get(jobId);
+  if (!state) return;
+
+  try {
+    state.stage = "downloading";
+    console.log(`[SponsorMonitor][${jobId}] Starting streaming initialization for ${today}`);
+
+    await downloadAndStreamSponsorList(today, 5000, (event) => {
+      state.stage = "inserting";
+      state.rowsInserted = event.rowsInserted;
+      state.batchesComplete = event.batchesComplete;
+      if (event.totalBatches !== null) {
+        state.estimatedTotalBatches = event.totalBatches;
+      }
+    });
+
+    state.stage = "rebuilding_index";
+    console.log(`[SponsorMonitor][${jobId}] Rebuilding Fuse.js search index...`);
+    await rebuildSponsorIndex();
+
+    state.stage = "done";
+    state.completedAt = Date.now();
+    console.log(`[SponsorMonitor][${jobId}] Initialization complete: ${state.rowsInserted} records stored for ${today}`);
+
+  } catch (err: any) {
+    state.stage = "failed";
+    state.error = err.message || "Unknown error during initialization";
+    state.completedAt = Date.now();
+    console.error(`[SponsorMonitor][${jobId}] Initialization failed:`, err);
+
+    // Clean up any partial snapshot so the admin can retry cleanly.
+    // Without this, getLatestSnapshotDate() would see the partial write and
+    // block future initialization attempts with a "snapshot already exists" error.
+    try {
+      await db.delete(sponsorList).where(eq(sponsorList.snapshotDate, today));
+      console.log(`[SponsorMonitor][${jobId}] Partial snapshot for ${today} deleted — ready to retry.`);
+    } catch (cleanupErr: any) {
+      console.error(`[SponsorMonitor][${jobId}] Partial snapshot cleanup failed:`, cleanupErr.message);
+    }
+  } finally {
+    scheduleInitJobCleanup(jobId);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -2713,9 +2791,10 @@ Format your response in clear, professional markdown.`;
     }
   });
 
-  // Initialize sponsor monitor with first snapshot
+  // Initialize sponsor monitor with first snapshot (non-blocking — returns 202 + jobId immediately)
   app.post('/api/admin/sponsor-monitor/initialize', isAdmin, async (req: any, res) => {
     try {
+      // Guard: reject if a snapshot already exists
       const existingDate = await getLatestSnapshotDate();
       if (existingDate) {
         return res.status(409).json({
@@ -2724,27 +2803,92 @@ Format your response in clear, professional markdown.`;
         });
       }
 
-      console.log("[SponsorMonitor] Admin-triggered initialization starting...");
-      const records = await downloadAndParseSponsorList();
-
-      if (records.length === 0) {
-        return res.status(502).json({ message: "CSV download returned 0 records. The gov.uk data source may be temporarily unavailable." });
+      // Guard: reject if an initialize job is already in flight — return its jobId so the
+      // frontend can resume polling rather than starting a duplicate.
+      for (const [, job] of activeInitJobs) {
+        if (job.stage !== "done" && job.stage !== "failed") {
+          return res.status(409).json({
+            message: "An initialization job is already running.",
+            jobId: job.jobId,
+          });
+        }
       }
 
+      const jobId = crypto.randomUUID();
       const today = new Date().toISOString().split("T")[0];
-      await storeSnapshot(records, today);
-      await rebuildSponsorIndex();
 
-      console.log(`[SponsorMonitor] Initialization complete: ${records.length} records stored for ${today}`);
-      res.json({
-        message: "Initial snapshot loaded successfully.",
+      const state: InitJobState = {
+        jobId,
+        stage: "pending",
+        rowsInserted: 0,
+        batchesComplete: 0,
+        estimatedTotalBatches: 25, // ~124k rows / 5000 batch ≈ 25; refined at runtime
+        startedAt: Date.now(),
+        completedAt: null,
+        error: null,
         snapshotDate: today,
-        recordCount: records.length,
+      };
+      activeInitJobs.set(jobId, state);
+
+      // Fire and forget — HTTP response is sent before the job starts
+      runInitJob(jobId, today).catch((err) => {
+        console.error(`[SponsorMonitor] runInitJob uncaught error for ${jobId}:`, err);
       });
+
+      return res.status(202).json({
+        message: "Initialization started. Poll /api/admin/sponsor-monitor/init-progress/:jobId for status.",
+        jobId,
+        snapshotDate: today,
+      });
+
     } catch (error: any) {
-      console.error("[SponsorMonitor] Initialization failed:", error);
-      res.status(500).json({ message: "Failed to initialize sponsor monitor. " + (error.message || "") });
+      console.error("[SponsorMonitor] Failed to start initialization:", error);
+      return res.status(500).json({ message: "Failed to start initialization: " + (error.message || "") });
     }
+  });
+
+  // Poll progress of an in-flight initialize job
+  app.get('/api/admin/sponsor-monitor/init-progress/:jobId', isAdmin, (req: any, res) => {
+    const { jobId } = req.params;
+    const state = activeInitJobs.get(jobId);
+
+    if (!state) {
+      return res.status(404).json({ message: "Job not found or already expired (>30 min)." });
+    }
+
+    const elapsedMs = Date.now() - state.startedAt;
+
+    // Progress % logic:
+    //  0–90%  → linear on batchesComplete / estimatedTotalBatches (during "inserting")
+    //  95%    → when stage === "rebuilding_index"
+    //  100%   → only when stage === "done"
+    //  capped at 99 during all non-done stages to prevent premature 100%
+    let progressPct: number;
+    if (state.stage === "done") {
+      progressPct = 100;
+    } else if (state.stage === "rebuilding_index") {
+      progressPct = 95;
+    } else if (state.stage === "failed") {
+      progressPct = 0;
+    } else {
+      const raw = state.estimatedTotalBatches > 0
+        ? Math.round((state.batchesComplete / state.estimatedTotalBatches) * 90)
+        : 0;
+      progressPct = Math.min(raw, 90);
+    }
+
+    return res.json({
+      jobId: state.jobId,
+      stage: state.stage,
+      rowsInserted: state.rowsInserted,
+      batchesComplete: state.batchesComplete,
+      estimatedTotalBatches: state.estimatedTotalBatches,
+      progressPct,
+      elapsedMs,
+      error: state.error,
+      snapshotDate: state.snapshotDate,
+      done: state.stage === "done" || state.stage === "failed",
+    });
   });
 
   // Sponsor monitor status dashboard

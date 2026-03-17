@@ -201,11 +201,20 @@ export default function SimpleAdmin() {
   const [runElapsed, setRunElapsed] = useState(0);
   const [initConfirmOpen, setInitConfirmOpen] = useState(false);
   const [initializing, setInitializing] = useState(false);
+  const [initJobId, setInitJobId] = useState<string | null>(null);
+  const [initProgress, setInitProgress] = useState<{
+    stage: string;
+    progressPct: number;
+    rowsInserted: number;
+    elapsedMs: number;
+    error: string | null;
+  } | null>(null);
   const [migratingCanonical, setMigratingCanonical] = useState(false);
   const [migrateResult, setMigrateResult] = useState<{ inserted?: number; message: string; error?: boolean } | null>(null);
   const [releasingLock, setReleasingLock] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const initPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [storageStats, setStorageStats] = useState<any>(null);
   const [storageLoading, setStorageLoading] = useState(false);
   const [cleaningUp, setCleaningUp] = useState(false);
@@ -370,6 +379,10 @@ export default function SimpleAdmin() {
     if (elapsedRef.current) { clearInterval(elapsedRef.current); elapsedRef.current = null; }
   };
 
+  const stopInitPolling = () => {
+    if (initPollRef.current) { clearInterval(initPollRef.current); initPollRef.current = null; }
+  };
+
   const handleRunSponsorJob = async () => {
     setRunConfirmOpen(false);
     setRunResult(null);
@@ -422,25 +435,93 @@ export default function SimpleAdmin() {
     }
   };
 
+  const startInitPolling = (jobId: string) => {
+    stopInitPolling();
+    initPollRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/admin/sponsor-monitor/init-progress/${jobId}`, {
+          credentials: 'include',
+        });
+        if (!res.ok) return; // transient network blip — keep polling
+        const data = await res.json();
+
+        setInitProgress({
+          stage: data.stage,
+          progressPct: data.progressPct,
+          rowsInserted: data.rowsInserted,
+          elapsedMs: data.elapsedMs,
+          error: data.error,
+        });
+
+        if (data.done) {
+          stopInitPolling();
+          setInitializing(false);
+          if (data.stage === 'done') {
+            toast({
+              title: "Initialized",
+              description: `Loaded ${data.rowsInserted?.toLocaleString()} records for ${data.snapshotDate}`,
+            });
+            loadSponsorMonitorData();
+            loadStorageStats();
+            setInitJobId(null);
+            setInitProgress(null);
+          } else {
+            // stage === 'failed'
+            toast({
+              title: "Initialization Failed",
+              description: data.error || "Unknown error — check server logs.",
+              variant: "destructive",
+            });
+          }
+        }
+      } catch {
+        // network blip — keep polling
+      }
+    }, 3000);
+  };
+
   const handleInitialize = async () => {
     setInitConfirmOpen(false);
     setInitializing(true);
+    setInitProgress(null);
+    setInitJobId(null);
+    stopInitPolling();
+
     try {
       const res = await fetch('/api/admin/sponsor-monitor/initialize', {
         method: 'POST',
         credentials: 'include',
       });
       const data = await res.json();
-      if (res.ok) {
-        toast({ title: "Initialized", description: `Loaded ${data.recordCount?.toLocaleString()} records for ${data.snapshotDate}` });
-        loadSponsorMonitorData();
-        loadStorageStats();
-      } else {
-        toast({ title: "Error", description: data.message, variant: "destructive" });
+
+      if (res.status === 409) {
+        if (data.jobId) {
+          // A job is already in flight — resume polling it
+          setInitJobId(data.jobId);
+          toast({ title: "Job In Progress", description: "An initialization is already running. Tracking it now." });
+          startInitPolling(data.jobId);
+          return;
+        }
+        // Snapshot already exists
+        toast({ title: "Already Initialized", description: data.message });
+        setInitializing(false);
+        return;
       }
-    } catch (error) {
-      toast({ title: "Error", description: "Failed to initialize", variant: "destructive" });
-    } finally {
+
+      if (!res.ok) {
+        toast({ title: "Error", description: data.message || "Failed to start initialization", variant: "destructive" });
+        setInitializing(false);
+        return;
+      }
+
+      // 202 Accepted — job started
+      const { jobId } = data;
+      setInitJobId(jobId);
+      toast({ title: "Initialization Started", description: "Downloading sponsor register in the background…" });
+      startInitPolling(jobId);
+
+    } catch {
+      toast({ title: "Error", description: "Failed to reach server", variant: "destructive" });
       setInitializing(false);
     }
   };
@@ -2218,12 +2299,49 @@ export default function SimpleAdmin() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    {sponsorStatus?.latestSnapshot ? (
+                    {sponsorStatus?.latestSnapshot && !initializing ? (
                       <div className="flex items-center gap-2 text-sm">
                         <CheckCircle className="w-4 h-4 text-green-400" />
                         <span className="text-green-400">Initialized on {sponsorStatus.latestSnapshot}</span>
                       </div>
+                    ) : initializing && initProgress ? (
+                      // ── Live progress bar (shown once first poll arrives) ──
+                      <div className="space-y-3">
+                        <div className="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2.5">
+                          <div
+                            className="bg-emerald-500 h-2.5 rounded-full transition-all duration-500"
+                            style={{ width: `${initProgress.progressPct}%` }}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-slate-400">
+                          <span>
+                            {initProgress.stage === 'downloading' && 'Downloading CSV from gov.uk…'}
+                            {initProgress.stage === 'inserting' && `Storing records… ${initProgress.rowsInserted.toLocaleString()} rows`}
+                            {initProgress.stage === 'rebuilding_index' && 'Building search index…'}
+                            {initProgress.stage === 'pending' && 'Starting…'}
+                            {initProgress.stage === 'done' && 'Complete'}
+                            {initProgress.stage === 'failed' && 'Failed'}
+                          </span>
+                          <span className="font-medium">{initProgress.progressPct}%</span>
+                        </div>
+                        <p className="text-xs text-gray-400 dark:text-slate-500">
+                          Elapsed: {Math.round(initProgress.elapsedMs / 1000)}s
+                        </p>
+                        {initProgress.error && (
+                          <Alert className="bg-red-500/10 border-red-500/30">
+                            <AlertTriangle className="w-4 h-4 text-red-400" />
+                            <AlertDescription className="text-red-300 text-xs">{initProgress.error}</AlertDescription>
+                          </Alert>
+                        )}
+                      </div>
+                    ) : initializing ? (
+                      // ── Spinner before first poll arrives ──
+                      <div className="flex items-center gap-2 text-sm text-emerald-400">
+                        <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin shrink-0" />
+                        <span>Starting initialization…</span>
+                      </div>
                     ) : (
+                      // ── Not yet initialized ──
                       <div className="space-y-3">
                         <Alert className="bg-amber-500/10 border-amber-500/30">
                           <AlertTriangle className="w-4 h-4 text-amber-400" />
@@ -2236,17 +2354,8 @@ export default function SimpleAdmin() {
                           disabled={initializing}
                           className="bg-emerald-600 hover:bg-emerald-700"
                         >
-                          {initializing ? (
-                            <>
-                              <div className="w-4 h-4 mr-1 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              Initializing...
-                            </>
-                          ) : (
-                            <>
-                              <Download className="w-4 h-4 mr-1" />
-                              Initialize Baseline
-                            </>
-                          )}
+                          <Download className="w-4 h-4 mr-1" />
+                          Initialize Baseline
                         </Button>
                       </div>
                     )}

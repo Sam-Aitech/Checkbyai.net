@@ -4,7 +4,7 @@ import { db } from "../db";
 import { sponsorCanonical, sponsorChanges, dailyDigest, monitorJobRuns } from "@shared/schema";
 import { eq, and, ne, inArray, sql } from "drizzle-orm";
 import {
-  downloadAndParseSponsorList,
+  downloadAndStreamToArray,
   generateFingerprint,
   type SponsorRecord,
   type SponsorChange,
@@ -253,7 +253,7 @@ async function downloadWithRetry(): Promise<SponsorRecord[]> {
   for (let attempt = 1; attempt <= DOWNLOAD_MAX_RETRIES; attempt++) {
     try {
       console.log(`[SponsorMonitorJob] CSV download attempt ${attempt}/${DOWNLOAD_MAX_RETRIES}...`);
-      const records = await downloadAndParseSponsorList();
+      const records = await downloadAndStreamToArray();
       console.log(`[SponsorMonitorJob] CSV download succeeded on attempt ${attempt}: ${records.length} records parsed`);
       return records;
     } catch (err: any) {
