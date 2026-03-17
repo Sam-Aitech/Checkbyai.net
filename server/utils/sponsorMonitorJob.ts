@@ -2,7 +2,7 @@ import cron from "node-cron";
 import stringSimilarity from "string-similarity";
 import { db } from "../db";
 import { sponsorCanonical, sponsorChanges, dailyDigest, monitorJobRuns } from "@shared/schema";
-import { eq, and, ne, inArray, sql } from "drizzle-orm";
+import { eq, and, ne, inArray, sql, gt, asc } from "drizzle-orm";
 import {
   downloadAndStreamToArray,
   generateFingerprint,

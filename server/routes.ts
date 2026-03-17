@@ -2822,17 +2822,6 @@ Format your response in clear, professional markdown.`;
     }
   });
 
-  // Endpoint to get sponsor monitor status
-  app.get('/api/admin/sponsor-monitor/status', isAdmin, async (_req: any, res) => {
-    try {
-      const statusData = await getLastRunInfo();
-      res.json(statusData);
-    } catch (error) {
-      console.error("Error getting sponsor monitor status:", error);
-      res.status(500).json({ message: "Failed to get sponsor monitor status." });
-    }
-  });
-
   // Endpoint to get job progress by ID
   app.get('/api/admin/jobs/:jobId/progress', isAdmin, async (req: any, res) => {
     try {
@@ -2918,12 +2907,26 @@ Format your response in clear, professional markdown.`;
             AND  pl.granted   = true
         `);
         const holder = lockHolder.rows[0] as any;
-        if (holder && (holder.state === 'idle' || holder.state === 'idle in transaction')) {
+        // Only terminate if the backend has been idle for > 10 minutes.
+        // A running init job is briefly 'idle' between batch inserts (milliseconds) —
+        // terminating it would cause "terminating connection due to administrator command".
+        // A genuine zombie from a crashed run is idle for hours, not seconds.
+        const ZOMBIE_IDLE_THRESHOLD_SECONDS = 600; // 10 minutes
+        if (
+          holder &&
+          (holder.state === 'idle' || holder.state === 'idle in transaction') &&
+          holder.idle_seconds > ZOMBIE_IDLE_THRESHOLD_SECONDS
+        ) {
           console.warn(
             `[SponsorMonitor] Advisory lock held by idle backend PID ${holder.pid} ` +
-            `(idle ${holder.idle_seconds}s) — terminating zombie to release lock.`
+            `(idle ${holder.idle_seconds}s > ${ZOMBIE_IDLE_THRESHOLD_SECONDS}s threshold) — terminating zombie to release lock.`
           );
           await db.execute(sql`SELECT pg_terminate_backend(${holder.pid})`);
+        } else if (holder && (holder.state === 'idle' || holder.state === 'idle in transaction')) {
+          console.log(
+            `[SponsorMonitor] Advisory lock held by idle backend PID ${holder.pid} ` +
+            `(idle ${holder.idle_seconds}s) — within active-job window, not terminating.`
+          );
         }
       } catch (lockCheckErr: any) {
         // Non-fatal — runInitJob() will surface a clear error if lock is still held.
