@@ -18,8 +18,10 @@ import { PDFAnalyzer } from "./services/pdfAnalyzer";
 import bcrypt from "bcrypt";
 import { rebuildSponsorIndex, searchSponsors, searchSponsorsFallback, ensureIndexReady, isIndexReady } from "./utils/sponsorSearch";
 import { normalizeName, downloadAndParseSponsorList, downloadAndStreamSponsorList, storeSnapshot, getLatestSnapshotDate, generateFingerprint } from "./utils/sponsorListFetcher";
-import { runSponsorMonitorJob, startSponsorMonitorCron, isJobRunning, getLastRunInfo, checkAndTriggerIfNeeded } from "./utils/sponsorMonitorJob";
+import { runSponsorMonitorJob, startSponsorMonitorCron, isJobRunning, getLastRunInfo, checkAndTriggerIfNeeded, tryAcquireJobLock, releaseJobLock } from "./utils/sponsorMonitorJob";
+const SPONSOR_JOB_LOCK_KEY = 7483920; // Same key as sponsorMonitorJob — init and nightly are mutually exclusive
 import { startJobAlertScheduler } from "./utils/jobAlertJob";
+import { isQueueAvailable, getSponsorRefreshQueue } from "./services/jobQueue";
 
 // Start background schedulers
 startJobAlertScheduler();
@@ -140,6 +142,18 @@ async function runInitJob(jobId: string, today: string): Promise<void> {
   const state = activeInitJobs.get(jobId);
   if (!state) return;
 
+  // Acquire the same advisory lock used by the nightly monitor job so that
+  // an init run and a cron run can never execute concurrently.
+  const lockAcquired = await tryAcquireJobLock();
+  if (!lockAcquired) {
+    state.stage = "failed";
+    state.error = "Another job (nightly sync or another init) is already running. Please wait for it to complete and retry.";
+    state.completedAt = Date.now();
+    console.warn(`[SponsorMonitor][${jobId}] Could not acquire advisory lock — aborting init.`);
+    scheduleInitJobCleanup(jobId);
+    return;
+  }
+
   try {
     state.stage = "downloading";
     console.log(`[SponsorMonitor][${jobId}] Starting streaming initialization for ${today}`);
@@ -177,6 +191,7 @@ async function runInitJob(jobId: string, today: string): Promise<void> {
       console.error(`[SponsorMonitor][${jobId}] Partial snapshot cleanup failed:`, cleanupErr.message);
     }
   } finally {
+    await releaseJobLock();
     scheduleInitJobCleanup(jobId);
   }
 }
@@ -2767,41 +2782,109 @@ Format your response in clear, professional markdown.`;
         return res.status(409).json({ message: "Sponsor monitor job is already running. Please wait for it to finish." });
       }
 
-      res.json({ message: "Sponsor monitor job started. This may take several minutes." });
+      const queue = getSponsorRefreshQueue();
 
-      runSponsorMonitorJob("manual-admin", true).catch((err) => {
-        console.error("[SponsorMonitorJob] Manual run error:", err);
+      if (isQueueAvailable() && queue) {
+        // Redis is available — enqueue via BullMQ for reliable background execution
+        const job = await queue.add('refresh-sponsors', {
+          triggeredBy: req.user?.id || 'unknown',
+          timestamp: new Date().toISOString()
+        }, {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 5000 },
+          removeOnComplete: true,
+          removeOnFail: 10,
+        });
+
+        return res.status(202).json({
+          message: "Sponsor monitor job started via queue.",
+          jobId: job.id,
+          status: "accepted",
+          mode: "bullmq",
+        });
+      }
+
+      // Redis unavailable — run inline (fire-and-forget, lock-protected)
+      console.warn("[SponsorMonitor] Redis unavailable — running sponsor sync inline.");
+      runSponsorMonitorJob("admin-manual", true).catch((err) =>
+        console.error("[SponsorMonitor] Inline run error:", err)
+      );
+
+      return res.status(202).json({
+        message: "Sponsor monitor job started inline (Redis unavailable).",
+        status: "accepted",
+        mode: "inline",
       });
+
     } catch (error) {
       console.error("Error triggering sponsor monitor job:", error);
       res.status(500).json({ message: "Failed to trigger sponsor monitor job." });
     }
   });
 
-  // Force-release a stuck advisory lock (use when job hangs and never resets)
+  // Endpoint to get sponsor monitor status
+  app.get('/api/admin/sponsor-monitor/status', isAdmin, async (_req: any, res) => {
+    try {
+      const statusData = await getLastRunInfo();
+      res.json(statusData);
+    } catch (error) {
+      console.error("Error getting sponsor monitor status:", error);
+      res.status(500).json({ message: "Failed to get sponsor monitor status." });
+    }
+  });
+
+  // Endpoint to get job progress by ID
+  app.get('/api/admin/jobs/:jobId/progress', isAdmin, async (req: any, res) => {
+    try {
+      const { jobId } = req.params;
+      const queue = getSponsorRefreshQueue();
+
+      if (!isQueueAvailable() || !queue) {
+        return res.status(503).json({ message: "Job queue unavailable (Redis not configured)." });
+      }
+
+      const job = await queue.getJob(jobId);
+
+      if (!job) {
+        return res.status(404).json({ message: "Job not found" });
+      }
+
+      const progress = job.progress;
+      const state = await job.getState();
+
+      res.json({ jobId: job.id, progress, status: state, data: job.data });
+    } catch (error) {
+      console.error("Error getting job progress:", error);
+      res.status(500).json({ message: "Failed to get job progress." });
+    }
+  });
+
+  // Force-release a stuck advisory lock (use when job hangs and never resets).
+  // pg_advisory_unlock() returns TRUE if the lock was held and released,
+  // FALSE if this session did not hold it (it may be held by another pooled connection).
+  // pg_advisory_unlock_all() releases every advisory lock on this connection — safe to call
+  // even if no lock is held; used as a belt-and-braces cleanup.
   app.post('/api/admin/sponsor-monitor/release-lock', isAdmin, async (req: any, res) => {
     try {
-      const SPONSOR_MONITOR_LOCK_KEY = 7483920;
-      await db.execute(sql`SELECT pg_advisory_unlock(${SPONSOR_MONITOR_LOCK_KEY})`);
-      console.warn("[SponsorMonitorJob] Advisory lock force-released by admin.");
-      res.json({ message: "Advisory lock released. You can now trigger a new run." });
+      const unlockResult = await db.execute(
+        sql`SELECT pg_advisory_unlock(${SPONSOR_JOB_LOCK_KEY}) AS released`
+      );
+      const released = (unlockResult.rows[0] as any)?.released === true;
+
+      // Belt-and-braces: also release all advisory locks on this connection
+      await db.execute(sql`SELECT pg_advisory_unlock_all()`);
+
+      const message = released
+        ? "Advisory lock was held and has been released. You can now trigger a new run."
+        : "No lock was held by this connection (may have been on a different pooled connection). All locks on this connection cleared.";
+
+      console.warn(`[SponsorMonitorJob] Admin force-release: ${message}`);
+      res.json({ released, message });
     } catch (error: any) {
       console.error("Error releasing advisory lock:", error);
       res.status(500).json({ message: "Failed to release lock: " + (error.message || "") });
     }
   });
-
-  // Initialize sponsor monitor with first snapshot (non-blocking — returns 202 + jobId immediately)
-  app.post('/api/admin/sponsor-monitor/initialize', isAdmin, async (req: any, res) => {
-    try {
-      // Guard: reject if a snapshot already exists
-      const existingDate = await getLatestSnapshotDate();
-      if (existingDate) {
-        return res.status(409).json({
-          message: `A snapshot already exists (${existingDate}). Use the daily run or manual trigger to update.`,
-          latestSnapshot: existingDate,
-        });
-      }
 
       // Guard: reject if an initialize job is already in flight — return its jobId so the
       // frontend can resume polling rather than starting a duplicate.
@@ -2976,6 +3059,20 @@ Format your response in clear, professional markdown.`;
     } catch (error) {
       console.error("Error fetching sponsor monitor status:", error);
       res.status(500).json({ message: "Failed to fetch sponsor monitor status." });
+    }
+  });
+
+  // Last 10 nightly job runs — replaces "Bull Board" concept without needing Redis
+  app.get('/api/admin/sponsor-monitor/job-history', isAdmin, async (_req: any, res) => {
+    try {
+      const history = await db
+        .select()
+        .from(monitorJobRuns)
+        .orderBy(desc(monitorJobRuns.startedAt))
+        .limit(10);
+      return res.json(history);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to fetch job history: " + (error.message || "") });
     }
   });
 

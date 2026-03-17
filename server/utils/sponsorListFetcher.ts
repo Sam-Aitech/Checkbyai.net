@@ -8,6 +8,7 @@ import * as cheerio from "cheerio";
 import { db } from "../db";
 import { sponsorList } from "@shared/schema";
 import { eq, desc, lt, sql } from "drizzle-orm";
+import { sendAdminAlert } from "./adminAlert";
 
 const GOV_UK_PAGE_URL =
   "https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers";
@@ -219,6 +220,16 @@ async function findCsvUrl(): Promise<string> {
       "[SponsorListFetcher] Cheerio scraper failed, trying Scrapling fallback:",
       primaryErr.message,
     );
+
+    // Non-blocking admin alert — cheerio failure may indicate gov.uk page structure change.
+    // Never let alerting throw or block the fallback attempt.
+    sendAdminAlert(
+      "⚠️ CheckByAI: Scrapling fallback activated",
+      `<p>The cheerio-based gov.uk scraper failed:</p>
+       <pre style="background:#f5f5f5;padding:10px;border-radius:4px">${primaryErr.message.replace(/</g, "&lt;")}</pre>
+       <p>The Scrapling Python fallback is now running. If this alert fires repeatedly, the gov.uk page structure may have changed and <code>findCsvUrlPrimary()</code> needs updating.</p>`,
+    ).catch(() => {});
+
     return await findCsvUrlFallback();
   }
 }

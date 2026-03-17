@@ -13,6 +13,7 @@ import { rebuildSponsorIndex } from "./sponsorSearch";
 import { notifyAffectedUsers, processDelayedNotifications } from "./notificationDispatcher";
 import { generateHeadline, type RawDigestData } from "../services/aiDigest";
 import { withRetry } from "./dbRetry";
+import { sendAdminAlert } from "./adminAlert";
 
 // Distributed advisory lock key — must be a unique integer per job.
 // Prevents duplicate execution across multiple server instances (horizontal scaling).
@@ -27,10 +28,21 @@ const REQUEST_CHECK_INTERVAL_MS = 60 * 60 * 1000;
  * Attempts to acquire a PostgreSQL session-level advisory lock.
  * Returns true if the lock was acquired, false if another instance holds it.
  * The lock is automatically released if the DB connection drops (crash-safe).
+ *
+ * Uses pg_try_advisory_lock() — atomic, non-blocking. A single SQL call that
+ * both checks and acquires in one step, eliminating the TOCTOU race that
+ * existed when using a separate pg_locks SELECT + pg_advisory_lock() pair.
  */
 async function tryAcquireJobLock(): Promise<boolean> {
-  const result = await db.execute(sql`SELECT pg_try_advisory_lock(${SPONSOR_MONITOR_LOCK_KEY}) AS acquired`);
-  return (result.rows[0] as any)?.acquired === true;
+  try {
+    const result = await db.execute(
+      sql`SELECT pg_try_advisory_lock(${SPONSOR_MONITOR_LOCK_KEY}) AS acquired`
+    );
+    return (result.rows[0] as any)?.acquired === true;
+  } catch (err) {
+    console.error('[SponsorMonitorJob] Failed to acquire advisory lock:', err);
+    return false;
+  }
 }
 
 async function releaseJobLock(): Promise<void> {
@@ -39,6 +51,8 @@ async function releaseJobLock(): Promise<void> {
   });
 }
 
+// Export lock functions for use in routes and the BullMQ worker
+export { tryAcquireJobLock, releaseJobLock };
 
 interface CanonicalRecord {
   id: number;
@@ -101,50 +115,23 @@ function classifyRatingChange(
 }
 
 async function sendAdminFailureAlert(errorMessage: string): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  const adminEmail = process.env.ADMIN_EMAIL;
-  if (!apiKey || !adminEmail) {
-    console.error("[SponsorMonitorJob] Cannot send admin alert: RESEND_API_KEY or ADMIN_EMAIL not configured");
-    return;
-  }
-
-  try {
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        from: "Sponsor Monitor <alerts@checkbyai.net>",
-        to: [adminEmail],
-        subject: "ALERT: Daily sponsor monitor job failed",
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="background: linear-gradient(135deg, #8B0000 0%, #CC0000 100%); padding: 30px; border-radius: 10px 10px 0 0;">
-              <h1 style="color: #ffffff; margin: 0; text-align: center; font-size: 22px;">Sponsor Monitor Job Failed</h1>
-            </div>
-            <div style="background: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
-              <p style="color: #333; font-size: 15px; line-height: 1.6;">The daily sponsor licence register check failed after ${DOWNLOAD_MAX_RETRIES} attempts.</p>
-              <div style="background: #fff3f3; padding: 15px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #CC0000;">
-                <p style="color: #333; font-size: 14px; margin: 0; font-family: monospace; white-space: pre-wrap;">${errorMessage.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>
-              </div>
-              <p style="color: #666; font-size: 14px;">You can manually trigger a rerun from the admin portal or via POST /api/admin/sponsor-monitor/run.</p>
-              <p style="color: #999; font-size: 12px;">Timestamp: ${new Date().toISOString()}</p>
-            </div>
-          </div>
-        `,
-      }),
-    });
-
-    if (!response.ok) {
-      console.error("[SponsorMonitorJob] Failed to send admin alert email:", await response.text());
-    } else {
-      console.log("[SponsorMonitorJob] Admin failure alert sent to", adminEmail);
-    }
-  } catch (err) {
-    console.error("[SponsorMonitorJob] Error sending admin alert:", err);
-  }
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <div style="background: linear-gradient(135deg, #8B0000 0%, #CC0000 100%); padding: 30px; border-radius: 10px 10px 0 0;">
+        <h1 style="color: #ffffff; margin: 0; text-align: center; font-size: 22px;">Sponsor Monitor Job Failed</h1>
+      </div>
+      <div style="background: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
+        <p style="color: #333; font-size: 15px; line-height: 1.6;">The daily sponsor licence register check failed after ${DOWNLOAD_MAX_RETRIES} attempts.</p>
+        <div style="background: #fff3f3; padding: 15px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #CC0000;">
+          <p style="color: #333; font-size: 14px; margin: 0; font-family: monospace; white-space: pre-wrap;">${errorMessage.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>
+        </div>
+        <p style="color: #666; font-size: 14px;">You can manually trigger a rerun from the admin portal or via POST /api/admin/sponsor-monitor/run.</p>
+        <p style="color: #999; font-size: 12px;">Timestamp: ${new Date().toISOString()}</p>
+      </div>
+    </div>
+  `;
+  await sendAdminAlert("ALERT: Daily sponsor monitor job failed", html);
+  console.log("[SponsorMonitorJob] Admin failure alert sent.");
 }
 
 async function sendAdminJobCompleteEmail(result: {
@@ -157,10 +144,6 @@ async function sendAdminJobCompleteEmail(result: {
   notificationsFailed: number;
   error?: string;
 }, durationMs: number, source: string): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  const adminEmail = process.env.ADMIN_EMAIL;
-  if (!apiKey || !adminEmail) return;
-
   const isSuccess = result.success;
   const durationSec = (durationMs / 1000).toFixed(1);
   const changeCount = result.changesDetected ?? 0;
@@ -227,21 +210,8 @@ async function sendAdminJobCompleteEmail(result: {
     </div>`;
 
   try {
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        from: "Sponsor Monitor <alerts@checkbyai.net>",
-        to: [adminEmail],
-        subject,
-        html,
-      }),
-    });
-    if (!response.ok) {
-      console.error("[SponsorMonitorJob] Failed to send job completion email:", await response.text());
-    } else {
-      console.log(`[SponsorMonitorJob] Job ${isSuccess ? "success" : "failure"} email sent to ${adminEmail}`);
-    }
+    await sendAdminAlert(subject, html);
+    console.log(`[SponsorMonitorJob] Job ${isSuccess ? "success" : "failure"} email sent.`);
   } catch (err) {
     console.error("[SponsorMonitorJob] Error sending job completion email:", err);
   }
@@ -767,18 +737,93 @@ export async function runSponsorMonitorJob(source: string = "cron", notifyOnFail
   }
 
   const startTime = Date.now();
+  const JOB_TIMEOUT_MS = 25 * 60 * 1000; // 25-minute hard ceiling
+  let watchdogTimer: ReturnType<typeof setTimeout> | null = null;
 
+  // ── Watchdog + lock-release wrapper ──────────────────────────────────────
+  // Promise.race ensures that if runJobCore() stalls (e.g. a DB insert hangs),
+  // the timeout rejects after 25 min. The finally block ALWAYS runs, releasing
+  // the advisory lock even on timeout.
   try {
+    const watchdog = new Promise<never>((_, reject) => {
+      watchdogTimer = setTimeout(
+        () => reject(new Error(`Job timed out after ${JOB_TIMEOUT_MS / 60000} minutes. Advisory lock released.`)),
+        JOB_TIMEOUT_MS
+      );
+    });
+
+    await Promise.race([runJobCore(), watchdog]);
+    return result; // reached only when runJobCore() completes without throwing
+  } catch (err: any) {
+    // Handles: timeout, unexpected throws from runJobCore()
+    const errorMsg = `Unexpected error: ${err.message}`;
+    console.error(`[SponsorMonitorJob] ${errorMsg}`, err);
+    if (notifyOnFailure) await sendAdminFailureAlert(errorMsg);
+    const failDuration = Date.now() - startTime;
+    const failTime = new Date();
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      await withRetry(async () => {
+        await db.insert(monitorJobRuns).values({
+          runDate: today,
+          source,
+          status: "failed",
+          recordsProcessed: result.recordsProcessed,
+          changesDetected: 0,
+          durationMs: failDuration,
+          errorMessage: err.message,
+          completedAt: failTime,
+        }).onConflictDoUpdate({
+          target: monitorJobRuns.runDate,
+          set: {
+            status: "failed",
+            errorMessage: err.message,
+            durationMs: failDuration,
+            completedAt: failTime,
+          },
+        });
+      }, "Log job failure");
+    } catch (logErr) {
+      console.error("[SponsorMonitorJob] Failed to log job failure:", logErr);
+    }
+    if (notifyOnFailure) {
+      sendAdminJobCompleteEmail(
+        { success: false, recordsProcessed: result.recordsProcessed, notificationsSent: result.notificationsSent, notificationsSkipped: result.notificationsSkipped, notificationsFailed: result.notificationsFailed, error: errorMsg },
+        failDuration,
+        source
+      ).catch((e) => console.error('[SponsorMonitorJob] Failed to send admin failure alert email:', e));
+    }
+    Object.assign(result, { error: errorMsg });
+    return result;
+  } finally {
+    if (watchdogTimer) clearTimeout(watchdogTimer);
+    await releaseJobLock();
+    lastRunInfo = {
+      date: new Date().toISOString(),
+      success: result.success,
+      recordsProcessed: result.recordsProcessed,
+      changesDetected: Object.values(result.changes).reduce((a, b) => a + b, 0),
+      changes: result.changes,
+      notificationsSent: result.notificationsSent,
+      error: (result as any).error,
+    };
+  }
+
+  // ── Inner job function ────────────────────────────────────────────────────
+  // Mutates `result` in place. Early exits set result.error and return (void).
+  // Unexpected throws bubble up to the outer catch above.
+  async function runJobCore(): Promise<void> {
     console.log(`[SponsorMonitorJob] === Daily sponsor monitor check starting (triggered by: ${source}) ===`);
 
     let currentRecords: SponsorRecord[];
     try {
       currentRecords = await downloadWithRetry();
     } catch (err: any) {
-      const errorMsg = `CSV download failed after ${MAX_RETRIES} attempts: ${err.message}`;
+      const errorMsg = `CSV download failed after ${DOWNLOAD_MAX_RETRIES} attempts: ${err.message}`;
       console.error(`[SponsorMonitorJob] ${errorMsg}`);
       if (notifyOnFailure) await sendAdminFailureAlert(errorMsg);
-      return { ...result, error: errorMsg };
+      Object.assign(result, { error: errorMsg });
+      return;
     }
 
     result.recordsProcessed = currentRecords.length;
@@ -787,7 +832,8 @@ export async function runSponsorMonitorJob(source: string = "cron", notifyOnFail
       const errorMsg = "CSV download returned 0 records. Aborting to prevent false mass-removal detection.";
       console.error(`[SponsorMonitorJob] ${errorMsg}`);
       if (notifyOnFailure) await sendAdminFailureAlert(errorMsg);
-      return { ...result, error: errorMsg };
+      Object.assign(result, { error: errorMsg });
+      return;
     }
 
     const today = new Date().toISOString().split("T")[0];
@@ -802,7 +848,8 @@ export async function runSponsorMonitorJob(source: string = "cron", notifyOnFail
       const msg = `Reconciliation already completed successfully for ${today}. Skipping duplicate cron run.`;
       console.log(`[SponsorMonitorJob] ${msg}`);
       result.success = true;
-      return { ...result, error: msg };
+      Object.assign(result, { error: msg });
+      return;
     }
 
     // Load live canonical (ACTIVE + NEWLY_GRANTED + GRACE_PERIOD)
@@ -835,7 +882,7 @@ export async function runSponsorMonitorJob(source: string = "cron", notifyOnFail
       console.log(`[SponsorMonitorJob] Saving ${detectedChanges.length} changes in batches...`);
       const CHANGE_BATCH = 500;
       const savedChanges: any[] = [];
-      
+
       for (let i = 0; i < detectedChanges.length; i += CHANGE_BATCH) {
         const batch = detectedChanges.slice(i, i + CHANGE_BATCH);
         try {
@@ -948,8 +995,6 @@ export async function runSponsorMonitorJob(source: string = "cron", notifyOnFail
         notificationsFailed: result.notificationsFailed,
         durationMs: finalDuration,
         completedAt: completionTime,
-        // Added JSON context for easier debugging and auditing.
-        // Provides a snapshot of the raw result object.
         jobOutput: result,
       }).onConflictDoUpdate({
         target: monitorJobRuns.runDate,
@@ -986,60 +1031,8 @@ export async function runSponsorMonitorJob(source: string = "cron", notifyOnFail
       { success: true, recordsProcessed: result.recordsProcessed, changesDetected: detectedChanges.length, changeSummary: changeCounts, notificationsSent: result.notificationsSent, notificationsSkipped: result.notificationsSkipped, notificationsFailed: result.notificationsFailed },
       Date.now() - startTime,
       source
-    ).catch((err) => console.error('[SponsorMonitorJob] Failed to send admin job completion email:', err));
-
-    return result;
-  } catch (err: any) {
-    const errorMsg = `Unexpected error: ${err.message}`;
-    console.error(`[SponsorMonitorJob] ${errorMsg}`, err);
-    if (notifyOnFailure) await sendAdminFailureAlert(errorMsg);
-    const failDuration = Date.now() - startTime;
-    const failTime = new Date();
-    try {
-      const today = new Date().toISOString().split("T")[0];
-      await withRetry(async () => {
-        await db.insert(monitorJobRuns).values({
-          runDate: today,
-          source,
-          status: "failed",
-          recordsProcessed: result.recordsProcessed,
-          changesDetected: 0,
-          durationMs: failDuration,
-          errorMessage: err.message,
-          completedAt: failTime,
-        }).onConflictDoUpdate({
-          target: monitorJobRuns.runDate,
-          set: {
-            status: "failed",
-            errorMessage: err.message,
-            durationMs: failDuration,
-            completedAt: failTime,
-          },
-        });
-      }, "Log job failure");
-    } catch (logErr) {
-      console.error("[SponsorMonitorJob] Failed to log job failure:", logErr);
-    }
-    if (notifyOnFailure) {
-      sendAdminJobCompleteEmail(
-        { success: false, recordsProcessed: result.recordsProcessed, notificationsSent: result.notificationsSent, notificationsSkipped: result.notificationsSkipped, notificationsFailed: result.notificationsFailed, error: errorMsg },
-        failDuration,
-        source
-      ).catch((err) => console.error('[SponsorMonitorJob] Failed to send admin failure alert email:', err));
-    }
-    return { ...result, error: errorMsg };
-  } finally {
-    await releaseJobLock();
-    lastRunInfo = {
-      date: new Date().toISOString(),
-      success: result.success,
-      recordsProcessed: result.recordsProcessed,
-      changesDetected: Object.values(result.changes).reduce((a, b) => a + b, 0),
-      changes: result.changes,
-      notificationsSent: result.notificationsSent,
-      error: (result as any).error,
-    };
-  }
+    ).catch((e) => console.error('[SponsorMonitorJob] Failed to send admin job completion email:', e));
+  } // end runJobCore
 }
 
 export function getLastRunInfo(): LastRunInfo | null {

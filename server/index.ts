@@ -4,6 +4,9 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { storage } from "./storage";
 
+// Import the job queue setup
+import { initJobQueue, setupWorkers } from "./services/jobQueue";
+
 // Startup validation — fail fast if truly critical env vars are missing
 // ADMIN_EMAIL is intentionally excluded: the app handles its absence gracefully (admin emails disabled)
 const REQUIRED_ENV_VARS = [
@@ -229,6 +232,10 @@ app.use((req, res, next) => {
   } else {
     serveStatic(app);
   }
+
+  // Probe Redis and initialise BullMQ queues (no-op if Redis is unavailable)
+  await initJobQueue();
+  setupWorkers();
 
   // ALWAYS serve the app on port 5000
   // this serves both the API and the client.

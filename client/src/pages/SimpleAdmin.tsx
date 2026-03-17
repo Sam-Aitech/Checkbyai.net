@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { 
-  Shield, Upload, FileText, CheckCircle, AlertTriangle, XCircle, LogOut, Trash2, Eye, 
+import {
+  Shield, Upload, FileText, CheckCircle, AlertTriangle, XCircle, LogOut, Trash2, Eye,
   RefreshCw, Search, Filter, ChevronLeft, ChevronRight, Activity, Database, Clock,
-  Sparkles, X, Download, ChevronDown, Users, TrendingUp, Cpu, HardDrive, Brain, Plus, Power, Radio, Play, Bell, BarChart3
+  Sparkles, X, Download, ChevronDown, Users, TrendingUp, Cpu, HardDrive, Brain, Plus, Power, Radio, Play, Bell, BarChart3, History
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -219,6 +219,8 @@ export default function SimpleAdmin() {
   const [storageLoading, setStorageLoading] = useState(false);
   const [cleaningUp, setCleaningUp] = useState(false);
   const [cleanupConfirmOpen, setCleanupConfirmOpen] = useState(false);
+  const [jobHistory, setJobHistory] = useState<any[]>([]);
+  const [jobHistoryLoading, setJobHistoryLoading] = useState(false);
 
   const { toast } = useToast();
 
@@ -374,6 +376,18 @@ export default function SimpleAdmin() {
     }
   }, []);
 
+  const loadJobHistory = useCallback(async () => {
+    setJobHistoryLoading(true);
+    try {
+      const res = await fetch('/api/admin/sponsor-monitor/job-history', { credentials: 'include' });
+      if (res.ok) setJobHistory(await res.json());
+    } catch {
+      // non-critical — silently skip
+    } finally {
+      setJobHistoryLoading(false);
+    }
+  }, []);
+
   const stopPolling = () => {
     if (pollRef.current)    { clearInterval(pollRef.current);    pollRef.current    = null; }
     if (elapsedRef.current) { clearInterval(elapsedRef.current); elapsedRef.current = null; }
@@ -395,39 +409,56 @@ export default function SimpleAdmin() {
         method: 'POST',
         credentials: 'include',
       });
-      const data = await res.json();
-      if (!res.ok) {
+      
+      if (res.status === 202) {
+        // Handle accepted job
+        const data = await res.json();
+        setRunResult(data.message);
+        toast({ title: "Job Accepted", description: data.message });
+
+        // Elapsed timer: tick every second
+        elapsedRef.current = setInterval(() => setRunElapsed(s => s + 1), 1000);
+
+        // Poll status every 5 seconds until job finishes
+        pollRef.current = setInterval(async () => {
+          try {
+            const statusRes = await fetch('/api/admin/sponsor-monitor/status', { credentials: 'include' });
+            if (!statusRes.ok) return;
+            const statusData = await statusRes.json();
+            
+            // Check if the job is still running by looking at the actual running status
+            const isActuallyRunning = statusData.jobRunning;
+            
+            setSponsorStatus(statusData);
+            
+            if (!isActuallyRunning) {
+              stopPolling();
+              setRunningJob(false);
+              loadJobHistory();
+              if (statusData.lastRun?.success === false) {
+                setRunError(statusData.lastRun?.error || 'Job failed — check server logs.');
+                toast({ title: "Job Failed", description: statusData.lastRun?.error || 'Run failed', variant: "destructive" });
+              } else {
+                setRunResult(`Job completed. ${statusData.lastRun?.changesDetected ?? 0} changes detected.`);
+                toast({ title: "Job Completed", description: `${statusData.lastRun?.recordsProcessed?.toLocaleString() ?? '?'} records processed.` });
+                loadSponsorMonitorData();
+              }
+            }
+          } catch { /* network blip — keep polling */ }
+        }, 5000);
+      } else if (res.status === 409) {
+        // Conflict - already running
+        const data = await res.json();
+        setRunError(data.message);
+        toast({ title: "Conflict", description: data.message, variant: "destructive" });
+        setRunningJob(false);
+      } else {
+        // Other error
+        const data = await res.json();
         setRunError(data.message || 'Failed to start job');
         toast({ title: "Error", description: data.message, variant: "destructive" });
         setRunningJob(false);
-        return;
       }
-      setRunResult(data.message);
-      toast({ title: "Job Started", description: data.message });
-
-      // Elapsed timer: tick every second
-      elapsedRef.current = setInterval(() => setRunElapsed(s => s + 1), 1000);
-
-      // Poll status every 5 seconds until job finishes
-      pollRef.current = setInterval(async () => {
-        try {
-          const statusRes = await fetch('/api/admin/sponsor-monitor/status', { credentials: 'include' });
-          if (!statusRes.ok) return;
-          const statusData = await statusRes.json();
-          setSponsorStatus(statusData);
-          if (!statusData.jobRunning) {
-            stopPolling();
-            setRunningJob(false);
-            if (statusData.lastRun?.success === false) {
-              setRunError(statusData.lastRun?.error || 'Job failed — check server logs.');
-              toast({ title: "Job Failed", description: statusData.lastRun?.error || 'Run failed', variant: "destructive" });
-            } else {
-              setRunResult(`Job completed. ${statusData.lastRun?.changesDetected ?? 0} changes detected.`);
-              toast({ title: "Job Completed", description: `${statusData.lastRun?.recordsProcessed?.toLocaleString() ?? '?'} records processed.` });
-            }
-          }
-        } catch { /* network blip — keep polling */ }
-      }, 5000);
     } catch (error) {
       setRunError('Network error — could not reach server.');
       toast({ title: "Error", description: "Failed to trigger job", variant: "destructive" });
@@ -463,7 +494,7 @@ export default function SimpleAdmin() {
             });
             loadSponsorMonitorData();
             loadStorageStats();
-            setInitJobId(null);
+            loadJobHistory();
             setInitProgress(null);
           } else {
             // stage === 'failed'
@@ -606,8 +637,9 @@ export default function SimpleAdmin() {
     if (isAuthenticated && activeTab === 'sponsor') {
       loadSponsorMonitorData();
       loadStorageStats();
+      loadJobHistory();
     }
-  }, [isAuthenticated, activeTab, loadGlobalRules, loadSponsorMonitorData, loadStorageStats]);
+  }, [isAuthenticated, activeTab, loadGlobalRules, loadSponsorMonitorData, loadStorageStats, loadJobHistory]);
 
   const createGlobalRule = async () => {
     if (!newRuleCategory || !newRuleText) {
@@ -2281,6 +2313,94 @@ export default function SimpleAdmin() {
                         Last run failed: {sponsorStatus.lastRun.error}
                       </AlertDescription>
                     </Alert>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Run History Card */}
+              <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-gray-900 dark:text-white text-base flex items-center gap-2">
+                      <History className="w-4 h-4 text-blue-400" />
+                      Run History
+                    </CardTitle>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={loadJobHistory}
+                      disabled={jobHistoryLoading}
+                      className="h-7 px-2 text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${jobHistoryLoading ? 'animate-spin' : ''}`} />
+                    </Button>
+                  </div>
+                  <CardDescription className="text-gray-500 dark:text-slate-400">
+                    Last 10 nightly sponsor monitor job runs
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {jobHistoryLoading && jobHistory.length === 0 ? (
+                    <div className="space-y-2">
+                      {[...Array(3)].map((_, i) => (
+                        <div key={i} className="h-7 bg-gray-100 dark:bg-slate-700 rounded animate-pulse" />
+                      ))}
+                    </div>
+                  ) : jobHistory.length === 0 ? (
+                    <p className="text-sm text-gray-500 dark:text-slate-400">No runs recorded yet.</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="text-gray-500 dark:text-slate-400 border-b border-gray-200 dark:border-slate-700">
+                            <th className="text-left py-1.5 pr-3 font-medium">Date</th>
+                            <th className="text-left py-1.5 pr-3 font-medium">Source</th>
+                            <th className="text-left py-1.5 pr-3 font-medium">Status</th>
+                            <th className="text-right py-1.5 pr-3 font-medium">Records</th>
+                            <th className="text-right py-1.5 pr-3 font-medium">Changes</th>
+                            <th className="text-right py-1.5 font-medium">Duration</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 dark:divide-slate-700/50">
+                          {jobHistory.map((run: any) => (
+                            <tr key={run.id} title={run.errorMessage || undefined}>
+                              <td className="py-1.5 pr-3 text-gray-700 dark:text-slate-300 font-mono">{run.runDate}</td>
+                              <td className="py-1.5 pr-3 text-gray-500 dark:text-slate-400 capitalize">{run.source}</td>
+                              <td className="py-1.5 pr-3">
+                                <span className={`inline-block px-1.5 py-0.5 rounded text-[11px] font-medium
+                                  ${run.status === 'success'
+                                    ? 'bg-green-500/10 text-green-500 dark:text-green-400'
+                                    : 'bg-red-500/10 text-red-500 dark:text-red-400'}`}>
+                                  {run.status}
+                                </span>
+                              </td>
+                              <td className="py-1.5 pr-3 text-right text-gray-700 dark:text-slate-300 tabular-nums">
+                                {run.recordsProcessed != null ? run.recordsProcessed.toLocaleString() : '—'}
+                              </td>
+                              <td className="py-1.5 pr-3 text-right text-gray-700 dark:text-slate-300 tabular-nums">
+                                {run.changesDetected ?? '—'}
+                              </td>
+                              <td className="py-1.5 text-right text-gray-500 dark:text-slate-400 tabular-nums">
+                                {run.durationMs != null
+                                  ? run.durationMs < 60000
+                                    ? `${Math.round(run.durationMs / 1000)}s`
+                                    : `${Math.floor(run.durationMs / 60000)}m ${Math.round((run.durationMs % 60000) / 1000)}s`
+                                  : '—'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      {jobHistory.some((r: any) => r.errorMessage) && (
+                        <div className="mt-3 space-y-1 border-t border-gray-100 dark:border-slate-700 pt-2">
+                          {jobHistory.filter((r: any) => r.errorMessage).slice(0, 3).map((r: any) => (
+                            <p key={r.id} className="text-[11px] text-red-400 font-mono truncate">
+                              {r.runDate}: {r.errorMessage}
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </CardContent>
               </Card>
