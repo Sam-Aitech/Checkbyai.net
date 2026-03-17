@@ -38,7 +38,15 @@ interface SponsorSearchResult {
   route: string | null;
   status: string;
   matchScore: number;
+  isNew: boolean;
   historicalNames: string[];
+}
+
+interface PagedSearchResponse {
+  results: SponsorSearchResult[];
+  total: number;
+  page: number;
+  totalPages: number;
 }
 
 interface SponsorChange {
@@ -105,11 +113,29 @@ function StatusBadge({ status, typeRating }: { status: string; typeRating: strin
   const rating = (typeRating || "").toLowerCase();
   const isBRated = rating.includes("b rating") || rating.includes("b-rating") || rating === "b";
 
-  if (status === "NOT_LISTED") {
+  if (status === "REMOVED_REVOKED") {
     return (
       <Badge className="bg-red-600 text-white border-red-700 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide">
         <XCircle className="w-3 h-3 mr-1" />
-        Revoked
+        Removed
+      </Badge>
+    );
+  }
+
+  if (status === "NEWLY_GRANTED") {
+    return (
+      <Badge className="bg-orange-500 text-white border-orange-600 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide">
+        <Zap className="w-3 h-3 mr-1" />
+        Newly Granted
+      </Badge>
+    );
+  }
+
+  if (status === "GRACE_PERIOD") {
+    return (
+      <Badge className="bg-yellow-500 text-white border-yellow-600 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide">
+        <Clock className="w-3 h-3 mr-1" />
+        Under Review
       </Badge>
     );
   }
@@ -131,7 +157,7 @@ function StatusBadge({ status, typeRating }: { status: string; typeRating: strin
 }
 
 function getWatchStatusBadge(currentStatus: WatchEntry["currentStatus"]) {
-  const canonicalStatus = currentStatus.status || (currentStatus.listed ? "ACTIVE" : "NOT_LISTED");
+  const canonicalStatus = currentStatus.status || (currentStatus.listed ? "ACTIVE" : "REMOVED_REVOKED");
   return <StatusBadge status={canonicalStatus} typeRating={currentStatus.typeRating} />;
 }
 
@@ -751,8 +777,8 @@ export default function SponsorMonitor() {
   }, []);
 
   const {
-    data: searchResults, isLoading: searchLoading, isFetching: searchFetching, error: searchError,
-  } = useQuery<SponsorSearchResult[]>({
+    data: searchData, isLoading: searchLoading, isFetching: searchFetching, error: searchError,
+  } = useQuery<PagedSearchResponse>({
     queryKey: ["/api/sponsors/search", debouncedQuery],
     queryFn: async () => {
       const res = await fetch(`/api/sponsors/search?q=${encodeURIComponent(debouncedQuery.trim())}`, { credentials: "include" });
@@ -763,6 +789,7 @@ export default function SponsorMonitor() {
     staleTime: 30 * 1000,
     retry: false,
   });
+  const searchResults = searchData?.results;
 
   useEffect(() => {
     if (!shouldSearch || isAuthenticated) {
@@ -1034,14 +1061,16 @@ export default function SponsorMonitor() {
               )}
 
               <p className="text-sm text-muted-foreground mb-3">
-                {effectiveResults!.length} result{effectiveResults!.length !== 1 ? "s" : ""} found
+                {isAuthenticated && searchData
+                  ? `Showing ${effectiveResults!.length} of ${searchData.total.toLocaleString()} match${searchData.total !== 1 ? "es" : ""}`
+                  : `${effectiveResults!.length} result${effectiveResults!.length !== 1 ? "s" : ""} found`}
               </p>
               {effectiveResults!.map((result, index) => {
                 const isAdded = addedCompanies.has(result.organisationName) || activeWatches.some(w => w.organisationName === result.organisationName);
                 const isAdding = addWatchMutation.isPending && addWatchMutation.variables?.organisationName === result.organisationName;
 
                 return (
-                  <Card key={`${result.fingerprint}-${index}`} className="transition-colors hover:bg-muted/30">
+                  <Card key={`${result.fingerprint}-${index}`} className={`transition-colors hover:bg-muted/30 ${result.isNew ? "border-l-4 border-l-orange-400" : ""}`}>
                     <CardContent className="py-4">
                       <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0 flex-1">
@@ -1050,6 +1079,11 @@ export default function SponsorMonitor() {
                             <h3 className="font-semibold text-foreground truncate">{result.organisationName}</h3>
                             <StatusBadge status={result.status} typeRating={result.typeRating} />
                           </div>
+                          {result.isNew && (
+                            <p className="text-[11px] font-semibold text-orange-600 dark:text-orange-400 mb-1.5 flex items-center gap-1">
+                              <Zap className="w-3 h-3" /> Recently added to the UK sponsor register
+                            </p>
+                          )}
                           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                             {result.townCity && <span className="inline-flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{result.townCity}</span>}
                             {result.typeRating && <span className="inline-flex items-center gap-1"><Star className="w-3.5 h-3.5" />{result.typeRating}</span>}

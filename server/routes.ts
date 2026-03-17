@@ -1355,12 +1355,13 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
       // Attempt warm Fuse index first; fall back to pg_trgm if cold/empty.
       // ensureIndexReady() deduplicates concurrent rebuild calls onto one DB fetch.
       await ensureIndexReady();
-      const results = isIndexReady()
-        ? searchSponsors(q, 10)
-        : await searchSponsorsFallback(q, 10);
+      const opts = { limit: 10 };
+      const paged = isIndexReady()
+        ? searchSponsors(q, opts)
+        : await searchSponsorsFallback(q, opts);
 
       freeSearchTracker.set(ip, Date.now());
-      res.json({ results, freeSearchUsed: true });
+      res.json({ results: paged?.results ?? [], freeSearchUsed: true });
     } catch (error) {
       console.error("Error in free sponsor search:", error);
       res.status(500).json({ message: "Failed to search sponsors." });
@@ -1502,6 +1503,7 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
   });
 
   // Sponsor search endpoint
+  // Supports: ?q=&status=ACTIVE|NEWLY_GRANTED|REMOVED_REVOKED|GRACE_PERIOD&town=london&page=1&limit=20
   app.get('/api/sponsors/search', isAuthenticated, async (req: any, res) => {
     try {
       const q = (req.query.q as string || "").trim();
@@ -1509,16 +1511,117 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
         return res.status(400).json({ message: "Search query must be at least 3 characters long." });
       }
 
+      const VALID_STATUSES = ["ACTIVE", "NEWLY_GRANTED", "REMOVED_REVOKED", "GRACE_PERIOD"];
+      const statusParam = (req.query.status as string || "").toUpperCase();
+      const status = VALID_STATUSES.includes(statusParam) ? statusParam : undefined;
+      const town = (req.query.town as string || "").trim() || undefined;
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
+
+      const opts = { status, town, page, limit };
+
       // Attempt warm Fuse index first; fall back to pg_trgm if cold/empty.
       await ensureIndexReady();
-      const results = isIndexReady()
-        ? searchSponsors(q, 20)
-        : await searchSponsorsFallback(q, 20);
+      const paged = isIndexReady()
+        ? searchSponsors(q, opts)
+        : await searchSponsorsFallback(q, opts);
 
-      res.json(results);
+      res.json(paged ?? { results: [], total: 0, page: 1, totalPages: 1 });
     } catch (error) {
       console.error("Error searching sponsors:", error);
       res.status(500).json({ message: "Failed to search sponsors." });
+    }
+  });
+
+  // Public sponsor directory — no auth required.
+  // Browse/filter the full register with pagination.
+  // Supports: ?name=&status=&town=&route=&page=1&limit=50
+  app.get('/api/sponsors/directory', async (req: any, res) => {
+    try {
+      const VALID_STATUSES = ["ACTIVE", "NEWLY_GRANTED", "REMOVED_REVOKED", "GRACE_PERIOD"];
+      const name   = (req.query.name   as string || "").trim() || null;
+      const statusParam = (req.query.status as string || "").toUpperCase();
+      const status = VALID_STATUSES.includes(statusParam) ? statusParam : null;
+      const town   = (req.query.town   as string || "").trim() || null;
+      const route  = (req.query.route  as string || "").trim() || null;
+      const page   = Math.max(1, parseInt(req.query.page  as string) || 1);
+      const limit  = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
+      const offset = (page - 1) * limit;
+
+      // Build dynamic WHERE clauses
+      const nameFilter   = name   ? sql`AND current_name ILIKE ${"%" + name + "%"}`     : sql``;
+      const statusFilter = status ? sql`AND status = ${status}`                          : sql``;
+      const townFilter   = town   ? sql`AND town_city ILIKE ${"%" + town + "%"}`         : sql``;
+      const routeFilter  = route  ? sql`AND route ILIKE ${"%" + route + "%"}`            : sql``;
+
+      const [rows, countRows, statsRows] = await Promise.all([
+        db.execute(sql`
+          SELECT
+            fingerprint,
+            current_name   AS "organisationName",
+            town_city      AS "townCity",
+            county,
+            type_rating    AS "typeRating",
+            route,
+            status,
+            granted_at     AS "grantedAt",
+            removed_at     AS "removedAt",
+            first_seen     AS "firstSeen"
+          FROM sponsor_canonical
+          WHERE 1=1
+            ${nameFilter}
+            ${statusFilter}
+            ${townFilter}
+            ${routeFilter}
+          ORDER BY
+            CASE status
+              WHEN 'NEWLY_GRANTED'   THEN 0
+              WHEN 'ACTIVE'          THEN 1
+              WHEN 'GRACE_PERIOD'    THEN 2
+              ELSE                        3
+            END,
+            current_name ASC
+          LIMIT ${limit} OFFSET ${offset}
+        `),
+        db.execute(sql`
+          SELECT COUNT(*)::int AS total
+          FROM sponsor_canonical
+          WHERE 1=1
+            ${nameFilter}
+            ${statusFilter}
+            ${townFilter}
+            ${routeFilter}
+        `),
+        db.execute(sql`
+          SELECT
+            COUNT(*) FILTER (WHERE status = 'ACTIVE')                                                        AS active,
+            COUNT(*) FILTER (WHERE status = 'NEWLY_GRANTED')                                                 AS "newlyGranted",
+            COUNT(*) FILTER (WHERE status = 'REMOVED_REVOKED' AND removed_at >= NOW() - INTERVAL '7 days')  AS "removedThisWeek",
+            COUNT(*) FILTER (WHERE status = 'GRACE_PERIOD')                                                  AS "gracePeriod"
+          FROM sponsor_canonical
+        `),
+      ]);
+
+      const total      = (countRows.rows[0] as any)?.total ?? 0;
+      const totalPages = Math.max(1, Math.ceil(total / limit));
+      const stats      = statsRows.rows[0] as any;
+
+      res.json({
+        results: rows.rows,
+        total,
+        page,
+        totalPages,
+        limit,
+        stats: {
+          active:          Number(stats?.active ?? 0),
+          newlyGranted:    Number(stats?.newlyGranted ?? 0),
+          removedThisWeek: Number(stats?.removedThisWeek ?? 0),
+          gracePeriod:     Number(stats?.gracePeriod ?? 0),
+        },
+      });
+    } catch (error: any) {
+      console.error("Error in sponsor directory:", error);
+      res.status(500).json({ message: "Failed to load sponsor directory." });
     }
   });
 

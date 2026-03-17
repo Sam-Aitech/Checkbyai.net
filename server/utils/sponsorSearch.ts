@@ -114,96 +114,169 @@ export function isIndexReady(): boolean {
 
 // ── Search ────────────────────────────────────────────────────────────────────
 
-/**
- * Fuse.js in-memory fuzzy search.  P99 < 5ms for 100k records.
- * Returns [] if the index is cold or empty — callers should fall back to
- * searchSponsorsFallback() in that case.
- */
-export function searchSponsors(
-  query: string,
-  limit: number = 20,
-): SponsorSearchResult[] {
-  if (!fuseIndex || indexRecordCount === 0) return [];
+export interface SearchOptions {
+  status?: string;   // e.g. "ACTIVE" | "NEWLY_GRANTED" | "REMOVED_REVOKED" | "GRACE_PERIOD"
+  town?: string;     // partial, case-insensitive
+  page?: number;     // 1-based
+  limit?: number;
+}
 
-  return fuseIndex.search(query, { limit }).map((r) => ({
-    fingerprint:      r.item.fingerprint,
-    organisationName: r.item.organisationName,
-    townCity:         r.item.townCity,
-    typeRating:       r.item.typeRating,
-    route:            r.item.route,
-    status:           r.item.status,
-    matchScore:       Math.round((1 - (r.score ?? 1)) * 100),
-    grantedAt:        r.item.grantedAt,
-    isNew:            r.item.status === "NEWLY_GRANTED",
-    historicalNames:  r.item.historicalNames,
-    source:           "index",
-  }));
+export interface PagedSearchResult {
+  results: SponsorSearchResult[];
+  total: number;
+  page: number;
+  totalPages: number;
 }
 
 /**
- * PostgreSQL pg_trgm trigram similarity search.
+ * Fuse.js in-memory fuzzy search with optional status/town filtering and pagination.
+ * Oversamples at 5× the requested limit before filtering so post-filter pages stay full.
+ * Returns null if the index is cold/empty — caller should fall back to searchSponsorsFallback().
+ */
+export function searchSponsors(
+  query: string,
+  options: SearchOptions = {},
+): PagedSearchResult | null {
+  if (!fuseIndex || indexRecordCount === 0) return null;
+
+  const { status, town, page = 1, limit = 20 } = options;
+  const oversample = Math.min(limit * 5, 500);
+
+  let hits = fuseIndex.search(query, { limit: oversample });
+
+  if (status) {
+    hits = hits.filter((r) => r.item.status === status);
+  }
+  if (town) {
+    const t = town.toLowerCase();
+    hits = hits.filter((r) => (r.item.townCity ?? "").toLowerCase().includes(t));
+  }
+
+  const total = hits.length;
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const safePage = Math.min(Math.max(1, page), totalPages);
+  const offset = (safePage - 1) * limit;
+  const pageHits = hits.slice(offset, offset + limit);
+
+  return {
+    results: pageHits.map((r) => ({
+      fingerprint:      r.item.fingerprint,
+      organisationName: r.item.organisationName,
+      townCity:         r.item.townCity,
+      typeRating:       r.item.typeRating,
+      route:            r.item.route,
+      status:           r.item.status,
+      matchScore:       Math.round((1 - (r.score ?? 1)) * 100),
+      grantedAt:        r.item.grantedAt,
+      isNew:            r.item.status === "NEWLY_GRANTED",
+      historicalNames:  r.item.historicalNames,
+      source:           "index",
+    })),
+    total,
+    page: safePage,
+    totalPages,
+  };
+}
+
+/**
+ * PostgreSQL pg_trgm trigram similarity search with optional status/town filtering and pagination.
  *
  * Used when the Fuse index has not yet been built (server cold start,
  * first boot before any sync has run, or after a failed rebuild).
  * Requires migration 0003 (CREATE EXTENSION pg_trgm +
  * GIN indexes on current_name and town_city).
- *
- * The `%` operator uses pg_trgm.similarity_threshold (default 0.3).
  */
 export async function searchSponsorsFallback(
   query: string,
-  limit: number = 20,
-): Promise<SponsorSearchResult[]> {
-  try {
-    const rows = await db.execute(sql`
-      SELECT
-        fingerprint,
-        current_name        AS "organisationName",
-        town_city           AS "townCity",
-        type_rating         AS "typeRating",
-        route,
-        status,
-        granted_at          AS "grantedAt",
-        historical_names    AS "historicalNames",
-        GREATEST(
-          similarity(current_name, ${query}),
-          COALESCE(
-            (SELECT MAX(similarity(hn, ${query}))
-               FROM UNNEST(historical_names) AS hn),
-            0
-          )
-        ) AS match_score
-      FROM sponsor_canonical
-      WHERE
-        status IN ('ACTIVE', 'NEWLY_GRANTED')
-        AND (
-          current_name % ${query}
-          OR EXISTS (
-            SELECT 1 FROM UNNEST(historical_names) AS hn
-            WHERE hn % ${query}
-          )
-        )
-      ORDER BY match_score DESC
-      LIMIT ${limit}
-    `);
+  options: SearchOptions = {},
+): Promise<PagedSearchResult> {
+  const { status, town, page = 1, limit = 20 } = options;
+  const offset = (Math.max(1, page) - 1) * limit;
 
-    return (rows.rows as any[]).map((r) => ({
-      fingerprint:      r.fingerprint,
-      organisationName: r.organisationName,
-      townCity:         r.townCity ?? null,
-      typeRating:       r.typeRating ?? null,
-      route:            r.route ?? null,
-      status:           r.status,
-      matchScore:       Math.round((parseFloat(r.match_score) || 0) * 100),
-      grantedAt:        r.grantedAt ?? null,
-      isNew:            r.status === "NEWLY_GRANTED",
-      historicalNames:  r.historicalNames || [],
-      source:           "db",
-    }));
+  // Build dynamic WHERE clauses
+  const statusFilter = status
+    ? sql`AND status = ${status}`
+    : sql`AND status IN ('ACTIVE', 'NEWLY_GRANTED')`;
+
+  const townFilter = town
+    ? sql`AND town_city ILIKE ${"%" + town + "%"}`
+    : sql``;
+
+  try {
+    const [dataRows, countRows] = await Promise.all([
+      db.execute(sql`
+        SELECT
+          fingerprint,
+          current_name        AS "organisationName",
+          town_city           AS "townCity",
+          type_rating         AS "typeRating",
+          route,
+          status,
+          granted_at          AS "grantedAt",
+          historical_names    AS "historicalNames",
+          GREATEST(
+            similarity(current_name, ${query}),
+            COALESCE(
+              (SELECT MAX(similarity(hn, ${query}))
+                 FROM UNNEST(historical_names) AS hn),
+              0
+            )
+          ) AS match_score
+        FROM sponsor_canonical
+        WHERE
+          (
+            current_name % ${query}
+            OR EXISTS (
+              SELECT 1 FROM UNNEST(historical_names) AS hn
+              WHERE hn % ${query}
+            )
+          )
+          ${statusFilter}
+          ${townFilter}
+        ORDER BY match_score DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `),
+      db.execute(sql`
+        SELECT COUNT(*)::int AS total
+        FROM sponsor_canonical
+        WHERE
+          (
+            current_name % ${query}
+            OR EXISTS (
+              SELECT 1 FROM UNNEST(historical_names) AS hn
+              WHERE hn % ${query}
+            )
+          )
+          ${statusFilter}
+          ${townFilter}
+      `),
+    ]);
+
+    const total: number = (countRows.rows[0] as any)?.total ?? 0;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+
+    return {
+      results: (dataRows.rows as any[]).map((r) => ({
+        fingerprint:      r.fingerprint,
+        organisationName: r.organisationName,
+        townCity:         r.townCity ?? null,
+        typeRating:       r.typeRating ?? null,
+        route:            r.route ?? null,
+        status:           r.status,
+        matchScore:       Math.round((parseFloat(r.match_score) || 0) * 100),
+        grantedAt:        r.grantedAt ?? null,
+        isNew:            r.status === "NEWLY_GRANTED",
+        historicalNames:  r.historicalNames || [],
+        source:           "db",
+      })),
+      total,
+      page: Math.max(1, page),
+      totalPages,
+    };
   } catch (err: any) {
     // pg_trgm extension not installed yet (migration pending) — return empty
     // rather than crashing the request handler.
     console.error("[SponsorSearch] pg_trgm fallback failed:", err.message);
-    return [];
+    return { results: [], total: 0, page: 1, totalPages: 1 };
   }
 }

@@ -18,6 +18,7 @@ const navLinks = [
   { href: "/ai-guide", label: "AI Guide" },
   { href: "/cos-guide", label: "CoS Guide" },
   { href: "/technology", label: "Technology" },
+  { href: "/sponsors",        label: "Sponsor Register" },
   { href: "/sponsor-monitor", label: "Sponsor Monitor" },
   { href: "/api-docs", label: "API" },
 ];
