@@ -2886,6 +2886,8 @@ Format your response in clear, professional markdown.`;
     }
   });
 
+  app.post('/api/admin/sponsor-monitor/initialize', isAdmin, async (req: any, res) => {
+    try {
       // Guard: reject if an initialize job is already in flight — return its jobId so the
       // frontend can resume polling rather than starting a duplicate.
       for (const [, job] of activeInitJobs) {
