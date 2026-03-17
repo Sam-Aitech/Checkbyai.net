@@ -9,7 +9,7 @@ import { db } from "./db";
 import { sql, eq, and, desc, inArray, gte, lt } from "drizzle-orm";
 import { setupAuth, isAuthenticated, isAdmin } from "./auth";
 import { checkIpRateLimit, recordIpVerification, getClientIp, hashIpAddress } from "./ipRateLimit";
-import { insertVerificationResultSchema, insertFeedbackSchema, companyWatches, sponsorList, sponsorCanonical, sponsorChanges, notificationPreferences, notificationLog, dailyDigest, users, verificationResults, processedCheckouts, jobAlertPreferences } from "@shared/schema";
+import { insertVerificationResultSchema, insertFeedbackSchema, companyWatches, sponsorList, sponsorCanonical, sponsorChanges, notificationPreferences, notificationLog, dailyDigest, users, verificationResults, processedCheckouts, jobAlertPreferences, monitorJobRuns } from "@shared/schema";
 import { authLimiter, verifyLimiter } from "./middleware/rateLimiter";
 import { withRetry } from "./utils/dbRetry";
 import multer from "multer";
@@ -548,7 +548,7 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
     if (!userEmail) {
       try {
         const user = await storage.getUser(userId);
-        userEmail = user?.email;
+        userEmail = user?.email ?? undefined;
       } catch (err) {
         console.error('[Subscription] Failed to fetch user email for notifications:', err);
       }
@@ -2700,6 +2700,19 @@ Format your response in clear, professional markdown.`;
     }
   });
 
+  // Force-release a stuck advisory lock (use when job hangs and never resets)
+  app.post('/api/admin/sponsor-monitor/release-lock', isAdmin, async (req: any, res) => {
+    try {
+      const SPONSOR_MONITOR_LOCK_KEY = 7483920;
+      await db.execute(sql`SELECT pg_advisory_unlock(${SPONSOR_MONITOR_LOCK_KEY})`);
+      console.warn("[SponsorMonitorJob] Advisory lock force-released by admin.");
+      res.json({ message: "Advisory lock released. You can now trigger a new run." });
+    } catch (error: any) {
+      console.error("Error releasing advisory lock:", error);
+      res.status(500).json({ message: "Failed to release lock: " + (error.message || "") });
+    }
+  });
+
   // Initialize sponsor monitor with first snapshot
   app.post('/api/admin/sponsor-monitor/initialize', isAdmin, async (req: any, res) => {
     try {
@@ -2772,6 +2785,14 @@ Format your response in clear, professional markdown.`;
 
       const lastRunMemory = getLastRunInfo();
 
+      // Persistent last run from DB (survives server restart; in-memory preferred when fresh)
+      const lastRunDb = await db
+        .select()
+        .from(monitorJobRuns)
+        .orderBy(desc(monitorJobRuns.startedAt))
+        .limit(1);
+      const lastRunDbRow = lastRunDb[0] ?? null;
+
       const activeWatchResult = await db
         .select({ count: sql<number>`count(*)::int` })
         .from(companyWatches)
@@ -2790,10 +2811,20 @@ Format your response in clear, professional markdown.`;
         );
       const notificationsSent24h = notifResult[0]?.count ?? 0;
 
+      // Prefer in-memory (most recent), fall back to DB row, then change-log derived
+      const lastRun = lastRunMemory ?? (lastRunDbRow ? {
+        date:             lastRunDbRow.runDate,
+        success:          lastRunDbRow.status === "success",
+        error:            lastRunDbRow.errorMessage ?? undefined,
+        recordsProcessed: lastRunDbRow.recordsProcessed ?? 0,
+        changesDetected:  lastRunDbRow.changesDetected ?? 0,
+        durationMs:       lastRunDbRow.durationMs ?? undefined,
+      } : (lastRunDate ? { date: lastRunDate, success: true, changes: lastRunSummary } : null));
+
       res.json({
         latestSnapshot: latestDate,
         snapshotRecordCount,
-        lastRun: lastRunMemory || (lastRunDate ? { date: lastRunDate, success: true, changes: lastRunSummary } : null),
+        lastRun,
         activeWatchCount,
         notificationsSent24h,
         jobRunning: isJobRunning(),
@@ -2971,6 +3002,7 @@ Format your response in clear, professional markdown.`;
           status: "ACTIVE" as const,
           firstSeen: today,
           lastSeen: today,
+          grantedAt: latestDate,   // use snapshot date, not today
           consecutiveMisses: 0,
           historicalNames: [] as string[],
         };
@@ -3096,7 +3128,7 @@ Format your response in clear, professional markdown.`;
       const { producer, verificationId } = tpParsed.data;
 
       // Get the verification to extract metadata
-      const verification = await storage.getVerificationById(verificationId);
+      const verification = verificationId !== undefined ? await storage.getVerificationById(verificationId) : null;
       
       // Create a trusted pattern from this producer
       const patternId = await storage.createTrustedPattern(

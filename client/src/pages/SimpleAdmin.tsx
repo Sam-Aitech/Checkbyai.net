@@ -197,8 +197,15 @@ export default function SimpleAdmin() {
   const [runningJob, setRunningJob] = useState(false);
   const [runConfirmOpen, setRunConfirmOpen] = useState(false);
   const [runResult, setRunResult] = useState<string | null>(null);
+  const [runError, setRunError] = useState<string | null>(null);
+  const [runElapsed, setRunElapsed] = useState(0);
   const [initConfirmOpen, setInitConfirmOpen] = useState(false);
   const [initializing, setInitializing] = useState(false);
+  const [migratingCanonical, setMigratingCanonical] = useState(false);
+  const [migrateResult, setMigrateResult] = useState<{ inserted?: number; message: string; error?: boolean } | null>(null);
+  const [releasingLock, setReleasingLock] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [storageStats, setStorageStats] = useState<any>(null);
   const [storageLoading, setStorageLoading] = useState(false);
   const [cleaningUp, setCleaningUp] = useState(false);
@@ -358,28 +365,59 @@ export default function SimpleAdmin() {
     }
   }, []);
 
+  const stopPolling = () => {
+    if (pollRef.current)    { clearInterval(pollRef.current);    pollRef.current    = null; }
+    if (elapsedRef.current) { clearInterval(elapsedRef.current); elapsedRef.current = null; }
+  };
+
   const handleRunSponsorJob = async () => {
     setRunConfirmOpen(false);
-    setRunResult(null); // Clear previous result at start
+    setRunResult(null);
+    setRunError(null);
+    setRunElapsed(0);
     setRunningJob(true);
+    stopPolling();
     try {
       const res = await fetch('/api/admin/sponsor-monitor/run', {
         method: 'POST',
         credentials: 'include',
       });
       const data = await res.json();
-      if (res.ok) {
-        setRunResult(data.message);
-        toast({ title: "Job Started", description: data.message });
-        setTimeout(() => loadSponsorMonitorData(), 30000);
-      } else {
-        setRunResult(data.message || 'Failed to start job');
+      if (!res.ok) {
+        setRunError(data.message || 'Failed to start job');
         toast({ title: "Error", description: data.message, variant: "destructive" });
+        setRunningJob(false);
+        return;
       }
+      setRunResult(data.message);
+      toast({ title: "Job Started", description: data.message });
+
+      // Elapsed timer: tick every second
+      elapsedRef.current = setInterval(() => setRunElapsed(s => s + 1), 1000);
+
+      // Poll status every 5 seconds until job finishes
+      pollRef.current = setInterval(async () => {
+        try {
+          const statusRes = await fetch('/api/admin/sponsor-monitor/status', { credentials: 'include' });
+          if (!statusRes.ok) return;
+          const statusData = await statusRes.json();
+          setSponsorStatus(statusData);
+          if (!statusData.jobRunning) {
+            stopPolling();
+            setRunningJob(false);
+            if (statusData.lastRun?.success === false) {
+              setRunError(statusData.lastRun?.error || 'Job failed — check server logs.');
+              toast({ title: "Job Failed", description: statusData.lastRun?.error || 'Run failed', variant: "destructive" });
+            } else {
+              setRunResult(`Job completed. ${statusData.lastRun?.changesDetected ?? 0} changes detected.`);
+              toast({ title: "Job Completed", description: `${statusData.lastRun?.recordsProcessed?.toLocaleString() ?? '?'} records processed.` });
+            }
+          }
+        } catch { /* network blip — keep polling */ }
+      }, 5000);
     } catch (error) {
-      setRunResult('Network error');
+      setRunError('Network error — could not reach server.');
       toast({ title: "Error", description: "Failed to trigger job", variant: "destructive" });
-    } finally {
       setRunningJob(false);
     }
   };
@@ -404,6 +442,45 @@ export default function SimpleAdmin() {
       toast({ title: "Error", description: "Failed to initialize", variant: "destructive" });
     } finally {
       setInitializing(false);
+    }
+  };
+
+  const handleMigrateCanonical = async () => {
+    setMigratingCanonical(true);
+    setMigrateResult(null);
+    try {
+      const res = await fetch('/api/admin/migrate-canonical', { method: 'POST', credentials: 'include' });
+      const data = await res.json();
+      if (res.ok) {
+        setMigrateResult({ inserted: data.inserted, message: `${data.inserted?.toLocaleString()} records indexed from snapshot ${data.snapshotDate}.` });
+        toast({ title: "Search Index Built", description: `${data.inserted?.toLocaleString()} sponsors now searchable.` });
+        loadSponsorMonitorData();
+      } else if (res.status === 409) {
+        setMigrateResult({ message: data.message, inserted: data.existingCount });
+        toast({ title: "Already Indexed", description: data.message });
+      } else {
+        setMigrateResult({ message: data.message || 'Migration failed', error: true });
+        toast({ title: "Error", description: data.message, variant: "destructive" });
+      }
+    } catch {
+      setMigrateResult({ message: 'Network error', error: true });
+      toast({ title: "Error", description: "Failed to build search index", variant: "destructive" });
+    } finally {
+      setMigratingCanonical(false);
+    }
+  };
+
+  const handleReleaseLock = async () => {
+    setReleasingLock(true);
+    try {
+      const res = await fetch('/api/admin/sponsor-monitor/release-lock', { method: 'POST', credentials: 'include' });
+      const data = await res.json();
+      toast({ title: res.ok ? "Lock Released" : "Error", description: data.message, variant: res.ok ? "default" : "destructive" });
+      if (res.ok) { stopPolling(); setRunningJob(false); loadSponsorMonitorData(); }
+    } catch {
+      toast({ title: "Error", description: "Failed to release lock", variant: "destructive" });
+    } finally {
+      setReleasingLock(false);
     }
   };
 
@@ -2096,9 +2173,32 @@ export default function SimpleAdmin() {
                   ) : (
                     <p className="text-gray-500 dark:text-slate-400 text-sm">No status data available.</p>
                   )}
-                  {runResult && (
+                  {(runningJob || sponsorStatus?.jobRunning) && (
+                    <div className="mt-4 flex items-center gap-3 text-sm text-blue-300">
+                      <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin shrink-0" />
+                      <span>Running… {runElapsed > 0 && `(${Math.floor(runElapsed / 60)}m ${runElapsed % 60}s)`}</span>
+                      <Button size="sm" variant="destructive" className="ml-auto h-7 text-xs" disabled={releasingLock} onClick={handleReleaseLock}>
+                        {releasingLock ? 'Releasing…' : 'Force Release Lock'}
+                      </Button>
+                    </div>
+                  )}
+                  {runResult && !runError && !(runningJob || sponsorStatus?.jobRunning) && (
                     <Alert className="mt-4 bg-blue-500/10 border-blue-500/30">
                       <AlertDescription className="text-blue-300">{runResult}</AlertDescription>
+                    </Alert>
+                  )}
+                  {runError && (
+                    <Alert className="mt-4 bg-red-500/10 border-red-500/30">
+                      <AlertTriangle className="w-4 h-4 text-red-400" />
+                      <AlertDescription className="text-red-300 text-xs font-mono break-all">{runError}</AlertDescription>
+                    </Alert>
+                  )}
+                  {!runError && sponsorStatus?.lastRun?.success === false && sponsorStatus?.lastRun?.error && (
+                    <Alert className="mt-4 bg-red-500/10 border-red-500/30">
+                      <AlertTriangle className="w-4 h-4 text-red-400" />
+                      <AlertDescription className="text-red-300 text-xs font-mono break-all">
+                        Last run failed: {sponsorStatus.lastRun.error}
+                      </AlertDescription>
                     </Alert>
                   )}
                 </CardContent>
@@ -2148,6 +2248,50 @@ export default function SimpleAdmin() {
                             </>
                           )}
                         </Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Bootstrap Canonical / Search Index Card */}
+                <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
+                  <CardHeader>
+                    <CardTitle className="text-gray-900 dark:text-white text-base flex items-center gap-2">
+                      <Search className="w-4 h-4 text-violet-400" />
+                      Populate Search Index
+                    </CardTitle>
+                    <CardDescription className="text-gray-500 dark:text-slate-400">
+                      Copy snapshot data into the live search table (sponsor_canonical). Run once after Initialize.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {migrateResult && !migrateResult.error ? (
+                      <div className="flex items-center gap-2 text-sm">
+                        <CheckCircle className="w-4 h-4 text-green-400" />
+                        <span className="text-green-400">{migrateResult.message}</span>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {migrateResult?.error && (
+                          <Alert className="bg-red-500/10 border-red-500/30">
+                            <AlertTriangle className="w-4 h-4 text-red-400" />
+                            <AlertDescription className="text-red-300 text-xs">{migrateResult.message}</AlertDescription>
+                          </Alert>
+                        )}
+                        <Button
+                          onClick={handleMigrateCanonical}
+                          disabled={migratingCanonical || !sponsorStatus?.latestSnapshot}
+                          className="bg-violet-600 hover:bg-violet-700"
+                        >
+                          {migratingCanonical ? (
+                            <><div className="w-4 h-4 mr-1 border-2 border-white border-t-transparent rounded-full animate-spin" />Indexing…</>
+                          ) : (
+                            <><Database className="w-4 h-4 mr-1" />Build Search Index</>
+                          )}
+                        </Button>
+                        {!sponsorStatus?.latestSnapshot && (
+                          <p className="text-xs text-amber-400">Run Initialize first to download the snapshot.</p>
+                        )}
                       </div>
                     )}
                   </CardContent>

@@ -74,6 +74,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
   const [searchLoading, setSearchLoading] = useState(false)
   const [searchLimitReached, setSearchLimitReached] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
+  const [searchUnavailable, setSearchUnavailable] = useState(false)
 
   useEffect(() => {
     setIsLoaded(true)
@@ -84,6 +85,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
     setSearchLoading(true);
     setSearchResults([]);
     setSearchLimitReached(false);
+    setSearchUnavailable(false);
     setHasSearched(true);
     try {
       const res = await fetch(`/api/sponsors/free-search?q=${encodeURIComponent(searchQuery.trim())}`);
@@ -92,9 +94,11 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
         setSearchLimitReached(true);
       } else if (res.ok) {
         setSearchResults(data.results || []);
+      } else {
+        setSearchUnavailable(true);
       }
     } catch {
-      setSearchResults([]);
+      setSearchUnavailable(true);
     } finally {
       setSearchLoading(false);
     }
@@ -292,7 +296,10 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
             </div>
           )}
 
-          {!searchLoading && !searchLimitReached && hasSearched && searchResults.length === 0 && (
+          {!searchLoading && searchUnavailable && (
+            <p className="text-sm text-amber-400 mt-4">Search temporarily unavailable — please try again in a moment.</p>
+          )}
+          {!searchLoading && !searchLimitReached && !searchUnavailable && hasSearched && searchResults.length === 0 && (
             <p className="text-sm text-muted-foreground mt-4">No sponsors found matching your search. Try a different name.</p>
           )}
 
