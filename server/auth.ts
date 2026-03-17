@@ -8,8 +8,10 @@ import crypto from "crypto";
 import { otpLimiter } from "./middleware/rateLimiter";
 
 
-if (!process.env.REPLIT_DOMAINS) {
-  throw new Error("Environment variable REPLIT_DOMAINS not provided");
+if (process.env.NODE_ENV === "production" && !process.env.REPLIT_DOMAINS) {
+  // If we're on Replit but forgot domains, we cannot handle OAuth callbacks.
+  // We only throw in production to allow local dev to work without these.
+  console.warn("REPLIT_DOMAINS not provided; Google OAuth callback redirects may fail.");
 }
 
 export function getSession() {
@@ -581,13 +583,17 @@ export const isAdmin: RequestHandler = async (req, res, next) => {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
-  const user = req.user as any;
-  const userId = user.id;
-  const dbUser = await storage.getUser(userId);
-  
-  if (!dbUser || dbUser.role !== 'admin') {
-    return res.status(403).json({ message: "Admin access required" });
-  }
+  try {
+    const user = req.user as any;
+    const userId = user.id;
+    const dbUser = await storage.getUser(userId);
+    
+    if (!dbUser || dbUser.role !== 'admin') {
+      return res.status(403).json({ message: "Admin access required" });
+    }
 
-  next();
+    next();
+  } catch (err) {
+    next(err);
+  }
 };

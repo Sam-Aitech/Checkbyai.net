@@ -13,12 +13,12 @@ if (!process.env.DATABASE_URL) {
 
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  // Keep the pool small — Neon serverless charges per active connection and
-  // auto-pauses on idle. Large pools cause cascading cold-start failures.
-  max: 10,
+  // Increased pool size to 20 to support concurrent background reconciliation
+  // and real-time user verification requests without saturating.
+  max: 20,
   // Release idle connections quickly so Neon can auto-pause between cron runs.
   idleTimeoutMillis: 30_000,
-  // Fail fast if the pool is saturated rather than queuing indefinitely.
-  connectionTimeoutMillis: 10_000,
+  // Increased timeout slightly to allow for heavy background operations.
+  connectionTimeoutMillis: 15_000,
 });
 export const db = drizzle({ client: pool, schema });

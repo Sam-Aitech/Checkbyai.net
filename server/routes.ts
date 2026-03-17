@@ -112,11 +112,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Clean up old processed checkout records on startup (older than 48h)
   cleanupOldProcessedCheckouts().catch((err) => console.error('[Startup] Failed to clean processed checkouts:', err));
 
-  // Request-triggered sponsor monitor check (runs at most once per hour, non-blocking)
-  app.use((req, res, next) => {
+  // Request-triggered sponsor monitor check (runs at most once per hour)
+  // Replaced global middleware with a 1-hour interval frequency
+  setInterval(() => {
     checkAndTriggerIfNeeded().catch((err) => console.error('[SponsorMonitor] Trigger check failed:', err));
-    next();
-  });
+  }, 60 * 60 * 1000);
 
   // Health endpoint for external uptime monitors (keeps server alive for cron windows)
   app.get('/api/health', async (req, res) => {
@@ -2685,7 +2685,7 @@ Format your response in clear, professional markdown.`;
   // Manual trigger for sponsor monitor job
   app.post('/api/admin/sponsor-monitor/run', isAdmin, async (req: any, res) => {
     try {
-      if (isJobRunning()) {
+      if (await isJobRunning()) {
         return res.status(409).json({ message: "Sponsor monitor job is already running. Please wait for it to finish." });
       }
 

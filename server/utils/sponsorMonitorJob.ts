@@ -79,7 +79,7 @@ let lastRunInfo: LastRunInfo | null = null;
 // Staged retry delays: 5 min then 15 min (total worst-case wait: 20 min vs old 60 min)
 // gov.uk transient errors (DNS, 503) recover in minutes, not half-hours.
 const RETRY_DELAYS_MS = [5 * 60 * 1000, 15 * 60 * 1000];
-const MAX_RETRIES = 3;
+const DOWNLOAD_MAX_RETRIES = 3;
 const RENAME_SIMILARITY_THRESHOLD = 0.85;
 
 function classifyRatingChange(
@@ -125,7 +125,7 @@ async function sendAdminFailureAlert(errorMessage: string): Promise<void> {
               <h1 style="color: #ffffff; margin: 0; text-align: center; font-size: 22px;">Sponsor Monitor Job Failed</h1>
             </div>
             <div style="background: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
-              <p style="color: #333; font-size: 15px; line-height: 1.6;">The daily sponsor licence register check failed after ${MAX_RETRIES} attempts.</p>
+              <p style="color: #333; font-size: 15px; line-height: 1.6;">The daily sponsor licence register check failed after ${DOWNLOAD_MAX_RETRIES} attempts.</p>
               <div style="background: #fff3f3; padding: 15px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #CC0000;">
                 <p style="color: #333; font-size: 14px; margin: 0; font-family: monospace; white-space: pre-wrap;">${errorMessage.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>
               </div>
@@ -250,9 +250,9 @@ async function sendAdminJobCompleteEmail(result: {
 async function downloadWithRetry(): Promise<SponsorRecord[]> {
   let lastError: Error | null = null;
 
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+  for (let attempt = 1; attempt <= DOWNLOAD_MAX_RETRIES; attempt++) {
     try {
-      console.log(`[SponsorMonitorJob] CSV download attempt ${attempt}/${MAX_RETRIES}...`);
+      console.log(`[SponsorMonitorJob] CSV download attempt ${attempt}/${DOWNLOAD_MAX_RETRIES}...`);
       const records = await downloadAndParseSponsorList();
       console.log(`[SponsorMonitorJob] CSV download succeeded on attempt ${attempt}: ${records.length} records parsed`);
       return records;
@@ -260,7 +260,7 @@ async function downloadWithRetry(): Promise<SponsorRecord[]> {
       lastError = err;
       console.error(`[SponsorMonitorJob] CSV download attempt ${attempt} failed: ${err.message}`);
 
-      if (attempt < MAX_RETRIES) {
+      if (attempt < DOWNLOAD_MAX_RETRIES) {
         const delay = RETRY_DELAYS_MS[attempt - 1] ?? RETRY_DELAYS_MS[RETRY_DELAYS_MS.length - 1];
         const delayMin = Math.round(delay / 60000);
         console.log(`[SponsorMonitorJob] Waiting ${delayMin} minute(s) before retry...`);
@@ -275,20 +275,39 @@ async function downloadWithRetry(): Promise<SponsorRecord[]> {
 // ── Canonical data loaders ────────────────────────────────────────────────────
 
 /**
- * Loads all LIVE canonical records (ACTIVE + NEWLY_GRANTED + GRACE_PERIOD).
- * Used by the reconcile engine to classify today's CSV records.
+ * Loads all LIVE canonical records (ACTIVE + NEWLY_GRANTED + GRACE_PERIOD) in batches
+ * to prevent high-heap memory pressure during the reconciliation classify phase.
  * Excludes REMOVED_REVOKED — those are handled by loadRevokedFingerprints().
  */
 async function loadLiveCanonical(): Promise<Map<string, CanonicalRecord>> {
-  const records = await db
-    .select()
-    .from(sponsorCanonical)
-    .where(inArray(sponsorCanonical.status, ["ACTIVE", "NEWLY_GRANTED", "GRACE_PERIOD"]));
-
   const map = new Map<string, CanonicalRecord>();
-  for (const r of records) {
-    map.set(r.fingerprint, r as CanonicalRecord);
+  let lastId = 0;
+  const BATCH_SIZE = 5000;
+
+  console.log("[SponsorMonitorJob] Loading live canonical records in batches...");
+
+  while (true) {
+    const batch = await db
+      .select()
+      .from(sponsorCanonical)
+      .where(
+        and(
+          inArray(sponsorCanonical.status, ["ACTIVE", "NEWLY_GRANTED", "GRACE_PERIOD"]),
+          gt(sponsorCanonical.id, lastId)
+        )
+      )
+      .orderBy(asc(sponsorCanonical.id))
+      .limit(BATCH_SIZE);
+
+    if (batch.length === 0) break;
+
+    for (const r of batch) {
+      map.set(r.fingerprint, r as CanonicalRecord);
+      lastId = r.id;
+    }
+    console.log(`[SponsorMonitorJob]   ...loaded ${map.size} live records`);
   }
+
   return map;
 }
 
@@ -298,11 +317,35 @@ async function loadLiveCanonical(): Promise<Map<string, CanonicalRecord>> {
  * when a previously revoked company reappears in today's CSV.
  */
 async function loadRevokedFingerprints(): Promise<Set<string>> {
-  const rows = await db
-    .select({ fingerprint: sponsorCanonical.fingerprint })
-    .from(sponsorCanonical)
-    .where(eq(sponsorCanonical.status, "REMOVED_REVOKED"));
-  return new Set(rows.map((r) => r.fingerprint));
+  const set = new Set<string>();
+  let lastId = 0;
+  const BATCH_SIZE = 5000;
+
+  console.log("[SponsorMonitorJob] Loading revoked fingerprints in batches...");
+
+  while (true) {
+    const batch = await db
+      .select({ id: sponsorCanonical.id, fingerprint: sponsorCanonical.fingerprint })
+      .from(sponsorCanonical)
+      .where(
+        and(
+          eq(sponsorCanonical.status, "REMOVED_REVOKED"),
+          gt(sponsorCanonical.id, lastId)
+        )
+      )
+      .orderBy(asc(sponsorCanonical.id))
+      .limit(BATCH_SIZE);
+
+    if (batch.length === 0) break;
+
+    for (const r of batch) {
+      set.add(r.fingerprint);
+      lastId = r.id;
+    }
+  }
+
+  console.log(`[SponsorMonitorJob]   ...loaded ${set.size} revoked fingerprints`);
+  return set;
 }
 
 function buildTodayRecords(csvRecords: SponsorRecord[]): Map<string, TodayRecord> {
@@ -367,7 +410,6 @@ async function reconcile(
     const canonical = liveMap.get(fp);
 
     if (canonical) {
-      matchedFingerprints.add(fp);
       matchedIds.push(canonical.id);
 
       const prevRating = (canonical.typeRating ?? "").trim();
@@ -906,6 +948,9 @@ export async function runSponsorMonitorJob(source: string = "cron", notifyOnFail
         notificationsFailed: result.notificationsFailed,
         durationMs: finalDuration,
         completedAt: completionTime,
+        // Added JSON context for easier debugging and auditing.
+        // Provides a snapshot of the raw result object.
+        jobOutput: result,
       }).onConflictDoUpdate({
         target: monitorJobRuns.runDate,
         set: {
@@ -919,6 +964,7 @@ export async function runSponsorMonitorJob(source: string = "cron", notifyOnFail
           notificationsFailed: result.notificationsFailed,
           durationMs: finalDuration,
           completedAt: completionTime,
+          jobOutput: result,
         },
       });
     }, "Log job success");
@@ -1158,11 +1204,22 @@ export function startSponsorMonitorCron(): void {
   }, 15000);
 }
 
-export function isJobRunning(): boolean {
-  // Note: isJobRunning() is now advisory-lock-based at the DB level.
-  // This in-process check is a best-effort heuristic only.
-  // Use the monitorJobRuns table directly for authoritative job status.
-  return false;
+export async function isJobRunning(): Promise<boolean> {
+  // Use DB-level advisory lock query to check if job is truly active across any node.
+  // pg_locks table tracks all active locks by PID.
+  try {
+    const result = await db.execute(sql`
+      SELECT count(*) > 0 AS locked 
+      FROM pg_locks 
+      WHERE locktype = 'advisory' 
+        AND classid  = (${SPONSOR_MONITOR_LOCK_KEY}::bigint >> 32)::int
+        AND objid    = (${SPONSOR_MONITOR_LOCK_KEY}::bigint & x'ffffffff'::bigint)::int
+    `);
+    return (result.rows[0] as any)?.locked === true;
+  } catch (err) {
+    console.error('[SponsorMonitorJob] Failed to check advisory lock:', err);
+    return false;
+  }
 }
 
 export async function checkAndTriggerIfNeeded(): Promise<void> {

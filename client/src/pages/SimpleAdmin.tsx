@@ -360,8 +360,8 @@ export default function SimpleAdmin() {
 
   const handleRunSponsorJob = async () => {
     setRunConfirmOpen(false);
+    setRunResult(null); // Clear previous result at start
     setRunningJob(true);
-    setRunResult(null);
     try {
       const res = await fetch('/api/admin/sponsor-monitor/run', {
         method: 'POST',
