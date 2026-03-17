@@ -472,3 +472,31 @@ The current architecture runs as a single Node.js process. If scaling to multipl
 2. Run `POST /api/admin/migrate-canonical` if `sponsor_canonical` is empty
 3. Verify search index: `GET /api/health` → `indexReady: true`
 4. Trigger manual monitor run to re-sync to latest CSV state
+
+---
+
+## 9. Troubleshooting Common Issues
+
+### 9.1 TypeScript Compilation Errors
+
+**Issue:** Cannot find type definition file for 'vite/client'
+
+**Error Message:**
+```
+Cannot find type definition file for 'vite/client'.
+The file is in the program because:
+  Entry point of type library 'vite/client' specified in compilerOptions
+```
+
+**Root Cause:** The Vite package and its associated type definitions are not installed in the node_modules directory, even though 'vite/client' is specified in the tsconfig.json compiler options under the "types" array. This commonly occurs when dependencies are not properly installed or when switching branches that have different package requirements.
+
+**Solution:**
+```bash
+npm install
+```
+
+This ensures all dependencies including Vite and its type definitions are properly installed. After installation, verify that `node_modules/vite/client.d.ts` exists, which contains the type definitions for 'vite/client'.
+
+**Prevention:**
+- Always run `npm install` after cloning the repository or pulling changes that update dependencies
+- Ensure the `vite` package is listed in `package.json` dependencies (it should be already)
