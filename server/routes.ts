@@ -2886,6 +2886,9 @@ Format your response in clear, professional markdown.`;
     }
   });
 
+  // Initialize a fresh baseline snapshot of the UK sponsor register.
+  // Streams the full CSV, batch-inserts ~124k rows, then rebuilds the Fuse.js index.
+  // Fires and forgets — poll /init-progress/:jobId for live status.
   app.post('/api/admin/sponsor-monitor/initialize', isAdmin, async (req: any, res) => {
     try {
       // Guard: reject if an initialize job is already in flight — return its jobId so the
@@ -2897,6 +2900,34 @@ Format your response in clear, professional markdown.`;
             jobId: job.jobId,
           });
         }
+      }
+
+      // Fix B: Pre-flight orphaned-lock check.
+      // If the advisory lock is held by an idle/zombie backend (e.g., from a previous
+      // crashed run that didn't release cleanly), terminate that backend so the lock
+      // is released before runInitJob() tries to acquire it.
+      try {
+        const lockHolder = await db.execute(sql`
+          SELECT pl.pid, pa.state,
+                 EXTRACT(EPOCH FROM (now() - pa.state_change))::int AS idle_seconds
+          FROM   pg_locks pl
+          LEFT JOIN pg_stat_activity pa ON pa.pid = pl.pid
+          WHERE  pl.locktype  = 'advisory'
+            AND  pl.classid   = (${SPONSOR_JOB_LOCK_KEY}::bigint >> 32)::int
+            AND  pl.objid     = (${SPONSOR_JOB_LOCK_KEY}::bigint & x'ffffffff'::bigint)::int
+            AND  pl.granted   = true
+        `);
+        const holder = lockHolder.rows[0] as any;
+        if (holder && (holder.state === 'idle' || holder.state === 'idle in transaction')) {
+          console.warn(
+            `[SponsorMonitor] Advisory lock held by idle backend PID ${holder.pid} ` +
+            `(idle ${holder.idle_seconds}s) — terminating zombie to release lock.`
+          );
+          await db.execute(sql`SELECT pg_terminate_backend(${holder.pid})`);
+        }
+      } catch (lockCheckErr: any) {
+        // Non-fatal — runInitJob() will surface a clear error if lock is still held.
+        console.warn('[SponsorMonitor] Pre-flight zombie-lock check failed (non-fatal):', lockCheckErr.message);
       }
 
       const jobId = crypto.randomUUID();
