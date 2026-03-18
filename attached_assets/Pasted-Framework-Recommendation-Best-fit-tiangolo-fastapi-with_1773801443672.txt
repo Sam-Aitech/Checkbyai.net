@@ -1,0 +1,21 @@
+Framework Recommendation
+
+Best fit: tiangolo/fastapi with deterministic ETL modules (httpx + stdlib csv + optional Scrapling fallback for CSV-link extraction).
+dlt-hub/dlt: strong for warehouse loading pipelines, but its abstraction/state model is heavier than needed for a strict, API-first 5-step flow.
+PrefectHQ/prefect: excellent orchestration platform, but adds control-plane/worker overhead for a workflow that can be a single procedural service.
+Verdict: use a lean FastAPI microservice with explicit function calls and fixed control flow; no LLM/agent framework involved.
+Technical Architecture Plan
+
+Deploy ETL as a standalone service (Replit/container) that is read-only against Gov.uk and does not write directly to the main app DB.
+Refresh job creates a stable snapshot_id and persists normalized rows (snapshot_id, row_num) in local SQLite/Postgres for deterministic pagination.
+Expose GET /api/sponsors?page=1&limit=5000 returning snapshot_id, total_rows, total_pages, and rows.
+Main app ingestion worker fetches pages sequentially for one snapshot_id, writes each page to a staging table, then runs set-based bulk upserts.
+Use DB-row mutex (SELECT ... FOR UPDATE SKIP LOCKED) for ingestion jobs to avoid duplicate runs from pooled-connection lock loss.
+Prevent granted_at failures by always setting it on insert (COALESCE(payload.granted_at, snapshot_date)) and preserving existing value on conflict update (granted_at = sponsor_canonical.granted_at).
+Deterministic 5-Step Pipeline (Fixed Flow)
+
+1) Scrape URL: call Gov.uk page with realistic User-Agent; extract <a href="...csv"> via Scrapling or httpx + parser.
+2) Stream Download: open CSV request with stream=True; process chunks only, never full-file load.
+3) Decode cp1252: decode incremental bytes using cp1252/windows-1252 with malformed-byte handling (errors="ignore").
+4) Map Columns: pass decoded lines to csv.DictReader; map Organisation Name -> company_name, Town/City -> town, County -> county, Type & Rating -> tier_rating, Route -> visa_route; drop rows with empty company_name.
+5) Return JSON: batch cleaned rows and serve paginated JSON via GET /api/sponsors?page&limit (max limit=5000) so checkbyai ingests safely without timeout/memory spikes.

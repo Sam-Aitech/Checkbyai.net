@@ -1,0 +1,34 @@
+Role: Act as a Principal Data Engineer. We are building a standalone Python Microservice (ETL Agent) on Replit to handle heavy web scraping and CSV parsing.
+
+Context: The UK Gov updates a 10.4MB CSV of Sponsor Licences daily. The URL changes every day. Our main web app crashes when trying to process this. This Replit agent will act as a dedicated API to fetch, clean, and return this data safely.
+
+Task 1: Project Setup (FastAPI)
+Initialize a basic, high-performance Python FastAPI server with a single GET /api/v1/fetch-sponsors endpoint. Use uvicorn to run it.
+
+Task 2: Dynamic Link Scraper (Gov.uk)
+The CSV link changes daily. Write a scraper function (using Scrapling, httpx, or BeautifulSoup) that targets the Gov.uk guidance page:
+https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers
+Logic: Find the <a> tag where the text contains "Download CSV" or the href ends with .csv. Extract that dynamic URL. Set a realistic User-Agent header so Gov.uk does not block the request.
+
+Task 3: Stream, Download & Parse (Memory Safe)
+Replit has RAM limits, so we cannot load the whole CSV into memory carelessly.
+Logic:
+
+Download the CSV dynamically using a streamed request.
+CRITICAL: Gov.uk CSV files are notoriously encoded in Windows-1252 or cp1252 (not UTF-8). Implement a robust CSV reader (csv.DictReader or pandas) that explicitly handles this encoding to prevent crash errors on special characters.
+Task 4: Data Cleaning & JSON Formatting
+Map the messy Gov.uk CSV columns into a clean JSON array.
+Extract these specific fields:
+
+company_name (from "Organisation Name")
+town (from "Town/City")
+county (from "County")
+tier_rating (from "Type & Rating")
+visa_route (from "Route")
+Add a new field: scraped_at (current UTC timestamp).
+Task 5: The API Response
+The /api/v1/fetch-sponsors endpoint should return the fully cleaned JSON array. Add an optional query parameter ?limit=1000 for testing purposes so it doesn't return all 124,000 rows while we are debugging.
+
+Execution Rule:
+Please generate the main.py and requirements.txt files for this Replit project. Ensure robust try/except error handling around the scraping and parsing steps.
+
