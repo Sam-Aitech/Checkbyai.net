@@ -14,6 +14,7 @@ Called by the Node.js ingestion worker (Task #2) via internal HTTP on port 8000.
 
 import csv
 import io
+import os
 import sqlite3
 import threading
 import uuid
@@ -34,7 +35,7 @@ except Exception:
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
-SQLITE_PATH = "etl_sponsors.db"
+SQLITE_PATH = os.path.join(os.path.dirname(__file__), "etl_sponsors.db")
 GOV_UK_USER_AGENT = (
     "Mozilla/5.0 (compatible; CheckByAI-SponsorBot/1.0; +https://checkbyai.net)"
 )
