@@ -118,8 +118,8 @@ def run_etl_pipeline(snapshot_id: str) -> int:
 
     Step 1 — Discover CSV URL via Scrapling (Fetcher → StealthyFetcher).
     Step 2 — Stream download using requests with a 120-second timeout.
-    Step 3 — Decode raw bytes as cp1252 with errors='replace' (Gov.uk standard).
-    Step 4 — Parse decoded text with csv.DictReader; map column names.
+    Step 3+4 — Wrap resp.raw in io.TextIOWrapper(encoding='cp1252', errors='replace')
+               and feed decoded lines directly to csv.DictReader — no full-file buffer.
     Step 5 — Bulk-insert mapped rows into SQLite in batches of 5,000.
 
     Returns total valid rows inserted.
@@ -145,30 +145,25 @@ def run_etl_pipeline(snapshot_id: str) -> int:
     except requests.RequestException as exc:
         raise RuntimeError(f"CSV download failed: {exc}") from exc
 
-    # ── Step 3: Accumulate and decode as cp1252 ───────────────────────────────
+    # ── Step 3 & 4: Stream-decode as cp1252 and parse on-the-fly ─────────────
+    # Bytes are decoded incrementally via TextIOWrapper — no full-file buffer.
     try:
-        raw_bytes = b"".join(resp.iter_content(chunk_size=65_536))
-    except Exception as exc:
-        raise RuntimeError(f"Error reading CSV response stream: {exc}") from exc
-
-    try:
-        # BOM-aware: strip UTF-8/UTF-16 BOM if present; otherwise decode cp1252
-        if raw_bytes.startswith(b"\xef\xbb\xbf"):
-            text = raw_bytes[3:].decode("utf-8", errors="replace")
-        else:
-            text = raw_bytes.decode("cp1252", errors="replace")
-    except Exception as exc:
-        raise RuntimeError(f"CSV decoding failed: {exc}") from exc
-
-    text_stream = io.StringIO(text)
-
-    # ── Step 4: Parse with DictReader ────────────────────────────────────────
-    try:
+        resp.raw.decode_content = True  # urllib3: decompress gzip/deflate in-stream
+        text_stream = io.TextIOWrapper(
+            io.BufferedReader(resp.raw),
+            encoding="cp1252",
+            errors="replace",
+            newline="",
+        )
         reader = csv.DictReader(text_stream)
         if reader.fieldnames is None:
             raise RuntimeError("CSV appears to be empty (no header row found).")
+        # Strip cp1252-decoded UTF-8 BOM artefact from first header column.
+        # A UTF-8 BOM (0xEF 0xBB 0xBF) mis-decoded as cp1252 appears as "ï»¿".
+        if reader.fieldnames[0].startswith("\xef\xbb\xbf") or reader.fieldnames[0].startswith("ï»¿"):
+            reader.fieldnames[0] = reader.fieldnames[0][3:]
     except Exception as exc:
-        raise RuntimeError(f"CSV parsing initialisation failed: {exc}") from exc
+        raise RuntimeError(f"CSV stream decode/parse initialisation failed: {exc}") from exc
 
     # ── Step 5: Bulk-insert into SQLite ──────────────────────────────────────
     _INSERT_SQL = (
