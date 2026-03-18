@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Scrapling-based fallback for finding the UK Gov sponsor register CSV URL.
+Scrapling-based CSV URL discovery with HTML table fallback.
 
-Called as a subprocess by server/utils/sponsorListFetcher.ts when the
-primary cheerio scraper fails (e.g. gov.uk adds JS rendering or bot protection).
+Called as a subprocess by server/utils/sponsorListFetcher.ts.
 
 Exits with code 0 and prints one of:
-  {"url": "https://assets.publishing.service.gov.uk/...csv"}   — success
-  {"error": "reason string"}                                    — failure
+  {"url": "https://assets.publishing.service.gov.uk/...csv"}                    — CSV found (Phase 1 or 2)
+  {"html_records": [{...}], "warning": "..."}                                   — HTML fallback triggered (Phase 3)
+  {"error": "reason string"}                                                     — all phases failed
 
 Usage:
   python3 backend/find_csv_url.py
@@ -28,6 +28,51 @@ def _find_in_hrefs(hrefs: list) -> str | None:
         if href and CSV_HOST in href and href.endswith(".csv"):
             return href
     return None
+
+
+def _parse_html_table(page) -> list | None:
+    """
+    Parse the HTML <table> on the gov.uk page.
+    Returns a list of dicts matching SponsorRecord shape, or None if parsing fails.
+    
+    Expected columns: Organisation Name, Town/City, County, Type/Rating, Route
+    """
+    try:
+        # Extract all table rows
+        rows = page.css("table tbody tr").getall()
+        
+        if not rows:
+            return None
+        
+        records = []
+        
+        for row in rows:
+            # Parse <td> elements from this row
+            cells = []
+            for td in row.css("td"):
+                text = td.css("::text").get()
+                cells.append((text or "").strip())
+            
+            if len(cells) < 5:
+                continue
+            
+            record = {
+                "organisationName": cells[0],
+                "townCity": cells[1] if len(cells) > 1 else "",
+                "county": cells[2] if len(cells) > 2 else "",
+                "typeRating": cells[3] if len(cells) > 3 else "",
+                "route": cells[4] if len(cells) > 4 else "",
+            }
+            
+            # Only include if organisation name is non-empty
+            if record["organisationName"]:
+                records.append(record)
+        
+        return records if records else None
+    
+    except Exception as exc:
+        print(f"[Scrapling] HTML table parse failed: {exc}", file=sys.stderr)
+        return None
 
 
 def find_csv_url() -> None:
@@ -66,10 +111,46 @@ def find_csv_url() -> None:
             print(json.dumps({"url": url}))
             return
 
-        print(json.dumps({"error": "No CSV link found on gov.uk page (both Fetcher and StealthyFetcher tried)"}))
+        print(
+            "[Scrapling] StealthyFetcher found no CSV link — falling back to HTML table",
+            file=sys.stderr,
+        )
+
+        # Phase 3 fallback: reuse the already-fetched page to parse HTML table
+        records = _parse_html_table(page)
+        if records:
+            print(json.dumps({
+                "html_records": records,
+                "warning": "WARNING: Falling back to HTML preview. Only 1,000 records will be synced."
+            }))
+            return
+
+        print(json.dumps({"error": "No CSV link or HTML table found on gov.uk page (all phases exhausted)"}))
+        return
 
     except Exception as exc:
-        print(json.dumps({"error": f"StealthyFetcher failed: {exc}"}))
+        print(
+            f"[Scrapling] StealthyFetcher failed ({exc}) — attempting HTML fallback",
+            file=sys.stderr,
+        )
+        
+        # Last-ditch Phase 3: try plain Fetcher for HTML table only
+        try:
+            from scrapling.fetchers import Fetcher
+            
+            page = Fetcher.get(GOV_UK_PAGE, timeout=30)
+            records = _parse_html_table(page)
+            
+            if records:
+                print(json.dumps({
+                    "html_records": records,
+                    "warning": "WARNING: Falling back to HTML preview. Only 1,000 records will be synced."
+                }))
+                return
+        except Exception as html_exc:
+            print(f"[Scrapling] HTML fallback also failed: {html_exc}", file=sys.stderr)
+        
+        print(json.dumps({"error": f"StealthyFetcher and all fallbacks failed. Last error: {exc}"}))
 
 
 if __name__ == "__main__":

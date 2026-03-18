@@ -26,6 +26,17 @@ export interface SponsorRecord {
   route: string;
 }
 
+/**
+ * Response from Scrapling Python script.
+ * Either a CSV URL was found, or we fell back to HTML records.
+ */
+interface ScraplingResponse {
+  url?: string;
+  html_records?: SponsorRecord[];
+  warning?: string;
+  error?: string;
+}
+
 const COMPANY_SUFFIXES =
   /\b(ltd|limited|plc|llp|llc|inc|incorporated|uk|co|company|corp|corporation|group|holdings)\b/g;
 
@@ -176,11 +187,11 @@ async function findCsvUrlPrimary(): Promise<string> {
 }
 
 /**
- * Fallback: Scrapling Python subprocess (~2–4 s).
- * Activated only when findCsvUrlPrimary() throws — handles JS-rendered pages
- * and Cloudflare / bot-protection scenarios that cheerio cannot.
+ * Scrapling Python subprocess (~2–4 s).
+ * Returns either a CSV URL (Phase 1–2) or HTML fallback records (Phase 3).
+ * Handles JS-rendered pages, Cloudflare bot protection, and gov.uk page structure changes.
  */
-async function findCsvUrlFallback(): Promise<string> {
+async function runScraplingScript(): Promise<ScraplingResponse> {
   const scriptPath = path.join(process.cwd(), "backend", "find_csv_url.py");
   const { stdout, stderr } = await execFileAsync(
     "python3",
@@ -192,27 +203,34 @@ async function findCsvUrlFallback(): Promise<string> {
     console.warn("[SponsorListFetcher] Scrapling stderr:", stderr.trim());
   }
 
-  let result: { url?: string; error?: string };
+  let result: ScraplingResponse;
   try {
     result = JSON.parse(stdout.trim());
   } catch {
-    throw new Error(`Scrapling fallback returned unparseable output: ${stdout.slice(0, 200)}`);
+    throw new Error(`Scrapling returned unparseable output: ${stdout.slice(0, 200)}`);
   }
 
-  if (result.error || !result.url) {
-    throw new Error(`Scrapling fallback: ${result.error ?? "no URL returned"}`);
+  if (result.error) {
+    throw new Error(`Scrapling: ${result.error}`);
   }
 
-  return result.url;
+  if (result.url) {
+    return { url: result.url };
+  }
+
+  if (result.html_records && result.html_records.length > 0) {
+    return { html_records: result.html_records, warning: result.warning };
+  }
+
+  throw new Error("Scrapling returned neither CSV URL nor HTML records");
 }
 
 /**
  * Entry point for CSV URL discovery.
  * Tries cheerio first; on failure escalates to the Scrapling Python subprocess.
- * All callers (downloadAndParseSponsorList, downloadAndStreamSponsorList,
- * downloadAndStreamToArray) go through this single function.
+ * Can return either a CSV URL string or ScraplingResponse with HTML records.
  */
-async function findCsvUrl(): Promise<string> {
+async function findCsvUrl(): Promise<string | ScraplingResponse> {
   try {
     return await findCsvUrlPrimary();
   } catch (primaryErr: any) {
@@ -230,7 +248,7 @@ async function findCsvUrl(): Promise<string> {
        <p>The Scrapling Python fallback is now running. If this alert fires repeatedly, the gov.uk page structure may have changed and <code>findCsvUrlPrimary()</code> needs updating.</p>`,
     ).catch(() => {});
 
-    return await findCsvUrlFallback();
+    return await runScraplingScript();
   }
 }
 
@@ -265,6 +283,26 @@ function rowToRecord(row: string[], idx: ColumnIndexes): SponsorRecord | null {
     typeRating:(idx.typeIdx   >= 0 ? row[idx.typeIdx]   ?? "" : "").trim(),
     route:     (idx.routeIdx  >= 0 ? row[idx.routeIdx]  ?? "" : "").trim(),
   };
+}
+
+/**
+ * Validates and returns HTML records from Scrapling fallback.
+ * Filters out records with empty organisation names and logs a critical warning
+ * that only ~1,000 records are available from HTML fallback (not the full CSV).
+ */
+function validateAndProcessHtmlRecords(records: SponsorRecord[], warning?: string): SponsorRecord[] {
+  if (warning) {
+    console.warn("[SponsorListFetcher] CRITICAL HTML FALLBACK WARNING:", warning);
+    sendAdminAlert(
+      "🔴 CRITICAL: Sponsor Monitor using HTML fallback",
+      `<p>The Scrapling CSV URL discovery failed across all phases.</p>
+       <p><strong>${warning}</strong></p>
+       <p>This means only ~1,000 sponsor records (from the HTML preview) will be synced today instead of the full 124K+ from the CSV.</p>
+       <p>Action: Check gov.uk for any page structure changes at <a href="https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers">the sponsor register page</a>.</p>`,
+    ).catch(() => {});
+  }
+
+  return records.filter(r => r.organisationName?.trim());
 }
 
 // ── Original sync download (kept for backward-compat; used by any legacy paths) ─
@@ -466,6 +504,7 @@ export async function downloadAndStreamSponsorList(
 
 /**
  * Streams the CSV and accumulates all records into a SponsorRecord[] array.
+ * Handles both CSV download (with Windows-1252 encoding fallback) and HTML record fallback.
  *
  * Used by the nightly run job (sponsorMonitorJob.ts) to replace the memory-heavy
  * downloadAndParseSponsorList() which loaded the full CSV as a raw string first.
@@ -474,7 +513,22 @@ export async function downloadAndStreamSponsorList(
  * SponsorRecord objects in memory (~25 MB for 124k records).
  */
 export async function downloadAndStreamToArray(): Promise<SponsorRecord[]> {
-  const csvUrl = await findCsvUrl();
+  const result = await findCsvUrl();
+
+  // Handle HTML fallback from Scrapling
+  if (typeof result !== "string" && result.html_records) {
+    const records = validateAndProcessHtmlRecords(result.html_records, result.warning);
+    if (records.length === 0) {
+      throw new Error("HTML fallback returned no valid sponsor records.");
+    }
+    return records;
+  }
+
+  // Standard CSV download path
+  const csvUrl = typeof result === "string" ? result : result.url;
+  if (!csvUrl) {
+    throw new Error("No CSV URL or fallback records available from discovery phase.");
+  }
 
   let csvResponse: Response;
   try {
