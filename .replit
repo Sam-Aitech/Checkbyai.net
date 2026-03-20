@@ -8,7 +8,7 @@ packages = ["freetype", "glibcLocales", "gumbo", "harfbuzz", "imagemagick", "jbi
 
 [deployment]
 deploymentTarget = "autoscale"
-build = ["npm", "run", "build"]
+build = ["sh", "-c", "npm run setup:binaries && npm run build"]
 run = ["npm", "run", "start"]
 
 [[ports]]
