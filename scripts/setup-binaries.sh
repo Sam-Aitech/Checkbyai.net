@@ -23,11 +23,11 @@ ARCH=$(uname -m)
 # Map to binary naming conventions
 case "$ARCH" in
   x86_64)
-    QSV_ARCH="x86_64-unknown-linux-gnu"
+    QSV_ARCH="x86_64-unknown-linux-musl"
     CSVDIFF_ARCH="linux_amd64"
     ;;
   aarch64 | arm64)
-    QSV_ARCH="aarch64-unknown-linux-gnu"
+    QSV_ARCH="aarch64-unknown-linux-musl"
     CSVDIFF_ARCH="linux_arm64"
     ;;
   *)
@@ -126,7 +126,7 @@ install_qsv() {
   trap - EXIT
   rm -rf "$TMP"
 
-  echo "[setup] qsv installed: $("$BIN_DIR/qsv" --version)"
+  echo "[setup] qsv installed: $BIN_DIR/qsv (static build)"
 }
 
 # ── Install csvdiff (Go CSV diff engine) ─────────────────────────────────────
