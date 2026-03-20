@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Shield, Upload, FileText, CheckCircle, AlertTriangle, XCircle, LogOut, Trash2, Eye,
   RefreshCw, Search, Filter, ChevronLeft, ChevronRight, Activity, Database, Clock,
-  Sparkles, X, Download, ChevronDown, Users, TrendingUp, Cpu, HardDrive, Brain, Plus, Power, Radio, Play, Bell, BarChart3, History
+  Sparkles, X, Download, ChevronDown, Users, TrendingUp, Cpu, HardDrive, Brain, Plus, Power, Radio, Play, Bell, BarChart3, History, Info
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -140,6 +140,8 @@ export default function SimpleAdmin() {
   const [logsPage, setLogsPage] = useState(1);
   const [logsFilter, setLogsFilter] = useState<'all' | 'genuine' | 'suspicious' | 'fake'>('all');
   const [logsSearch, setLogsSearch] = useState('');
+  const [logsSearchInput, setLogsSearchInput] = useState('');
+  const logsSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [logsStartDate, setLogsStartDate] = useState('');
   const [logsEndDate, setLogsEndDate] = useState('');
   const [selectedLog, setSelectedLog] = useState<VerificationLog | null>(null);
@@ -157,6 +159,8 @@ export default function SimpleAdmin() {
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersPage, setUsersPage] = useState(1);
   const [usersSearch, setUsersSearch] = useState('');
+  const [usersSearchInput, setUsersSearchInput] = useState('');
+  const usersSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // Tab state for triggering data loads
   const [activeTab, setActiveTab] = useState('logs');
@@ -210,10 +214,12 @@ export default function SimpleAdmin() {
     error: string | null;
   } | null>(null);
   const [migratingCanonical, setMigratingCanonical] = useState(false);
-  const [migrateResult, setMigrateResult] = useState<{ inserted?: number; message: string; error?: boolean } | null>(null);
+  const [migrateResult, setMigrateResult] = useState<{ inserted?: number; message: string; error?: boolean; deprecated?: boolean } | null>(null);
   const [releasingLock, setReleasingLock] = useState(false);
+  const [confirmReleaseLock, setConfirmReleaseLock] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollMaxRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [storageStats, setStorageStats] = useState<any>(null);
   const [storageLoading, setStorageLoading] = useState(false);
@@ -227,6 +233,13 @@ export default function SimpleAdmin() {
   useEffect(() => {
     checkAuth();
   }, []);
+
+  // Refresh stats cards every 5 minutes so counts don't go stale during a long session
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const statsTimer = setInterval(() => loadData(), 5 * 60 * 1000);
+    return () => clearInterval(statsTimer);
+  }, [isAuthenticated]);
 
   const checkAuth = async () => {
     try {
@@ -391,6 +404,7 @@ export default function SimpleAdmin() {
   const stopPolling = () => {
     if (pollRef.current)    { clearInterval(pollRef.current);    pollRef.current    = null; }
     if (elapsedRef.current) { clearInterval(elapsedRef.current); elapsedRef.current = null; }
+    if (pollMaxRef.current) { clearTimeout(pollMaxRef.current);  pollMaxRef.current  = null; }
   };
 
   const stopInitPolling = () => {
@@ -418,6 +432,14 @@ export default function SimpleAdmin() {
 
         // Elapsed timer: tick every second
         elapsedRef.current = setInterval(() => setRunElapsed(s => s + 1), 1000);
+
+        // Auto-stop polling after 30 minutes — prevents infinite spinner if job crashes silently
+        pollMaxRef.current = setTimeout(() => {
+          stopPolling();
+          setRunningJob(false);
+          setRunError('Job timed out after 30 minutes — check server logs or Force Release Lock.');
+          toast({ title: "Job Timed Out", description: "No response after 30 min. Check server logs.", variant: "destructive" });
+        }, 30 * 60 * 1000);
 
         // Poll status every 5 seconds until job finishes
         pollRef.current = setInterval(async () => {
@@ -570,6 +592,9 @@ export default function SimpleAdmin() {
       } else if (res.status === 409) {
         setMigrateResult({ message: data.message, inserted: data.existingCount });
         toast({ title: "Already Indexed", description: data.message });
+      } else if (res.status === 410) {
+        setMigrateResult({ message: data.message, deprecated: true });
+        toast({ title: "No Action Needed", description: data.message });
       } else {
         setMigrateResult({ message: data.message || 'Migration failed', error: true });
         toast({ title: "Error", description: data.message, variant: "destructive" });
@@ -663,7 +688,7 @@ export default function SimpleAdmin() {
         loadGlobalRules();
       }
     } catch (error) {
-      toast({ title: 'Failed to create rule', variant: 'destructive' });
+      toast({ title: 'Failed to create rule', description: error instanceof Error ? error.message : 'Network error', variant: 'destructive' });
     }
   };
 
@@ -677,7 +702,7 @@ export default function SimpleAdmin() {
       });
       loadGlobalRules();
     } catch (error) {
-      toast({ title: 'Failed to toggle rule', variant: 'destructive' });
+      toast({ title: 'Failed to toggle rule', description: error instanceof Error ? error.message : 'Network error', variant: 'destructive' });
     }
   };
 
@@ -690,7 +715,7 @@ export default function SimpleAdmin() {
       toast({ title: 'Rule deleted' });
       loadGlobalRules();
     } catch (error) {
-      toast({ title: 'Failed to delete rule', variant: 'destructive' });
+      toast({ title: 'Failed to delete rule', description: error instanceof Error ? error.message : 'Network error', variant: 'destructive' });
     }
   };
 
@@ -727,7 +752,7 @@ export default function SimpleAdmin() {
         });
       }
     } catch (error) {
-      toast({ title: 'Failed to teach AI', variant: 'destructive' });
+      toast({ title: 'Failed to teach AI', description: error instanceof Error ? error.message : 'Network error', variant: 'destructive' });
     } finally {
       setTeachingAi(false);
     }
@@ -752,7 +777,7 @@ export default function SimpleAdmin() {
         toast({ title: 'Failed to approve', description: error.message, variant: 'destructive' });
       }
     } catch (error) {
-      toast({ title: 'Failed to approve', variant: 'destructive' });
+      toast({ title: 'Failed to approve', description: error instanceof Error ? error.message : 'Network error', variant: 'destructive' });
     } finally {
       setFeedbackLoading(false);
     }
@@ -796,7 +821,7 @@ export default function SimpleAdmin() {
         toast({ title: 'Failed to submit feedback', description: error.message, variant: 'destructive' });
       }
     } catch (error) {
-      toast({ title: 'Failed to submit feedback', variant: 'destructive' });
+      toast({ title: 'Failed to submit feedback', description: error instanceof Error ? error.message : 'Network error', variant: 'destructive' });
     } finally {
       setFeedbackLoading(false);
     }
@@ -814,8 +839,8 @@ export default function SimpleAdmin() {
         const err = await res.json();
         toast({ title: 'Failed to delete', description: err.message, variant: 'destructive' });
       }
-    } catch {
-      toast({ title: 'Failed to delete', variant: 'destructive' });
+    } catch (error) {
+      toast({ title: 'Failed to delete', description: error instanceof Error ? error.message : 'Network error', variant: 'destructive' });
     }
   };
 
@@ -823,15 +848,17 @@ export default function SimpleAdmin() {
   const getAdminStatusBadge = (log: VerificationLog) => {
     const adminStatus = (log as any).adminStatus || 'pending';
     const aiResult = log.result;
-    const isConflict = adminStatus === 'fake' && aiResult === 'genuine';
+    const isConflict =
+      (adminStatus === 'fake' && aiResult === 'genuine') ||
+      (adminStatus === 'approved' && aiResult === 'suspicious');
 
     if (adminStatus === 'pending') {
       return <Badge variant="outline" className="bg-gray-100 text-gray-600 border-gray-300 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600">Pending Review</Badge>;
     }
     if (isConflict) {
       return (
-        <Badge className="bg-red-500/20 text-red-400 border-2 border-red-500 animate-pulse">
-          Admin Overridden
+        <Badge className="bg-orange-500/20 text-orange-400 border-2 border-orange-500 ring-1 ring-orange-400/40" title={`AI said ${aiResult} but admin marked ${adminStatus}`}>
+          ⚠ Overridden
         </Badge>
       );
     }
@@ -1012,7 +1039,8 @@ export default function SimpleAdmin() {
       });
 
       if (!response.ok) {
-        throw new Error('Upload failed');
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.message || `Server error ${response.status}`);
       }
 
       toast({ title: 'Upload successful', description: 'Document added to trusted patterns with AI instructions' });
@@ -1020,7 +1048,7 @@ export default function SimpleAdmin() {
       setAiInstructions('');
       loadData();
     } catch (error) {
-      toast({ title: 'Upload failed', description: 'Could not upload document', variant: 'destructive' });
+      toast({ title: 'Upload failed', description: error instanceof Error ? error.message : 'Network error', variant: 'destructive' });
     } finally {
       setUploading(false);
     }
@@ -1039,13 +1067,14 @@ export default function SimpleAdmin() {
       });
 
       if (!response.ok) {
-        throw new Error('Delete failed');
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.message || `Server error ${response.status}`);
       }
 
       toast({ title: 'Deleted', description: 'Pattern removed successfully' });
       loadData();
     } catch (error) {
-      toast({ title: 'Delete failed', description: 'Could not delete pattern', variant: 'destructive' });
+      toast({ title: 'Delete failed', description: error instanceof Error ? error.message : 'Network error', variant: 'destructive' });
     }
   };
 
@@ -1469,8 +1498,12 @@ export default function SimpleAdmin() {
                         <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-slate-400" />
                         <Input
                           placeholder="Search filename..."
-                          value={logsSearch}
-                          onChange={(e) => { setLogsSearch(e.target.value); setLogsPage(1); }}
+                          value={logsSearchInput}
+                          onChange={(e) => {
+                            setLogsSearchInput(e.target.value);
+                            if (logsSearchDebounceRef.current) clearTimeout(logsSearchDebounceRef.current);
+                            logsSearchDebounceRef.current = setTimeout(() => { setLogsSearch(e.target.value); setLogsPage(1); }, 400);
+                          }}
                           className="pl-9 w-48 bg-gray-50 dark:bg-slate-700/50 border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white"
                         />
                       </div>
@@ -1486,11 +1519,13 @@ export default function SimpleAdmin() {
                           <SelectItem value="fake">Fake</SelectItem>
                         </SelectContent>
                       </Select>
-                      <Button 
-                        variant="outline" 
-                        size="icon" 
+                      <Button
+                        variant="outline"
+                        size="icon"
                         onClick={loadLogs}
                         disabled={logsLoading}
+                        aria-label="Refresh logs"
+                        title="Refresh logs"
                         className="border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700"
                       >
                         <RefreshCw className={`w-4 h-4 ${logsLoading ? 'animate-spin' : ''}`} />
@@ -1563,12 +1598,14 @@ export default function SimpleAdmin() {
                         </thead>
                         <tbody>
                           {logs?.data.map((log) => (
-                            <tr 
-                              key={log.id} 
+                            <tr
+                              key={log.id}
                               className={`border-b border-gray-100 dark:border-slate-700/50 hover:bg-gray-50 dark:hover:bg-slate-700/30 cursor-pointer ${
                                 (log as any).adminStatus === 'fake'
-                                  ? 'bg-red-50/40 dark:bg-red-900/10' 
-                                  : ''
+                                  ? 'bg-red-50/40 dark:bg-red-900/10'
+                                  : (log as any).adminStatus === 'approved'
+                                  ? 'bg-green-50/30 dark:bg-green-900/10'
+                                  : 'bg-amber-50/20 dark:bg-amber-900/5'
                               }`}
                               onClick={() => setSelectedLog(log)}
                             >
@@ -1594,30 +1631,30 @@ export default function SimpleAdmin() {
                               </td>
                               <td className="py-3 px-4 text-right">
                                 <div className="flex items-center justify-end gap-1">
-                                  {(log as any).adminStatus === 'pending' && (
-                                    <>
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={(e) => { e.stopPropagation(); handleApproveLog(log); }}
-                                        disabled={feedbackLoading}
-                                        className="text-green-400 hover:bg-green-500/20 hover:text-green-300"
-                                        title="Approve AI result"
-                                      >
-                                        <CheckCircle className="w-4 h-4" />
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={(e) => { e.stopPropagation(); handleOpenFeedbackModal(log); }}
-                                        disabled={feedbackLoading}
-                                        className="text-red-400 hover:bg-red-500/20 hover:text-red-300"
-                                        title="Mark as fake"
-                                      >
-                                        <XCircle className="w-4 h-4" />
-                                      </Button>
-                                    </>
-                                  )}
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={(e) => { e.stopPropagation(); handleApproveLog(log); }}
+                                    disabled={feedbackLoading}
+                                    className={(log as any).adminStatus === 'approved'
+                                      ? "bg-green-500/20 text-green-400 hover:bg-green-500/30"
+                                      : "text-gray-400 hover:bg-green-500/20 hover:text-green-400"}
+                                    title={(log as any).adminStatus === 'approved' ? "Approved — click to undo" : "Approve AI result"}
+                                  >
+                                    <CheckCircle className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={(e) => { e.stopPropagation(); handleOpenFeedbackModal(log); }}
+                                    disabled={feedbackLoading}
+                                    className={(log as any).adminStatus === 'fake'
+                                      ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                                      : "text-gray-400 hover:bg-red-500/20 hover:text-red-400"}
+                                    title={(log as any).adminStatus === 'fake' ? "Marked fake — click to override" : "Mark as fake"}
+                                  >
+                                    <XCircle className="w-4 h-4" />
+                                  </Button>
                                   <Button
                                     size="sm"
                                     variant="outline"
@@ -1695,16 +1732,22 @@ export default function SimpleAdmin() {
                       <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-slate-400" />
                       <Input
                         placeholder="Search users..."
-                        value={usersSearch}
-                        onChange={(e) => { setUsersSearch(e.target.value); setUsersPage(1); }}
+                        value={usersSearchInput}
+                        onChange={(e) => {
+                          setUsersSearchInput(e.target.value);
+                          if (usersSearchDebounceRef.current) clearTimeout(usersSearchDebounceRef.current);
+                          usersSearchDebounceRef.current = setTimeout(() => { setUsersSearch(e.target.value); setUsersPage(1); }, 400);
+                        }}
                         className="pl-9 w-48 bg-gray-50 dark:bg-slate-700/50 border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white"
                       />
                     </div>
-                    <Button 
-                      variant="outline" 
-                      size="icon" 
+                    <Button
+                      variant="outline"
+                      size="icon"
                       onClick={loadUsers}
                       disabled={usersLoading}
+                      aria-label="Refresh users"
+                      title="Refresh users"
                       className="border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700"
                     >
                       <RefreshCw className={`w-4 h-4 ${usersLoading ? 'animate-spin' : ''}`} />
@@ -1749,7 +1792,11 @@ export default function SimpleAdmin() {
                                 <span className="block truncate" title={u.email || 'N/A'}>{u.email || 'N/A'}</span>
                               </td>
                               <td className="py-3 px-4">
-                                <Badge className={u.role === 'admin' ? 'bg-purple-500/20 text-purple-400' : 'bg-slate-500/20 text-gray-500 dark:text-slate-400'}>
+                                <Badge className={
+                                  u.role === 'admin'
+                                    ? 'bg-purple-500/20 text-purple-400 border-purple-500/30'
+                                    : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                                }>
                                   {u.role}
                                 </Badge>
                               </td>
@@ -1895,18 +1942,14 @@ export default function SimpleAdmin() {
                 {patterns.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 px-4 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/50 dark:bg-slate-900/20 mt-4">
                     <div className="w-20 h-20 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center mb-6 shadow-xl shadow-blue-500/10 dark:shadow-none border border-blue-100 dark:border-slate-700 relative">
-                      <div className="absolute inset-0 bg-blue-100 dark:bg-slate-800 rounded-full animate-pulse blur-md opacity-50" />
+                      <div className="absolute inset-0 bg-blue-100 dark:bg-slate-800 rounded-full blur-md opacity-50" />
                       <FileText className="w-10 h-10 text-blue-500 relative z-10" />
                     </div>
                     <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">No Trusted Patterns</h3>
                     <p className="text-gray-500 dark:text-slate-400 max-w-md mx-auto mb-6">
                       Upload genuine Certificate of Sponsorship documents to establish a baseline. The AI uses these patterns to detect anomalies in user submissions.
                     </p>
-                    <Button onClick={() => {
-                        const tabs = document.querySelectorAll('[role="tab"]');
-                        const uploadTab = Array.from(tabs).find(t => t.textContent?.includes('Upload'));
-                        if (uploadTab) (uploadTab as HTMLElement).click();
-                      }} className="rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg shadow-blue-500/20 font-medium px-6">
+                    <Button onClick={() => setActiveTab('upload')} className="rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg shadow-blue-500/20 font-medium px-6">
                       <Upload className="w-4 h-4 mr-2" />
                       Upload First Pattern
                     </Button>
@@ -2217,6 +2260,8 @@ export default function SimpleAdmin() {
                         variant="outline"
                         onClick={loadSponsorMonitorData}
                         disabled={sponsorStatusLoading}
+                        aria-label="Refresh sponsor monitor status"
+                        title="Refresh sponsor monitor status"
                         className="border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700"
                       >
                         <RefreshCw className={`w-4 h-4 sm:mr-1 ${sponsorStatusLoading ? 'animate-spin' : ''}`} />
@@ -2290,9 +2335,15 @@ export default function SimpleAdmin() {
                     <div className="mt-4 flex items-center gap-3 text-sm text-blue-300">
                       <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin shrink-0" />
                       <span>Running… {runElapsed > 0 && `(${Math.floor(runElapsed / 60)}m ${runElapsed % 60}s)`}</span>
-                      <Button size="sm" variant="destructive" className="ml-auto h-7 text-xs" disabled={releasingLock} onClick={handleReleaseLock}>
-                        {releasingLock ? 'Releasing…' : 'Force Release Lock'}
-                      </Button>
+                      {confirmReleaseLock ? (
+                        <Button size="sm" variant="destructive" className="ml-auto h-7 text-xs" disabled={releasingLock} onClick={() => { setConfirmReleaseLock(false); handleReleaseLock(); }}>
+                          {releasingLock ? 'Releasing…' : 'Confirm Release?'}
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="outline" className="ml-auto h-7 text-xs border-red-500/40 text-red-400 hover:bg-red-500/10" onClick={() => { setConfirmReleaseLock(true); setTimeout(() => setConfirmReleaseLock(false), 4000); }} title="Only use if job is genuinely stuck">
+                          Force Release Lock
+                        </Button>
+                      )}
                     </div>
                   )}
                   {runResult && !runError && !(runningJob || sponsorStatus?.jobRunning) && (
@@ -2336,7 +2387,7 @@ export default function SimpleAdmin() {
                     </Button>
                   </div>
                   <CardDescription className="text-gray-500 dark:text-slate-400">
-                    Last 10 nightly sponsor monitor job runs
+                    Last {jobHistory.length || '…'} nightly sponsor monitor job runs
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -2494,13 +2545,19 @@ export default function SimpleAdmin() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    {migrateResult && !migrateResult.error ? (
+                    {migrateResult && !migrateResult.error && !migrateResult.deprecated ? (
                       <div className="flex items-center gap-2 text-sm">
                         <CheckCircle className="w-4 h-4 text-green-400" />
                         <span className="text-green-400">{migrateResult.message}</span>
                       </div>
                     ) : (
                       <div className="space-y-3">
+                        {migrateResult?.deprecated && (
+                          <Alert className="bg-amber-500/10 border-amber-500/30">
+                            <Info className="w-4 h-4 text-amber-400" />
+                            <AlertDescription className="text-amber-300 text-xs">{migrateResult.message}</AlertDescription>
+                          </Alert>
+                        )}
                         {migrateResult?.error && (
                           <Alert className="bg-red-500/10 border-red-500/30">
                             <AlertTriangle className="w-4 h-4 text-red-400" />
@@ -2591,7 +2648,7 @@ export default function SimpleAdmin() {
               <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
                 <CardHeader>
                   <CardTitle className="text-gray-900 dark:text-white text-base">Recent Changes</CardTitle>
-                  <CardDescription className="text-gray-500 dark:text-slate-400">Last 50 detected changes across all companies</CardDescription>
+                  <CardDescription className="text-gray-500 dark:text-slate-400">Last {recentChanges.length || '…'} detected changes across all companies</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {recentChangesLoading ? (
