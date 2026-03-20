@@ -19,6 +19,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import SponsorLicenceSearch from '@/components/admin/SponsorLicenceSearch';
 
 interface AdminUser {
   id: string;
@@ -169,11 +170,11 @@ export default function SimpleAdmin() {
   const domain = location.startsWith('/admin/sponsor') ? 'sponsor' : 'cos';
 
   // Tab state — initialised from URL so direct navigation and refresh work correctly
-  const [activeTab, setActiveTab] = useState(domain === 'sponsor' ? 'sponsor' : 'patterns');
+  const [activeTab, setActiveTab] = useState(domain === 'sponsor' ? 'licenceCheck' : 'patterns');
 
   const handleDomainChange = (newDomain: string) => {
     setLocation(`/admin/${newDomain}`);
-    setActiveTab(newDomain === 'sponsor' ? 'sponsor' : 'patterns');
+    setActiveTab(newDomain === 'sponsor' ? 'licenceCheck' : 'patterns');
   };
   
   // Global AI rules state
@@ -679,9 +680,9 @@ export default function SimpleAdmin() {
 
   // Keep activeTab in sync when user navigates via browser back/forward
   useEffect(() => {
-    if (domain === 'sponsor' && activeTab !== 'sponsor') {
-      setActiveTab('sponsor');
-    } else if (domain === 'cos' && activeTab === 'sponsor') {
+    if (domain === 'sponsor' && activeTab !== 'sponsor' && activeTab !== 'licenceCheck') {
+      setActiveTab('licenceCheck');
+    } else if (domain === 'cos' && (activeTab === 'sponsor' || activeTab === 'licenceCheck')) {
       setActiveTab('patterns');
     }
   }, [domain]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1490,10 +1491,16 @@ export default function SimpleAdmin() {
           <div className="overflow-x-auto -mx-3 sm:-mx-0 px-3 sm:px-0 scrollbar-hide">
             <TabsList className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 shadow-sm p-1 flex w-max min-w-full sm:w-auto sm:min-w-0">
               {domain === 'sponsor' ? (
-                <TabsTrigger value="sponsor" className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap data-[state=active]:bg-cyan-50 data-[state=active]:text-cyan-700 dark:data-[state=active]:bg-cyan-900/30 dark:data-[state=active]:text-cyan-400">
-                  <Radio className="w-4 h-4 shrink-0" />
-                  <span className="text-xs sm:text-sm">Sponsor Monitor</span>
-                </TabsTrigger>
+                <>
+                  <TabsTrigger value="licenceCheck" className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 dark:data-[state=active]:bg-blue-900/30 dark:data-[state=active]:text-blue-400">
+                    <Search className="w-4 h-4 shrink-0" />
+                    <span className="text-xs sm:text-sm">Licence Check</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="sponsor" className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap data-[state=active]:bg-cyan-50 data-[state=active]:text-cyan-700 dark:data-[state=active]:bg-cyan-900/30 dark:data-[state=active]:text-cyan-400">
+                    <Radio className="w-4 h-4 shrink-0" />
+                    <span className="text-xs sm:text-sm">Sponsor Monitor</span>
+                  </TabsTrigger>
+                </>
               ) : (
                 <>
                   <TabsTrigger value="patterns" className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 dark:data-[state=active]:bg-emerald-900/30 dark:data-[state=active]:text-emerald-400">
@@ -1604,7 +1611,7 @@ export default function SimpleAdmin() {
               <CardContent>
                 {logsLoading && !logs ? (
                   <div className="flex justify-center py-12">
-                    <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                    <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
                   </div>
                 ) : logs?.data.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 px-4 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/50 dark:bg-slate-900/20 mt-4">
@@ -1632,7 +1639,7 @@ export default function SimpleAdmin() {
                             <th className="text-left py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">Filename</th>
                             <th className="text-left py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">Result</th>
                             <th className="text-left py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">Admin Review</th>
-                            <th className="text-left py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">Producer</th>
+                            <th className="text-left py-3 px-4 text-gray-500 dark:text-slate-400 font-medium hidden sm:table-cell">Producer</th>
                             <th className="text-right py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">Actions</th>
                           </tr>
                         </thead>
@@ -1649,7 +1656,7 @@ export default function SimpleAdmin() {
                               }`}
                               onClick={() => setSelectedLog(log)}
                             >
-                              <td className="py-3 px-4 text-gray-600 dark:text-slate-300 text-sm">
+                              <td className="py-3 px-4 text-gray-600 dark:text-slate-300 text-sm whitespace-nowrap">
                                 {new Date(log.verifiedAt).toLocaleString()}
                               </td>
                               <td className="py-3 px-4 text-gray-900 dark:text-white font-medium max-w-[200px] truncate">
@@ -1666,7 +1673,7 @@ export default function SimpleAdmin() {
                               <td className="py-3 px-4">
                                 {getAdminStatusBadge(log)}
                               </td>
-                              <td className="py-3 px-4 text-gray-600 dark:text-slate-300 text-sm max-w-[150px] truncate">
+                              <td className="py-3 px-4 text-gray-600 dark:text-slate-300 text-sm max-w-[150px] truncate hidden sm:table-cell">
                                 {log.metadata?.producer || 'Unknown'}
                               </td>
                               <td className="py-3 px-4 text-right">
@@ -1677,9 +1684,9 @@ export default function SimpleAdmin() {
                                     onClick={(e) => { e.stopPropagation(); handleApproveLog(log); }}
                                     disabled={feedbackLoading}
                                     className={(log as any).adminStatus === 'approved'
-                                      ? "bg-green-500/20 text-green-400 hover:bg-green-500/30"
-                                      : "text-gray-400 hover:bg-green-500/20 hover:text-green-400"}
-                                    title={(log as any).adminStatus === 'approved' ? "Approved — click to undo" : "Approve AI result"}
+                                      ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                                      : 'text-gray-400 hover:bg-green-500/20 hover:text-green-400'}
+                                    title={(log as any).adminStatus === 'approved' ? 'Approved — click to undo' : 'Approve AI result'}
                                   >
                                     <CheckCircle className="w-4 h-4" />
                                   </Button>
@@ -1689,9 +1696,9 @@ export default function SimpleAdmin() {
                                     onClick={(e) => { e.stopPropagation(); handleOpenFeedbackModal(log); }}
                                     disabled={feedbackLoading}
                                     className={(log as any).adminStatus === 'fake'
-                                      ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
-                                      : "text-gray-400 hover:bg-red-500/20 hover:text-red-400"}
-                                    title={(log as any).adminStatus === 'fake' ? "Marked fake — click to override" : "Mark as fake"}
+                                      ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                                      : 'text-gray-400 hover:bg-red-500/20 hover:text-red-400'}
+                                    title={(log as any).adminStatus === 'fake' ? 'Marked fake — click to override' : 'Mark as fake'}
                                   >
                                     <XCircle className="w-4 h-4" />
                                   </Button>
@@ -1700,7 +1707,7 @@ export default function SimpleAdmin() {
                                     variant="outline"
                                     onClick={(e) => { e.stopPropagation(); runAiAnalysis(log); }}
                                     className="border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700"
-                                    title="Analyze"
+                                    title="AI analysis"
                                   >
                                     <Sparkles className="w-4 h-4 sm:mr-1" />
                                     <span className="hidden sm:inline">Analyze</span>
@@ -1721,12 +1728,12 @@ export default function SimpleAdmin() {
                         </tbody>
                       </table>
                     </div>
-                    
+
                     {/* Pagination */}
                     {logs && logs.totalPages > 1 && (
                       <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-200 dark:border-slate-700">
                         <p className="text-sm text-gray-500 dark:text-slate-400">
-                          Page {logs.page} of {logs.totalPages}
+                          Page {logs.page} of {logs.totalPages} &middot; {logs.total.toLocaleString()} entries
                         </p>
                         <div className="flex gap-2">
                           <Button
@@ -1755,7 +1762,6 @@ export default function SimpleAdmin() {
               </CardContent>
             </Card>
           </TabsContent>
-
           {/* Users Tab */}
           <TabsContent value="users">
             <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
@@ -2157,125 +2163,207 @@ export default function SimpleAdmin() {
 
           {/* ── Phase 4: Global AI Rules ── */}
           <TabsContent value="knowledge">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="space-y-4">
+
+              {/* ── Create new rule ── */}
               <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
                 <CardHeader>
                   <CardTitle className="text-gray-900 dark:text-white flex items-center gap-2">
-                    <Plus className="w-5 h-5 text-green-400" />
-                    Add Global AI Rule
+                    <Brain className="w-5 h-5 text-pink-400" />
+                    Global AI Rules
                   </CardTitle>
                   <CardDescription className="text-gray-500 dark:text-slate-400">
-                    Create rules that apply to ALL document verifications
+                    Rules applied to every AI analysis — define categories, criteria, and priority weighting.
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <Label className="text-gray-900 dark:text-white">Category</Label>
-                    <Select value={newRuleCategory} onValueChange={setNewRuleCategory}>
-                      <SelectTrigger className="bg-gray-50 dark:bg-slate-700 border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white">
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
-                        <SelectItem value="date_check">Date Check</SelectItem>
-                        <SelectItem value="producer_check">Producer Check</SelectItem>
-                        <SelectItem value="metadata_check">Metadata Check</SelectItem>
-                        <SelectItem value="pattern_check">Pattern Check</SelectItem>
-                        <SelectItem value="red_flag">Red Flag</SelectItem>
-                        <SelectItem value="trusted_marker">Trusted Marker</SelectItem>
-                      </SelectContent>
-                    </Select>
+                <CardContent>
+                  <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto_auto] gap-3 items-end">
+                    {/* Category */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium text-gray-600 dark:text-slate-400 uppercase tracking-wide">Category</Label>
+                      <Input
+                        placeholder="e.g. Font Consistency"
+                        value={newRuleCategory}
+                        onChange={(e) => setNewRuleCategory(e.target.value)}
+                        className="bg-gray-50 dark:bg-slate-700/50 border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    {/* Rule text */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium text-gray-600 dark:text-slate-400 uppercase tracking-wide">Rule</Label>
+                      <Input
+                        placeholder="e.g. Flag if font changes mid-document"
+                        value={newRuleText}
+                        onChange={(e) => setNewRuleText(e.target.value)}
+                        className="bg-gray-50 dark:bg-slate-700/50 border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    {/* Priority */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium text-gray-600 dark:text-slate-400 uppercase tracking-wide">Priority</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        placeholder="0"
+                        value={newRulePriority === 0 ? '' : newRulePriority}
+                        onChange={(e) => setNewRulePriority(Number(e.target.value) || 0)}
+                        className="w-20 bg-gray-50 dark:bg-slate-700/50 border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    {/* Add button */}
+                    <Button
+                      onClick={createGlobalRule}
+                      disabled={!newRuleCategory || !newRuleText}
+                      className="bg-pink-600 hover:bg-pink-700 text-white gap-1.5 self-end"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Rule
+                    </Button>
                   </div>
-
-                  <div>
-                    <Label className="text-gray-900 dark:text-white">Rule Text</Label>
-                    <textarea
-                      value={newRuleText}
-                      onChange={(e) => setNewRuleText(e.target.value)}
-                      placeholder="E.g., 'Always flag any document where the ModDate is on a Sunday as suspicious' or 'Trust documents with producer containing gov.uk'"
-                      className="w-full h-24 p-3 bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg text-gray-900 dark:text-white placeholder-slate-500 resize-none"
-                    />
-                  </div>
-
-                  <div>
-                    <Label className="text-gray-900 dark:text-white">Priority (higher = more important)</Label>
-                    <Input
-                      type="number"
-                      value={newRulePriority}
-                      onChange={(e) => setNewRulePriority(parseInt(e.target.value) || 0)}
-                      className="bg-gray-50 dark:bg-slate-700 border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white"
-                    />
-                  </div>
-
-                  <Button onClick={createGlobalRule} className="w-full">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Rule
-                  </Button>
                 </CardContent>
               </Card>
 
+              {/* ── Rules list ── */}
               <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
                 <CardHeader>
-                  <div className="flex justify-between items-center">
+                  <div className="flex items-center justify-between">
                     <div>
-                      <CardTitle className="text-gray-900 dark:text-white flex items-center gap-2">
-                        <Brain className="w-5 h-5 text-purple-400" />
+                      <CardTitle className="text-gray-900 dark:text-white text-base">
                         Active Rules
+                        {globalRules.length > 0 && (
+                          <span className="ml-2 text-sm font-normal text-gray-500 dark:text-slate-400">
+                            ({globalRules.length})
+                          </span>
+                        )}
                       </CardTitle>
-                      <CardDescription className="text-gray-500 dark:text-slate-400">
-                        {globalRules.length} rules configured
+                      <CardDescription className="text-gray-500 dark:text-slate-400 text-xs mt-0.5">
+                        Toggle rules on/off without deleting them.
                       </CardDescription>
                     </div>
-                    <Button variant="outline" size="icon" onClick={loadGlobalRules} disabled={rulesLoading} className="border-gray-300 dark:border-slate-600">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={loadGlobalRules}
+                      disabled={rulesLoading}
+                      aria-label="Refresh rules"
+                      className="border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 shrink-0"
+                    >
                       <RefreshCw className={`w-4 h-4 ${rulesLoading ? 'animate-spin' : ''}`} />
                     </Button>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <ScrollArea className="h-96">
-                    {globalRules.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-12 px-4 text-center h-full">
-                        <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800/80 rounded-full flex items-center justify-center mb-6 ring-8 ring-slate-50 dark:ring-slate-900/50">
-                          <Brain className="w-10 h-10 text-purple-400" />
-                        </div>
-                        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">No Global Rules Configured</h3>
-                        <p className="text-gray-500 dark:text-slate-400 max-w-sm mx-auto text-sm">
-                          Add custom rules to train the AI's forensic engine. Rules govern how anomalies are weighted and flagged.
-                        </p>
+                  {/* Loading */}
+                  {rulesLoading && (
+                    <div className="flex justify-center py-12">
+                      <div className="w-8 h-8 border-4 border-pink-200 border-t-pink-500 rounded-full animate-spin" />
+                    </div>
+                  )}
+
+                  {/* Empty state */}
+                  {!rulesLoading && globalRules.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-16 px-4 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/50 dark:bg-slate-900/20">
+                      <div className="w-14 h-14 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center mb-4 shadow-sm border border-slate-100 dark:border-slate-700">
+                        <Brain className="w-7 h-7 text-slate-400" />
                       </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {globalRules.map((rule) => (
-                          <div key={rule.id} className={`p-3 rounded-lg border ${rule.isActive ? 'bg-gray-50 dark:bg-slate-700/50 border-gray-200 dark:border-slate-600' : 'bg-gray-100 dark:bg-slate-900/50 border-gray-300 dark:border-slate-700 opacity-60'}`}>
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <Badge variant="outline" className="text-xs">{rule.category}</Badge>
-                                  <span className="text-xs text-gray-400 dark:text-slate-500">Priority: {rule.priority}</span>
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">No rules yet</h3>
+                      <p className="text-xs text-gray-500 dark:text-slate-400 max-w-xs">
+                        Add your first rule above to start guiding AI analysis decisions.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Rules table */}
+                  {!rulesLoading && globalRules.length > 0 && (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-gray-200 dark:border-slate-700">
+                            <th className="text-left py-3 px-3 text-gray-500 dark:text-slate-400 font-medium">Category</th>
+                            <th className="text-left py-3 px-3 text-gray-500 dark:text-slate-400 font-medium">Rule</th>
+                            <th className="text-left py-3 px-3 text-gray-500 dark:text-slate-400 font-medium hidden sm:table-cell">Priority</th>
+                            <th className="text-left py-3 px-3 text-gray-500 dark:text-slate-400 font-medium">Status</th>
+                            <th className="text-right py-3 px-3 text-gray-500 dark:text-slate-400 font-medium">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {globalRules.map((rule) => (
+                            <tr
+                              key={rule.id}
+                              className={`border-b border-gray-100 dark:border-slate-700/50 transition-colors ${
+                                rule.isActive
+                                  ? 'hover:bg-gray-50 dark:hover:bg-slate-700/30'
+                                  : 'opacity-50 bg-gray-50/50 dark:bg-slate-900/20 hover:bg-gray-100/50 dark:hover:bg-slate-800/30'
+                              }`}
+                            >
+                              <td className="py-3 px-3">
+                                <Badge className="bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20 rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap">
+                                  {rule.category}
+                                </Badge>
+                              </td>
+                              <td className="py-3 px-3 text-gray-700 dark:text-slate-300 max-w-xs">
+                                {rule.ruleText}
+                              </td>
+                              <td className="py-3 px-3 text-gray-500 dark:text-slate-400 hidden sm:table-cell text-center">
+                                <span className="inline-block w-8 text-center font-mono text-xs bg-gray-100 dark:bg-slate-700 rounded px-1 py-0.5">
+                                  {rule.priority}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3">
+                                {rule.isActive ? (
+                                  <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
+                                    <CheckCircle className="w-3 h-3 mr-1" />
+                                    Active
+                                  </Badge>
+                                ) : (
+                                  <Badge className="bg-gray-400/10 text-gray-500 dark:text-slate-500 border-gray-400/20 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
+                                    <XCircle className="w-3 h-3 mr-1" />
+                                    Disabled
+                                  </Badge>
+                                )}
+                              </td>
+                              <td className="py-3 px-3">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => toggleRule(rule.id, !rule.isActive)}
+                                    title={rule.isActive ? 'Disable rule' : 'Enable rule'}
+                                    className={`w-7 h-7 ${
+                                      rule.isActive
+                                        ? 'text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
+                                        : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-slate-700'
+                                    }`}
+                                  >
+                                    <Power className="w-3.5 h-3.5" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => deleteRule(rule.id)}
+                                    title="Delete rule"
+                                    className="w-7 h-7 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </Button>
                                 </div>
-                                <p className="text-sm text-gray-900 dark:text-white">{rule.ruleText}</p>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  onClick={() => toggleRule(rule.id, !rule.isActive)}
-                                  className={rule.isActive ? 'text-green-400' : 'text-slate-500'}
-                                >
-                                  <Power className="w-4 h-4" />
-                                </Button>
-                                <Button variant="ghost" size="icon" onClick={() => deleteRule(rule.id)} className="text-red-400 hover:text-red-300">
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </ScrollArea>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
+
             </div>
+          </TabsContent>
+
+          {/* Licence Check Tab */}
+          <TabsContent value="licenceCheck">
+            <SponsorLicenceSearch />
           </TabsContent>
 
           {/* Sponsor Monitor Tab */}
