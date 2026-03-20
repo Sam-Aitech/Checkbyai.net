@@ -66,7 +66,6 @@ require_tool() {
 }
 
 require_tool curl
-require_tool unzip || true   # only needed for qsv
 
 # ── Install qsv (Rust CSV toolkit) ───────────────────────────────────────────
 install_qsv() {
@@ -94,7 +93,17 @@ install_qsv() {
     curl -sSfL "$LITE_URL" -o "$TMP/qsv.zip"
   }
 
-  unzip -q "$TMP/qsv.zip" -d "$TMP/qsv_extracted"
+  # Extract zip - try unzip first, fallback to other methods
+  if command -v unzip &>/dev/null; then
+    unzip -q "$TMP/qsv.zip" -d "$TMP/qsv_extracted"
+  else
+    # Fallback: use Python or skip qsv
+    echo "[setup] WARNING: unzip not found. Attempting Python fallback..."
+    python3 -m zipfile -e "$TMP/qsv.zip" "$TMP/qsv_extracted" 2>/dev/null || {
+      echo "[setup] WARNING: Could not extract qsv (unzip and Python not available). Skipping qsv installation."
+      return 0
+    }
+  fi
 
   # The zip may contain 'qsv', 'qsv_lite', or 'qsvlite'
   QSV_BINARY=""
