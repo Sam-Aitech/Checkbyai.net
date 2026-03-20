@@ -1,6 +1,6 @@
 # Product Requirements Document (PRD)
 # checkbyai.net
-**Version:** 1.0 | **Status:** Live | **Last Updated:** 2026-03-16
+**Version:** 1.1 | **Status:** Live | **Last Updated:** 2026-03-20
 
 ---
 
@@ -20,7 +20,7 @@ The platform targets individuals on UK work visas, immigration advisers, HR comp
 ## 2. Problem Statement
 
 ### 2.1 Sponsor Licence Monitor
-The Home Office publishes the Register of Licensed Sponsors as a CSV file on gov.uk. It is updated without notice and there is no official API or alerting mechanism. Visa holders and advisers must manually check the register — a CSV with 80,000+ rows — to detect if a sponsor has been removed or downgraded. A removal means the employer can no longer legally sponsor workers. Affected employees may lose their right to remain in the UK. Missing this change by even a few days can be catastrophic.
+The Home Office publishes the Register of Licensed Sponsors as a CSV file on gov.uk. It is updated without notice and there is no official API or alerting mechanism. Visa holders and advisers must manually check the register — a CSV with 124,000+ rows — to detect if a sponsor has been removed or downgraded. A removal means the employer can no longer legally sponsor workers. Affected employees may lose their right to remain in the UK. Missing this change by even a few days can be catastrophic.
 
 ### 2.2 COS Check
 Fraudulent Certificates of Sponsorship are a known vector for immigration fraud. A fake COS can be used to obtain a Skilled Worker visa. Detecting document tampering requires forensic PDF metadata analysis (XMP history, producer chain, edit software markers) that non-specialists cannot perform manually.
@@ -181,6 +181,8 @@ Fraudulent Certificates of Sponsorship are a known vector for immigration fraud.
 | Notification delivery (Pro+) | Within 5 minutes of cron completion |
 | COS Check turnaround | Under 30 seconds |
 | CSV download retry | 3 attempts, staged 5min/15min delays |
+| CSV validation (qsv) | Hard abort if row count < 100,000 (register has 124k+) — prevents false mass-removal on truncated file |
+| CSV diffing (csvdiff) | Go binary processes 100k+ row fingerprinted CSVs in < 5 seconds |
 | API availability | 99.5% uptime (health endpoint monitored) |
 | PDF storage | Zero — deleted immediately post-analysis |
 | Phone data encryption | AES-256-GCM at rest |

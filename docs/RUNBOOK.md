@@ -1,6 +1,6 @@
 # Operations Runbook
 # checkbyai.net
-**Version:** 1.0 | **Last Updated:** 2026-03-16
+**Version:** 1.1 | **Last Updated:** 2026-03-20
 
 ---
 
@@ -70,10 +70,11 @@ PYTHON_BACKEND_URL="http://localhost:8000"
 □ 3. Seed the admin user (automatic on first start via seedAdminUser())
       Start server → check logs for "Admin user created: ..."
 
-□ 4. Populate the canonical sponsor table:
-      POST /api/admin/migrate-canonical
-      (requires admin session)
-      Expected: { inserted: ~82000, skipped: 0, snapshotDate: "YYYY-MM-DD" }
+□ 4. Seed the canonical sponsor table (first run only):
+      The first nightly job automatically seeds sponsor_canonical via buildFirstRunDiff()
+      when no yesterday archive exists. No manual step required.
+      Or trigger immediately: POST /api/admin/sponsor-monitor/run (requires admin session)
+      ⚠ NOTE: POST /api/admin/migrate-canonical returns 410 Gone — it is deprecated.
 
 □ 5. Verify search index built:
       GET /api/health
@@ -176,12 +177,17 @@ npm run db:push
 Uses Drizzle ORM to apply schema changes. Safe to run on a running server (additive changes only).
 
 ### 4.2 Seed Canonical Table (First-Time or After Data Loss)
+
+> **⚠ `POST /api/admin/migrate-canonical` is deprecated and returns 410 Gone.**
+
+The canonical table is now seeded automatically by the nightly job. On first run (or after data loss), trigger manually:
+
 ```bash
-# Must be done via authenticated admin session
-curl -X POST https://checkbyai.net/api/admin/migrate-canonical \
+curl -X POST https://checkbyai.net/api/admin/sponsor-monitor/run \
   -H "Cookie: session=<admin-session-id>"
 ```
-This reads the latest snapshot from `sponsor_list` and populates `sponsor_canonical`.
+
+When no yesterday archive exists, `buildFirstRunDiff()` creates a synthetic diff treating all register records as Additions — seeding `sponsor_canonical` with all ~124,000 current records as `NEWLY_GRANTED`.
 
 ### 4.3 Useful Diagnostic Queries
 
@@ -253,14 +259,12 @@ ORDER BY nl.created_at DESC;
 
 **Fix:**
 ```bash
-# Option 1: Trigger manual index rebuild via admin endpoint
+# Trigger manual index rebuild (also seeds canonical table if empty)
 curl -X POST https://checkbyai.net/api/admin/sponsor-monitor/run \
   -H "Cookie: session=..."
-
-# Option 2: If canonical is empty (first deploy)
-curl -X POST https://checkbyai.net/api/admin/migrate-canonical \
-  -H "Cookie: session=..."
 ```
+
+> ⚠ `POST /api/admin/migrate-canonical` returns 410 Gone — do not use.
 
 **Verify:**
 ```bash
@@ -292,6 +296,9 @@ LIMIT 3;
 | `Failed to download CSV: HTTP 403` | User-Agent blocked | Check `USER_AGENT` constant in `sponsorListFetcher.ts` |
 | `terminating connection due to administrator command` | Neon cold start | Usually recovers on retry; check `withRetry` logs |
 | `CSV download returned 0 records` | gov.uk returned empty file | Re-trigger manually after 1 hour |
+| `Record count below safety floor` | qsv count < 100,000 — truncated CSV | Check gov.uk manually; wait for correct CSV before re-triggering |
+| `csvdiff exited with code 1` | csvdiff binary missing or corrupt | Verify binary at `./data/binaries/csvdiff` and re-download if needed |
+| `libwayland-client.so.0` error | Wrong qsv binary (GNU instead of musl) | Replace with musl static build from dathere/qsv releases |
 
 **Manually re-trigger:**
 ```bash
@@ -469,7 +476,7 @@ The current architecture runs as a single Node.js process. If scaling to multipl
 
 **Recovery procedure after DB restore:**
 1. Run `npm run db:push` to ensure schema is current
-2. Run `POST /api/admin/migrate-canonical` if `sponsor_canonical` is empty
+2. Trigger `POST /api/admin/sponsor-monitor/run` if `sponsor_canonical` is empty (auto-seeds via buildFirstRunDiff)
 3. Verify search index: `GET /api/health` → `indexReady: true`
 4. Trigger manual monitor run to re-sync to latest CSV state
 

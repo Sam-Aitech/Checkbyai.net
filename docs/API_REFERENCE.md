@@ -1,6 +1,6 @@
 # API Reference
 # checkbyai.net
-**Version:** 1.0 | **Base URL:** `https://checkbyai.net` | **Last Updated:** 2026-03-16
+**Version:** 1.1 | **Base URL:** `https://checkbyai.net` | **Last Updated:** 2026-03-20
 
 ---
 
@@ -639,15 +639,27 @@ Manually triggers the sponsor monitor job.
 
 ---
 
-### `POST /api/admin/migrate-canonical`
-Populates the `sponsor_canonical` table from the latest snapshot. **Required on first deployment.**
+### `POST /api/admin/migrate-canonical` ⛔ DEPRECATED
 
-**Response 200:**
+> **Returns 410 Gone.** This route is no longer functional. Sponsor canonical seeding now happens automatically on the first nightly job run via `buildFirstRunDiff()`. Use `POST /api/admin/sponsor-monitor/run` to trigger manually.
+
+**Response 410:**
 ```json
 {
-  "inserted": 82341,
-  "skipped": 0,
-  "snapshotDate": "2026-03-16"
+  "message": "This endpoint is deprecated. The sponsor_list table is being retired. The monitor job now auto-seeds sponsor_canonical on first run via buildFirstRunDiff()."
+}
+```
+
+---
+
+### `POST /api/admin/sponsor-monitor/cleanup` ⛔ DEPRECATED
+
+> **Returns 410 Gone.** The `sponsor_list` table is being retired (scheduled DROP 2026-04-20). No cleanup action is required.
+
+**Response 410:**
+```json
+{
+  "message": "This endpoint is deprecated. The sponsor_list table is being retired."
 }
 ```
 

@@ -1,6 +1,6 @@
 # Security Design Document
 # checkbyai.net
-**Version:** 1.0 | **Classification:** Internal | **Last Updated:** 2026-03-16
+**Version:** 1.1 | **Classification:** Internal | **Last Updated:** 2026-03-20
 
 ---
 
