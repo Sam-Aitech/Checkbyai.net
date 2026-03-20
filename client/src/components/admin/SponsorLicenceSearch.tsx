@@ -70,7 +70,7 @@ function StatusBadge({ status, typeRating }: { status: string; typeRating: strin
 }
 
 const STATUS_OPTIONS = [
-  { value: '',                 label: 'All statuses'   },
+  { value: 'all',             label: 'All statuses'   },
   { value: 'ACTIVE',          label: 'Active'         },
   { value: 'NEWLY_GRANTED',   label: 'Newly Granted'  },
   { value: 'REMOVED_REVOKED', label: 'Removed'        },
@@ -79,7 +79,7 @@ const STATUS_OPTIONS = [
 
 export default function SponsorLicenceSearch() {
   const [nameInput, setNameInput] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [page, setPage] = useState(1);
   const [data, setData] = useState<DirectoryResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -92,8 +92,8 @@ export default function SponsorLicenceSearch() {
     setError('');
     try {
       const params = new URLSearchParams({ page: String(p), limit: '25' });
-      if (name)   params.set('name',   name);
-      if (status) params.set('status', status);
+      if (name)                    params.set('name',   name);
+      if (status && status !== 'all') params.set('status', status);
       const res = await fetch(`/api/sponsors/directory?${params.toString()}`, {
         credentials: 'include',
       });
