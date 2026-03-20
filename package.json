@@ -8,7 +8,9 @@
     "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "setup:binaries": "bash scripts/setup-binaries.sh",
+    "check:binaries": "tsx -e \"import('./server/utils/binaryRunner.ts').then(m => m.checkBinaryHealth()).then(r => console.log(JSON.stringify(r, null, 2)))\""
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
