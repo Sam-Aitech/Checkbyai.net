@@ -47,6 +47,20 @@ const MIN_SPONSOR_COUNT = 100_000;
 const ARCHIVE_DIR = path.join(process.cwd(), "data", "archives");
 const USER_AGENT = "Mozilla/5.0 (compatible; CheckByAI-SponsorBot/1.0; +https://checkbyai.net)";
 
+// Browser-like headers sent with every CSV fetch request.
+// GOV.UK's Cloudflare CDN scores bot probability by checking Accept,
+// Accept-Language, and Referer alongside the User-Agent.  A cold
+// direct-to-asset request with no Referer and no Accept header is a
+// strong bot signal regardless of what the UA string says.
+const FETCH_HEADERS: Record<string, string> = {
+  "User-Agent":      USER_AGENT,
+  "Accept":          "text/csv, application/octet-stream, text/plain, */*;q=0.9",
+  "Accept-Language": "en-GB,en;q=0.9",
+  // Tells the CDN this request was navigated from the publications index page,
+  // not opened cold by an automated client.
+  "Referer":         "https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers",
+};
+
 // ── Directory bootstrap ───────────────────────────────────────────────────────
 
 function ensureArchiveDir(): void {
@@ -182,17 +196,42 @@ export async function ensureTodaysArchive(
   try {
     response = await fetchFn(csvUrl, {
       signal: connectController.signal,
-      headers: { "User-Agent": USER_AGENT },
+      headers: FETCH_HEADERS,
     });
   } catch (err: any) {
     clearTimeout(connectTimer);
     throw new Error(
       err.name === "AbortError"
         ? `[CsvArchiver] CSV download connect timed out (30 s) from ${csvUrl}`
-        : `[CsvArchiver] CSV download failed: ${err.message}`,
+        : `[CsvArchiver] CSV download failed: ${err?.message ?? String(err)}`,
     );
   }
   clearTimeout(connectTimer);
+
+  // Single retry on CDN rate-limit (429) or overload (503) before hard-failing.
+  // Both codes are explicitly retryable; re-using a fresh AbortController keeps
+  // the 30 s connect cap on the retry independent of the original request.
+  if (response.status === 429 || response.status === 503) {
+    const retryAfterSec = parseInt(response.headers.get("retry-after") ?? "10", 10);
+    const delayMs = Math.min((isNaN(retryAfterSec) ? 10 : retryAfterSec) * 1_000, 30_000);
+    console.warn(
+      `[CsvArchiver] HTTP ${response.status} from CDN — waiting ${delayMs / 1000}s then retrying once`,
+    );
+    await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+    const retryController = new AbortController();
+    const retryTimer = setTimeout(() => retryController.abort(), 30_000);
+    try {
+      response = await fetchFn(csvUrl, { signal: retryController.signal, headers: FETCH_HEADERS });
+    } catch (retryErr: any) {
+      clearTimeout(retryTimer);
+      throw new Error(
+        retryErr.name === "AbortError"
+          ? `[CsvArchiver] CSV download retry connect timed out (30 s) from ${csvUrl}`
+          : `[CsvArchiver] CSV download retry failed: ${retryErr?.message ?? String(retryErr)}`,
+      );
+    }
+    clearTimeout(retryTimer);
+  }
 
   if (!response.ok) {
     throw new Error(
@@ -214,7 +253,7 @@ export async function ensureTodaysArchive(
   if (!ACCEPTABLE_CONTENT_TYPES.some((ct) => contentType.startsWith(ct))) {
     const ctErr = new Error(
       `[CsvArchiver] GOV_UK_UNEXPECTED_RESPONSE: expected CSV content-type, ` +
-      `got "${contentType}". URL: ${csvUrl}. ` +
+      `got "${contentType}" (HTTP ${response.status}). URL: ${csvUrl}. ` +
       `Possible Cloudflare interstitial or unexpected redirect — aborting before stream.`,
     );
     (ctErr as any).code = "GOV_UK_UNEXPECTED_RESPONSE";
@@ -243,7 +282,7 @@ export async function ensureTodaysArchive(
     throw new Error(
       err.name === "AbortError"
         ? `[CsvArchiver] CSV body stream timed out after 120 s from ${csvUrl}. Server stalled mid-download.`
-        : `[CsvArchiver] Failed to write CSV to disk: ${err.message}`,
+        : `[CsvArchiver] Failed to write CSV to disk: ${err?.message ?? String(err)}`,
     );
   } finally {
     clearTimeout(bodyTimer);

@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import type { SponsorChange } from "./utils/sponsorListFetcher";
 import { createServer, type Server } from "http";
 import { checkBinaryHealth } from "./utils/binaryRunner";
 import * as fs from "fs";
@@ -3262,7 +3263,7 @@ Format your response in clear, professional markdown.`;
         .returning();
 
       const { notifyAffectedUsers } = await import("./utils/notificationDispatcher");
-      const notifResult = await notifyAffectedUsers(savedChange);
+      const notifResult = await notifyAffectedUsers(savedChange as SponsorChange);
 
       res.json({
         message: "Test change created and notifications dispatched.",

@@ -201,7 +201,7 @@ async function saveDiffResult(runDate: string, diff: CsvDiffResult): Promise<voi
       diffDurationMs:       diff.durationMs,
     }).onConflictDoNothing();
   } catch (err: any) {
-    console.warn("[SponsorMonitorJob] Failed to save diff result (non-fatal):", err.message);
+    console.warn("[SponsorMonitorJob] Failed to save diff result (non-fatal):", err?.message ?? String(err));
   }
 }
 
@@ -255,7 +255,9 @@ export async function runSponsorMonitorJob(source: string = "cron", notifyOnFail
     return result; // reached only when runJobCore() completes without throwing
   } catch (err: any) {
     // Handles: timeout, unexpected throws from runJobCore()
-    const errorMsg = `Unexpected error: ${err.message}`;
+    // err?.message ?? String(err) ensures a non-null string even when the thrown
+    // value is a plain string, null, undefined, or a non-standard error object.
+    const errorMsg = `Unexpected error: ${err?.message ?? String(err)}`;
     console.error(`[SponsorMonitorJob] ${errorMsg}`, err);
     if (notifyOnFailure) await sendAdminFailureAlert(errorMsg);
     const failDuration = Date.now() - startTime;
@@ -270,13 +272,13 @@ export async function runSponsorMonitorJob(source: string = "cron", notifyOnFail
           recordsProcessed: result.recordsProcessed,
           changesDetected: 0,
           durationMs: failDuration,
-          errorMessage: err.message,
+          errorMessage: errorMsg,
           completedAt: failTime,
         }).onConflictDoUpdate({
           target: monitorJobRuns.runDate,
           set: {
             status: "failed",
-            errorMessage: err.message,
+            errorMessage: errorMsg,
             durationMs: failDuration,
             completedAt: failTime,
           },
@@ -397,7 +399,7 @@ export async function runSponsorMonitorJob(source: string = "cron", notifyOnFail
           result.notificationsSkipped += notifResult.skipped;
           result.notificationsFailed  += notifResult.failed;
         } catch (err: any) {
-          console.error(`[SponsorMonitorJob] Notification error for "${change.organisationName}":`, err.message);
+          console.error(`[SponsorMonitorJob] Notification error for "${change.organisationName}":`, err?.message ?? String(err));
           result.notificationsFailed += 1;
         }
       }
@@ -461,7 +463,7 @@ export async function runSponsorMonitorJob(source: string = "cron", notifyOnFail
 
       console.log(`[SponsorMonitorJob] Daily digest generated: "${headlineResult.headline}" (model: ${headlineResult.model})`);
     } catch (digestErr: any) {
-      console.error("[SponsorMonitorJob] Failed to generate daily digest:", digestErr.message);
+      console.error("[SponsorMonitorJob] Failed to generate daily digest:", digestErr?.message ?? String(digestErr));
     }
 
     // ── Audit log ────────────────────────────────────────────────────────────────
@@ -597,7 +599,7 @@ async function seedInitialDigest(): Promise<void> {
 
     console.log(`[SponsorMonitorJob] Initial digest seeded: "${headline}" (${active} active, ${revoked} revoked sponsors)`);
   } catch (err: any) {
-    console.error("[SponsorMonitorJob] Failed to seed initial digest:", err.message);
+    console.error("[SponsorMonitorJob] Failed to seed initial digest:", err?.message ?? String(err));
   }
 }
 
