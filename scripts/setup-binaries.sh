@@ -71,7 +71,7 @@ require_tool curl
 install_qsv() {
   if [[ -x "$BIN_DIR/qsv" ]]; then
     echo "[setup] qsv already installed:"
-    "$BIN_DIR/qsv" --version
+    "$BIN_DIR/qsv" --version 2>&1 || echo "[setup] WARNING: qsv binary exists but could not run --version (missing shared libs?). Continuing anyway."
     return 0
   fi
 
@@ -115,10 +115,11 @@ install_qsv() {
   done
 
   if [[ -z "$QSV_BINARY" ]]; then
-    echo "[setup] ERROR: Could not find qsv binary in downloaded zip."
+    echo "[setup] WARNING: Could not find qsv binary in downloaded zip. Skipping qsv installation."
     echo "[setup] Contents:"
-    ls -la "$TMP/qsv_extracted/"
-    exit 1
+    ls -la "$TMP/qsv_extracted/" 2>/dev/null || true
+    rm -rf "$TMP"
+    return 0
   fi
 
   cp "$QSV_BINARY" "$BIN_DIR/qsv"
@@ -126,7 +127,12 @@ install_qsv() {
   trap - EXIT
   rm -rf "$TMP"
 
-  echo "[setup] qsv installed: $BIN_DIR/qsv (static build)"
+  if "$BIN_DIR/qsv" --version >/dev/null 2>&1; then
+    echo "[setup] qsv installed and verified: $BIN_DIR/qsv"
+  else
+    echo "[setup] WARNING: qsv binary installed but cannot execute (missing shared libs?). Removing."
+    rm -f "$BIN_DIR/qsv"
+  fi
 }
 
 # ── Install csvdiff (Go CSV diff engine) ─────────────────────────────────────
@@ -168,14 +174,18 @@ install_csvdiff() {
 }
 
 # ── Run installations ─────────────────────────────────────────────────────────
-install_qsv
+install_qsv || echo "[setup] WARNING: qsv installation failed. qsv is optional — the app will use fallback values at runtime."
 echo ""
 install_csvdiff
 
 echo ""
 echo "================================================"
 echo "  Binary setup complete!"
-echo "  qsv:      $BIN_DIR/qsv"
+if [[ -x "$BIN_DIR/qsv" ]]; then
+  echo "  qsv:      $BIN_DIR/qsv"
+else
+  echo "  qsv:      NOT INSTALLED (optional)"
+fi
 echo "  csvdiff:  $BIN_DIR/csvdiff"
 echo "  archives: $DATA_DIR"
 echo ""
