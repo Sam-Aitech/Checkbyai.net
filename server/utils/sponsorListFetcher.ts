@@ -164,6 +164,18 @@ async function findCsvUrlPrimary(): Promise<string> {
     );
   }
 
+  // Guard: if the publication page itself was intercepted by a bot challenge,
+  // the CDN may return non-HTML content (e.g. a JSON error or binary blob).
+  // Cheerio would silently find zero links and trigger the Scrapling fallback
+  // with no explanation. Fail fast with a clear error instead.
+  const pageContentType = (response.headers.get("content-type") ?? "").toLowerCase();
+  if (!pageContentType.startsWith("text/html")) {
+    throw new Error(
+      `gov.uk publication page returned unexpected content-type "${pageContentType}" ` +
+      `(expected text/html). The page may be behind a bot challenge or have moved.`,
+    );
+  }
+
   const html = await response.text();
   const $ = cheerio.load(html);
 

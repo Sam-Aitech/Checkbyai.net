@@ -24,7 +24,7 @@
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
-import { Readable } from "stream";
+import { Readable, Writable } from "stream";
 import { pipeline } from "stream/promises";
 import { parse as parseStream } from "csv-parse";
 import { db } from "../db";
@@ -75,6 +75,25 @@ function sha256File(filePath: string): string {
     fs.closeSync(fd);
   }
   return hash.digest("hex");
+}
+
+// ── HTML content detection ─────────────────────────────────────────────────────
+// Defence-in-depth: a CDN can lie about Content-Type and serve an HTML
+// Cloudflare challenge page with "text/plain" or "application/octet-stream".
+// Reading 512 bytes is cheaper than running qsv on garbage for 90 s.
+
+const HTML_SIGNATURES = ["<!doctype", "<html", "<head>", "<title>", "cloudflare"];
+
+function detectHtmlContent(filePath: string): boolean {
+  const buf = Buffer.allocUnsafe(512);
+  const fd = fs.openSync(filePath, "r");
+  try {
+    const bytesRead = fs.readSync(fd, buf, 0, 512, 0);
+    const head = buf.subarray(0, bytesRead).toString("utf8").trimStart().toLowerCase();
+    return HTML_SIGNATURES.some((sig) => head.includes(sig));
+  } finally {
+    fs.closeSync(fd);
+  }
 }
 
 // ── Column resolution (duplicated here to avoid circular import) ──────────────
@@ -153,24 +172,27 @@ export async function ensureTodaysArchive(
   // ── Download to disk ────────────────────────────────────────────────────────
   console.log(`[CsvArchiver] Downloading CSV for ${date} → ${filePath}`);
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 120_000); // 2-min timeout
+  // Phase A: connect + receive headers (30 s hard cap).
+  // The AbortController signal is cleared as soon as headers arrive — before
+  // the body is streamed — so we keep it scoped to the connect phase only.
+  const connectController = new AbortController();
+  const connectTimer = setTimeout(() => connectController.abort(), 30_000);
 
   let response: Response;
   try {
     response = await fetchFn(csvUrl, {
-      signal: controller.signal,
+      signal: connectController.signal,
       headers: { "User-Agent": USER_AGENT },
     });
   } catch (err: any) {
-    clearTimeout(timer);
+    clearTimeout(connectTimer);
     throw new Error(
       err.name === "AbortError"
-        ? `[CsvArchiver] CSV download timed out after 2 min from ${csvUrl}`
+        ? `[CsvArchiver] CSV download connect timed out (30 s) from ${csvUrl}`
         : `[CsvArchiver] CSV download failed: ${err.message}`,
     );
   }
-  clearTimeout(timer);
+  clearTimeout(connectTimer);
 
   if (!response.ok) {
     throw new Error(
@@ -178,19 +200,53 @@ export async function ensureTodaysArchive(
     );
   }
 
+  // ── Content-Type guard ──────────────────────────────────────────────────────
+  // Rejects Cloudflare challenge pages and HTML redirects before any bytes hit
+  // disk. GOV.UK serves the CSV as text/csv or application/octet-stream; a
+  // text/html response here means the CDN intercepted the request.
+  const contentType = (response.headers.get("content-type") ?? "").toLowerCase();
+  const ACCEPTABLE_CONTENT_TYPES = [
+    "text/csv",
+    "application/octet-stream",
+    "application/csv",
+    "text/plain",
+  ];
+  if (!ACCEPTABLE_CONTENT_TYPES.some((ct) => contentType.startsWith(ct))) {
+    const ctErr = new Error(
+      `[CsvArchiver] GOV_UK_UNEXPECTED_RESPONSE: expected CSV content-type, ` +
+      `got "${contentType}". URL: ${csvUrl}. ` +
+      `Possible Cloudflare interstitial or unexpected redirect — aborting before stream.`,
+    );
+    (ctErr as any).code = "GOV_UK_UNEXPECTED_RESPONSE";
+    throw ctErr;
+  }
+
   if (!response.body) {
     throw new Error("[CsvArchiver] Response body is null — cannot stream to disk.");
   }
 
-  // Stream response body → file (never loads full CSV into RAM)
+  // Phase B: body streaming (120 s hard cap, independent of the connect timeout).
+  // A new AbortController is required here — the connect-phase one was already
+  // cleared above, so it can no longer cancel anything. Without this second
+  // controller, a server that sends HTTP 200 + headers quickly and then stalls
+  // mid-body would cause pipeline() to hang indefinitely.
+  const bodyController = new AbortController();
+  const bodyTimer = setTimeout(() => bodyController.abort(), 120_000);
+
   const nodeReadable = Readable.fromWeb(response.body as any);
   const writeStream = fs.createWriteStream(filePath);
   try {
-    await pipeline(nodeReadable, writeStream);
-  } catch (err) {
-    // Clean up partial file on failure
-    fs.existsSync(filePath) && fs.unlinkSync(filePath);
-    throw new Error(`[CsvArchiver] Failed to write CSV to disk: ${(err as Error).message}`);
+    await pipeline(nodeReadable, writeStream, { signal: bodyController.signal });
+  } catch (err: any) {
+    // Clean up partial file on failure (pipeline destroys both streams on throw)
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    throw new Error(
+      err.name === "AbortError"
+        ? `[CsvArchiver] CSV body stream timed out after 120 s from ${csvUrl}. Server stalled mid-download.`
+        : `[CsvArchiver] Failed to write CSV to disk: ${err.message}`,
+    );
+  } finally {
+    clearTimeout(bodyTimer);
   }
 
   // ── Sanity: ensure file is non-empty ───────────────────────────────────────
@@ -201,6 +257,20 @@ export async function ensureTodaysArchive(
   }
 
   console.log(`[CsvArchiver] Saved ${(stat.size / 1024 / 1024).toFixed(1)} MB to disk.`);
+
+  // ── HTML content guard (magic-byte check) ──────────────────────────────────
+  // Catches CDNs that serve a Cloudflare interstitial with a misleading
+  // Content-Type header (e.g. "text/plain"). Reading 512 bytes is essentially
+  // free compared with the 60 s + 30 s qsv invocations that would follow.
+  if (detectHtmlContent(filePath)) {
+    fs.unlinkSync(filePath);
+    const htmlErr = new Error(
+      `[CsvArchiver] GOV_UK_HTML_CONTENT: downloaded file starts with HTML markup, ` +
+      `not CSV data. URL: ${csvUrl}. Likely a Cloudflare challenge page or unexpected redirect.`,
+    );
+    (htmlErr as any).code = "GOV_UK_HTML_CONTENT";
+    throw htmlErr;
+  }
 
   // ── Compute checksum ────────────────────────────────────────────────────────
   const checksumSha256 = sha256File(filePath);
@@ -316,12 +386,17 @@ async function countCsvRows(filePath: string): Promise<number> {
   });
 
   let count = 0;
-  readStream.pipe(parser);
+  const counter = new Writable({
+    objectMode: true,
+    write(_chunk, _encoding, callback) {
+      count++;
+      callback();
+    },
+  });
 
-  for await (const _row of parser as AsyncIterable<string[]>) {
-    count++;
-  }
-
+  // pipeline() propagates errors across all three stages and destroys every
+  // stream on failure — no naked .pipe(), no manual error listener needed.
+  await pipeline(readStream, parser, counter);
   return count;
 }
 
@@ -337,28 +412,38 @@ export async function parseCsvFile(filePath: string): Promise<SponsorRecord[]> {
     bom: true,
   });
 
-  readStream.pipe(parser);
-
   let idx: ColumnIndexes | null = null;
   let headerRow: string[] | null = null;
   const sponsors: SponsorRecord[] = [];
 
-  try {
-    for await (const row of parser as AsyncIterable<string[]>) {
+  const collector = new Writable({
+    objectMode: true,
+    write(chunk, _encoding, callback) {
+      const row = chunk as string[];
+
       if (!headerRow) {
         headerRow = row;
         idx = resolveColumnIndexes(row);
         if (idx.nameIdx === -1) {
-          throw new Error(
-            `[CsvArchiver] Could not find "Organisation Name" column. ` +
-            `Found columns: ${row.join(", ")}`,
+          // Passing an error to callback propagates through pipeline() and
+          // causes it to destroy all streams and reject its Promise.
+          callback(
+            new Error(
+              `[CsvArchiver] Could not find "Organisation Name" column. ` +
+              `Found columns: ${row.join(", ")}`,
+            ),
           );
+          return;
         }
-        continue;
+        callback();
+        return;
       }
 
       const orgName = (row[idx!.nameIdx] ?? "").trim();
-      if (!orgName) continue;
+      if (!orgName) {
+        callback();
+        return;
+      }
 
       sponsors.push({
         organisationName: orgName,
@@ -367,13 +452,16 @@ export async function parseCsvFile(filePath: string): Promise<SponsorRecord[]> {
         typeRating: (idx!.typeIdx   >= 0 ? row[idx!.typeIdx]   ?? "" : "").trim(),
         route:      (idx!.routeIdx  >= 0 ? row[idx!.routeIdx]  ?? "" : "").trim(),
       });
-    }
-  } catch (err) {
-    parser.destroy();
-    readStream.destroy();
-    throw err;
-  }
+      callback();
+    },
+  });
 
+  // pipeline() handles error propagation across all three stages automatically:
+  //   readStream error  → parser + collector destroyed, Promise rejects
+  //   parser error      → readStream + collector destroyed, Promise rejects
+  //   collector error   → readStream + parser destroyed, Promise rejects
+  // No manual .on("error") listener or try/catch/destroy block needed.
+  await pipeline(readStream, parser, collector);
   return sponsors;
 }
 
