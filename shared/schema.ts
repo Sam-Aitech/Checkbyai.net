@@ -259,7 +259,11 @@ export const sponsorCanonical = pgTable(
   ]
 );
 
-// Daily snapshot of the UK government sponsor licence register
+/**
+ * @deprecated sponsor_list is retired. No new rows are written as of 2026-03-20.
+ * Superseded by: sponsorCanonical (per-company state) + csv_archive (daily CSV files on disk).
+ * Schedule: DROP TABLE sponsor_list after 2026-04-20 (30-day holdback).
+ */
 export const sponsorList = pgTable(
   "sponsor_list",
   {
@@ -469,6 +473,48 @@ export const jobAlertPreferences = pgTable(
   ],
 );
 
+// ==========================================
+// Pipeline Infrastructure Tables (Phase 0)
+// ==========================================
+
+// Immutable daily archive of the validated Gov.uk CSV (one row per day).
+// Replaces the sponsor_list row-per-record approach.
+// File lives on disk at file_path; this table is the registry.
+export const csvArchive = pgTable(
+  "csv_archive",
+  {
+    id:             integer("id").primaryKey().generatedByDefaultAsIdentity(),
+    snapshotDate:   date("snapshot_date").notNull(),
+    filePath:       text("file_path").notNull(),          // absolute path to qsv-cleaned CSV
+    recordCount:    integer("record_count").notNull(),
+    checksumSha256: text("checksum_sha256").notNull(),    // integrity check
+    sourceUrl:      text("source_url"),
+    isValid:        boolean("is_valid").notNull().default(true),
+    downloadedAt:   timestamp("downloaded_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("idx_csv_archive_date").on(table.snapshotDate),
+  ]
+);
+
+// Stores the csvdiff output for each nightly run (added/removed counts + raw JSON path).
+export const diffResults = pgTable(
+  "diff_results",
+  {
+    id:                   integer("id").primaryKey().generatedByDefaultAsIdentity(),
+    runDate:              date("run_date").notNull(),
+    addedCount:           integer("added_count").notNull().default(0),
+    removedCount:         integer("removed_count").notNull().default(0),
+    attributeChangeCount: integer("attribute_change_count").notNull().default(0),
+    diffDurationMs:       integer("diff_duration_ms"),
+    diffJsonPath:         text("diff_json_path"),          // path to raw diff.json for audit/replay
+    createdAt:            timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_diff_results_run_date").on(table.runDate),
+  ]
+);
+
 // Type exports
 export type DailyDigest = typeof dailyDigest.$inferSelect;
 export type AiGenerationLog = typeof aiGenerationLogs.$inferSelect;
@@ -487,6 +533,8 @@ export type CompanyWatch = typeof companyWatches.$inferSelect;
 export type SponsorChange = typeof sponsorChanges.$inferSelect;
 export type NotificationPreference = typeof notificationPreferences.$inferSelect;
 export type NotificationLogEntry = typeof notificationLog.$inferSelect;
+export type CsvArchiveEntry = typeof csvArchive.$inferSelect;
+export type DiffResultEntry = typeof diffResults.$inferSelect;
 
 // Zod schemas
 export const insertUserSchema = createInsertSchema(users);

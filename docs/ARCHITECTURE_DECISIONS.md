@@ -1,6 +1,6 @@
 # Architecture Decision Records (ADR)
 # checkbyai.net
-**Version:** 1.0 | **Last Updated:** 2026-03-16
+**Version:** 2.0 | **Last Updated:** 2026-03-20
 
 ---
 
@@ -24,7 +24,7 @@ Single Express process serves all routes, background jobs, and the static fronte
 - Background jobs need database access; running them in-process is simpler than a separate worker queue
 
 **Trade-offs accepted:**
-- Cron job reconciliation (30–120s) runs in the same process as API requests — mitigated by Node.js async I/O (reconcile is database-bound, not CPU-bound)
+- Cron job state machine (seconds per run) runs in the same process as API requests — mitigated by Node.js async I/O (state machine is database-bound, not CPU-bound)
 - Single point of failure — mitigated by Neon managed PostgreSQL surviving server restarts
 
 ---
@@ -34,7 +34,7 @@ Single Express process serves all routes, background jobs, and the static fronte
 **Status:** Accepted
 
 **Context:**
-The sponsor register has ~80,000 companies. Users need fuzzy search (typo tolerance, partial name matching). Options considered:
+The sponsor register has ~124,000 companies. Users need fuzzy search (typo tolerance, partial name matching). Options considered:
 1. PostgreSQL full-text search with `tsvector`
 2. Elasticsearch / OpenSearch
 3. In-memory Fuse.js index
@@ -43,7 +43,7 @@ The sponsor register has ~80,000 companies. Users need fuzzy search (typo tolera
 In-memory Fuse.js index rebuilt from `sponsor_canonical` table.
 
 **Rationale:**
-- 80,000 records × ~200 bytes ≈ 16MB in memory — trivial on a modern server
+- 124,000 records × ~200 bytes ≈ 25MB in memory — acceptable on a modern server
 - Fuse.js provides fuzzy matching with configurable thresholds; PostgreSQL `tsvector` is token-based and does not handle misspellings
 - No external service dependency; Elasticsearch adds operational complexity for a dataset that fits comfortably in RAM
 - Rebuild time: ~200–500ms; done on startup and after each daily job — users never experience a stale index for more than 24 hours
@@ -59,15 +59,16 @@ In-memory Fuse.js index rebuilt from `sponsor_canonical` table.
 **Status:** Accepted
 
 **Context:**
-The sponsor monitor cron runs daily. If the server is deployed with multiple instances (horizontal scaling), two pods could both fire the cron at 00:30 UTC and both attempt to reconcile the same data, producing duplicate changes and double notifications.
+The sponsor monitor cron runs daily. If the server is deployed with multiple instances (horizontal scaling), two pods could both fire the cron at 00:30 UTC and both attempt to process the same data, producing duplicate changes and double notifications.
 
 **Decision:**
-Use `pg_try_advisory_lock(7483920)` at the start of each job. If the lock is already held by another instance, the job exits immediately.
+Use `pg_try_advisory_lock(7483920)` at the start of each job. If the lock is already held by another instance, the job exits immediately. Combined with a DB-level idempotency check (`monitor_job_runs WHERE status='success' AND runDate=today`).
 
 **Rationale:**
 - Zero additional infrastructure (no Redis, no ZooKeeper)
 - PostgreSQL advisory locks are crash-safe — if the server crashes mid-job, the lock is automatically released when the connection drops
 - Atomic acquisition: `pg_try_advisory_lock` is a non-blocking test-and-set
+- DB idempotency check provides a second layer: even if the lock is not held, a previously successful run for today is not repeated
 
 **Trade-offs accepted:**
 - Advisory lock is **session-scoped** — tied to the specific database connection. With Neon's serverless WebSocket pool, that connection may be silently recycled under load. If the connection holding the lock is recycled mid-job, the lock releases and a second instance could start.
@@ -75,46 +76,56 @@ Use `pg_try_advisory_lock(7483920)` at the start of each job. If the lock is alr
 
 ---
 
-## ADR-004: Two-Day Confirmation Before Marking a Sponsor REMOVED
+## ADR-004: Two-State Removal Confirmation (GRACE_PERIOD → REMOVED_REVOKED)
 
-**Status:** Accepted
+**Status:** Accepted | **Supersedes:** Original single-state removal
 
 **Context:**
-gov.uk sometimes temporarily omits companies from the CSV (download errors on their side, data pipeline issues) and re-adds them the next day. A single-day absence triggering REMOVED notifications would generate false positives and erode user trust.
+gov.uk sometimes temporarily omits companies from the CSV (download errors on their side, data pipeline issues) and re-adds them the next day. A single-day absence triggering REMOVED_REVOKED notifications would generate false positives and erode user trust.
 
 **Decision:**
-A company must be absent from the CSV for **2 consecutive days** before a REMOVED change is emitted and notifications sent.
+A company transitions through two states before being confirmed removed:
+1. **Day 1 absent:** `ACTIVE` → `GRACE_PERIOD` (emit `GRACE_PERIOD` change, increment `consecutiveMisses=1`)
+2. **Day 2 absent:** `GRACE_PERIOD` → `REMOVED_REVOKED` (emit `REMOVED_REVOKED` change)
+
+GRACE_PERIOD state is detected via csvdiff Deletions (day 1) and a separate Phase D2 check (companies already in GRACE_PERIOD that are still absent in today's fingerprint set).
 
 **Rationale:**
 - Analysis of historical gov.uk data showed occasional single-day omissions that were not actual removals
 - The visa impact of a false "REMOVED" notification is significant — it causes unnecessary panic
 - 2-day window balances false-positive prevention with timely alerting for genuine removals
-- `consecutiveMisses` field tracks the count; status changes to `NOT_LISTED` only at miss ≥ 2
+- GRACE_PERIOD notification provides an early warning without the urgent language of REMOVED_REVOKED
 
 **Trade-offs accepted:**
-- A genuine removal will notify users 24 hours after it actually happened
+- A genuine removal will not send the urgent notification until day 2 (24-hour delay)
 - The 24-hour delay is explicitly documented in the product as a data quality measure
 
 ---
 
-## ADR-005: Fingerprint as Stable Sponsor Identity
+## ADR-005: Fingerprint as Stable Sponsor Identity + csvdiff Primary Key
 
-**Status:** Accepted
+**Status:** Accepted | **Updated:** 2026-03-20
 
 **Context:**
 Companies rename frequently (acquisition, rebrand, trading name change). If identity is based on the exact name string, a rename would create a new entity — users watching "Acme Ltd" would lose their watch continuity after "Acme Holdings Ltd" appears.
 
+Additionally, the previous in-memory reconcile() approach loaded all ~124k records into RAM to compare. This was error-prone and slow.
+
 **Decision:**
-Fingerprint = `normalize(name)|normalize(city)|lowercase(route)`. The fingerprint is the primary key for `sponsor_canonical`. When a rename is detected (85%+ string similarity + same city+route), the fingerprint is updated on the existing row.
+Fingerprint = `normalize(name)|normalize(city)|lowercase(route)`. The fingerprint is:
+1. The primary key for `sponsor_canonical`
+2. Prepended as the first column of every fingerprinted CSV (`*_sponsors_fp.csv`)
+3. The primary key used by `csvdiff` to detect additions, deletions, and modifications
 
 **Rationale:**
 - Stable identity survives: `Acme Ltd` → `Acme Limited` (same fingerprint), `Acme Corp Limited` → `Acme Corp Ltd` (same fingerprint)
 - Historical names stored in `historicalNames[]` array — searchable and auditable
-- Rename detection uses locality bucketing (only compare candidates in same city+route) — prevents O(M×N) comparison across all 80,000 sponsors
+- Using fingerprint as csvdiff primary key means the diff output maps 1:1 to sponsor_canonical rows — no lookup required
+- csvdiff is O(N) in file size, not O(M×N) in-memory comparison
 
 **Trade-offs accepted:**
 - Companies that move cities get a new fingerprint — treated as a new entity. Rare but possible.
-- 85% similarity threshold may miss extreme renames (`Acme Ltd` → `Global Services Ltd`) — these would appear as a REMOVED + ADDED pair rather than a NAME_CHANGE
+- 85% similarity threshold in rename detection may miss extreme renames — these appear as REMOVED_REVOKED + NEW_LICENCE rather than NAME_CHANGE
 
 ---
 
@@ -206,21 +217,106 @@ Add PostgreSQL RLS policies as a future hardening milestone when the connection 
 
 ---
 
-## ADR-010: Staged Retry Delays for gov.uk CSV Download
+## ADR-010: qsv Validation Gate (Hard Floor on Record Count)
 
-**Status:** Accepted
+**Status:** Accepted | **Introduced:** 2026-03-20
 
 **Context:**
-gov.uk experiences transient failures (DNS timeouts, 503s) that typically resolve within 2–5 minutes. The original implementation used a flat 30-minute retry delay — if the first attempt failed, the job would wait 30 minutes before retry, potentially delaying the day's monitor completion by 60+ minutes.
+The old pipeline had no validation of the downloaded CSV before processing. A corrupted, truncated, or accidentally replaced file from gov.uk could silently zero out all sponsors from `sponsor_canonical` — sending mass REMOVED notifications to all users.
 
 **Decision:**
-Staged retry delays: 5 minutes after attempt 1, 15 minutes after attempt 2. Maximum total wait: 20 minutes for 3 attempts.
+All CSV downloads must pass through `csvArchiver.ts` which runs:
+1. `qsv validate` — structural validation (relaxed, non-fatal: sends admin alert but continues)
+2. `qsv count` — hard abort if row count < 100,000 (the register has 120k+ entries; 100k is a safe floor)
+
+If the count check fails, the job aborts, inserts a `isValid=false` record into `csv_archive`, sends an admin alert, and stops. No state machine changes are made.
 
 **Rationale:**
-- gov.uk transient errors resolve quickly — a 30-minute wait wastes the window when notifications should be sent
-- Staged delays (5→15 min) match the observed recovery pattern: most transient issues resolve within 5 minutes; persistent issues (maintenance windows) require the full 15
-- 20-minute worst-case is substantially better than the previous 60-minute worst-case
+- 100,000-record floor is far below the real register size (~124k) but well above any plausible legitimate truncation
+- qsv (Rust) is extremely fast (~50ms for a 25MB file) — no meaningful overhead
+- Admin alert ensures someone investigates gov.uk rather than silently serving stale data
+
+**Graceful degradation:**
+- qsv not installed → structural validation skipped (log warning), row count falls back to streaming csv-parse
+- qsv binary reports -1 → same fallback
 
 **Trade-offs accepted:**
-- Still a single retry path for both the HTML page scrape and the CSV download — a failure in either triggers the full retry delay
-- Future improvement: cache the last-known CSV URL to skip the page scrape on retry
+- 100,000 threshold is a heuristic — a legitimate dramatic shrinkage of the register (unlikely) would false-positive abort
+- qsv binary must be installed on the server for best performance; streaming fallback is slower for very large files
+
+---
+
+## ADR-011: csvdiff for Sponsor Register Diffing
+
+**Status:** Accepted | **Introduced:** 2026-03-20 | **Replaces:** in-memory reconcile()
+
+**Context:**
+The original `reconcile()` function (~459 lines) loaded all ~124k canonical records and all ~124k today records into RAM as Maps, then iterated to detect additions/deletions/modifications. This was:
+- Error-prone (subtle bugs in custom diff logic)
+- Memory-intensive (~500MB peak)
+- Hard to test in isolation
+
+**Decision:**
+Replace reconcile() with `csvdiff` (Go binary by aswinkarthik/csvdiff). Both yesterday's and today's fingerprinted CSVs are passed to the binary. It outputs JSON `{Additions, Deletions, Modifications}`. The state machine (`sponsorStateMachine.ts`) then processes this structured diff.
+
+**Rationale:**
+- csvdiff is purpose-built, extensively tested, and processes 100k+ rows in seconds
+- Fingerprinted CSVs are stored on disk — the diff is reproducible and auditable
+- Clean separation: Phase 2 (what changed) is entirely separate from Phase 3 (what to do about it)
+- First-run handling: when no yesterday archive exists, `buildFirstRunDiff()` creates a synthetic diff with all records as Additions — state machine seeds DB normally
+
+**Trade-offs accepted:**
+- csvdiff binary must be installed on the server — hard failure if missing (no graceful degradation)
+- CSV files accumulate on disk — requires periodic cleanup (retain at minimum yesterday + today)
+
+---
+
+## ADR-012: sponsor_list Table Deprecation
+
+**Status:** Accepted | **Introduced:** 2026-03-20
+
+**Context:**
+The `sponsor_list` table stored ~124k rows per day as a snapshot of the CSV. With the csvdiff-based pipeline:
+- The raw CSV lives on disk in `data/archives/` (registered in `csv_archive`)
+- Per-company state lives in `sponsor_canonical`
+- No code reads from `sponsor_list` anymore
+
+Keeping the table active wastes PostgreSQL storage and creates confusion about the authoritative data source.
+
+**Decision:**
+- 2026-03-20: Stop all writes to `sponsor_list`. Mark table `@deprecated` in schema.ts and all related functions in `sponsorListFetcher.ts`.
+- 2026-04-20: DROP TABLE `sponsor_list` (30-day holdback for safety).
+
+**Rationale:**
+- 30-day holdback ensures no hidden consumers are discovered after the fact
+- Admin routes that read from `sponsor_list` have been redirected to `sponsorCanonical` / `csv_archive`
+- The `/api/admin/sponsor-monitor/cleanup` and `/api/admin/migrate-canonical` routes return 410 Gone
+
+**Trade-offs accepted:**
+- Until DROP is executed, the table occupies disk space (but receives no new rows)
+
+---
+
+## ADR-013: Single Daily Cron + Idempotency (No Backup Cron)
+
+**Status:** Accepted | **Introduced:** 2026-03-20 | **Replaces:** backup 4h cron + startup catch-up
+
+**Context:**
+The original implementation had three triggers:
+1. Main cron at 00:30 UTC Mon-Fri
+2. Backup cron every 4 hours Mon-Fri (in case the main cron failed)
+3. `setTimeout(15s)` startup catch-up (in case the server restarted mid-day)
+
+These overlapping triggers caused confusion and occasional double-runs despite the advisory lock.
+
+**Decision:**
+Single cron at 00:30 UTC Mon-Fri. No backup cron. No startup catch-up. The DB idempotency check (`monitor_job_runs WHERE status='success' AND runDate=today`) makes extra triggers safe, and the advisory lock prevents concurrent runs.
+
+**Rationale:**
+- The idempotency check is a complete solution: if today's job succeeded, any subsequent trigger skips immediately
+- The request-triggered middleware (`checkAndTriggerIfNeeded`) still provides recovery if the cron fails — fires on the next API request after 01:00 UTC if today's job hasn't run
+- Fewer moving parts = easier to reason about and debug
+
+**Trade-offs accepted:**
+- If the main cron fails AND no API requests come in before midnight, the day's job is missed
+- Acceptable because gov.uk typically publishes at 09:00 UK time — the 00:30 UTC cron runs before the new register is available; the request-triggered path handles the actual download during business hours

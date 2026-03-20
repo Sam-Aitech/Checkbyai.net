@@ -1,6 +1,6 @@
 # Data Model Document
 # checkbyai.net
-**Version:** 1.0 | **Last Updated:** 2026-03-16
+**Version:** 2.0 | **Last Updated:** 2026-03-20
 
 ---
 
@@ -19,15 +19,23 @@ users ────────────────────────�
   └─── job_alert_preferences (1:N)              │
                                                 │
 sponsor_canonical ──────────────────────────────┤
-  │ (fingerprint FK via denormalized name)      │
-  ├─── sponsor_list (daily snapshots)           │
+  │ (fingerprint = stable identity)             │
   ├─── sponsor_changes (1:N)                    │
   ├─── company_watches (via fingerprint)        │
   ├─── sponsor_enrichment (1:1)                 │
   └─── job_listings (1:N)                       │
                                                 │
+csv_archive ─────────────────────────────────── │
+  └─── one row per day (Phase 1 output)         │
+                                                │
+diff_results ──────────────────────────────────  │
+  └─── one row per nightly run (Phase 2 audit)  │
+                                                │
 notification_log ────────────────────────────── │
   └─── sponsor_changes (via changeId FK)        │
+
+sponsor_list [DEPRECATED 2026-03-20]
+  └─── No new writes. Schedule DROP after 2026-04-20.
 ```
 
 ---
@@ -165,38 +173,63 @@ User feedback on verification accuracy.
 | `townCity` | text | Town/city |
 | `typeRating` | text | 'A-Rating' \| 'B-Rating' \| 'Provisional' |
 | `route` | text | 'Worker' \| 'Temporary Worker' |
-| `status` | text | 'ACTIVE' \| 'NOT_LISTED' |
+| `status` | text | `'ACTIVE'` \| `'NEWLY_GRANTED'` \| `'GRACE_PERIOD'` \| `'REMOVED_REVOKED'` |
 | `firstSeen` | text | ISO date when first appeared on register |
 | `lastSeen` | text | ISO date of last confirmation on register |
-| `consecutiveMisses` | integer | Days absent from CSV in a row (triggers removal after 2) |
+| `grantedAt` | text | ISO date of most recent licence grant |
+| `removedAt` | timestamp | When status transitioned to REMOVED_REVOKED |
+| `consecutiveMisses` | integer | Days absent from CSV in a row |
 | `historicalNames` | text[] | Previous names (for search and audit trail) |
 
 **Indexes:** `fingerprint` (unique), `status`
 
-**Design rationale:** The fingerprint provides stable identity across name changes. When a company renames, the `fingerprint` column is updated on the existing row and the old name is appended to `historicalNames`. This preserves watch continuity — users watching "Acme Ltd" continue watching after it becomes "Acme Holdings Ltd".
+**Status transitions:**
+- `ACTIVE` → `GRACE_PERIOD` (absent day 1, consecutiveMisses=1)
+- `GRACE_PERIOD` → `REMOVED_REVOKED` (absent day 2, consecutiveMisses≥2)
+- `REMOVED_REVOKED` → `NEWLY_GRANTED` (reappears on register: RE_ACTIVATED)
+- Any → `ACTIVE` (confirmed present in today's fingerprint set)
+- New fingerprint → `NEWLY_GRANTED` (NEW_LICENCE)
+
+**Design rationale:** The fingerprint provides stable identity across name changes. When a company renames, the `fingerprint` column is updated on the existing row and the old name is appended to `historicalNames`. This preserves watch continuity.
 
 ---
 
-### 2.9 `sponsor_list`
-Daily snapshots of the gov.uk CSV. Raw data store before reconciliation.
+### 2.9 `csv_archive` *(Phase 1 output — replaces sponsor_list as the download registry)*
+Registry of downloaded and validated Gov.uk CSV files. One row per day.
 
 | Column | Type | Description |
 |---|---|---|
 | `id` | serial PK | — |
-| `organisationName` | text | Exact name from CSV |
-| `organisationNameNormalized` | text | Normalized name for matching |
-| `townCity` | text | — |
-| `county` | text | — |
-| `typeRating` | text | — |
-| `route` | text | — |
-| `fingerprint` | text | — |
-| `snapshotDate` | text | ISO date (YYYY-MM-DD) |
+| `snapshotDate` | date | unique | ISO date (YYYY-MM-DD) |
+| `filePath` | text | Absolute path to raw CSV on disk (`data/archives/`) |
+| `recordCount` | integer | Validated row count (from qsv or streaming fallback) |
+| `checksumSha256` | text | SHA-256 of the downloaded file |
+| `sourceUrl` | text | Gov.uk CSV URL that was downloaded |
+| `isValid` | boolean | default true | False if record count was below minimum threshold |
+| `downloadedAt` | timestamp | Download completion time |
 
-**Retention:** 90 days. Rows older than 90 days are deleted by `cleanupOldSnapshots()` after each successful cron run.
+**Indexes:** `snapshotDate` (unique)
+
+**Note:** The corresponding fingerprinted CSV lives at `data/archives/YYYY-MM-DD_sponsors_fp.csv` and is the direct input to `csvdiff`.
 
 ---
 
-### 2.10 `company_watches`
+### 2.10 `diff_results` *(Phase 2 audit — csvdiff output summary)*
+Audit log of each nightly diff run. One row per calendar day.
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | serial PK | — |
+| `runDate` | date | unique | ISO date (YYYY-MM-DD) |
+| `addedCount` | integer | Additions detected by csvdiff |
+| `removedCount` | integer | Deletions detected by csvdiff |
+| `attributeChangeCount` | integer | Modifications (rating/route/name changes) |
+| `diffDurationMs` | integer | Time taken by csvdiff binary |
+| `diffJsonPath` | text | Optional path to raw diff JSON file for audit/replay |
+
+---
+
+### 2.11 `company_watches`
 User watchlist — which users are watching which companies.
 
 | Column | Type | Description |
@@ -213,24 +246,30 @@ User watchlist — which users are watching which companies.
 
 ---
 
-### 2.11 `sponsor_changes`
+### 2.12 `sponsor_changes`
 Immutable log of all detected changes on the sponsor register.
 
 | Column | Type | Description |
 |---|---|---|
 | `id` | serial PK | — |
 | `organisationName` | text | Company name at time of change |
-| `changeType` | text | 'REMOVED' \| 'ADDED' \| 'DOWNGRADED' \| 'UPGRADED' \| 'ROUTE_CHANGE' \| 'NAME_CHANGE' \| 'NEW_LICENCE' |
+| `fingerprint` | text | FK → sponsor_canonical.fingerprint |
+| `changeType` | text | `'NEW_LICENCE'` \| `'RE_ACTIVATED'` \| `'REMOVED_REVOKED'` \| `'GRACE_PERIOD'` \| `'UPGRADED'` \| `'DOWNGRADED'` \| `'ROUTE_CHANGE'` \| `'NAME_CHANGE'` |
 | `previousValue` | text | Previous rating/route/name |
 | `newValue` | text | New rating/route/name |
 | `snapshotDate` | text | ISO date when change was detected |
-| `createdAt` | timestamp | — |
+| `detectedAt` | timestamp | — |
 
-**Note:** `NAME_CHANGE` and `NEW_LICENCE` are logged but **not dispatched** to users as notifications (configurable via `alertableSaved` filter in sponsorMonitorJob.ts).
+**Alertable change types** (dispatched to users via notificationDispatcher):
+`NEW_LICENCE`, `RE_ACTIVATED`, `REMOVED_REVOKED`, `GRACE_PERIOD`, `UPGRADED`, `DOWNGRADED`, `ROUTE_CHANGE`
+
+**Non-alertable:** `NAME_CHANGE` — logged but not sent to users.
+
+**Note:** `id` is populated by `batchedInsertChanges()` using `.returning()` and written back to the in-memory `SponsorChange` objects so `notifyAffectedUsers()` can use it as the `notificationLog.changeId` FK.
 
 ---
 
-### 2.12 `notification_preferences`
+### 2.13 `notification_preferences`
 Per-user notification channel settings. One row per user.
 
 | Column | Type | Description |
@@ -248,14 +287,14 @@ Per-user notification channel settings. One row per user.
 
 ---
 
-### 2.13 `notification_log`
+### 2.14 `notification_log`
 Immutable audit log of every notification dispatched or queued.
 
 | Column | Type | Description |
 |---|---|---|
 | `id` | serial PK | — |
 | `userId` | text | FK → users.id |
-| `changeId` | integer | FK → sponsor_changes.id |
+| `changeId` | integer | NOT NULL FK → sponsor_changes.id |
 | `channel` | text | 'email' \| 'sms' \| 'whatsapp' |
 | `status` | text | 'queued' \| 'sent' \| 'failed' \| 'skipped' |
 | `sentAt` | timestamp | Actual delivery time (null if queued/failed) |
@@ -268,7 +307,7 @@ Immutable audit log of every notification dispatched or queued.
 
 ---
 
-### 2.14 `sponsor_enrichment`
+### 2.15 `sponsor_enrichment`
 Companies House data cache. Sourced from Python backend scraper.
 
 | Column | Type | Description |
@@ -287,7 +326,7 @@ Companies House data cache. Sourced from Python backend scraper.
 
 ---
 
-### 2.15 `job_listings`
+### 2.16 `job_listings`
 Deduplicated job postings scraped for watched companies.
 
 | Column | Type | Description |
@@ -306,7 +345,7 @@ Deduplicated job postings scraped for watched companies.
 
 ---
 
-### 2.16 `job_alert_preferences`
+### 2.17 `job_alert_preferences`
 Per-user job alert opt-in. Pro+ only.
 
 | Column | Type | Description |
@@ -318,7 +357,7 @@ Per-user job alert opt-in. Pro+ only.
 
 ---
 
-### 2.17 `paid_submissions`
+### 2.18 `paid_submissions`
 Expert review submissions for Master Package buyers.
 
 | Column | Type | Description |
@@ -341,7 +380,7 @@ Expert review submissions for Master Package buyers.
 
 ---
 
-### 2.18 `processed_checkouts`
+### 2.19 `processed_checkouts`
 Stripe webhook idempotency table. Prevents duplicate credit grants on webhook replay.
 
 | Column | Type | Description |
@@ -354,7 +393,7 @@ Stripe webhook idempotency table. Prevents duplicate credit grants on webhook re
 
 ---
 
-### 2.19 `daily_digest`
+### 2.20 `daily_digest`
 AI-generated daily headlines from sponsor register changes. One row per day.
 
 | Column | Type | Description |
@@ -373,18 +412,18 @@ AI-generated daily headlines from sponsor register changes. One row per day.
 
 ---
 
-### 2.20 `monitor_job_runs`
+### 2.21 `monitor_job_runs`
 Persistent audit log of sponsor monitor job executions. One row per calendar day.
 
 | Column | Type | Description |
 |---|---|---|
 | `id` | serial PK | — |
 | `runDate` | text | unique | ISO date (YYYY-MM-DD) |
-| `source` | text | 'cron' \| 'request' \| 'manual' |
+| `source` | text | `'cron'` \| `'request'` \| `'manual'` |
 | `status` | text | 'success' \| 'failed' |
 | `recordsProcessed` | integer | Sponsors in that day's CSV |
 | `changesDetected` | integer | Total changes found |
-| `changeSummary` | jsonb | `{ REMOVED: 2, DOWNGRADED: 1, ... }` |
+| `changeSummary` | jsonb | `{ REMOVED_REVOKED: 2, DOWNGRADED: 1, ... }` |
 | `notificationsSent` | integer | — |
 | `notificationsSkipped` | integer | — |
 | `notificationsFailed` | integer | — |
@@ -392,7 +431,18 @@ Persistent audit log of sponsor monitor job executions. One row per calendar day
 | `errorMessage` | text | Error details if status='failed' |
 | `completedAt` | timestamp | — |
 
-**Usage:** The cron job checks for `status='success' AND runDate=today` before running, preventing duplicate executions on the same day.
+**Idempotency:** The job checks `status='success' AND runDate=today` before running. If found and `source='cron'`, the job skips. Manual triggers bypass this check.
+
+---
+
+### 2.22 `sponsor_list` *(DEPRECATED — no new writes as of 2026-03-20)*
+
+> **Deprecated.** The `sponsor_list` table stored per-row snapshots of the Gov.uk CSV. It has been superseded by:
+> - `csv_archive` — stores the raw CSV file path and metadata (Phase 1)
+> - `sponsorCanonical` — the per-company state (maintained by the state machine)
+>
+> **Schedule: DROP TABLE sponsor_list after 2026-04-20** (30-day holdback for any remaining reads).
+> Functions in `sponsorListFetcher.ts` marked `@deprecated`: `storeSnapshot`, `getLatestSnapshotDate`, `deleteOldSnapshots`, `downloadAndStreamSponsorList`, `downloadAndParseSponsorList`.
 
 ---
 
@@ -409,7 +459,7 @@ All phone numbers (SMS and WhatsApp) are stored encrypted:
 
 ## 4. Fingerprint Design
 
-The fingerprint is the core identity mechanism for sponsors:
+The fingerprint is the core identity mechanism for sponsors, and the primary key for `csvdiff` comparisons:
 
 ```typescript
 function normalizeName(name: string): string {
@@ -434,6 +484,8 @@ fingerprint = `${normalizeName(name)}|${normalizeName(city)}|${route.toLowerCase
 
 Note: `Acme Ltd` and `Acme Limited` produce the same fingerprint. `Acme Holdings PLC` does not — "holdings" is not in the suffix strip list.
 
+The fingerprinted CSV (`*_sponsors_fp.csv`) prepends the `fingerprint` column to every row, enabling `csvdiff` to detect additions, deletions, and modifications purely by fingerprint key.
+
 ---
 
 ## 5. Data Retention & Privacy
@@ -442,7 +494,8 @@ Note: `Acme Ltd` and `Acme Limited` produce the same fingerprint. `Acme Holdings
 |---|---|---|
 | Uploaded COS documents | Deleted immediately after analysis | Minimal necessary (UK GDPR Article 5(1)(c)) |
 | Verification results (metadata only) | Indefinite (user may request deletion) | Contract performance |
-| Sponsor register snapshots | 90 days rolling | Operational need |
+| CSV archive files (disk) | Rolling — retain yesterday + today minimum | Operational need (csvdiff requires T-1) |
+| sponsor_list DB rows | DEPRECATED — freeze, DROP after 2026-04-20 | Retired |
 | Session data | 7 days | Authentication |
 | Notification logs | Indefinite (audit trail) | Legitimate interest |
 | Phone numbers | Until user deletes notification preferences | Consent |

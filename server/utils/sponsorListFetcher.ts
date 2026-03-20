@@ -9,6 +9,7 @@ import { db } from "../db";
 import { sponsorList } from "@shared/schema";
 import { eq, desc, lt, sql } from "drizzle-orm";
 import { sendAdminAlert } from "./adminAlert";
+import { ensureTodaysArchive, parseCsvFile } from "./csvArchiver";
 
 const GOV_UK_PAGE_URL =
   "https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers";
@@ -57,6 +58,7 @@ export function generateFingerprint(name: string, city: string, route: string): 
   return `${normalizedName}|${normalizedCity}|${cleanedRoute}`;
 }
 
+/** @deprecated sponsor_list table is retired. No callers remain as of 2026-03-20. Drop after 2026-04-20. */
 export async function storeSnapshot(records: SponsorRecord[], date: string): Promise<void> {
   const batchSize = 5000; // was 500 — reduces DB round-trips from ~248 to ~25
   const formattedRecords = records.map(r => ({
@@ -76,6 +78,7 @@ export async function storeSnapshot(records: SponsorRecord[], date: string): Pro
   }
 }
 
+/** @deprecated sponsor_list table is retired. No callers remain as of 2026-03-20. Drop after 2026-04-20. */
 export async function getLatestSnapshotDate(): Promise<string | null> {
   const result = await db
     .select({ snapshotDate: sponsorList.snapshotDate })
@@ -109,6 +112,7 @@ export type ChangeType =
   | "NAME_CHANGE";    // organisation name changed
 
 export interface SponsorChange {
+  id?: number;           // DB primary key from sponsor_changes — populated after insert
   organisationName: string;
   changeType: ChangeType;
   previousValue: string | null;
@@ -252,6 +256,23 @@ async function findCsvUrl(): Promise<string | ScraplingResponse> {
   }
 }
 
+/**
+ * Discovers the CSV download URL for the UK Gov sponsor register.
+ * Tries cheerio first, then Scrapling as fallback.
+ * Throws if only the HTML fallback is available — the monitor job requires the full CSV.
+ */
+export async function discoverCsvUrl(): Promise<string> {
+  const result = await findCsvUrl();
+  const url = typeof result === "string" ? result : result.url;
+  if (!url) {
+    throw new Error(
+      "[SponsorListFetcher] CSV URL discovery failed — Scrapling returned HTML fallback only. " +
+      "The monitor job requires the full CSV. Check gov.uk for page structure changes.",
+    );
+  }
+  return url;
+}
+
 // ── Shared CSV parsing helpers ────────────────────────────────────────────────
 
 interface ColumnIndexes {
@@ -305,10 +326,13 @@ function validateAndProcessHtmlRecords(records: SponsorRecord[], warning?: strin
   return records.filter(r => r.organisationName?.trim());
 }
 
-// ── Original sync download (kept for backward-compat; used by any legacy paths) ─
+// ── Legacy download functions (deprecated — no active callers as of 2026-03-20) ──
 
+/** @deprecated Use ensureTodaysArchive() + parseCsvFile() from csvArchiver.ts instead. Drop after 2026-04-20. */
 export async function downloadAndParseSponsorList(): Promise<SponsorRecord[]> {
-  const csvUrl = await findCsvUrl();
+  const csvUrlOrFallback = await findCsvUrl();
+  const csvUrl = typeof csvUrlOrFallback === "string" ? csvUrlOrFallback : (csvUrlOrFallback.url ?? "");
+  if (!csvUrl) throw new Error("No CSV URL available from discovery phase.");
 
   let csvResponse: Response;
   try {
@@ -388,6 +412,10 @@ export type InitProgressCallback = (event: {
 }) => void;
 
 /**
+ * @deprecated sponsor_list table is retired. No callers remain as of 2026-03-20.
+ * Use ensureTodaysArchive() (csvArchiver.ts) which streams to disk instead.
+ * Drop after 2026-04-20.
+ *
  * Streams the UK Gov sponsor CSV directly into the sponsor_list DB table without
  * ever loading the full file into RAM.
  *
@@ -406,7 +434,9 @@ export async function downloadAndStreamSponsorList(
   batchSize = 5000,
   onProgress?: InitProgressCallback,
 ): Promise<{ rowsInserted: number }> {
-  const csvUrl = await findCsvUrl();
+  const csvUrlOrFallback = await findCsvUrl();
+  const csvUrl = typeof csvUrlOrFallback === "string" ? csvUrlOrFallback : (csvUrlOrFallback.url ?? "");
+  if (!csvUrl) throw new Error("No CSV URL available from discovery phase.");
 
   let csvResponse: Response;
   try {
@@ -503,19 +533,26 @@ export async function downloadAndStreamSponsorList(
 }
 
 /**
- * Streams the CSV and accumulates all records into a SponsorRecord[] array.
- * Handles both CSV download (with Windows-1252 encoding fallback) and HTML record fallback.
+ * Downloads, validates, and parses the Gov.uk sponsor CSV for today.
  *
- * Used by the nightly run job (sponsorMonitorJob.ts) to replace the memory-heavy
- * downloadAndParseSponsorList() which loaded the full CSV as a raw string first.
+ * Phase 1 gate — every call now goes through csvArchiver which:
+ *   1. Saves the raw CSV to data/archives/YYYY-MM-DD_raw.csv
+ *   2. Runs qsv validate (graceful skip if binary not installed)
+ *   3. Asserts record_count >= 100,000 (hard abort on corrupted/truncated file)
+ *   4. Registers the archive in the csv_archive table
+ *   5. Parses from disk into SponsorRecord[]
  *
- * RAM benefit: avoids the 15–25 MB raw string allocation; only holds parsed
- * SponsorRecord objects in memory (~25 MB for 124k records).
+ * HTML fallback path (Scrapling returns ~1,000 records):
+ *   The archiver is bypassed because there is no CSV file.
+ *   An admin alert is fired by validateAndProcessHtmlRecords().
+ *
+ * Used by the nightly monitor job (sponsorMonitorJob.ts).
  */
 export async function downloadAndStreamToArray(): Promise<SponsorRecord[]> {
   const result = await findCsvUrl();
 
-  // Handle HTML fallback from Scrapling
+  // ── HTML fallback (Scrapling Phase 3) ──────────────────────────────────────
+  // No CSV file → skip archiver, return partial records with admin alert.
   if (typeof result !== "string" && result.html_records) {
     const records = validateAndProcessHtmlRecords(result.html_records, result.warning);
     if (records.length === 0) {
@@ -524,67 +561,29 @@ export async function downloadAndStreamToArray(): Promise<SponsorRecord[]> {
     return records;
   }
 
-  // Standard CSV download path
+  // ── Standard CSV path ───────────────────────────────────────────────────────
   const csvUrl = typeof result === "string" ? result : result.url;
   if (!csvUrl) {
     throw new Error("No CSV URL or fallback records available from discovery phase.");
   }
 
-  let csvResponse: Response;
-  try {
-    csvResponse = await fetchWithTimeout(csvUrl, 120_000);
-  } catch (err: any) {
-    throw new Error(
-      err.name === "AbortError"
-        ? `Timed out downloading CSV (2 min limit).`
-        : `Failed to download CSV: ${err.message ?? "Unknown network error"}`,
-    );
-  }
+  const today = new Date().toISOString().split("T")[0];
 
-  if (!csvResponse.ok) {
-    throw new Error(`Failed to download CSV: HTTP ${csvResponse.status} from ${csvUrl}`);
-  }
+  // ensureTodaysArchive: download → validate → count guard → register in DB
+  // Throws hard on corrupted file (count < 100,000).
+  // Idempotent: returns cached file path if already downloaded today.
+  const archive = await ensureTodaysArchive(today, csvUrl);
 
-  if (!csvResponse.body) {
-    throw new Error("CSV response has no body — cannot stream.");
-  }
+  console.log(
+    `[SponsorListFetcher] Archive ready for ${today}: ` +
+    `${archive.recordCount.toLocaleString()} records (cached=${archive.wasAlreadyCached})`,
+  );
 
-  const nodeReadable = Readable.fromWeb(csvResponse.body as any);
-  const parser = parseStream({
-    skip_empty_lines: true,
-    relax_column_count: true,
-    bom: true,
-  });
-
-  nodeReadable.pipe(parser);
-
-  let idx: ColumnIndexes | null = null;
-  let headerRow: string[] | null = null;
-  const sponsors: SponsorRecord[] = [];
-
-  try {
-    for await (const row of parser as AsyncIterable<string[]>) {
-      if (!headerRow) {
-        headerRow = row;
-        idx = resolveColumnIndexes(row);
-        if (idx.nameIdx === -1) {
-          throw new Error(
-            `Could not find "Organisation Name" column in CSV header. Found: ${row.join(", ")}`,
-          );
-        }
-        continue;
-      }
-      const record = rowToRecord(row, idx!);
-      if (record) sponsors.push(record);
-    }
-  } catch (err) {
-    parser.destroy();
-    nodeReadable.destroy();
-    throw err;
-  }
+  // Parse from disk (no HTTP, no RAM spike from raw string)
+  const sponsors = await parseCsvFile(archive.filePath);
 
   if (sponsors.length === 0) {
-    throw new Error("CSV was streamed but contained no valid sponsor records.");
+    throw new Error("Parsed CSV from archive contains no valid sponsor records.");
   }
 
   return sponsors;

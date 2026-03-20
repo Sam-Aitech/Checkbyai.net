@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { checkBinaryHealth } from "./utils/binaryRunner";
 import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
@@ -9,7 +10,7 @@ import { db } from "./db";
 import { sql, eq, and, desc, inArray, gte, lt } from "drizzle-orm";
 import { setupAuth, isAuthenticated, isAdmin } from "./auth";
 import { checkIpRateLimit, recordIpVerification, getClientIp, hashIpAddress } from "./ipRateLimit";
-import { insertVerificationResultSchema, insertFeedbackSchema, companyWatches, sponsorList, sponsorCanonical, sponsorChanges, notificationPreferences, notificationLog, dailyDigest, users, verificationResults, processedCheckouts, jobAlertPreferences, monitorJobRuns } from "@shared/schema";
+import { insertVerificationResultSchema, insertFeedbackSchema, companyWatches, sponsorCanonical, sponsorChanges, notificationPreferences, notificationLog, dailyDigest, users, verificationResults, processedCheckouts, jobAlertPreferences, monitorJobRuns, csvArchive } from "@shared/schema";
 import { authLimiter, verifyLimiter } from "./middleware/rateLimiter";
 import { withRetry } from "./utils/dbRetry";
 import multer from "multer";
@@ -17,7 +18,7 @@ import { z } from "zod";
 import { PDFAnalyzer } from "./services/pdfAnalyzer";
 import bcrypt from "bcrypt";
 import { rebuildSponsorIndex, searchSponsors, searchSponsorsFallback, ensureIndexReady, isIndexReady } from "./utils/sponsorSearch";
-import { normalizeName, downloadAndParseSponsorList, downloadAndStreamSponsorList, storeSnapshot, getLatestSnapshotDate, generateFingerprint } from "./utils/sponsorListFetcher";
+import { normalizeName, generateFingerprint } from "./utils/sponsorListFetcher";
 import { runSponsorMonitorJob, startSponsorMonitorCron, isJobRunning, getLastRunInfo, checkAndTriggerIfNeeded, tryAcquireJobLock, releaseJobLock } from "./utils/sponsorMonitorJob";
 const SPONSOR_JOB_LOCK_KEY = 7483920; // Same key as sponsorMonitorJob — init and nightly are mutually exclusive
 import { startJobAlertScheduler } from "./utils/jobAlertJob";
@@ -142,56 +143,24 @@ async function runInitJob(jobId: string, today: string): Promise<void> {
   const state = activeInitJobs.get(jobId);
   if (!state) return;
 
-  // Acquire the same advisory lock used by the nightly monitor job so that
-  // an init run and a cron run can never execute concurrently.
-  const lockAcquired = await tryAcquireJobLock();
-  if (!lockAcquired) {
-    state.stage = "failed";
-    state.error = "Another job (nightly sync or another init) is already running. Please wait for it to complete and retry.";
-    state.completedAt = Date.now();
-    console.warn(`[SponsorMonitor][${jobId}] Could not acquire advisory lock — aborting init.`);
-    scheduleInitJobCleanup(jobId);
-    return;
-  }
-
   try {
     state.stage = "downloading";
-    console.log(`[SponsorMonitor][${jobId}] Starting streaming initialization for ${today}`);
+    console.log(`[SponsorMonitor][${jobId}] Triggering monitor job for ${today}`);
 
-    await downloadAndStreamSponsorList(today, 5000, (event) => {
-      state.stage = "inserting";
-      state.rowsInserted = event.rowsInserted;
-      state.batchesComplete = event.batchesComplete;
-      if (event.totalBatches !== null) {
-        state.estimatedTotalBatches = event.totalBatches;
-      }
-    });
-
-    state.stage = "rebuilding_index";
-    console.log(`[SponsorMonitor][${jobId}] Rebuilding Fuse.js search index...`);
-    await rebuildSponsorIndex();
+    // Delegate to the monitor job — it handles CSV download, diff, state machine,
+    // index rebuild, and notifications in one pipeline.
+    await runSponsorMonitorJob("manual");
 
     state.stage = "done";
     state.completedAt = Date.now();
-    console.log(`[SponsorMonitor][${jobId}] Initialization complete: ${state.rowsInserted} records stored for ${today}`);
+    console.log(`[SponsorMonitor][${jobId}] Monitor job complete for ${today}`);
 
   } catch (err: any) {
     state.stage = "failed";
     state.error = err.message || "Unknown error during initialization";
     state.completedAt = Date.now();
     console.error(`[SponsorMonitor][${jobId}] Initialization failed:`, err);
-
-    // Clean up any partial snapshot so the admin can retry cleanly.
-    // Without this, getLatestSnapshotDate() would see the partial write and
-    // block future initialization attempts with a "snapshot already exists" error.
-    try {
-      await db.delete(sponsorList).where(eq(sponsorList.snapshotDate, today));
-      console.log(`[SponsorMonitor][${jobId}] Partial snapshot for ${today} deleted — ready to retry.`);
-    } catch (cleanupErr: any) {
-      console.error(`[SponsorMonitor][${jobId}] Partial snapshot cleanup failed:`, cleanupErr.message);
-    }
   } finally {
-    await releaseJobLock();
     scheduleInitJobCleanup(jobId);
   }
 }
@@ -1538,7 +1507,7 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
           if (c.changeType === "ADDED" || c.changeType === "NEW_LICENCE") {
             addedCount += c.count;
             if (addedCompanies.length < 5) addedCompanies.push(c.organisationName);
-          } else if (c.changeType === "REMOVED") {
+          } else if (c.changeType === "REMOVED_REVOKED") {
             removedCount += c.count;
             if (removedCompanies.length < 10) removedCompanies.push(c.organisationName);
           } else if (["UPGRADED", "DOWNGRADED", "ROUTE_CHANGE", "NAME_CHANGE"].includes(c.changeType)) {
@@ -1549,7 +1518,7 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
         const stats = await db
           .select({
             active: sql<number>`count(*) filter (where ${sponsorCanonical.status} = 'ACTIVE')::int`,
-            revoked: sql<number>`count(*) filter (where ${sponsorCanonical.status} = 'REMOVED')::int`,
+            revoked: sql<number>`count(*) filter (where ${sponsorCanonical.status} = 'REMOVED_REVOKED')::int`,
           })
           .from(sponsorCanonical);
         addedCount = stats[0]?.active || 0;
@@ -2875,6 +2844,23 @@ Format your response in clear, professional markdown.`;
     }
   });
 
+  // Returns the installation status and version of the qsv and csvdiff pipeline binaries.
+  // Use this after running `npm run setup:binaries` to confirm the binaries are functional.
+  app.get('/api/admin/sponsor-monitor/binary-health', isAdmin, async (_req, res) => {
+    try {
+      const health = await checkBinaryHealth();
+      const allInstalled = health.qsv.installed && health.csvdiff.installed;
+      res.status(allInstalled ? 200 : 206).json({
+        allInstalled,
+        qsv: health.qsv,
+        csvdiff: health.csvdiff,
+        setupCommand: "npm run setup:binaries",
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: "Binary health check failed: " + error.message });
+    }
+  });
+
   // Initialize a fresh baseline snapshot of the UK sponsor register.
   // Streams the full CSV, batch-inserts ~124k rows, then rebuilds the Fuse.js index.
   // Fires and forgets — poll /init-progress/:jobId for live status.
@@ -3013,16 +2999,18 @@ Format your response in clear, professional markdown.`;
   // Sponsor monitor status dashboard
   app.get('/api/admin/sponsor-monitor/status', isAdmin, async (req: any, res) => {
     try {
-      const latestDate = await getLatestSnapshotDate();
+      const countResult = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(sponsorCanonical);
+      const snapshotRecordCount = countResult[0]?.count ?? 0;
 
-      let snapshotRecordCount = 0;
-      if (latestDate) {
-        const countResult = await db
-          .select({ count: sql<number>`count(*)::int` })
-          .from(sponsorList)
-          .where(eq(sponsorList.snapshotDate, latestDate));
-        snapshotRecordCount = countResult[0]?.count ?? 0;
-      }
+      // Latest archive date from csv_archive (Phase 1 output)
+      const archiveResult = await db
+        .select({ snapshotDate: csvArchive.snapshotDate })
+        .from(csvArchive)
+        .orderBy(desc(csvArchive.snapshotDate))
+        .limit(1);
+      const latestDate = archiveResult[0]?.snapshotDate ?? null;
 
       const lastRunChanges = await db
         .select({
@@ -3177,24 +3165,20 @@ Format your response in clear, professional markdown.`;
   // Sponsor monitor storage stats
   app.get('/api/admin/sponsor-monitor/storage', isAdmin, async (req: any, res) => {
     try {
-      const totalResult = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(sponsorList);
-      const totalRecords = totalResult[0]?.count ?? 0;
-
-      const dateRange = await db
-        .select({
-          earliest: sql<string>`min(${sponsorList.snapshotDate})::text`,
-          latest: sql<string>`max(${sponsorList.snapshotDate})::text`,
-          snapshotCount: sql<number>`count(distinct ${sponsorList.snapshotDate})::int`,
-        })
-        .from(sponsorList);
+      const [canonicalCount, archiveStats] = await Promise.all([
+        db.select({ count: sql<number>`count(*)::int` }).from(sponsorCanonical),
+        db.select({
+          earliest: sql<string>`min(${csvArchive.snapshotDate})::text`,
+          latest:   sql<string>`max(${csvArchive.snapshotDate})::text`,
+          count:    sql<number>`count(*)::int`,
+        }).from(csvArchive).where(eq(csvArchive.isValid, true)),
+      ]);
 
       res.json({
-        totalRecords,
-        earliestSnapshot: dateRange[0]?.earliest || null,
-        latestSnapshot: dateRange[0]?.latest || null,
-        snapshotCount: dateRange[0]?.snapshotCount ?? 0,
+        totalRecords:      canonicalCount[0]?.count ?? 0,
+        earliestSnapshot:  archiveStats[0]?.earliest || null,
+        latestSnapshot:    archiveStats[0]?.latest || null,
+        snapshotCount:     archiveStats[0]?.count ?? 0,
       });
     } catch (error) {
       console.error("Error fetching sponsor storage stats:", error);
@@ -3202,120 +3186,20 @@ Format your response in clear, professional markdown.`;
     }
   });
 
-  // Cleanup old sponsor snapshots (keep only latest)
-  app.post('/api/admin/sponsor-monitor/cleanup', isAdmin, async (req: any, res) => {
-    try {
-      const latestDate = await getLatestSnapshotDate();
-      if (!latestDate) {
-        return res.status(404).json({ message: "No snapshots found to clean up." });
-      }
-
-      const countBefore = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(sponsorList);
-      const totalBefore = countBefore[0]?.count ?? 0;
-
-      await db.delete(sponsorList).where(
-        sql`${sponsorList.snapshotDate} < ${latestDate}`
-      );
-
-      const countAfter = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(sponsorList);
-      const totalAfter = countAfter[0]?.count ?? 0;
-      const deletedRecords = totalBefore - totalAfter;
-
-      res.json({
-        message: `Cleaned up ${deletedRecords.toLocaleString()} old records. Kept latest snapshot (${latestDate}).`,
-        deletedRecords,
-        remainingRecords: totalAfter,
-        keptSnapshot: latestDate,
-      });
-    } catch (error) {
-      console.error("Error cleaning up sponsor snapshots:", error);
-      res.status(500).json({ message: "Failed to clean up old snapshots." });
-    }
+  // Cleanup old sponsor snapshots — deprecated (sponsor_list table is being retired)
+  app.post('/api/admin/sponsor-monitor/cleanup', isAdmin, (_req: any, res) => {
+    res.status(410).json({
+      message: "This endpoint is deprecated. The sponsor_list table is being retired. " +
+               "Data is now stored in sponsorCanonical (per-company state) and csv_archive (daily CSV files on disk).",
+    });
   });
 
-  app.post('/api/admin/migrate-canonical', isAdmin, async (req: any, res) => {
-    try {
-      const existingCount = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(sponsorCanonical);
-
-      if ((existingCount[0]?.count ?? 0) > 0) {
-        return res.status(409).json({
-          message: `Canonical table already has ${existingCount[0].count} records. To re-run, clear the table first.`,
-          existingCount: existingCount[0].count,
-        });
-      }
-
-      const latestDate = await getLatestSnapshotDate();
-      if (!latestDate) {
-        return res.status(404).json({ message: "No sponsor list snapshots found. Run the monitor job first." });
-      }
-
-      const snapshot = await db
-        .select()
-        .from(sponsorList)
-        .where(eq(sponsorList.snapshotDate, latestDate));
-
-      if (snapshot.length === 0) {
-        return res.status(404).json({ message: "Latest snapshot is empty." });
-      }
-
-      const today = new Date().toISOString().split("T")[0];
-      let inserted = 0;
-      let skipped = 0;
-      const batchSize = 500;
-      const canonicalRecords = snapshot.map((r) => {
-        const fp = generateFingerprint(r.organisationName, r.townCity || "", r.route || "");
-        return {
-          fingerprint: fp,
-          currentName: r.organisationName,
-          townCity: r.townCity || null,
-          typeRating: r.typeRating || null,
-          route: r.route || null,
-          status: "ACTIVE" as const,
-          firstSeen: today,
-          lastSeen: today,
-          grantedAt: latestDate,   // use snapshot date, not today
-          consecutiveMisses: 0,
-          historicalNames: [] as string[],
-        };
-      });
-
-      const seen = new Set<string>();
-      const deduplicated = canonicalRecords.filter((r) => {
-        if (seen.has(r.fingerprint)) {
-          skipped++;
-          return false;
-        }
-        seen.add(r.fingerprint);
-        return true;
-      });
-
-      for (let i = 0; i < deduplicated.length; i += batchSize) {
-        const batch = deduplicated.slice(i, i + batchSize);
-        await db.insert(sponsorCanonical).values(batch).onConflictDoNothing();
-        inserted += batch.length;
-      }
-
-      await (await import("./utils/sponsorSearch")).rebuildSponsorIndex();
-
-      console.log(`[Migration] Canonical table populated: ${inserted} records inserted, ${skipped} duplicates skipped from snapshot ${latestDate}.`);
-
-      res.json({
-        message: `Migration complete. ${inserted} canonical records created from snapshot ${latestDate}.`,
-        inserted,
-        skipped,
-        snapshotDate: latestDate,
-        snapshotRecords: snapshot.length,
-      });
-    } catch (error) {
-      console.error("Error migrating canonical data:", error);
-      res.status(500).json({ message: "Failed to migrate canonical data." });
-    }
+  // One-time migration route — deprecated (monitor job seeds canonicalCanonical on first run)
+  app.post('/api/admin/migrate-canonical', isAdmin, (_req: any, res) => {
+    res.status(410).json({
+      message: "This migration route is no longer needed. The nightly monitor job (or the Initialize button) " +
+               "automatically seeds sponsorCanonical on its first run via the state machine.",
+    });
   });
 
   // Public sponsor changes endpoint (last 7 days, grouped by date)
@@ -3360,7 +3244,7 @@ Format your response in clear, professional markdown.`;
         return res.status(400).json({ message: "organisationName and changeType are required." });
       }
 
-      const validTypes = ["REMOVED", "ADDED", "DOWNGRADED", "UPGRADED", "ROUTE_CHANGE"];
+      const validTypes = ["REMOVED_REVOKED", "GRACE_PERIOD", "NEW_LICENCE", "RE_ACTIVATED", "DOWNGRADED", "UPGRADED", "ROUTE_CHANGE", "NAME_CHANGE"];
       if (!validTypes.includes(changeType)) {
         return res.status(400).json({ message: `changeType must be one of: ${validTypes.join(", ")}` });
       }

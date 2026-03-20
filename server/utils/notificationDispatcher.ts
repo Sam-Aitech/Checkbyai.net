@@ -1,7 +1,7 @@
 import { db } from "../db";
 import { eq, and, gte, lte, sql, inArray } from "drizzle-orm";
 import { companyWatches, notificationPreferences, notificationLog, users, sponsorChanges } from "@shared/schema";
-import type { SponsorChange } from "@shared/schema";
+import type { SponsorChange } from "./sponsorListFetcher";
 import { normalizeName } from "./sponsorListFetcher";
 import { sendSMS, sendWhatsApp } from "../services/messaging";
 import { decryptPhone } from "./phoneCrypto";
@@ -55,14 +55,18 @@ function escapeHtml(str: string): string {
 
 function buildPlainTextAlert(changeType: string, companyName: string, previousValue?: string | null, newValue?: string | null): string {
   switch (changeType) {
-    case "REMOVED":
+    case "REMOVED_REVOKED":
       return `URGENT: ${companyName} has been REMOVED from the UK sponsor licence register. If you hold a visa sponsored by this organisation, seek immigration advice immediately. checkbyai.net/sponsor-monitor`;
+    case "GRACE_PERIOD":
+      return `Alert: ${companyName} has been absent from the UK sponsor licence register. Monitoring for confirmation. checkbyai.net/sponsor-monitor`;
     case "DOWNGRADED":
       return `Alert: ${companyName} sponsor licence DOWNGRADED${previousValue && newValue ? ` from ${previousValue} to ${newValue}` : ""}. Compliance issues identified by Home Office. checkbyai.net/sponsor-monitor`;
     case "UPGRADED":
       return `Good news: ${companyName} sponsor licence UPGRADED${previousValue && newValue ? ` from ${previousValue} to ${newValue}` : ""}. Now fully compliant. checkbyai.net/sponsor-monitor`;
-    case "ADDED":
+    case "NEW_LICENCE":
       return `Update: ${companyName} has been ADDED to the UK sponsor licence register${newValue ? ` (${newValue})` : ""}. checkbyai.net/sponsor-monitor`;
+    case "RE_ACTIVATED":
+      return `Update: ${companyName} has RETURNED to the UK sponsor licence register${newValue ? ` (${newValue})` : ""}. checkbyai.net/sponsor-monitor`;
     default:
       return `Sponsor licence change for ${companyName}: ${changeType}. checkbyai.net/sponsor-monitor`;
   }
@@ -73,20 +77,22 @@ function buildEmailHtml(changeType: string, companyName: string, previousValue?:
   const safePrev = previousValue ? escapeHtml(previousValue) : null;
   const safeNew = newValue ? escapeHtml(newValue) : null;
   const headerColors: Record<string, { bg: string; accent: string }> = {
-    REMOVED: { bg: "linear-gradient(135deg, #8B0000 0%, #CC0000 100%)", accent: "#CC0000" },
-    DOWNGRADED: { bg: "linear-gradient(135deg, #CC6600 0%, #FF8C00 100%)", accent: "#CC6600" },
-    UPGRADED: { bg: "linear-gradient(135deg, #006633 0%, #009933 100%)", accent: "#006633" },
-    ADDED: { bg: "linear-gradient(135deg, #003366 0%, #0066CC 100%)", accent: "#003366" },
+    REMOVED_REVOKED: { bg: "linear-gradient(135deg, #8B0000 0%, #CC0000 100%)", accent: "#CC0000" },
+    GRACE_PERIOD:    { bg: "linear-gradient(135deg, #7B3F00 0%, #CC6600 100%)", accent: "#CC6600" },
+    DOWNGRADED:      { bg: "linear-gradient(135deg, #CC6600 0%, #FF8C00 100%)", accent: "#CC6600" },
+    UPGRADED:        { bg: "linear-gradient(135deg, #006633 0%, #009933 100%)", accent: "#006633" },
+    NEW_LICENCE:     { bg: "linear-gradient(135deg, #003366 0%, #0066CC 100%)", accent: "#003366" },
+    RE_ACTIVATED:    { bg: "linear-gradient(135deg, #003366 0%, #0066CC 100%)", accent: "#003366" },
   };
 
-  const colors = headerColors[changeType] || headerColors.ADDED;
+  const colors = headerColors[changeType] || headerColors.NEW_LICENCE;
 
   let subject = "";
   let headline = "";
   let bodyParagraphs: string[] = [];
 
   switch (changeType) {
-    case "REMOVED":
+    case "REMOVED_REVOKED":
       subject = `URGENT: ${companyName} removed from UK sponsor licence register`;
       headline = "Sponsor Licence Removed";
       bodyParagraphs = [
@@ -94,6 +100,16 @@ function buildEmailHtml(changeType: string, companyName: string, previousValue?:
         "This typically means the organisation's sponsor licence has been revoked or surrendered. They may no longer be able to sponsor workers under the relevant immigration routes.",
         "If you hold a visa sponsored by this organisation, or are in the process of applying, we strongly recommend seeking professional immigration advice as soon as possible.",
         "You can verify this change directly on the <a href=\"https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers\" style=\"color: " + colors.accent + ";\">official register</a>.",
+      ];
+      break;
+
+    case "GRACE_PERIOD":
+      subject = `Alert: ${companyName} absent from UK sponsor licence register`;
+      headline = "Sponsor Licence — Absence Detected";
+      bodyParagraphs = [
+        `<strong>${safeCompanyName}</strong> was not found on today's UK Home Office Register of Licensed Sponsors.`,
+        "This may be a temporary data issue or the start of a revocation. We are monitoring for a second consecutive absence before issuing a confirmed removal alert.",
+        "No action is needed right now, but you may wish to verify directly on the <a href=\"https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers\" style=\"color: " + colors.accent + ";\">official register</a>.",
       ];
       break;
 
@@ -118,13 +134,22 @@ function buildEmailHtml(changeType: string, companyName: string, previousValue?:
       ];
       break;
 
-    case "ADDED":
+    case "NEW_LICENCE":
       subject = `Update: ${companyName} added to sponsor licence register`;
       headline = "New Sponsor Licence Granted";
       bodyParagraphs = [
         `<strong>${safeCompanyName}</strong> has been added to the UK Home Office Register of Licensed Sponsors.`,
         `They are now authorised to sponsor workers${safeNew ? ` under the <strong>${safeNew}</strong> route` : ""}.`,
         "This means the organisation has successfully applied for and been granted a sponsor licence by the Home Office.",
+      ];
+      break;
+
+    case "RE_ACTIVATED":
+      subject = `Update: ${companyName} has returned to the sponsor licence register`;
+      headline = "Sponsor Licence Reinstated";
+      bodyParagraphs = [
+        `<strong>${safeCompanyName}</strong> has reappeared on the UK Home Office Register of Licensed Sponsors after a period of absence.`,
+        `They are once again authorised to sponsor workers${safeNew ? ` under the <strong>${safeNew}</strong> route` : ""}.`,
       ];
       break;
 
@@ -260,6 +285,17 @@ async function sendNotificationViaChannel(
 export async function notifyAffectedUsers(change: SponsorChange): Promise<{ sent: number; skipped: number; failed: number; queued: number }> {
   const stats = { sent: 0, skipped: 0, failed: 0, queued: 0 };
 
+  // changeId is populated by batchedInsertChanges() in the state machine before
+  // this function is called. Guard defensively in case of unexpected flow.
+  const changeId = change.id;
+  if (changeId === undefined) {
+    console.warn(
+      `[NotificationDispatcher] Skipping notifications for "${change.organisationName}" (${change.changeType}) — ` +
+      "changeId not set. This change was not persisted to sponsorChanges before dispatch.",
+    );
+    return stats;
+  }
+
   try {
     const normalizedOrg = normalizeName(change.organisationName);
 
@@ -359,7 +395,7 @@ export async function notifyAffectedUsers(change: SponsorChange): Promise<{ sent
         const recentCount = rateLimitMap.get(watch.userId) ?? 0;
         if (recentCount >= MAX_NOTIFICATIONS_PER_DAY) {
           console.log(`[NotificationDispatcher] Rate limit reached for user ${watch.userId} (${recentCount}/${MAX_NOTIFICATIONS_PER_DAY} in 24h)`);
-          await logNotification(watch.userId, change.id, "email", "skipped", undefined, "Rate limit: exceeded 10 notifications in 24 hours");
+          await logNotification(watch.userId, changeId, "email", "skipped", undefined, "Rate limit: exceeded 10 notifications in 24 hours");
           stats.skipped++;
           continue;
         }
@@ -381,13 +417,13 @@ export async function notifyAffectedUsers(change: SponsorChange): Promise<{ sent
         if (deliverAfter) {
           for (const channel of tierConfig.channels) {
             if (channel === "email" && emailEnabled && recipientEmail) {
-              await logNotification(watch.userId, change.id, "email", "queued", undefined, undefined, deliverAfter);
+              await logNotification(watch.userId, changeId, "email", "queued", undefined, undefined, deliverAfter);
               stats.queued++;
             } else if (channel === "whatsapp" && prefs?.whatsappEnabled && prefs?.whatsappVerified && prefs?.whatsappNumber) {
-              await logNotification(watch.userId, change.id, "whatsapp", "queued", undefined, undefined, deliverAfter);
+              await logNotification(watch.userId, changeId, "whatsapp", "queued", undefined, undefined, deliverAfter);
               stats.queued++;
             } else if (channel === "sms" && prefs?.smsEnabled && prefs?.smsVerified && prefs?.smsNumber) {
-              await logNotification(watch.userId, change.id, "sms", "queued", undefined, undefined, deliverAfter);
+              await logNotification(watch.userId, changeId, "sms", "queued", undefined, undefined, deliverAfter);
               stats.queued++;
             }
           }
@@ -399,17 +435,17 @@ export async function notifyAffectedUsers(change: SponsorChange): Promise<{ sent
         const channelPromises: Promise<void>[] = [];
         for (const channel of tierConfig.channels) {
           if (channel === "email" && emailEnabled) {
-            channelPromises.push(sendNotificationViaChannel("email", watch.userId, change.id, recipientEmail, null, null, subject, html, plainText, stats));
+            channelPromises.push(sendNotificationViaChannel("email", watch.userId, changeId, recipientEmail, null, null, subject, html, plainText, stats));
           } else if (channel === "whatsapp" && prefs?.whatsappEnabled && prefs?.whatsappVerified && prefs?.whatsappNumber) {
-            channelPromises.push(sendNotificationViaChannel("whatsapp", watch.userId, change.id, null, null, prefs.whatsappNumber, subject, html, plainText, stats));
+            channelPromises.push(sendNotificationViaChannel("whatsapp", watch.userId, changeId, null, null, prefs.whatsappNumber, subject, html, plainText, stats));
           } else if (channel === "sms" && prefs?.smsEnabled && prefs?.smsVerified && prefs?.smsNumber) {
-            channelPromises.push(sendNotificationViaChannel("sms", watch.userId, change.id, null, prefs.smsNumber, null, subject, html, plainText, stats));
+            channelPromises.push(sendNotificationViaChannel("sms", watch.userId, changeId, null, prefs.smsNumber, null, subject, html, plainText, stats));
           }
         }
         await Promise.all(channelPromises);
       } catch (err: any) {
         console.error(`[NotificationDispatcher] Error processing user ${watch.userId}:`, err);
-        await logNotification(watch.userId, change.id, "email", "failed", undefined, err.message || "Internal error");
+        await logNotification(watch.userId, changeId, "email", "failed", undefined, err.message || "Internal error");
         stats.failed++;
       }
     }

@@ -1,6 +1,6 @@
 # System Design Document
 # checkbyai.net
-**Version:** 1.0 | **Last Updated:** 2026-03-16
+**Version:** 2.0 | **Last Updated:** 2026-03-20
 
 ---
 
@@ -39,6 +39,8 @@ checkbyai.net is a monolithic Node.js/Express application that serves both the A
 
 External:  gov.uk CSV · Stripe · Resend · Brevo · Twilio · OpenAI/Claude/DeepSeek
            Python FastAPI backend (localhost:8000) for Companies House + job scraping
+           qsv (Rust binary) — CSV validation and row counting
+           csvdiff (Go binary) — fingerprinted CSV diffing
 ```
 
 ---
@@ -70,6 +72,8 @@ External:  gov.uk CSV · Stripe · Resend · Brevo · Twilio · OpenAI/Claude/De
 | CAPTCHA | Cloudflare Turnstile | — |
 | Validation | Zod | 3.x |
 | Compression | compression (gzip level 6) | — |
+| CSV Validation | qsv (Rust binary, dathere/qsv) | latest |
+| CSV Diffing | csvdiff (Go binary, aswinkarthik/csvdiff) | latest |
 
 ---
 
@@ -77,77 +81,140 @@ External:  gov.uk CSV · Stripe · Resend · Brevo · Twilio · OpenAI/Claude/De
 
 ### 3.1 Sponsor Monitor Pipeline
 
-The sponsor monitor job is the core data pipeline. It runs daily and is responsible for maintaining the canonical state of every UK sponsor.
+The sponsor monitor job is the core data pipeline. It runs daily at 00:30 UTC Mon–Fri. The pipeline has 5 phases: validation gate, diff, state machine, notifications, digest.
 
 ```
-Trigger (cron 00:30 UTC or HTTP request)
+Trigger (cron 00:30 UTC Mon-Fri, or HTTP /api/admin/sponsor-monitor/run)
           │
           ▼
 pg_try_advisory_lock(7483920)  ──► false → skip (another instance running)
           │ true
           ▼
-downloadWithRetry()
-  ├─ findCsvUrl(): scrape gov.uk HTML → extract CSV href
-  └─ fetchWithTimeout(csvUrl, 60s): download + parse CSV
+Idempotency check
+  └─ SELECT from monitor_job_runs WHERE runDate=today AND status='success'
+     → exists + source='cron' → skip (already ran today)
           │
-          ▼  ~80,000 SponsorRecord objects
-storeSnapshot(records, today)
-  └─ batch INSERT into sponsor_list (500/batch, onConflictDoNothing)
-          │
-          ▼
-loadActiveCanonical()
-  └─ SELECT * FROM sponsor_canonical WHERE status='ACTIVE'
-     → Map<fingerprint, CanonicalRecord>
+          ▼ ── PHASE 1: CSV Acquisition & Validation ──────────────────────
+discoverCsvUrl()
+  └─ scrape gov.uk HTML → extract CSV href (throws if only HTML fallback)
           │
           ▼
-buildTodayRecords(csvRecords)
-  └─ Map<fingerprint, TodayRecord> (deduped by fingerprint)
+ensureTodaysArchive(today, csvUrl)            [csvArchiver.ts]
+  ├─ Cache check: csv_archive WHERE snapshotDate=today AND file exists → return cached
+  ├─ Download CSV → disk: data/archives/YYYY-MM-DD_sponsors_raw.csv
+  ├─ SHA-256 checksum
+  ├─ qsv validate → admin alert if structural errors (non-fatal)
+  ├─ qsv count → HARD ABORT if count < 100,000 (corruption guard)
+  ├─ INSERT csv_archive (snapshotDate, filePath, recordCount, checksumSha256)
+  └─ buildFingerprintedCsv() → YYYY-MM-DD_sponsors_fp.csv
           │
-          ▼
-reconcile(canonicalMap, todayMap, today)
+          ▼ ── PHASE 2: CSV Diff ──────────────────────────────────────────
+getArchiveForDate(yesterday)
+  ├─ null → first run → buildFirstRunDiff(rawFilePath)
+  │          └─ parseCsvFile() → all records as Additions → seed DB
   │
-  ├─ Phase 1: Match fingerprints
-  │   ├─ Phase 1a: Bulk UPDATE matched records (last_seen, consecutive_misses=0)
-  │   │            Batched 500/batch via ARRAY[...]::int[]
-  │   ├─ Phase 1b: Individual UPDATE for name/rating changes
-  │   └─ Phase 1c: INSERT new records (250/batch, onConflictDoNothing)
+  └─ found → runCsvDiff(yesterday_fp.csv, today_fp.csv, ["fingerprint"])
+               [binaryRunner.ts — calls csvdiff binary]
+               └─ JSON output: { Additions[], Deletions[], Modifications[] }
+          │
+          ▼
+saveDiffResult(runDate, diff)  → INSERT diff_results (non-fatal)
+          │
+          ▼ ── PHASE 3: State Machine ─────────────────────────────────────
+applyStateMachine(diff, today, todayFingerprintedCsvPath)
+  [sponsorStateMachine.ts]
   │
-  └─ Phase 2: Process missing records
-      ├─ miss=1: fuzzy rename check (85% Jaro-Winkler, same city+route bucket)
-      │          rename → UPDATE fingerprint + historical_names
-      │          no rename → UPDATE consecutive_misses=1
-      └─ miss≥2: UPDATE status='NOT_LISTED', emit REMOVED change
+  ├─ Phase A: Load only affected records from sponsor_canonical (batched IN clause)
+  │
+  ├─ Phase C: Additions
+  │   ├─ new fingerprint → INSERT sponsor_canonical (status=NEWLY_GRANTED)
+  │   │   emit NEW_LICENCE change
+  │   └─ known fingerprint (REMOVED_REVOKED) → UPDATE status=NEWLY_GRANTED
+  │       emit RE_ACTIVATED change
+  │
+  ├─ Phase D: Deletions
+  │   ├─ consecutiveMisses=0 → UPDATE status=GRACE_PERIOD, misses=1
+  │   │   emit GRACE_PERIOD change
+  │   └─ consecutiveMisses≥1 → UPDATE status=REMOVED_REVOKED
+  │       emit REMOVED_REVOKED change
+  │
+  ├─ Phase D2: GRACE_PERIOD → REMOVED_REVOKED
+  │   SELECT GRACE_PERIOD records NOT IN today's fingerprint set
+  │   → UPDATE to REMOVED_REVOKED, emit REMOVED_REVOKED change
+  │
+  ├─ Phase E: Modifications (attribute changes from csvdiff)
+  │   Classify: rating change → UPGRADED/DOWNGRADED
+  │             route change → ROUTE_CHANGE
+  │             name change → NAME_CHANGE
+  │
+  ├─ Phase F: Rename detection (85% Jaro-Winkler, same city+route bucket)
+  │   → UPDATE fingerprint on sponsor_canonical, append to historicalNames[]
+  │
+  ├─ Phase G: Bulk UPDATE lastSeen on all ACTIVE records seen today
+  │
+  └─ batchedInsertChanges(changes, today)  → INSERT sponsor_changes
+     [uses .returning() to populate change.id for notification FK]
           │
           ▼
-rebuildSponsorIndex()  ← in-memory Fuse.js index from sponsor_canonical
+rebuildSponsorIndex()  ← Fuse.js index rebuilt from sponsor_canonical
+          │
+          ▼ ── PHASE 4: Notifications ─────────────────────────────────────
+for each alertable change (changeType ≠ NAME_CHANGE):
+  └─ notifyAffectedUsers(change)
+       ├─ SELECT watches matching normalized org name
+       ├─ Rate limit: skip if user received ≥10 notifications in 24h
+       ├─ getTierConfig → getDeliverAfter: null=immediate, Date=queue
+       ├─ Build email (buildEmailHtml) + SMS/WhatsApp text (buildPlainTextAlert)
+       │   ChangeTypes: REMOVED_REVOKED, GRACE_PERIOD, DOWNGRADED, UPGRADED,
+       │                NEW_LICENCE, RE_ACTIVATED, ROUTE_CHANGE
+       └─ Dispatch: email (Resend) + WhatsApp (Twilio) + SMS (Brevo) in parallel
+          INSERT notification_log with changeId FK
           │
           ▼
-INSERT sponsor_changes (batch 500)
+processDelayedNotifications() ← hourly cron, delivers queued notifications
+          │
+          ▼ ── PHASE 5: Audit & Digest ────────────────────────────────────
+generateHeadline() → INSERT daily_digest (AI-generated summary)
           │
           ▼
-notifyAffectedUsers() per alertable change
-  └─ 4 DB queries total (batch pattern):
-     ① COUNT sent notifications last 24h per user (rate limit check)
-     ② SELECT user records
-     ③ SELECT notification preferences
-     Dispatch: email + WhatsApp + SMS in parallel (Promise.all)
-          │
-          ▼
-generateHeadline() → INSERT daily_digest
-          │
-          ▼
-INSERT monitor_job_runs (status, duration, counts)
+INSERT monitor_job_runs (runDate, source, status, recordsProcessed, durationMs...)
           │
           ▼
 pg_advisory_unlock(7483920)
 ```
 
 **Fingerprint Design:**
-The fingerprint is the stable identity of a sponsor across name changes:
+The fingerprint is the stable identity of a sponsor, and the primary key for `csvdiff` comparisons:
 ```
 fingerprint = normalize(name) + "|" + normalize(city) + "|" + lowercase(route)
 ```
-`normalize()` strips punctuation, suffixes (Ltd, PLC, LLP, etc.), and extra whitespace. This means "Acme Ltd" and "Acme Limited" both produce the same fingerprint.
+`normalize()` strips punctuation, suffixes (Ltd, PLC, LLP, etc.), and extra whitespace. The fingerprinted CSV (`*_sponsors_fp.csv`) prepends this column so `csvdiff` can detect additions, deletions, and modifications by fingerprint.
+
+**4-State Status Model (sponsor_canonical.status):**
+```
+                    ┌─────────────────────────────────┐
+                    │           ACTIVE                 │
+                    │  (seen in today's CSV)           │
+                    └─────────────┬───────────────────┘
+                      absent 1 day│             ▲ reappears
+                                  ▼             │
+                    ┌─────────────────────────────────┐
+                    │         GRACE_PERIOD             │
+                    │  (absent day 1, miss count = 1)  │
+                    └─────────────┬───────────────────┘
+                      absent 2nd  │
+                      day         ▼
+                    ┌─────────────────────────────────┐
+                    │       REMOVED_REVOKED            │
+                    │  (confirmed removed, ≥2 misses)  │
+                    └─────────────────────────────────┘
+                                  │ reappears on register
+                                  ▼
+                    ┌─────────────────────────────────┐
+                    │         NEWLY_GRANTED            │
+                    │  (new or reactivated licence)    │
+                    └─────────────────────────────────┘
+```
 
 ### 3.2 COS Check Pipeline
 
@@ -211,12 +278,15 @@ It is rebuilt:
 2. After each daily cron run completes
 3. Lazily on first search request if still null
 
-All 3 rebuild paths call `rebuildSponsorIndex()` which issues a single `SELECT` against `sponsor_canonical` and instantiates a new Fuse instance. With ~80,000 records this takes ~200–500ms. During the rebuild, the old index continues to serve requests.
+All 3 rebuild paths call `rebuildSponsorIndex()` which issues a single `SELECT` against `sponsor_canonical` and instantiates a new Fuse instance. With ~124,000 records this takes ~200–500ms. During the rebuild, the old index continues to serve requests.
 
 ### 3.4 Notification Engine
 
 ```
-notifyAffectedUsers(change: SponsorChange)
+notifyAffectedUsers(change: SponsorChange)  [changeId populated from batchedInsertChanges()]
+          │
+          ▼
+Guard: change.id === undefined → warn + return (prevents FK violation)
           │
           ▼
 SELECT watches WHERE organisationNameNormalized = normalize(change.name)
@@ -251,6 +321,19 @@ processDelayedNotifications()  ← runs hourly
   └─ Deliver + UPDATE status='sent'/'failed'
 ```
 
+### 3.5 CSV Archive & Diff System
+
+**File layout on disk:**
+```
+data/archives/
+  YYYY-MM-DD_sponsors_raw.csv      ← raw Gov.uk CSV (downloaded by csvArchiver)
+  YYYY-MM-DD_sponsors_fp.csv       ← fingerprinted CSV (input to csvdiff)
+```
+
+**qsv binary (dathere/qsv):** Used for CSV structural validation (`qsv validate`) and record counting (`qsv count`). If binary not installed, validation is skipped and counting falls back to streaming csv-parse. Hard abort if record count < 100,000.
+
+**csvdiff binary (aswinkarthik/csvdiff):** Takes two fingerprinted CSVs and outputs JSON `{Additions, Deletions, Modifications}` keyed by `fingerprint` column. This replaces the old in-memory reconcile() function (~459 lines deleted).
+
 ---
 
 ## 4. Data Flow Diagrams
@@ -279,13 +362,18 @@ User                    Frontend              API                  DB           
  │                          │                  ├─ INSERT watches ──►│                  │
  │                          │                  │                    │                  │
  │  [next day, 00:30 UTC]   │                  │                    │                  │
- │                          │               [cron] ──── GET ──────────────────────────►│
- │                          │                  │◄── CSV ────────────────────────────── │
- │                          │               [reconcile]             │                  │
- │                          │                  ├─ INSERT changes ──►│                  │
- │                          │                  ├─ SELECT watches ──►│                  │
- │                          │                  ├─ SELECT prefs ────►│                  │
- │◄─ email alert ─────────  │                  ├─ POST Resend API   │                  │
+ │                          │               [cron]                  │                  │
+ │                          │                  ├─ discoverCsvUrl() ─────────────────► │
+ │                          │                  │◄─ CSV URL ──────────────────────────  │
+ │                          │                  ├─ download CSV → disk                  │
+ │                          │                  ├─ qsv validate + count                 │
+ │                          │                  ├─ buildFingerprintedCsv()              │
+ │                          │                  ├─ runCsvDiff() ──────────              │
+ │                          │                  ├─ applyStateMachine()  │               │
+ │                          │                  ├─ INSERT changes ──►  │               │
+ │                          │                  ├─ SELECT watches ──►   │               │
+ │                          │                  ├─ SELECT prefs ────►   │               │
+ │◄─ email alert ─────────  │                  ├─ POST Resend API      │               │
 ```
 
 ### 4.2 COS Check Flow
@@ -337,10 +425,12 @@ return result to user
 ### 5.1 gov.uk Sponsor Register
 - **Method:** HTTP scrape + CSV download (no official API)
 - **Page URL:** `https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers`
-- **Pattern:** Scrape HTML with cheerio to find `assets.publishing.service.gov.uk/*.csv` link, then download
-- **Timeout:** 30s for HTML page, 60s for CSV download
+- **Pattern:** `discoverCsvUrl()` in `sponsorListFetcher.ts` — scrapes HTML with cheerio to find `assets.publishing.service.gov.uk/*.csv` link, throws if only HTML fallback available
+- **Download:** Streamed directly to disk via `ensureTodaysArchive()` — never fully loaded into RAM
+- **Validation:** qsv validate (structural) + qsv count (≥100,000 records hard floor)
+- **Timeout:** 2-minute abort controller on download
 - **User-Agent:** `CheckByAI-SponsorBot/1.0; +https://checkbyai.net`
-- **Retry:** 3 attempts with 5min/15min staged delays
+- **Retry:** None (validation gate + idempotency make retries unnecessary — job can safely re-run)
 
 ### 5.2 Stripe
 - **Mode:** Checkout Sessions (hosted page)
@@ -370,6 +460,14 @@ return result to user
 - **Timeout:** 60 seconds
 - **Failure mode:** Silent skip (enrichment missing = degraded notification, not failure)
 
+### 5.6 Binary Tools (Sponsor Monitor)
+| Tool | Purpose | Binary path |
+|---|---|---|
+| qsv (Rust) | CSV validation + row counting | `$PATH/qsv` |
+| csvdiff (Go) | Fingerprinted CSV diffing | `$PATH/csvdiff` |
+
+Both are optional — if missing, the pipeline degrades gracefully (qsv skipped, csvdiff falls back to error).
+
 ---
 
 ## 6. Concurrency & Distributed Locking
@@ -382,6 +480,8 @@ Both background jobs use PostgreSQL session-level advisory locks to prevent dupl
 | Job Alert | `pg_try_advisory_lock(7483921)` |
 
 Lock is acquired at job start and released in a `finally` block. If the DB connection drops, PostgreSQL automatically releases the lock, allowing the next instance to proceed.
+
+The monitor job also has an **idempotency check** (separate from the advisory lock): it queries `monitor_job_runs` for `status='success' AND runDate=today`. If found and `source='cron'`, the job skips entirely. This means a manual trigger (`source='manual'`) can still run even if today's cron already succeeded.
 
 **Caveat:** Session-level locks are tied to a specific DB connection. With Neon's serverless WebSocket pool, the connection holding the lock may be recycled. A DB-row mutex (`SELECT FOR UPDATE SKIP LOCKED`) would be more robust for a distributed setup.
 
@@ -400,8 +500,8 @@ Lock is acquired at job start and released in a `finally` block. If the DB conne
    ├─ setupAuth(app)          ← Passport + session store (PostgreSQL)
    ├─ All API routes registered
    ├─ rebuildSponsorIndex()   ← async, fire-and-forget (non-blocking)
-   ├─ startSponsorMonitorCron()  ← registers node-cron for 00:30 UTC
-   └─ startJobAlertScheduler()  ← registers node-cron for 02:00 UTC Mon-Fri
+   └─ startSponsorMonitorCron()  ← registers node-cron for 00:30 UTC Mon-Fri
+                                    + hourly cron for delayed notifications
 
 4. server.listen(5000)
    └─ seedAdminUser()         ← upsert admin user from ADMIN_EMAIL env var
@@ -451,8 +551,10 @@ Global error handler (status + message, no stack traces in response)
 
 | Constraint | Impact | Mitigation |
 |---|---|---|
-| Single process for API + cron | Cron failure blocks no requests; but resource contention during reconcile (30–120s) | Reconcile is async; advisory lock prevents duplicate runs |
+| Single process for API + cron | Cron failure blocks no requests; but resource contention during state machine (seconds) | State machine is database-bound async; advisory lock prevents duplicate runs |
 | In-memory Fuse index | Lost on restart; ~200–500ms rebuild | Lazy rebuild on first request if not ready |
-| gov.uk has no API | CSV scrape may break if gov.uk changes page structure | cheerio scrape + error alerting to admin email |
+| gov.uk has no API | CSV scrape may break if gov.uk changes page structure | discoverCsvUrl() throws hard; admin alert sent; job aborts cleanly |
+| qsv/csvdiff binaries | If binaries not installed, pipeline cannot diff | qsv gracefully skipped; csvdiff binary missing is a hard error (job fails) |
 | Neon auto-pause | Cold start latency (2–10s) after idle period | Pool `idleTimeoutMillis=30s` releases connections; `dbRetry.ts` handles connection errors |
 | Python backend at localhost:8000 | If Python process dies, enrichment and job scraping fail | Silent failure (degraded mode); job alerts skipped gracefully |
+| sponsor_list table | Deprecated 2026-03-20; no new writes | Schedule DROP TABLE after 2026-04-20 (30-day holdback) |
