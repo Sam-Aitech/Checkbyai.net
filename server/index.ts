@@ -3,6 +3,7 @@ import compression from "compression";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { storage } from "./storage";
+import { pool } from "./db";
 
 // Import the job queue setup
 import { initJobQueue, setupWorkers } from "./services/jobQueue";
@@ -210,7 +211,27 @@ app.use((req, res, next) => {
   next();
 });
 
+async function applyPendingMigrations() {
+  const client = await pool.connect();
+  try {
+    const migrations = [
+      `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "cos_beta_enabled" boolean DEFAULT false`,
+      `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "cos_beta_limit" integer`,
+      `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "deleted_at" timestamp`,
+    ];
+    for (const sql of migrations) {
+      await client.query(sql);
+    }
+    log("Schema migrations applied successfully");
+  } catch (error) {
+    console.error("Failed to apply schema migrations:", error);
+  } finally {
+    client.release();
+  }
+}
+
 (async () => {
+  await applyPendingMigrations();
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
