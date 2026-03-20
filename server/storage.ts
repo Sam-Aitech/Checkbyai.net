@@ -27,7 +27,7 @@ import {
   type InsertSponsorWatch,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, gte, count, avg, sql, inArray } from "drizzle-orm";
+import { eq, desc, gte, count, avg, sql, inArray, isNull, and } from "drizzle-orm";
 
 // Interface for storage operations
 export interface IStorage {
@@ -184,7 +184,8 @@ export interface IStorage {
 export class DatabaseStorage implements IStorage {
   // User operations
   async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
+    const [user] = await db.select().from(users)
+      .where(and(eq(users.id, id), isNull(users.deletedAt)));
     return user;
   }
 
@@ -434,7 +435,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteUser(userId: string): Promise<void> {
-    await db.delete(users).where(eq(users.id, userId));
+    await db.update(users)
+      .set({ deletedAt: new Date(), updatedAt: new Date() })
+      .where(eq(users.id, userId));
   }
 
   // System settings operations
@@ -895,9 +898,10 @@ export class DatabaseStorage implements IStorage {
     const { page, limit, search } = options;
     const offset = (page - 1) * limit;
 
+    const notDeleted = isNull(users.deletedAt);
     const whereClause = search
-      ? sql`${users.email} ILIKE ${'%' + search + '%'} OR ${users.username} ILIKE ${'%' + search + '%'}`
-      : undefined;
+      ? and(notDeleted, sql`(${users.email} ILIKE ${'%' + search + '%'} OR ${users.username} ILIKE ${'%' + search + '%'})`)
+      : notDeleted;
 
     const [countResult] = await db
       .select({ count: count() })

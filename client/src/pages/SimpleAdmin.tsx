@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import SponsorLicenceSearch from '@/components/admin/SponsorLicenceSearch';
@@ -164,7 +165,8 @@ export default function SimpleAdmin() {
   const [usersSearch, setUsersSearch] = useState('');
   const [usersSearchInput, setUsersSearchInput] = useState('');
   const usersSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+
   // Domain-level navigation — synced to /admin/sponsor or /admin/cos via Wouter
   const [location, setLocation] = useLocation();
   const domain = location.startsWith('/admin/sponsor') ? 'sponsor' : 'cos';
@@ -351,6 +353,27 @@ export default function SimpleAdmin() {
       setUsersLoading(false);
     }
   }, [usersPage, usersSearch]);
+
+  const handleDeleteUser = async (userId: string) => {
+    setDeletingUserId(userId);
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (res.ok) {
+        toast({ title: 'User deleted', description: 'The account has been deactivated and the user logged out.' });
+        loadUsers();
+      } else {
+        const body = await res.json().catch(() => ({}));
+        toast({ title: body.message || 'Delete failed', variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: 'Delete failed', variant: 'destructive' });
+    } finally {
+      setDeletingUserId(null);
+    }
+  };
 
   // Load users when Users tab is selected
   useEffect(() => {
@@ -1933,6 +1956,35 @@ export default function SimpleAdmin() {
                                     >
                                       {u.isRestricted ? 'Unrestrict' : 'Restrict'}
                                     </Button>
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <Button
+                                          size="sm"
+                                          variant="destructive"
+                                          disabled={deletingUserId === u.id}
+                                        >
+                                          <Trash2 size={14} className="mr-1" />
+                                          Delete
+                                        </Button>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>Delete {u.email ?? u.id}?</AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            This will immediately deactivate the account and log the user out. Their email remains intact so they can re-register, but this session and all data access will be revoked. This action cannot be undone.
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                          <AlertDialogAction
+                                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                            onClick={() => handleDeleteUser(u.id)}
+                                          >
+                                            Delete Account
+                                          </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
                                   </div>
                                 )}
                               </td>

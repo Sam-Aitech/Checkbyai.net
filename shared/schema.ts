@@ -54,6 +54,7 @@ export const users = pgTable("users", {
   cosCheckApproved: boolean("cos_check_approved").default(false),
   cosCheckSubscription: boolean("cos_check_subscription").default(false),
   ipExempt: boolean("ip_exempt").default(false),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [

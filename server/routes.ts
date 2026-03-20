@@ -11,7 +11,7 @@ import { db } from "./db";
 import { sql, eq, and, desc, inArray, gte, lt } from "drizzle-orm";
 import { setupAuth, isAuthenticated, isAdmin } from "./auth";
 import { checkIpRateLimit, recordIpVerification, getClientIp, hashIpAddress } from "./ipRateLimit";
-import { insertVerificationResultSchema, insertFeedbackSchema, companyWatches, sponsorCanonical, sponsorChanges, notificationPreferences, notificationLog, dailyDigest, users, verificationResults, processedCheckouts, jobAlertPreferences, monitorJobRuns, csvArchive } from "@shared/schema";
+import { insertVerificationResultSchema, insertFeedbackSchema, companyWatches, sponsorCanonical, sponsorChanges, notificationPreferences, notificationLog, dailyDigest, users, verificationResults, processedCheckouts, jobAlertPreferences, monitorJobRuns, csvArchive, sessions } from "@shared/schema";
 import { authLimiter, verifyLimiter } from "./middleware/rateLimiter";
 import { withRetry } from "./utils/dbRetry";
 import multer from "multer";
@@ -3613,10 +3613,16 @@ Format your response in clear, professional markdown.`;
     }
   });
 
-  // Delete a user (admin only — cannot delete admin accounts)
+  // Delete a user — soft delete (admin only; cannot delete self or other admins)
   app.delete('/api/admin/users/:id', isAdmin, async (req: any, res) => {
     try {
       const userId = req.params.id;
+
+      // Guard: admin cannot delete themselves
+      if (req.user?.id === userId) {
+        return res.status(403).json({ message: 'You cannot delete your own account' });
+      }
+
       const targetUser = await storage.getUser(userId);
       if (!targetUser) {
         return res.status(404).json({ message: 'User not found' });
@@ -3624,7 +3630,16 @@ Format your response in clear, professional markdown.`;
       if (targetUser.role === 'admin') {
         return res.status(403).json({ message: 'Admin accounts cannot be deleted' });
       }
+
+      // Soft-delete the user row
       await storage.deleteUser(userId);
+
+      // Invalidate all active sessions for this user.
+      // Passport stores the serialised user object at sess->'passport'->'user'.
+      await db.execute(
+        sql`DELETE FROM sessions WHERE sess->'passport'->'user'->>'id' = ${userId}`
+      );
+
       res.json({ message: 'User deleted successfully', userId });
     } catch (error) {
       console.error("Error deleting user:", error);
