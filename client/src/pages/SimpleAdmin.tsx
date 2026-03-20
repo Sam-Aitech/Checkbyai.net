@@ -2,8 +2,10 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Shield, Upload, FileText, CheckCircle, AlertTriangle, XCircle, LogOut, Trash2, Eye,
   RefreshCw, Search, Filter, ChevronLeft, ChevronRight, Activity, Database, Clock,
-  Sparkles, X, Download, ChevronDown, Users, TrendingUp, Cpu, HardDrive, Brain, Plus, Power, Radio, Play, Bell, BarChart3, History, Info
+  Sparkles, X, Download, ChevronDown, Users, TrendingUp, Cpu, HardDrive, Brain, Plus, Power, Radio, Play, Bell, BarChart3, History, Info,
+  Building2, FileCheck
 } from 'lucide-react';
+import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -162,8 +164,17 @@ export default function SimpleAdmin() {
   const [usersSearchInput, setUsersSearchInput] = useState('');
   const usersSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
-  // Tab state for triggering data loads
-  const [activeTab, setActiveTab] = useState('logs');
+  // Domain-level navigation — synced to /admin/sponsor or /admin/cos via Wouter
+  const [location, setLocation] = useLocation();
+  const domain = location.startsWith('/admin/sponsor') ? 'sponsor' : 'cos';
+
+  // Tab state — initialised from URL so direct navigation and refresh work correctly
+  const [activeTab, setActiveTab] = useState(domain === 'sponsor' ? 'sponsor' : 'patterns');
+
+  const handleDomainChange = (newDomain: string) => {
+    setLocation(`/admin/${newDomain}`);
+    setActiveTab(newDomain === 'sponsor' ? 'sponsor' : 'patterns');
+  };
   
   // Global AI rules state
   const [globalRules, setGlobalRules] = useState<GlobalAiRule[]>([]);
@@ -665,6 +676,15 @@ export default function SimpleAdmin() {
       loadJobHistory();
     }
   }, [isAuthenticated, activeTab, loadGlobalRules, loadSponsorMonitorData, loadStorageStats, loadJobHistory]);
+
+  // Keep activeTab in sync when user navigates via browser back/forward
+  useEffect(() => {
+    if (domain === 'sponsor' && activeTab !== 'sponsor') {
+      setActiveTab('sponsor');
+    } else if (domain === 'cos' && activeTab === 'sponsor') {
+      setActiveTab('patterns');
+    }
+  }, [domain]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const createGlobalRule = async () => {
     if (!newRuleCategory || !newRuleText) {
@@ -1451,37 +1471,57 @@ export default function SimpleAdmin() {
           </Card>
         </div>
 
+        {/* ── Top-level domain navigation ── */}
+        <Tabs value={domain} onValueChange={handleDomainChange} className="mb-4 sm:mb-6">
+          <TabsList className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 shadow-sm p-1">
+            <TabsTrigger value="cos" className="flex items-center gap-2 px-4 py-2 data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700 dark:data-[state=active]:bg-indigo-900/30 dark:data-[state=active]:text-indigo-400">
+              <FileCheck className="w-4 h-4 shrink-0" />
+              <span className="text-xs sm:text-sm font-medium">COS Document Verification</span>
+            </TabsTrigger>
+            <TabsTrigger value="sponsor" className="flex items-center gap-2 px-4 py-2 data-[state=active]:bg-cyan-50 data-[state=active]:text-cyan-700 dark:data-[state=active]:bg-cyan-900/30 dark:data-[state=active]:text-cyan-400">
+              <Building2 className="w-4 h-4 shrink-0" />
+              <span className="text-xs sm:text-sm font-medium">Sponsor Licence Tools</span>
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {/* ── Section tabs (inner) ── */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
           <div className="overflow-x-auto -mx-3 sm:-mx-0 px-3 sm:px-0 scrollbar-hide">
             <TabsList className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 shadow-sm p-1 flex w-max min-w-full sm:w-auto sm:min-w-0">
-              <TabsTrigger value="logs" className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 dark:data-[state=active]:bg-blue-900/30 dark:data-[state=active]:text-blue-400">
-                <Eye className="w-4 h-4 shrink-0" />
-                <span className="text-xs sm:text-sm">Logs</span>
-              </TabsTrigger>
-              <TabsTrigger value="users" className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap data-[state=active]:bg-purple-50 data-[state=active]:text-purple-700 dark:data-[state=active]:bg-purple-900/30 dark:data-[state=active]:text-purple-400">
-                <Users className="w-4 h-4 shrink-0" />
-                <span className="text-xs sm:text-sm">Users</span>
-              </TabsTrigger>
-              <TabsTrigger value="patterns" className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 dark:data-[state=active]:bg-emerald-900/30 dark:data-[state=active]:text-emerald-400">
-                <FileText className="w-4 h-4 shrink-0" />
-                <span className="text-xs sm:text-sm">Patterns</span>
-              </TabsTrigger>
-              <TabsTrigger value="upload" className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap data-[state=active]:bg-orange-50 data-[state=active]:text-orange-700 dark:data-[state=active]:bg-orange-900/30 dark:data-[state=active]:text-orange-400">
-                <Upload className="w-4 h-4 shrink-0" />
-                <span className="text-xs sm:text-sm">Upload</span>
-              </TabsTrigger>
-              <TabsTrigger value="knowledge" className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap data-[state=active]:bg-pink-50 data-[state=active]:text-pink-700 dark:data-[state=active]:bg-pink-900/30 dark:data-[state=active]:text-pink-400">
-                <Brain className="w-4 h-4 shrink-0" />
-                <span className="text-xs sm:text-sm">AI Rules</span>
-              </TabsTrigger>
-              <TabsTrigger value="sponsor" className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap data-[state=active]:bg-cyan-50 data-[state=active]:text-cyan-700 dark:data-[state=active]:bg-cyan-900/30 dark:data-[state=active]:text-cyan-400">
-                <Radio className="w-4 h-4 shrink-0" />
-                <span className="text-xs sm:text-sm">Sponsor</span>
-              </TabsTrigger>
+              {domain === 'sponsor' ? (
+                <TabsTrigger value="sponsor" className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap data-[state=active]:bg-cyan-50 data-[state=active]:text-cyan-700 dark:data-[state=active]:bg-cyan-900/30 dark:data-[state=active]:text-cyan-400">
+                  <Radio className="w-4 h-4 shrink-0" />
+                  <span className="text-xs sm:text-sm">Sponsor Monitor</span>
+                </TabsTrigger>
+              ) : (
+                <>
+                  <TabsTrigger value="patterns" className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 dark:data-[state=active]:bg-emerald-900/30 dark:data-[state=active]:text-emerald-400">
+                    <FileText className="w-4 h-4 shrink-0" />
+                    <span className="text-xs sm:text-sm">Patterns</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="upload" className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap data-[state=active]:bg-orange-50 data-[state=active]:text-orange-700 dark:data-[state=active]:bg-orange-900/30 dark:data-[state=active]:text-orange-400">
+                    <Upload className="w-4 h-4 shrink-0" />
+                    <span className="text-xs sm:text-sm">Upload</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="users" className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap data-[state=active]:bg-purple-50 data-[state=active]:text-purple-700 dark:data-[state=active]:bg-purple-900/30 dark:data-[state=active]:text-purple-400">
+                    <Users className="w-4 h-4 shrink-0" />
+                    <span className="text-xs sm:text-sm">Users</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="logs" className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 dark:data-[state=active]:bg-blue-900/30 dark:data-[state=active]:text-blue-400">
+                    <Eye className="w-4 h-4 shrink-0" />
+                    <span className="text-xs sm:text-sm">Verification Logs</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="knowledge" className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap data-[state=active]:bg-pink-50 data-[state=active]:text-pink-700 dark:data-[state=active]:bg-pink-900/30 dark:data-[state=active]:text-pink-400">
+                    <Brain className="w-4 h-4 shrink-0" />
+                    <span className="text-xs sm:text-sm">AI Rules</span>
+                  </TabsTrigger>
+                </>
+              )}
             </TabsList>
           </div>
 
-          {/* Verification Logs Tab */}
+          {/* ── Phase 3: Verification Logs Explorer ── */}
           <TabsContent value="logs">
             <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
               <CardHeader>
@@ -2115,7 +2155,7 @@ export default function SimpleAdmin() {
             </Card>
           </TabsContent>
 
-          {/* AI Knowledge Tab */}
+          {/* ── Phase 4: Global AI Rules ── */}
           <TabsContent value="knowledge">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
