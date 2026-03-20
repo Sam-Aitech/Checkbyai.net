@@ -9,6 +9,7 @@ import {
   boolean,
   uniqueIndex,
   date,
+  uuid,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -613,3 +614,40 @@ export const systemSettings = pgTable("system_settings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 export type SystemSetting = typeof systemSettings.$inferSelect;
+
+// Reactivation watches — users opt in to be notified when a currently-unlicensed
+// company reappears on the GOV.UK sponsor register.
+// Status state machine:
+//   pending_activation — watching, not yet notified
+//   notified          — reactivation detected, email sent
+//   cancelled         — user cancelled the watch
+export const sponsorWatches = pgTable(
+  "sponsor_watches",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: varchar("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    companyName: text("company_name").notNull(),
+    companyNumber: text("company_number"),
+    status: varchar("status", { enum: ["pending_activation", "notified", "cancelled"] })
+      .notNull()
+      .default("pending_activation"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    notifiedAt: timestamp("notified_at"),
+  },
+  (table) => [
+    index("idx_sponsor_watches_user_id").on(table.userId),
+    index("idx_sponsor_watches_status").on(table.status),
+    index("idx_sponsor_watches_company_name").on(table.companyName),
+  ]
+);
+
+export type SponsorWatch = typeof sponsorWatches.$inferSelect;
+export const insertSponsorWatchSchema = createInsertSchema(sponsorWatches).omit({
+  id: true,
+  createdAt: true,
+  notifiedAt: true,
+  status: true,
+});
+export type InsertSponsorWatch = z.infer<typeof insertSponsorWatchSchema>;

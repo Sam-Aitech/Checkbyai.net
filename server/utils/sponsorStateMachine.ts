@@ -26,6 +26,7 @@ import { normalizeName, generateFingerprint } from "./sponsorListFetcher";
 import type { CsvDiffResult } from "./binaryRunner";
 import type { SponsorChange } from "./sponsorListFetcher";
 import { loadFingerprintSet } from "./csvFingerprintBuilder";
+import { storage } from "../storage";
 
 const RENAME_SIMILARITY_THRESHOLD = 0.85;
 const BATCH_SIZE = 500; // for bulk DB operations
@@ -93,6 +94,79 @@ async function batchedInsertChanges(changes: SponsorChange[], today: string): Pr
       );
       if (match) match.id = row.id;
     }
+  }
+}
+
+// ── Reactivation watch helpers ────────────────────────────────────────────────
+
+async function sendReactivationEmail(toEmail: string, companyName: string): Promise<boolean> {
+  try {
+    if (!process.env.RESEND_API_KEY) {
+      console.error("[ReactivationWatch] RESEND_API_KEY not configured");
+      return false;
+    }
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: "Check By AI <noreply@checkbyai.net>",
+        to: [toEmail],
+        subject: `Sponsor licence alert: ${companyName} is back on the register`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background: linear-gradient(135deg, #003366 0%, #0066cc 100%); padding: 30px; border-radius: 10px 10px 0 0;">
+              <h1 style="color: #ffffff; margin: 0; text-align: center;">Sponsor Licence Reactivated</h1>
+            </div>
+            <div style="background: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
+              <p style="color: #333; font-size: 16px;">
+                Good news — the company you were watching has reappeared on the GOV.UK sponsor register:
+              </p>
+              <div style="background: #f0f4ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #003366;">
+                <p style="margin: 0; font-size: 18px; font-weight: bold; color: #003366;">${companyName}</p>
+              </div>
+              <p style="color: #666; font-size: 14px;">
+                You can now search for this company on Check By AI to verify its current licence status.
+              </p>
+              <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
+              <p style="color: #999; font-size: 12px; text-align: center;">
+                This is an automated alert from Check By AI. You requested this notification when the company was not yet licensed.
+              </p>
+            </div>
+          </div>
+        `,
+      }),
+    });
+    if (!response.ok) {
+      console.error("[ReactivationWatch] Resend error:", await response.text());
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("[ReactivationWatch] Email send failed:", err);
+    return false;
+  }
+}
+
+async function notifyReactivationWatchers(companyNames: string[]): Promise<void> {
+  if (companyNames.length === 0) return;
+  try {
+    for (const name of companyNames) {
+      const watches = await storage.getPendingWatchesByCompanyName(name);
+      for (const watch of watches) {
+        if (!watch.userEmail) continue;
+        const sent = await sendReactivationEmail(watch.userEmail, watch.companyName);
+        if (sent) {
+          await storage.markSponsorWatchNotified(watch.id);
+          console.log(`[ReactivationWatch] Notified ${watch.userEmail} → "${watch.companyName}"`);
+        }
+      }
+    }
+  } catch (err) {
+    // Never let notification errors abort the pipeline
+    console.error("[ReactivationWatch] notifyReactivationWatchers failed (non-fatal):", err);
   }
 }
 
@@ -213,6 +287,7 @@ export async function applyStateMachine(
   const toInsertNew: typeof sponsorCanonical.$inferInsert[] = [];
   const toReactivate: string[] = [];    // fingerprints: REMOVED_REVOKED → NEWLY_GRANTED
   const toRecoverFlicker: string[] = []; // fingerprints: GRACE_PERIOD → ACTIVE
+  const reactivationCandidates: string[] = []; // company names to check for pending watches
 
   for (const row of diff.Additions) {
     const fp      = (row["fingerprint"] ?? "").trim();
@@ -237,11 +312,13 @@ export async function applyStateMachine(
         historicalNames:  [],
       });
       changes.push({ organisationName: orgName, changeType: "NEW_LICENCE", previousValue: null, newValue: orgName, fingerprint: fp });
+      reactivationCandidates.push(orgName);
       addedCount++;
     } else if (existing.status === "REMOVED_REVOKED") {
       // Reactivation
       toReactivate.push(fp);
       changes.push({ organisationName: orgName, changeType: "RE_ACTIVATED", previousValue: "REMOVED_REVOKED", newValue: "NEWLY_GRANTED", fingerprint: fp });
+      reactivationCandidates.push(orgName);
       reactivatedCount++;
     } else if (existing.status === "GRACE_PERIOD") {
       // Flicker: company disappeared for one day and came back — suppress the removal
@@ -279,6 +356,9 @@ export async function applyStateMachine(
   console.log(
     `[StateMachine] Phase C: +${toInsertNew.length} new, ${toReactivate.length} reactivated, ${toRecoverFlicker.length} flicker recovered.`,
   );
+
+  // Fire reactivation watch notifications (non-blocking — errors are caught internally)
+  await notifyReactivationWatchers(reactivationCandidates);
 
   // ── Phase D: Deletions (first and second misses) ──────────────────────────
   const toGracePeriod: string[] = [];

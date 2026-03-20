@@ -4356,6 +4356,78 @@ Format your response in clear, professional markdown.`;
     }
   });
 
+  // ── Sponsor reactivation watches ─────────────────────────────────────────
+
+  // POST /api/sponsor-watch — create a watch for an unlicensed company
+  app.post('/api/sponsor-watch', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id as string;
+      const parsed = z.object({
+        companyName: z.string().trim().min(1),
+        companyNumber: z.string().trim().optional(),
+      }).safeParse(req.body);
+
+      if (!parsed.success) {
+        return res.status(400).json({ message: 'companyName is required' });
+      }
+
+      const { companyName, companyNumber } = parsed.data;
+
+      // Duplicate guard: one pending watch per user+company (case-insensitive)
+      const existing = await storage.getSponsorWatchesByUserId(userId, 'pending_activation');
+      const duplicate = existing.find(
+        (w) => w.companyName.toLowerCase() === companyName.toLowerCase()
+      );
+      if (duplicate) {
+        return res.status(409).json({ message: 'You already have an active watch for this company' });
+      }
+
+      const watch = await storage.createSponsorWatch(userId, { userId, companyName, companyNumber });
+      res.status(201).json(watch);
+    } catch (error: any) {
+      console.error('Error creating sponsor watch:', error);
+      res.status(500).json({ message: 'Failed to create watch' });
+    }
+  });
+
+  // DELETE /api/sponsor-watch/:id — cancel a watch (own records only)
+  app.delete('/api/sponsor-watch/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id as string;
+      const { id } = req.params;
+
+      const watch = await storage.getSponsorWatchById(id);
+      if (!watch) {
+        return res.status(404).json({ message: 'Watch not found' });
+      }
+      if (watch.userId !== userId) {
+        return res.status(403).json({ message: 'Not authorised to cancel this watch' });
+      }
+
+      await storage.cancelSponsorWatch(id);
+      res.json({ message: 'Watch cancelled' });
+    } catch (error: any) {
+      console.error('Error cancelling sponsor watch:', error);
+      res.status(500).json({ message: 'Failed to cancel watch' });
+    }
+  });
+
+  // GET /api/sponsor-watch — list the authenticated user's watches
+  app.get('/api/sponsor-watch', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id as string;
+      const status = req.query.status as string | undefined;
+
+      const data = await storage.getSponsorWatchesByUserId(userId, status);
+      res.json({ data, total: data.length });
+    } catch (error: any) {
+      console.error('Error fetching sponsor watches:', error);
+      res.status(500).json({ message: 'Failed to fetch watches' });
+    }
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+
   rebuildSponsorIndex().catch((err) => {
     console.error("[SponsorSearch] Failed to build initial index:", err);
   });
