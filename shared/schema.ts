@@ -54,6 +54,8 @@ export const users = pgTable("users", {
   cosCheckApproved: boolean("cos_check_approved").default(false),
   cosCheckSubscription: boolean("cos_check_subscription").default(false),
   ipExempt: boolean("ip_exempt").default(false),
+  cosBetaEnabled: boolean("cos_beta_enabled").default(false),
+  cosBetaLimit: integer("cos_beta_limit"),
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -95,6 +97,7 @@ export const globalAiRules = pgTable("global_ai_rules", {
   ruleText: text("rule_text").notNull(),
   priority: integer("priority").default(0),
   isActive: boolean("is_active").default(true),
+  createdBy: varchar("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -127,6 +130,7 @@ export const verificationResults = pgTable(
     index("idx_verification_user_id").on(table.userId),
     index("idx_verification_result_date").on(table.result, table.verifiedAt),
     index("idx_verification_admin_status").on(table.adminStatus),
+    index("idx_verification_user_verified").on(table.userId, table.verifiedAt),
     // NOTE: GIN indexes on metadata/analysis_details JSONB columns are defined in
     // migrations/0001_gin_indexes_jsonb.sql. They reduce admin HITL query cost
     // from O(N) full scan to O(log N) for JSONB key-path lookups.

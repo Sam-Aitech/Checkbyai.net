@@ -27,7 +27,7 @@ import {
   type InsertSponsorWatch,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, gte, count, avg, sql, inArray, isNull, and } from "drizzle-orm";
+import { eq, desc, gte, count, avg, sql, inArray, isNull, and, getTableColumns } from "drizzle-orm";
 
 // Interface for storage operations
 export interface IStorage {
@@ -54,6 +54,7 @@ export interface IStorage {
   updateCosCheckApproval(userId: string, approved: boolean): Promise<void>;
   updateIpExempt(userId: string, exempt: boolean): Promise<void>;
   updateCosCheckSubscription(userId: string, active: boolean): Promise<void>;
+  updateCosBeta(userId: string, enabled: boolean, limit: number | null): Promise<User>;
   deleteUser(userId: string): Promise<void>;
 
   // System settings operations
@@ -106,8 +107,9 @@ export interface IStorage {
     startDate?: string;
     endDate?: string;
     search?: string;
+    period?: string;
   }): Promise<{
-    data: VerificationResult[];
+    data: (VerificationResult & { userEmail?: string | null })[];
     total: number;
     page: number;
     limit: number;
@@ -180,6 +182,10 @@ export interface IStorage {
   getPendingWatchesByCompanyName(companyName: string): Promise<(SponsorWatch & { userEmail: string })[]>;
   markSponsorWatchNotified(id: string): Promise<void>;
 }
+
+// 60-second in-memory TTL cache for active global AI rules
+let rulesCache: { data: GlobalAiRule[]; expiresAt: number } | null = null;
+function invalidateRulesCache() { rulesCache = null; }
 
 export class DatabaseStorage implements IStorage {
   // User operations
@@ -434,6 +440,15 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId));
   }
 
+  async updateCosBeta(userId: string, enabled: boolean, limit: number | null): Promise<User> {
+    const [updatedUser] = await db
+      .update(users)
+      .set({ cosBetaEnabled: enabled, cosBetaLimit: limit, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+    return updatedUser;
+  }
+
   async deleteUser(userId: string): Promise<void> {
     await db.update(users)
       .set({ deletedAt: new Date(), updatedAt: new Date() })
@@ -541,11 +556,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getActiveGlobalAiRules(): Promise<GlobalAiRule[]> {
-    return await db
+    const now = Date.now();
+    if (rulesCache && rulesCache.expiresAt > now) return rulesCache.data;
+    const data = await db
       .select()
       .from(globalAiRules)
       .where(eq(globalAiRules.isActive, true))
       .orderBy(desc(globalAiRules.priority));
+    rulesCache = { data, expiresAt: now + 60_000 };
+    return data;
   }
 
   async createGlobalAiRule(data: InsertGlobalAiRule): Promise<GlobalAiRule> {
@@ -553,6 +572,7 @@ export class DatabaseStorage implements IStorage {
       .insert(globalAiRules)
       .values(data)
       .returning();
+    invalidateRulesCache();
     return rule;
   }
 
@@ -562,11 +582,13 @@ export class DatabaseStorage implements IStorage {
       .set({ ...data, updatedAt: new Date() })
       .where(eq(globalAiRules.id, id))
       .returning();
+    invalidateRulesCache();
     return rule;
   }
 
   async deleteGlobalAiRule(id: number): Promise<void> {
     await db.delete(globalAiRules).where(eq(globalAiRules.id, id));
+    invalidateRulesCache();
   }
 
   async toggleGlobalAiRule(id: number, isActive: boolean): Promise<void> {
@@ -574,6 +596,7 @@ export class DatabaseStorage implements IStorage {
       .update(globalAiRules)
       .set({ isActive, updatedAt: new Date() })
       .where(eq(globalAiRules.id, id));
+    invalidateRulesCache();
   }
 
   // Verification operations
@@ -659,33 +682,50 @@ export class DatabaseStorage implements IStorage {
     startDate?: string;
     endDate?: string;
     search?: string;
+    period?: string;
   }): Promise<{
-    data: VerificationResult[];
+    data: (VerificationResult & { userEmail?: string | null })[];
     total: number;
     page: number;
     limit: number;
     totalPages: number;
   }> {
-    const { page, limit, status, startDate, endDate, search } = options;
+    const { page, limit, status, search, period } = options;
+    let { startDate, endDate } = options;
     const offset = (page - 1) * limit;
+
+    // Resolve period shortcut → startDate/endDate (period overrides explicit dates)
+    if (period) {
+      const now = new Date();
+      if (period === 'today') {
+        const todayStr = now.toISOString().split('T')[0];
+        startDate = todayStr;
+        endDate = todayStr;
+      } else {
+        const days = period === '7d' ? 7 : period === '30d' ? 30 : period === '90d' ? 90 : null;
+        if (days) {
+          const from = new Date(now);
+          from.setDate(from.getDate() - days);
+          startDate = from.toISOString().split('T')[0];
+          endDate = undefined;
+        }
+      }
+    }
 
     // Build where conditions
     const conditions = [];
-    
+
     if (status && status !== 'all') {
       conditions.push(eq(verificationResults.result, status));
     }
-    
     if (startDate) {
       conditions.push(gte(verificationResults.verifiedAt, new Date(startDate)));
     }
-    
     if (endDate) {
       const end = new Date(endDate);
       end.setHours(23, 59, 59, 999);
       conditions.push(sql`${verificationResults.verifiedAt} <= ${end}`);
     }
-    
     if (search) {
       conditions.push(sql`${verificationResults.filename} ILIKE ${'%' + search + '%'}`);
     }
@@ -697,13 +737,17 @@ export class DatabaseStorage implements IStorage {
       .select({ count: count() })
       .from(verificationResults)
       .where(whereClause);
-    
+
     const total = Number(countResult?.count || 0);
 
-    // Get paginated data
+    // Get paginated data with user email via LEFT JOIN
     const data = await db
-      .select()
+      .select({
+        ...getTableColumns(verificationResults),
+        userEmail: users.email,
+      })
       .from(verificationResults)
+      .leftJoin(users, eq(verificationResults.userId, users.id))
       .where(whereClause)
       .orderBy(desc(verificationResults.verifiedAt))
       .limit(limit)

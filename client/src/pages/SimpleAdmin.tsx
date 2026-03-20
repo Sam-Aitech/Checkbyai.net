@@ -18,6 +18,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import SponsorLicenceSearch from '@/components/admin/SponsorLicenceSearch';
@@ -55,6 +56,7 @@ interface TrustedPattern {
 interface VerificationLog {
   id: number;
   userId?: string;
+  userEmail?: string | null;
   filename: string;
   result: 'genuine' | 'suspicious' | 'fake';
   confidence: number;
@@ -95,6 +97,8 @@ interface UserRecord {
   isRestricted?: boolean;
   restrictionReason?: string;
   cosCheckApproved?: boolean;
+  cosBetaEnabled?: boolean;
+  cosBetaLimit?: number | null;
   createdAt: string;
   dailyVerificationsUsed?: number;
   verificationLimit?: number | null;
@@ -114,6 +118,7 @@ interface GlobalAiRule {
   ruleText: string;
   priority: number;
   isActive: boolean;
+  createdBy?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -148,6 +153,7 @@ export default function SimpleAdmin() {
   const logsSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [logsStartDate, setLogsStartDate] = useState('');
   const [logsEndDate, setLogsEndDate] = useState('');
+  const [logsPeriod, setLogsPeriod] = useState<'today' | '7d' | '30d' | '90d' | ''>('');
   const [selectedLog, setSelectedLog] = useState<VerificationLog | null>(null);
   
   // AI Analysis state
@@ -166,6 +172,8 @@ export default function SimpleAdmin() {
   const [usersSearchInput, setUsersSearchInput] = useState('');
   const usersSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+  const [cosBetaDialog, setCosBetaDialog] = useState<{ open: boolean; userId: string; currentLimit: number | null } | null>(null);
+  const [cosBetaLimitInput, setCosBetaLimitInput] = useState<string>('');
 
   // Domain-level navigation — synced to /admin/sponsor or /admin/cos via Wouter
   const [location, setLocation] = useLocation();
@@ -185,6 +193,14 @@ export default function SimpleAdmin() {
   const [newRuleCategory, setNewRuleCategory] = useState('');
   const [newRuleText, setNewRuleText] = useState('');
   const [newRulePriority, setNewRulePriority] = useState(0);
+  // Inline-edit state
+  const [editingRuleId, setEditingRuleId] = useState<number | null>(null);
+  const [editCategory, setEditCategory] = useState('');
+  const [editText, setEditText] = useState('');
+  const [editPriority, setEditPriority] = useState(0);
+  // Drag-to-reorder state
+  const [dragId, setDragId] = useState<number | null>(null);
+  const [dragOverId, setDragOverId] = useState<number | null>(null);
   
   // Upload preview state (two-step upload with AI instructions)
   const [uploadPreview, setUploadPreview] = useState<UploadPreview | null>(null);
@@ -308,13 +324,17 @@ export default function SimpleAdmin() {
         search: logsSearch,
       });
       
-      if (logsStartDate) params.set('startDate', logsStartDate);
-      if (logsEndDate) params.set('endDate', logsEndDate);
-      
+      if (logsPeriod) {
+        params.set('period', logsPeriod);
+      } else {
+        if (logsStartDate) params.set('startDate', logsStartDate);
+        if (logsEndDate) params.set('endDate', logsEndDate);
+      }
+
       const res = await fetch(`/api/admin/verification-logs?${params}`, {
         credentials: 'include',
       });
-      
+
       if (res.ok) {
         setLogs(await res.json());
       }
@@ -323,7 +343,7 @@ export default function SimpleAdmin() {
     } finally {
       setLogsLoading(false);
     }
-  }, [logsPage, logsFilter, logsSearch, logsStartDate, logsEndDate]);
+  }, [logsPage, logsFilter, logsSearch, logsStartDate, logsEndDate, logsPeriod]);
 
   useEffect(() => {
     if (isAuthenticated && activeTab === 'logs') {
@@ -372,6 +392,50 @@ export default function SimpleAdmin() {
       toast({ title: 'Delete failed', variant: 'destructive' });
     } finally {
       setDeletingUserId(null);
+    }
+  };
+
+  const handleCosBetaEnable = async (limit: number | null) => {
+    if (!cosBetaDialog) return;
+    try {
+      const res = await fetch(`/api/admin/users/${cosBetaDialog.userId}/cos-beta`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ enabled: true, limit }),
+      });
+      if (res.ok) {
+        toast({ title: 'COS Beta enabled', description: 'Access granted' + (limit ? ` with a limit of ${limit}/day` : '') + '.' });
+        loadUsers();
+      } else {
+        const body = await res.json().catch(() => ({}));
+        toast({ title: body.message || 'Failed to enable COS Beta', variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: 'Failed to enable COS Beta', variant: 'destructive' });
+    } finally {
+      setCosBetaDialog(null);
+      setCosBetaLimitInput('');
+    }
+  };
+
+  const handleCosBetaDisable = async (userId: string) => {
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/cos-beta`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ enabled: false, limit: null }),
+      });
+      if (res.ok) {
+        toast({ title: 'COS Beta disabled' });
+        loadUsers();
+      } else {
+        const body = await res.json().catch(() => ({}));
+        toast({ title: body.message || 'Failed to disable COS Beta', variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: 'Failed to disable COS Beta', variant: 'destructive' });
     }
   };
 
@@ -760,6 +824,53 @@ export default function SimpleAdmin() {
       loadGlobalRules();
     } catch (error) {
       toast({ title: 'Failed to delete rule', description: error instanceof Error ? error.message : 'Network error', variant: 'destructive' });
+    }
+  };
+
+  const updateRule = async (id: number) => {
+    try {
+      const res = await fetch(`/api/admin/global-rules/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ category: editCategory, ruleText: editText, priority: editPriority }),
+      });
+      if (res.ok) {
+        toast({ title: 'Rule updated' });
+        setEditingRuleId(null);
+        loadGlobalRules();
+      } else {
+        toast({ title: 'Failed to update rule', variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: 'Failed to update rule', variant: 'destructive' });
+    }
+  };
+
+  const handleRuleDrop = async (targetId: number) => {
+    if (dragId === null || dragId === targetId) return;
+    const ordered = [...globalRules];
+    const fromIdx = ordered.findIndex(r => r.id === dragId);
+    const toIdx = ordered.findIndex(r => r.id === targetId);
+    if (fromIdx === -1 || toIdx === -1) return;
+    const [moved] = ordered.splice(fromIdx, 1);
+    ordered.splice(toIdx, 0, moved);
+    // Assign priorities: highest index → highest priority
+    const updates = ordered.map((r, i) => ({ id: r.id, priority: (ordered.length - i) * 10 }));
+    setGlobalRules(ordered.map((r, i) => ({ ...r, priority: updates[i].priority })));
+    setDragId(null); setDragOverId(null);
+    try {
+      await Promise.all(updates.map(({ id, priority }) =>
+        fetch(`/api/admin/global-rules/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ priority }),
+        })
+      ));
+    } catch {
+      toast({ title: 'Failed to save order', variant: 'destructive' });
+      loadGlobalRules();
     }
   };
 
@@ -1602,30 +1713,42 @@ export default function SimpleAdmin() {
                       </Button>
                     </div>
                   </div>
-                  {/* Date Range Filters */}
+                  {/* Period shortcuts + Date Range Filters */}
                   <div className="flex flex-wrap items-center gap-2">
+                    {(['today', '7d', '30d', '90d'] as const).map((p) => (
+                      <Button
+                        key={p}
+                        size="sm"
+                        variant={logsPeriod === p ? 'default' : 'outline'}
+                        onClick={() => { setLogsPeriod(logsPeriod === p ? '' : p); setLogsStartDate(''); setLogsEndDate(''); setLogsPage(1); }}
+                        className={`text-xs ${logsPeriod !== p ? 'border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700' : ''}`}
+                      >
+                        {p === 'today' ? 'Today' : p}
+                      </Button>
+                    ))}
+                    <span className="text-gray-300 dark:text-slate-600">|</span>
                     <Label className="text-gray-500 dark:text-slate-400 text-sm">From:</Label>
                     <Input
                       type="date"
                       value={logsStartDate}
-                      onChange={(e) => { setLogsStartDate(e.target.value); setLogsPage(1); }}
+                      onChange={(e) => { setLogsStartDate(e.target.value); setLogsPeriod(''); setLogsPage(1); }}
                       className="w-40 bg-gray-50 dark:bg-slate-700/50 border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white"
                     />
                     <Label className="text-gray-500 dark:text-slate-400 text-sm">To:</Label>
                     <Input
                       type="date"
                       value={logsEndDate}
-                      onChange={(e) => { setLogsEndDate(e.target.value); setLogsPage(1); }}
+                      onChange={(e) => { setLogsEndDate(e.target.value); setLogsPeriod(''); setLogsPage(1); }}
                       className="w-40 bg-gray-50 dark:bg-slate-700/50 border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white"
                     />
-                    {(logsStartDate || logsEndDate) && (
+                    {(logsStartDate || logsEndDate || logsPeriod) && (
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => { setLogsStartDate(''); setLogsEndDate(''); setLogsPage(1); }}
+                        onClick={() => { setLogsStartDate(''); setLogsEndDate(''); setLogsPeriod(''); setLogsPage(1); }}
                         className="text-gray-500 dark:text-slate-400 hover:text-white"
                       >
-                        Clear Dates
+                        Clear
                       </Button>
                     )}
                   </div>
@@ -1646,8 +1769,8 @@ export default function SimpleAdmin() {
                     <p className="text-gray-500 dark:text-slate-400 max-w-sm mx-auto mb-6">
                       Adjust your date range filters or wait for new verifications to be processed by users.
                     </p>
-                    {(logsStartDate || logsEndDate) && (
-                      <Button variant="outline" onClick={() => { setLogsStartDate(''); setLogsEndDate(''); setLogsPage(1); }} className="rounded-full">
+                    {(logsStartDate || logsEndDate || logsPeriod) && (
+                      <Button variant="outline" onClick={() => { setLogsStartDate(''); setLogsEndDate(''); setLogsPeriod(''); setLogsPage(1); }} className="rounded-full">
                         Clear Current Filters
                       </Button>
                     )}
@@ -1659,6 +1782,7 @@ export default function SimpleAdmin() {
                         <thead>
                           <tr className="border-b border-gray-200 dark:border-slate-700">
                             <th className="text-left py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">Time</th>
+                            <th className="text-left py-3 px-4 text-gray-500 dark:text-slate-400 font-medium hidden md:table-cell">User</th>
                             <th className="text-left py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">Filename</th>
                             <th className="text-left py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">Result</th>
                             <th className="text-left py-3 px-4 text-gray-500 dark:text-slate-400 font-medium">Admin Review</th>
@@ -1681,6 +1805,9 @@ export default function SimpleAdmin() {
                             >
                               <td className="py-3 px-4 text-gray-600 dark:text-slate-300 text-sm whitespace-nowrap">
                                 {new Date(log.verifiedAt).toLocaleString()}
+                              </td>
+                              <td className="py-3 px-4 text-gray-600 dark:text-slate-300 text-xs max-w-[160px] truncate hidden md:table-cell">
+                                {log.userEmail ?? (log.userId ? log.userId.slice(0, 8) + '…' : <span className="text-gray-400 dark:text-slate-500">anon</span>)}
                               </td>
                               <td className="py-3 px-4 text-gray-900 dark:text-white font-medium max-w-[200px] truncate">
                                 {log.filename}
@@ -1956,6 +2083,21 @@ export default function SimpleAdmin() {
                                     >
                                       {u.isRestricted ? 'Unrestrict' : 'Restrict'}
                                     </Button>
+                                    <div className="flex items-center gap-1.5">
+                                      <Switch
+                                        checked={!!u.cosBetaEnabled}
+                                        onCheckedChange={(checked) => {
+                                          if (checked) {
+                                            setCosBetaLimitInput('');
+                                            setCosBetaDialog({ open: true, userId: u.id, currentLimit: u.cosBetaLimit ?? null });
+                                          } else {
+                                            handleCosBetaDisable(u.id);
+                                          }
+                                        }}
+                                        aria-label="COS Beta"
+                                      />
+                                      <span className="text-xs text-gray-500 dark:text-slate-400 whitespace-nowrap">Beta</span>
+                                    </div>
                                     <AlertDialog>
                                       <AlertDialogTrigger asChild>
                                         <Button
@@ -2026,6 +2168,43 @@ export default function SimpleAdmin() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* COS Beta Enable Dialog */}
+          {cosBetaDialog && (
+            <Dialog open={cosBetaDialog.open} onOpenChange={(open) => { if (!open) { setCosBetaDialog(null); setCosBetaLimitInput(''); } }}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Enable COS Beta Access</DialogTitle>
+                  <DialogDescription>
+                    Grant this user COS Beta access. Optionally set a daily verification limit. Paid users will receive a notification email.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="py-2">
+                  <Label htmlFor="beta-limit" className="text-sm font-medium">Daily Limit (optional)</Label>
+                  <Input
+                    id="beta-limit"
+                    type="number"
+                    min={1}
+                    placeholder="Leave blank for no limit"
+                    value={cosBetaLimitInput}
+                    onChange={(e) => setCosBetaLimitInput(e.target.value)}
+                    className="mt-1.5"
+                  />
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => { setCosBetaDialog(null); setCosBetaLimitInput(''); }}>Cancel</Button>
+                  <Button
+                    onClick={() => {
+                      const parsed = cosBetaLimitInput ? parseInt(cosBetaLimitInput) : null;
+                      handleCosBetaEnable(parsed && parsed > 0 ? parsed : null);
+                    }}
+                  >
+                    Enable Beta Access
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
 
           {/* Trusted Patterns Tab */}
           <TabsContent value="patterns">
@@ -2282,15 +2461,15 @@ export default function SimpleAdmin() {
                   <div className="flex items-center justify-between">
                     <div>
                       <CardTitle className="text-gray-900 dark:text-white text-base">
-                        Active Rules
+                        Rules
                         {globalRules.length > 0 && (
                           <span className="ml-2 text-sm font-normal text-gray-500 dark:text-slate-400">
-                            ({globalRules.length})
+                            ({globalRules.filter(r => r.isActive).length} active / {globalRules.length} total)
                           </span>
                         )}
                       </CardTitle>
                       <CardDescription className="text-gray-500 dark:text-slate-400 text-xs mt-0.5">
-                        Toggle rules on/off without deleting them.
+                        Drag to reorder priority. Click the pencil to edit inline.
                       </CardDescription>
                     </div>
                     <Button
@@ -2326,85 +2505,125 @@ export default function SimpleAdmin() {
                     </div>
                   )}
 
-                  {/* Rules table */}
+                  {/* Rules cards — drag-to-reorder */}
                   {!rulesLoading && globalRules.length > 0 && (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-gray-200 dark:border-slate-700">
-                            <th className="text-left py-3 px-3 text-gray-500 dark:text-slate-400 font-medium">Category</th>
-                            <th className="text-left py-3 px-3 text-gray-500 dark:text-slate-400 font-medium">Rule</th>
-                            <th className="text-left py-3 px-3 text-gray-500 dark:text-slate-400 font-medium hidden sm:table-cell">Priority</th>
-                            <th className="text-left py-3 px-3 text-gray-500 dark:text-slate-400 font-medium">Status</th>
-                            <th className="text-right py-3 px-3 text-gray-500 dark:text-slate-400 font-medium">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {globalRules.map((rule) => (
-                            <tr
-                              key={rule.id}
-                              className={`border-b border-gray-100 dark:border-slate-700/50 transition-colors ${
-                                rule.isActive
-                                  ? 'hover:bg-gray-50 dark:hover:bg-slate-700/30'
-                                  : 'opacity-50 bg-gray-50/50 dark:bg-slate-900/20 hover:bg-gray-100/50 dark:hover:bg-slate-800/30'
-                              }`}
-                            >
-                              <td className="py-3 px-3">
-                                <Badge className="bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20 rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap">
-                                  {rule.category}
-                                </Badge>
-                              </td>
-                              <td className="py-3 px-3 text-gray-700 dark:text-slate-300 max-w-xs">
-                                {rule.ruleText}
-                              </td>
-                              <td className="py-3 px-3 text-gray-500 dark:text-slate-400 hidden sm:table-cell text-center">
-                                <span className="inline-block w-8 text-center font-mono text-xs bg-gray-100 dark:bg-slate-700 rounded px-1 py-0.5">
-                                  {rule.priority}
-                                </span>
-                              </td>
-                              <td className="py-3 px-3">
-                                {rule.isActive ? (
-                                  <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
-                                    <CheckCircle className="w-3 h-3 mr-1" />
-                                    Active
+                    <div className="space-y-2">
+                      {globalRules.map((rule) => (
+                        <div
+                          key={rule.id}
+                          draggable
+                          onDragStart={() => setDragId(rule.id)}
+                          onDragOver={(e) => { e.preventDefault(); setDragOverId(rule.id); }}
+                          onDrop={() => handleRuleDrop(rule.id)}
+                          onDragEnd={() => { setDragId(null); setDragOverId(null); }}
+                          className={`rounded-lg border transition-all ${
+                            dragOverId === rule.id && dragId !== rule.id
+                              ? 'border-pink-400 bg-pink-50/30 dark:bg-pink-900/10'
+                              : rule.isActive
+                              ? 'border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800/60'
+                              : 'border-gray-200 dark:border-slate-700/50 bg-gray-50 dark:bg-slate-900/30 opacity-60'
+                          } ${dragId === rule.id ? 'opacity-40 scale-95' : ''}`}
+                        >
+                          {editingRuleId === rule.id ? (
+                            /* ── Edit mode ── */
+                            <div className="p-3 space-y-2">
+                              <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2">
+                                <Input
+                                  value={editCategory}
+                                  onChange={(e) => setEditCategory(e.target.value)}
+                                  placeholder="Category"
+                                  className="text-sm bg-gray-50 dark:bg-slate-700 border-gray-300 dark:border-slate-600"
+                                />
+                                <Input
+                                  value={editText}
+                                  onChange={(e) => setEditText(e.target.value)}
+                                  placeholder="Rule text"
+                                  className="text-sm bg-gray-50 dark:bg-slate-700 border-gray-300 dark:border-slate-600"
+                                />
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  max={100}
+                                  value={editPriority}
+                                  onChange={(e) => setEditPriority(Number(e.target.value) || 0)}
+                                  placeholder="Priority"
+                                  className="w-20 text-sm bg-gray-50 dark:bg-slate-700 border-gray-300 dark:border-slate-600"
+                                />
+                              </div>
+                              <div className="flex gap-2 justify-end">
+                                <Button size="sm" variant="outline" onClick={() => setEditingRuleId(null)} className="text-xs">Cancel</Button>
+                                <Button size="sm" onClick={() => updateRule(rule.id)} className="text-xs bg-pink-600 hover:bg-pink-700 text-white">Save</Button>
+                              </div>
+                            </div>
+                          ) : (
+                            /* ── View mode ── */
+                            <div className="flex items-start gap-3 p-3">
+                              {/* Drag handle */}
+                              <div className="mt-0.5 cursor-grab active:cursor-grabbing text-gray-300 dark:text-slate-600 shrink-0 select-none">
+                                ⠿
+                              </div>
+                              {/* Content */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                                  <Badge className="bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20 rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap">
+                                    {rule.category}
                                   </Badge>
-                                ) : (
-                                  <Badge className="bg-gray-400/10 text-gray-500 dark:text-slate-500 border-gray-400/20 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
-                                    <XCircle className="w-3 h-3 mr-1" />
-                                    Disabled
-                                  </Badge>
-                                )}
-                              </td>
-                              <td className="py-3 px-3">
-                                <div className="flex items-center justify-end gap-1.5">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => toggleRule(rule.id, !rule.isActive)}
-                                    title={rule.isActive ? 'Disable rule' : 'Enable rule'}
-                                    className={`w-7 h-7 ${
-                                      rule.isActive
-                                        ? 'text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
-                                        : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-slate-700'
-                                    }`}
-                                  >
-                                    <Power className="w-3.5 h-3.5" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => deleteRule(rule.id)}
-                                    title="Delete rule"
-                                    className="w-7 h-7 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </Button>
+                                  {rule.isActive ? (
+                                    <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
+                                      <CheckCircle className="w-3 h-3 mr-1 inline" />Active
+                                    </Badge>
+                                  ) : (
+                                    <Badge className="bg-gray-400/10 text-gray-500 dark:text-slate-500 border-gray-400/20 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
+                                      <XCircle className="w-3 h-3 mr-1 inline" />Disabled
+                                    </Badge>
+                                  )}
+                                  <span className="font-mono text-[10px] text-gray-400 dark:text-slate-500">p={rule.priority}</span>
                                 </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                                <p className="text-sm text-gray-700 dark:text-slate-300 leading-snug">{rule.ruleText}</p>
+                              </div>
+                              {/* Actions */}
+                              <div className="flex items-center gap-1 shrink-0">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  title="Edit rule"
+                                  className="w-7 h-7 text-gray-400 hover:text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/20"
+                                  onClick={() => {
+                                    setEditingRuleId(rule.id);
+                                    setEditCategory(rule.category);
+                                    setEditText(rule.ruleText);
+                                    setEditPriority(rule.priority);
+                                  }}
+                                >
+                                  <Sparkles className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => toggleRule(rule.id, !rule.isActive)}
+                                  title={rule.isActive ? 'Disable rule' : 'Enable rule'}
+                                  className={`w-7 h-7 ${
+                                    rule.isActive
+                                      ? 'text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
+                                      : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-slate-700'
+                                  }`}
+                                >
+                                  <Power className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => deleteRule(rule.id)}
+                                  title="Delete rule"
+                                  className="w-7 h-7 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   )}
                 </CardContent>

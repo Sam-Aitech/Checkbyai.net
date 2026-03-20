@@ -2553,14 +2553,16 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
       const startDate = req.query.startDate as string | undefined;
       const endDate = req.query.endDate as string | undefined;
       const search = req.query.search as string | undefined;
-      
+      const period = req.query.period as string | undefined;
+
       const result = await storage.getPaginatedVerificationLogs({
         page,
         limit,
         status,
         startDate,
         endDate,
-        search
+        search,
+        period,
       });
       
       res.json(result);
@@ -3613,6 +3615,65 @@ Format your response in clear, professional markdown.`;
     }
   });
 
+  // Toggle COS Beta access for a user (admin only)
+  app.patch('/api/admin/users/:id/cos-beta', isAdmin, async (req: any, res) => {
+    try {
+      const userId = req.params.id;
+      const { enabled, limit } = req.body;
+
+      if (typeof enabled !== 'boolean') {
+        return res.status(400).json({ message: 'enabled must be a boolean' });
+      }
+      if (limit !== null && limit !== undefined && (!Number.isInteger(limit) || limit < 1)) {
+        return res.status(400).json({ message: 'limit must be a positive integer or null' });
+      }
+
+      const targetUser = await storage.getUser(userId);
+      if (!targetUser) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      const updatedUser = await storage.updateCosBeta(userId, enabled, limit ?? null);
+
+      // Send "COS Beta Access Granted" email only when enabling and user has a paid plan
+      const isPaid = ['starter', 'pro', 'unlimited', 'enterprise'].includes(updatedUser.subscriptionStatus || '');
+      if (enabled && isPaid && updatedUser.email) {
+        const apiKey = process.env.RESEND_API_KEY;
+        if (apiKey) {
+          const limitLine = limit ? `<p style="color:#333;font-size:15px;">Your daily verification limit has been set to <strong>${limit}</strong>.</p>` : '';
+          const html = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+            <div style="background:linear-gradient(135deg,#7c3aed 0%,#a855f7 100%);padding:28px;border-radius:10px 10px 0 0;">
+              <h1 style="color:#fff;margin:0;text-align:center;font-size:20px;">&#127881; COS Beta Access Granted</h1>
+            </div>
+            <div style="background:#fff;padding:28px;border:1px solid #e0e0e0;border-top:none;border-radius:0 0 10px 10px;">
+              <p style="color:#333;font-size:15px;margin-top:0;">Congratulations! You have been granted <strong>COS Beta access</strong> on Check By AI.</p>
+              ${limitLine}
+              <div style="text-align:center;margin:24px 0;">
+                <a href="https://checkbyai.net/dashboard" style="background:#7c3aed;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:15px;display:inline-block;">Go to Dashboard</a>
+              </div>
+              <p style="color:#999;font-size:12px;margin-top:24px;text-align:center;">Questions? <a href="mailto:support@checkbyai.net" style="color:#1d4ed8;">support@checkbyai.net</a></p>
+            </div>
+          </div>`;
+          fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+            body: JSON.stringify({
+              from: "CheckByAI <noreply@checkbyai.net>",
+              to: [updatedUser.email],
+              subject: "You've been granted COS Beta access",
+              html,
+            }),
+          }).catch(err => console.error("[COS Beta] Email error:", err));
+        }
+      }
+
+      res.json({ message: enabled ? 'COS Beta access enabled' : 'COS Beta access disabled', userId, cosBetaEnabled: enabled, cosBetaLimit: limit ?? null });
+    } catch (error) {
+      console.error("Error updating COS Beta access:", error);
+      res.status(500).json({ message: "Failed to update COS Beta access" });
+    }
+  });
+
   // Delete a user — soft delete (admin only; cannot delete self or other admins)
   app.delete('/api/admin/users/:id', isAdmin, async (req: any, res) => {
     try {
@@ -3709,6 +3770,7 @@ Format your response in clear, professional markdown.`;
         category,
         ruleText,
         priority,
+        createdBy: req.user?.id ?? null,
       });
 
       res.json(rule);
@@ -3791,11 +3853,12 @@ Format your response in clear, professional markdown.`;
         category,
         ruleText: enrichedRuleText,
         priority,
+        createdBy: req.user?.id ?? null,
       });
 
-      res.json({ 
+      res.json({
         message: 'AI has learned this pattern',
-        rule 
+        rule
       });
     } catch (error) {
       console.error("Error teaching AI:", error);
