@@ -183,7 +183,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Health endpoint for external uptime monitors (keeps server alive for cron windows)
   app.get('/api/health', async (req, res) => {
     const lastRun = getLastRunInfo();
-    const jobRunning = isJobRunning();
+    const jobRunning = await isJobRunning();
     res.json({
       status: 'ok',
       timestamp: new Date().toISOString(),
@@ -3078,7 +3078,7 @@ Format your response in clear, professional markdown.`;
         lastRun,
         activeWatchCount,
         notificationsSent24h,
-        jobRunning: isJobRunning(),
+        jobRunning: await isJobRunning(),
       });
     } catch (error) {
       console.error("Error fetching sponsor monitor status:", error);
