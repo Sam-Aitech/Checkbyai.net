@@ -879,9 +879,16 @@ export default function SponsorMonitor() {
   });
 
   const handleAddWatch = useCallback((company: SponsorSearchResult) => {
-    if (!isAuthenticated) { setLocation("/login"); return; }
+    if (!isAuthenticated) {
+      setLocation(`/pricing?company=${encodeURIComponent(company.organisationName)}`);
+      return;
+    }
+    if (isFreeUser) {
+      setLocation(`/pricing?company=${encodeURIComponent(company.organisationName)}`);
+      return;
+    }
     addWatchMutation.mutate(company);
-  }, [isAuthenticated, setLocation, addWatchMutation]);
+  }, [isAuthenticated, isFreeUser, setLocation, addWatchMutation]);
 
   const openHistory = useCallback((fingerprint: string, name: string) => {
     setHistoryTarget({ fingerprint, name });
@@ -1118,7 +1125,7 @@ export default function SponsorMonitor() {
                         </div>
                         <div className="shrink-0">
                           {isFreeUser ? (
-                            <Button size="sm" onClick={() => setLocation("/pricing")} className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 text-xs font-bold">
+                            <Button size="sm" onClick={() => setLocation(`/pricing?company=${encodeURIComponent(result.organisationName)}`)} className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 text-xs font-bold">
                               <Lock className="w-3.5 h-3.5 mr-1" />Upgrade to Monitor
                             </Button>
                           ) : isAdded ? (

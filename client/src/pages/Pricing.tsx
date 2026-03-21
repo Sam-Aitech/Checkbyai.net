@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useLocation } from 'wouter';
+import { useLocation, useSearch } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { Check, X, Shield, Zap, Clock, LogIn, Bell, Eye, MessageSquare, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -168,6 +168,8 @@ function NotificationPlanCard({ plan, index, isLoggedIn, loading, onSelect }: {
 
 export default function Pricing() {
   const [, setLocation] = useLocation();
+  const search = useSearch();
+  const companyParam = new URLSearchParams(search).get('company') || '';
   const { toast } = useToast();
   const [loading, setLoading] = useState<string | null>(null);
 
@@ -208,7 +210,10 @@ export default function Pricing() {
     }
 
     try {
-      const res = await apiRequest('POST', '/api/checkout/sign', { packageType: plan.packageType });
+      const res = await apiRequest('POST', '/api/checkout/sign', {
+        packageType: plan.packageType,
+        ...(companyParam ? { companyName: companyParam } : {}),
+      });
       const { clientReferenceId } = await res.json();
       const url = `${link}?client_reference_id=${encodeURIComponent(clientReferenceId)}&prefilled_email=${encodeURIComponent(user?.email || '')}`;
       window.location.href = url;
@@ -305,12 +310,28 @@ export default function Pricing() {
             <span className="editorial-caption text-muted-foreground mb-4 inline-block">
               Notification Engine
             </span>
-            <h1 className="text-5xl md:text-6xl editorial-heading text-foreground mb-4">
-              Protect Your Visa
-            </h1>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto editorial-body">
-              Get alerted the moment your sponsor's licence status changes. Never be caught off guard by a revocation or suspension.
-            </p>
+            {companyParam ? (
+              <>
+                <h1 className="text-4xl md:text-5xl editorial-heading text-foreground mb-4 break-words">
+                  Start monitoring{' '}
+                  <span className="text-primary">{companyParam}</span>
+                </h1>
+                <p className="text-xl text-muted-foreground max-w-2xl mx-auto editorial-body">
+                  Choose a plan to get instant alerts when{' '}
+                  <strong className="text-foreground">{companyParam}</strong>'s
+                  sponsor licence status changes.
+                </p>
+              </>
+            ) : (
+              <>
+                <h1 className="text-5xl md:text-6xl editorial-heading text-foreground mb-4">
+                  Protect Your Visa
+                </h1>
+                <p className="text-xl text-muted-foreground max-w-2xl mx-auto editorial-body">
+                  Get alerted the moment your sponsor's licence status changes. Never be caught off guard by a revocation or suspension.
+                </p>
+              </>
+            )}
             
             {!isLoadingUser && !isLoggedIn && (
               <div className="mt-6 inline-flex items-center gap-2 bg-muted text-foreground border border-border rounded-xl px-4 py-2">

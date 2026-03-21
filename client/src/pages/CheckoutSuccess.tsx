@@ -14,6 +14,7 @@ interface VerifyResult {
   credits?: number;
   subscriptionStatus?: string;
   status?: string;
+  companyName?: string;
 }
 
 const spring = { type: "spring" as const, stiffness: 100, damping: 15 };
@@ -54,6 +55,20 @@ export default function CheckoutSuccess() {
 
     verifySession();
   }, [sessionId, queryClient]);
+
+  const isNotificationPlan = verifyResult?.packageType === 'notification_starter' || verifyResult?.packageType === 'notification_pro';
+
+  const sponsorDashboardUrl = verifyResult?.companyName
+    ? `/dashboard/sponsor?company=${encodeURIComponent(verifyResult.companyName)}`
+    : '/dashboard/sponsor';
+
+  // Auto-redirect notification plan purchases to sponsor dashboard after 2s
+  useEffect(() => {
+    if (!isVerifying && verifyResult?.success && isNotificationPlan) {
+      const timer = setTimeout(() => setLocation(sponsorDashboardUrl), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [isVerifying, verifyResult?.success, isNotificationPlan, sponsorDashboardUrl, setLocation]);
 
   const getPackageLabel = (type?: string) => {
     switch (type) {
@@ -155,9 +170,9 @@ export default function CheckoutSuccess() {
               <Button
                 className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full"
                 size="lg"
-                onClick={() => setLocation('/')}
+                onClick={() => setLocation(isNotificationPlan ? sponsorDashboardUrl : '/')}
               >
-                Start Verifying Documents
+                {isNotificationPlan ? 'Go to Dashboard' : 'Start Verifying Documents'}
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </div>

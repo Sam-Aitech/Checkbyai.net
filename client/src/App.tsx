@@ -21,6 +21,7 @@ const Technology = lazy(() => import("@/pages/Technology"));
 const ApiDocs = lazy(() => import("@/pages/ApiDocs"));
 const VerificationHistory = lazy(() => import("@/pages/VerificationHistory"));
 const SponsorMonitor = lazy(() => import("@/pages/SponsorMonitor"));
+const SponsorDashboard = lazy(() => import("@/pages/SponsorDashboard"));
 const SponsorChanges = lazy(() => import("@/pages/SponsorChanges"));
 const SponsorDirectory = lazy(() => import("@/pages/SponsorDirectory"));
 const CheckFakeCoS = lazy(() => import("@/pages/CheckFakeCoS"));
@@ -58,6 +59,7 @@ function Router() {
         <Route path="/technology" component={Technology} />
         <Route path="/api-docs" component={ApiDocs} />
         <Route path="/history" component={VerificationHistory} />
+        <Route path="/dashboard/sponsor" component={SponsorDashboard} />
         <Route path="/sponsor-monitor" component={SponsorMonitor} />
         <Route path="/sponsor-changes" component={SponsorChanges} />
         <Route path="/sponsors" component={SponsorDirectory} />

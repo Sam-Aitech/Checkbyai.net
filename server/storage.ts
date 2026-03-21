@@ -25,6 +25,7 @@ import {
   type SystemSetting,
   type SponsorWatch,
   type InsertSponsorWatch,
+  type NotifEventPrefs,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, gte, count, avg, sql, inArray, isNull, and, getTableColumns } from "drizzle-orm";
@@ -181,11 +182,27 @@ export interface IStorage {
   cancelSponsorWatch(id: string): Promise<void>;
   getPendingWatchesByCompanyName(companyName: string): Promise<(SponsorWatch & { userEmail: string })[]>;
   markSponsorWatchNotified(id: string): Promise<void>;
+
+  // Notification event preferences (per-change-type toggles stored on users row)
+  getUserNotifPrefs(userId: string): Promise<NotifEventPrefs>;
+  updateUserNotifPrefs(userId: string, prefs: Partial<NotifEventPrefs>): Promise<void>;
 }
 
 // 60-second in-memory TTL cache for active global AI rules
 let rulesCache: { data: GlobalAiRule[]; expiresAt: number } | null = null;
 function invalidateRulesCache() { rulesCache = null; }
+
+// Default notification event preferences — all change types enabled.
+// Merged with any per-user overrides stored in users.notif_prefs.
+const DEFAULT_NOTIF_PREFS: NotifEventPrefs = {
+  NEW_LICENCE: true,
+  REMOVED_REVOKED: true,
+  RE_ACTIVATED: true,
+  UPGRADED: true,
+  DOWNGRADED: true,
+  ROUTE_CHANGE: true,
+  NAME_CHANGE: true,
+};
 
 export class DatabaseStorage implements IStorage {
   // User operations
@@ -1125,6 +1142,24 @@ export class DatabaseStorage implements IStorage {
       .update(sponsorWatches)
       .set({ status: "notified", notifiedAt: new Date() })
       .where(eq(sponsorWatches.id, id));
+  }
+
+  async getUserNotifPrefs(userId: string): Promise<NotifEventPrefs> {
+    const [row] = await db
+      .select({ notifPrefs: users.notifPrefs })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    return { ...DEFAULT_NOTIF_PREFS, ...(row?.notifPrefs ?? {}) };
+  }
+
+  async updateUserNotifPrefs(userId: string, prefs: Partial<NotifEventPrefs>): Promise<void> {
+    const current = await this.getUserNotifPrefs(userId);
+    const merged: NotifEventPrefs = { ...current, ...prefs };
+    await db
+      .update(users)
+      .set({ notifPrefs: merged, updatedAt: new Date() })
+      .where(eq(users.id, userId));
   }
 }
 

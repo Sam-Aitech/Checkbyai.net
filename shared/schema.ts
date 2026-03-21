@@ -14,6 +14,19 @@ import {
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Which change-event types a user wants to be alerted about.
+// Stored as jsonb on users to avoid an extra join in the hot notification path.
+// null column = use defaults (all true). Individual keys can be overridden to false.
+export interface NotifEventPrefs {
+  NEW_LICENCE: boolean;
+  REMOVED_REVOKED: boolean;
+  RE_ACTIVATED: boolean;
+  UPGRADED: boolean;
+  DOWNGRADED: boolean;
+  ROUTE_CHANGE: boolean;
+  NAME_CHANGE: boolean;
+}
+
 // Session storage table for Replit Auth
 export const sessions = pgTable(
   "sessions",
@@ -57,6 +70,7 @@ export const users = pgTable("users", {
   cosBetaEnabled: boolean("cos_beta_enabled").default(false),
   cosBetaLimit: integer("cos_beta_limit"),
   deletedAt: timestamp("deleted_at"),
+  notifPrefs: jsonb("notif_prefs").$type<NotifEventPrefs>(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [

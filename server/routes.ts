@@ -34,24 +34,42 @@ import { sendSMS, sendWhatsApp } from "./services/messaging";
 
 const CHECKOUT_HMAC_SECRET = process.env.CHECKOUT_HMAC_SECRET || process.env.SESSION_SECRET || process.env.STRIPE_SECRET_KEY!;
 
-function signClientReferenceId(userId: string, packageType: string): string {
-  const payload = `${userId}::${packageType}`;
+function signClientReferenceId(userId: string, packageType: string, companyName?: string): string {
+  const encodedCompany = companyName ? encodeURIComponent(companyName) : '';
+  const payload = encodedCompany
+    ? `${userId}::${packageType}::${encodedCompany}`
+    : `${userId}::${packageType}`;
   const hmac = crypto.createHmac('sha256', CHECKOUT_HMAC_SECRET).update(payload).digest('hex').slice(0, 16);
   return `${payload}::${hmac}`;
 }
 
-function verifyClientReferenceId(clientRefId: string): { userId: string; packageType: string } | null {
+function verifyClientReferenceId(clientRefId: string): { userId: string; packageType: string; companyName?: string } | null {
   try {
     const parts = clientRefId.split('::');
-    if (parts.length !== 3) return null;
-    const [userId, packageType, signature] = parts;
+    let userId: string, packageType: string, signature: string, encodedCompany: string | undefined;
+
+    if (parts.length === 3) {
+      // Legacy format: userId::packageType::hmac16
+      [userId, packageType, signature] = parts;
+    } else if (parts.length === 4) {
+      // Extended format: userId::packageType::encodedCompany::hmac16
+      [userId, packageType, encodedCompany, signature] = parts;
+    } else {
+      return null;
+    }
+
     if (!userId || !packageType || !signature || signature.length !== 16) return null;
-    const expected = crypto.createHmac('sha256', CHECKOUT_HMAC_SECRET).update(`${userId}::${packageType}`).digest('hex').slice(0, 16);
+    const payload = encodedCompany ? `${userId}::${packageType}::${encodedCompany}` : `${userId}::${packageType}`;
+    const expected = crypto.createHmac('sha256', CHECKOUT_HMAC_SECRET).update(payload).digest('hex').slice(0, 16);
     const sigBuf = Buffer.from(signature, 'hex');
     const expBuf = Buffer.from(expected, 'hex');
     if (sigBuf.length !== expBuf.length) return null;
     if (!crypto.timingSafeEqual(sigBuf, expBuf)) return null;
-    return { userId, packageType };
+    return {
+      userId,
+      packageType,
+      ...(encodedCompany ? { companyName: decodeURIComponent(encodedCompany) } : {}),
+    };
   } catch {
     return null;
   }
@@ -910,12 +928,13 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
   app.post('/api/checkout/sign', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const { packageType } = req.body;
+      const { packageType, companyName } = req.body;
       const validTypes = ['starter', 'pro', 'unlimited', 'master', 'notification_starter', 'notification_pro'];
       if (!packageType || !validTypes.includes(packageType)) {
         return res.status(400).json({ message: 'Invalid package type' });
       }
-      const clientReferenceId = signClientReferenceId(userId, packageType);
+      // companyName is encoded into the signed payload so it survives the Stripe payment link round-trip
+      const clientReferenceId = signClientReferenceId(userId, packageType, companyName || undefined);
       res.json({ clientReferenceId });
     } catch (error: any) {
       console.error('Sign checkout error:', error);
@@ -999,11 +1018,22 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
     try {
       const { sessionId } = req.params;
       const session = await stripe.checkout.sessions.retrieve(sessionId);
-      
+
       if (session.payment_status === 'paid') {
-        const packageType = session.metadata?.packageType;
-        const sessionUserId = session.metadata?.userId;
-        
+        let packageType = session.metadata?.packageType;
+        let sessionUserId = session.metadata?.userId;
+        let companyName: string | undefined;
+
+        // Payment-link sessions carry identity in client_reference_id, not metadata
+        if (!sessionUserId && session.client_reference_id) {
+          const verified = verifyClientReferenceId(session.client_reference_id);
+          if (verified && verified.userId === req.user.id) {
+            sessionUserId = verified.userId;
+            packageType = verified.packageType;
+            companyName = verified.companyName;
+          }
+        }
+
         if (sessionUserId && sessionUserId === req.user.id) {
           if (!(await isSessionProcessed(sessionId))) {
             await markSessionProcessed(sessionId);
@@ -1069,12 +1099,13 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
           
           const credits = await storage.getCredits(sessionUserId);
           const user = await storage.getUser(sessionUserId);
-          
-          res.json({ 
-            success: true, 
+
+          res.json({
+            success: true,
             packageType,
             credits,
-            subscriptionStatus: user?.subscriptionStatus 
+            subscriptionStatus: user?.subscriptionStatus,
+            ...(companyName ? { companyName } : {}),
           });
         } else {
           res.status(403).json({ message: 'Session does not belong to this user' });
@@ -2196,6 +2227,43 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
     } catch (error) {
       console.error("Error updating notification preferences:", error);
       res.status(500).json({ message: "Failed to update notification preferences." });
+    }
+  });
+
+  // ── Notification event-type preferences ────────────────────────────────────
+  // These control WHICH change events trigger an alert (separate from channel prefs).
+  // Stored as jsonb on the users row to avoid a join in the hot notification path.
+
+  app.get('/api/notifications/preferences', isAuthenticated, async (req: any, res) => {
+    try {
+      const prefs = await storage.getUserNotifPrefs(req.user.id);
+      res.json(prefs);
+    } catch (error) {
+      console.error('[NotifPrefs] GET error:', error);
+      res.status(500).json({ message: 'Failed to fetch notification event preferences.' });
+    }
+  });
+
+  app.patch('/api/notifications/preferences', isAuthenticated, async (req: any, res) => {
+    try {
+      const schema = z.object({
+        NEW_LICENCE:     z.boolean().optional(),
+        REMOVED_REVOKED: z.boolean().optional(),
+        RE_ACTIVATED:    z.boolean().optional(),
+        UPGRADED:        z.boolean().optional(),
+        DOWNGRADED:      z.boolean().optional(),
+        ROUTE_CHANGE:    z.boolean().optional(),
+        NAME_CHANGE:     z.boolean().optional(),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: parsed.error.errors.map((e: any) => e.message).join(', ') });
+      }
+      await storage.updateUserNotifPrefs(req.user.id, parsed.data);
+      res.json({ message: 'Notification event preferences updated.' });
+    } catch (error) {
+      console.error('[NotifPrefs] PATCH error:', error);
+      res.status(500).json({ message: 'Failed to update notification event preferences.' });
     }
   });
 
