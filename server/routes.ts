@@ -2246,14 +2246,22 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
 
   app.patch('/api/notifications/preferences', isAuthenticated, async (req: any, res) => {
     try {
+      const eventSchema = z.object({
+        enabled: z.boolean().optional(),
+        channels: z.object({
+          email: z.boolean().optional(),
+          inApp: z.boolean().optional(),
+          sms:   z.boolean().optional(),
+        }).optional(),
+      }).optional();
       const schema = z.object({
-        NEW_LICENCE:     z.boolean().optional(),
-        REMOVED_REVOKED: z.boolean().optional(),
-        RE_ACTIVATED:    z.boolean().optional(),
-        UPGRADED:        z.boolean().optional(),
-        DOWNGRADED:      z.boolean().optional(),
-        ROUTE_CHANGE:    z.boolean().optional(),
-        NAME_CHANGE:     z.boolean().optional(),
+        licence_revoked:    eventSchema,
+        rating_downgraded:  eventSchema,
+        licence_reinstated: eventSchema,
+        rating_upgraded:    eventSchema,
+        route_added:        eventSchema,
+        route_removed:      eventSchema,
+        weekly_digest:      eventSchema,
       });
       const parsed = schema.safeParse(req.body);
       if (!parsed.success) {

@@ -25,7 +25,9 @@ import {
   type SystemSetting,
   type SponsorWatch,
   type InsertSponsorWatch,
-  type NotifEventPrefs,
+  type NotifPrefs,
+  type NotifEventType,
+  DEFAULT_NOTIF_PREFS,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, gte, count, avg, sql, inArray, isNull, and, getTableColumns } from "drizzle-orm";
@@ -183,25 +185,26 @@ export interface IStorage {
   getPendingWatchesByCompanyName(companyName: string): Promise<(SponsorWatch & { userEmail: string })[]>;
   markSponsorWatchNotified(id: string): Promise<void>;
 
-  // Notification event preferences (per-change-type toggles stored on users row)
-  getUserNotifPrefs(userId: string): Promise<NotifEventPrefs>;
-  updateUserNotifPrefs(userId: string, prefs: Partial<NotifEventPrefs>): Promise<void>;
+  // Notification event preferences (per-event, per-channel toggles stored on users row)
+  getUserNotifPrefs(userId: string): Promise<NotifPrefs>;
+  updateUserNotifPrefs(userId: string, patch: DeepPartialNotifPrefs): Promise<void>;
 }
 
 // 60-second in-memory TTL cache for active global AI rules
 let rulesCache: { data: GlobalAiRule[]; expiresAt: number } | null = null;
 function invalidateRulesCache() { rulesCache = null; }
 
-// Default notification event preferences — all change types enabled.
-// Merged with any per-user overrides stored in users.notif_prefs.
-const DEFAULT_NOTIF_PREFS: NotifEventPrefs = {
-  NEW_LICENCE: true,
-  REMOVED_REVOKED: true,
-  RE_ACTIVATED: true,
-  UPGRADED: true,
-  DOWNGRADED: true,
-  ROUTE_CHANGE: true,
-  NAME_CHANGE: true,
+// Partial type for deep-merging per-event, per-channel prefs.
+// Only the keys being changed need to be provided; missing keys keep current values.
+type DeepPartialNotifPrefs = {
+  [K in NotifEventType]?: {
+    enabled?: boolean;
+    channels?: {
+      email?: boolean;
+      inApp?: boolean;
+      sms?: boolean;
+    };
+  };
 };
 
 export class DatabaseStorage implements IStorage {
@@ -1144,18 +1147,45 @@ export class DatabaseStorage implements IStorage {
       .where(eq(sponsorWatches.id, id));
   }
 
-  async getUserNotifPrefs(userId: string): Promise<NotifEventPrefs> {
+  async getUserNotifPrefs(userId: string): Promise<NotifPrefs> {
     const [row] = await db
       .select({ notifPrefs: users.notifPrefs })
       .from(users)
       .where(eq(users.id, userId))
       .limit(1);
-    return { ...DEFAULT_NOTIF_PREFS, ...(row?.notifPrefs ?? {}) };
+    const stored = row?.notifPrefs ?? {};
+    // Deep merge stored prefs over defaults so missing keys fall back correctly.
+    const result = { ...DEFAULT_NOTIF_PREFS } as NotifPrefs;
+    for (const key of Object.keys(DEFAULT_NOTIF_PREFS) as NotifEventType[]) {
+      const s = (stored as any)[key];
+      if (s) {
+        result[key] = {
+          enabled: s.enabled ?? DEFAULT_NOTIF_PREFS[key].enabled,
+          channels: {
+            email: s.channels?.email ?? DEFAULT_NOTIF_PREFS[key].channels.email,
+            inApp: s.channels?.inApp ?? DEFAULT_NOTIF_PREFS[key].channels.inApp,
+            sms:   s.channels?.sms   ?? DEFAULT_NOTIF_PREFS[key].channels.sms,
+          },
+        };
+      }
+    }
+    return result;
   }
 
-  async updateUserNotifPrefs(userId: string, prefs: Partial<NotifEventPrefs>): Promise<void> {
+  async updateUserNotifPrefs(userId: string, patch: DeepPartialNotifPrefs): Promise<void> {
     const current = await this.getUserNotifPrefs(userId);
-    const merged: NotifEventPrefs = { ...current, ...prefs };
+    // Three-level merge: top → event → channels. Prevents partial updates losing channel keys.
+    const merged = { ...DEFAULT_NOTIF_PREFS } as NotifPrefs;
+    for (const key of Object.keys(DEFAULT_NOTIF_PREFS) as NotifEventType[]) {
+      merged[key] = {
+        enabled:  patch[key]?.enabled  ?? current[key].enabled,
+        channels: {
+          email: patch[key]?.channels?.email ?? current[key].channels.email,
+          inApp: patch[key]?.channels?.inApp ?? current[key].channels.inApp,
+          sms:   patch[key]?.channels?.sms   ?? current[key].channels.sms,
+        },
+      };
+    }
     await db
       .update(users)
       .set({ notifPrefs: merged, updatedAt: new Date() })

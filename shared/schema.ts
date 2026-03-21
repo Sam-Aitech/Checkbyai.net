@@ -14,18 +14,38 @@ import {
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Which change-event types a user wants to be alerted about.
-// Stored as jsonb on users to avoid an extra join in the hot notification path.
-// null column = use defaults (all true). Individual keys can be overridden to false.
-export interface NotifEventPrefs {
-  NEW_LICENCE: boolean;
-  REMOVED_REVOKED: boolean;
-  RE_ACTIVATED: boolean;
-  UPGRADED: boolean;
-  DOWNGRADED: boolean;
-  ROUTE_CHANGE: boolean;
-  NAME_CHANGE: boolean;
-}
+// Per-event, per-channel notification preferences.
+// Stored as jsonb on users.notif_prefs to avoid an extra join in the hot notification path.
+// null column = use DEFAULT_NOTIF_PREFS. Partial updates are deep-merged server-side.
+export type NotifEventType =
+  | "licence_revoked"
+  | "rating_downgraded"
+  | "licence_reinstated"
+  | "rating_upgraded"
+  | "route_added"
+  | "route_removed"
+  | "weekly_digest";
+
+export type NotifPrefs = {
+  [K in NotifEventType]: {
+    enabled: boolean;
+    channels: {
+      email: boolean;
+      inApp: boolean;
+      sms: boolean;
+    };
+  };
+};
+
+export const DEFAULT_NOTIF_PREFS: NotifPrefs = {
+  licence_revoked:    { enabled: true,  channels: { email: true,  inApp: true,  sms: false } },
+  rating_downgraded:  { enabled: true,  channels: { email: true,  inApp: false, sms: false } },
+  licence_reinstated: { enabled: true,  channels: { email: true,  inApp: true,  sms: false } },
+  rating_upgraded:    { enabled: false, channels: { email: false, inApp: true,  sms: false } },
+  route_added:        { enabled: false, channels: { email: false, inApp: true,  sms: false } },
+  route_removed:      { enabled: false, channels: { email: false, inApp: false, sms: false } },
+  weekly_digest:      { enabled: true,  channels: { email: true,  inApp: false, sms: false } },
+};
 
 // Session storage table for Replit Auth
 export const sessions = pgTable(
@@ -70,7 +90,7 @@ export const users = pgTable("users", {
   cosBetaEnabled: boolean("cos_beta_enabled").default(false),
   cosBetaLimit: integer("cos_beta_limit"),
   deletedAt: timestamp("deleted_at"),
-  notifPrefs: jsonb("notif_prefs").$type<NotifEventPrefs>(),
+  notifPrefs: jsonb("notif_prefs").$type<NotifPrefs>(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
@@ -412,6 +432,28 @@ export const notifEngineLog = pgTable(
   ]
 );
 
+// New-generation audit log written by the notification engine (Part 5+).
+// Supersedes notif_engine_log (kept for backwards-compat; dropped after Part 5 migration).
+// uuid PK avoids int-sequence contention; success boolean simplifies analytics queries.
+export const notifLog = pgTable(
+  "notif_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: varchar("user_id").references(() => users.id).notNull(),
+    changeId: integer("change_id").references(() => sponsorChanges.id),
+    eventType: varchar("event_type").notNull(),
+    channel: varchar("channel").notNull().default("email"),
+    companyName: text("company_name").notNull(),
+    success: boolean("success").notNull(),
+    providerMessageId: varchar("provider_message_id"),
+    errorDetails: text("error_details"),
+    sentAt: timestamp("sent_at").defaultNow(),
+  },
+  (table) => [
+    index("idx_notif_log_user_sent").on(table.userId, table.sentAt),
+  ]
+);
+
 // Daily AI-generated digest for landing page
 export const dailyDigest = pgTable("daily_digest", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
@@ -579,7 +621,8 @@ export type CompanyWatch = typeof companyWatches.$inferSelect;
 export type SponsorChange = typeof sponsorChanges.$inferSelect;
 export type NotificationPreference = typeof notificationPreferences.$inferSelect;
 export type NotificationLogEntry = typeof notificationLog.$inferSelect;
-export type NotifEngineLogEntry = typeof notifEngineLog.$inferSelect;
+export type NotifEngineLogEntry = typeof notifEngineLog.$inferSelect; // deprecated — use NotifLogEntry
+export type NotifLogEntry = typeof notifLog.$inferSelect;
 export type CsvArchiveEntry = typeof csvArchive.$inferSelect;
 export type DiffResultEntry = typeof diffResults.$inferSelect;
 

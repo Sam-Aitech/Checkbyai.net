@@ -20,7 +20,7 @@ import {
   sponsorChanges,
   users,
 } from "@shared/schema";
-import type { NotifEventPrefs } from "@shared/schema";
+import type { NotifPrefs } from "@shared/schema";
 import type { SponsorChange } from "../utils/sponsorListFetcher";
 import { normalizeName } from "../utils/sponsorListFetcher";
 import { getTierConfig, getDeliverAfter } from "../utils/tierConfig";
@@ -54,9 +54,13 @@ function isRateLimited(userId: string): boolean {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function isEventEnabled(prefs: NotifEventPrefs | null, eventType: NotifEventType): boolean {
+function isEventEnabled(prefs: NotifPrefs | null, eventType: string): boolean {
   if (!prefs) return true; // null = all events enabled (backwards-compatible default)
-  return prefs[eventType] !== false;
+  // prefs uses snake_case keys; legacy engine passes ALL_CAPS changeType.
+  // Unknown keys are treated as enabled until Part 5 maps call sites to snake_case.
+  const pref = (prefs as any)[eventType];
+  if (pref === undefined) return true;
+  return pref.enabled !== false;
 }
 
 function esc(s: string): string {
@@ -282,7 +286,7 @@ export async function notifyUsersOfEvent(change: SponsorChange): Promise<void> {
         if (!tierConfig.channels.includes("email")) continue;
 
         // Event-type opt-out check (notifPrefs jsonb on users table)
-        if (!isEventEnabled(user.notifPrefs ?? null, eventType)) {
+        if (!isEventEnabled(user.notifPrefs as NotifPrefs | null, eventType)) {
           await logEvent(userId, changeId, eventType, "skipped", {
             errorDetails: "Event type opted out",
           });
