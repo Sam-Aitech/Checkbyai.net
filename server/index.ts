@@ -218,6 +218,7 @@ async function applyPendingMigrations() {
       `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "cos_beta_enabled" boolean DEFAULT false`,
       `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "cos_beta_limit" integer`,
       `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "deleted_at" timestamp`,
+      `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "notif_prefs" jsonb`,
     ];
     for (const sql of migrations) {
       await client.query(sql);
