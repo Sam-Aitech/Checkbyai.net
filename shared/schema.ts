@@ -386,6 +386,32 @@ export const notificationLog = pgTable(
   ]
 );
 
+// Audit log written by the notification engine (Part 5).
+// Separate from notification_log to avoid coupling to the legacy dispatcher schema.
+// Tracks event-type-filtered sends, skips, queued deferrals, and failures.
+export const notifEngineLog = pgTable(
+  "notif_engine_log",
+  {
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+    userId: varchar("user_id").references(() => users.id).notNull(),
+    changeId: integer("change_id").references(() => sponsorChanges.id).notNull(),
+    eventType: varchar("event_type").notNull(),
+    channel: varchar("channel").notNull().default("email"),
+    status: varchar("status").notNull(), // 'sent' | 'failed' | 'skipped' | 'queued'
+    sentAt: timestamp("sent_at"),
+    deliverAfter: timestamp("deliver_after"), // null = immediate, set = deferred (starter plan)
+    providerMessageId: varchar("provider_message_id"),
+    errorDetails: text("error_details"),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (table) => [
+    index("idx_notif_engine_log_user_id").on(table.userId),
+    index("idx_notif_engine_log_change_id").on(table.changeId),
+    index("idx_notif_engine_log_status").on(table.status),
+    index("idx_notif_engine_log_deliver_after").on(table.deliverAfter),
+  ]
+);
+
 // Daily AI-generated digest for landing page
 export const dailyDigest = pgTable("daily_digest", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
@@ -553,6 +579,7 @@ export type CompanyWatch = typeof companyWatches.$inferSelect;
 export type SponsorChange = typeof sponsorChanges.$inferSelect;
 export type NotificationPreference = typeof notificationPreferences.$inferSelect;
 export type NotificationLogEntry = typeof notificationLog.$inferSelect;
+export type NotifEngineLogEntry = typeof notifEngineLog.$inferSelect;
 export type CsvArchiveEntry = typeof csvArchive.$inferSelect;
 export type DiffResultEntry = typeof diffResults.$inferSelect;
 

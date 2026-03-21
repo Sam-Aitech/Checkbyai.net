@@ -7,7 +7,8 @@ import { ensureTodaysArchive, getArchiveForDate, parseCsvFile } from "./csvArchi
 import { runCsvDiff, type CsvDiffResult } from "./binaryRunner";
 import { applyStateMachine } from "./sponsorStateMachine";
 import { rebuildSponsorIndex } from "./sponsorSearch";
-import { notifyAffectedUsers, processDelayedNotifications } from "./notificationDispatcher";
+import { processDelayedNotifications } from "./notificationDispatcher";
+import { notifyUsersOfEvent, processQueuedEngineEvents } from "../services/notificationEngine";
 import { generateHeadline, type RawDigestData } from "../services/aiDigest";
 import { withRetry } from "./dbRetry";
 import { sendAdminAlert } from "./adminAlert";
@@ -388,20 +389,19 @@ export async function runSponsorMonitorJob(source: string = "cron", notifyOnFail
     result.changes = changeCounts;
 
     // ── Notifications ──────────────────────────────────────────────────────────
-    // sponsorChanges rows already persisted by state machine; use smResult for dispatch.
+    // Fire-and-forget via the notification engine, which respects per-event-type
+    // preferences (notifPrefs) and applies in-memory rate limiting.
+    // Logs to notif_engine_log; starter-plan sends are deferred to same-day window.
     const alertableChanges = smResult.changes.filter((c) => c.changeType !== "NAME_CHANGE");
     if (alertableChanges.length > 0) {
       console.log(`[SponsorMonitorJob] Dispatching notifications for ${alertableChanges.length} alertable changes…`);
       for (const change of alertableChanges) {
-        try {
-          const notifResult = await notifyAffectedUsers(change);
-          result.notificationsSent   += notifResult.sent;
-          result.notificationsSkipped += notifResult.skipped;
-          result.notificationsFailed  += notifResult.failed;
-        } catch (err: any) {
-          console.error(`[SponsorMonitorJob] Notification error for "${change.organisationName}":`, err?.message ?? String(err));
-          result.notificationsFailed += 1;
-        }
+        notifyUsersOfEvent(change).catch((err: any) =>
+          console.error(
+            `[SponsorMonitorJob] Notification engine error for "${change.organisationName}":`,
+            err?.message ?? String(err),
+          )
+        );
       }
     } else {
       console.log("[SponsorMonitorJob] No alertable changes today.");
@@ -640,6 +640,9 @@ export function startSponsorMonitorCron(): void {
   cron.schedule("0 * * * *", () => {
     processDelayedNotifications().catch((err) => {
       console.error("[NotificationQueue] Error processing delayed notifications:", err);
+    });
+    processQueuedEngineEvents().catch((err) => {
+      console.error("[NotificationEngine] Error processing queued engine events:", err);
     });
   }, {
     timezone: "UTC",
