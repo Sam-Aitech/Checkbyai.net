@@ -389,9 +389,9 @@ export async function runSponsorMonitorJob(source: string = "cron", notifyOnFail
     result.changes = changeCounts;
 
     // ── Notifications ──────────────────────────────────────────────────────────
-    // Fire-and-forget via the notification engine, which respects per-event-type
-    // preferences (notifPrefs) and applies in-memory rate limiting.
-    // Logs to notif_engine_log; starter-plan sends are deferred to same-day window.
+    // Fire-and-forget via the notification engine. Checks per-event, per-channel
+    // prefs (notif_prefs jsonb), applies rate limit (3/hr per user:company),
+    // and sends immediately. Results logged to notif_log.
     const alertableChanges = smResult.changes.filter((c) => c.changeType !== "NAME_CHANGE");
     if (alertableChanges.length > 0) {
       console.log(`[SponsorMonitorJob] Dispatching notifications for ${alertableChanges.length} alertable changes…`);

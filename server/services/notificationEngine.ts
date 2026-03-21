@@ -16,6 +16,7 @@ import { eq, and, inArray, lte } from "drizzle-orm";
 import {
   companyWatches,
   notifEngineLog,
+  notifLog,
   notificationPreferences,
   sponsorChanges,
   users,
@@ -23,44 +24,55 @@ import {
 import type { NotifPrefs } from "@shared/schema";
 import type { SponsorChange } from "../utils/sponsorListFetcher";
 import { normalizeName } from "../utils/sponsorListFetcher";
-import { getTierConfig, getDeliverAfter } from "../utils/tierConfig";
+import { getTierConfig } from "../utils/tierConfig";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+// Snake_case event types matching users.notif_prefs keys (NotifPrefs in schema.ts).
 export type NotifEventType =
-  | "NEW_LICENCE"
-  | "REMOVED_REVOKED"
-  | "RE_ACTIVATED"
-  | "UPGRADED"
-  | "DOWNGRADED"
-  | "ROUTE_CHANGE"
-  | "NAME_CHANGE";
+  | "licence_revoked"
+  | "rating_downgraded"
+  | "licence_reinstated"
+  | "rating_upgraded"
+  | "route_added"
+  | "route_removed"
+  | "weekly_digest";
+
+// Maps DB changeType (ALL_CAPS from sponsorChanges table) → snake_case NotifPrefs key.
+// Unmapped types (e.g. NEW_LICENCE) pass through isEventEnabled as unknown keys → enabled.
+const CHANGE_TYPE_MAP: Partial<Record<string, NotifEventType>> = {
+  REMOVED_REVOKED: "licence_revoked",
+  RE_ACTIVATED:    "licence_reinstated",
+  UPGRADED:        "rating_upgraded",
+  DOWNGRADED:      "rating_downgraded",
+  ROUTE_CHANGE:    "route_added",
+};
 
 // ── Rate limiter ──────────────────────────────────────────────────────────────
+// Keyed by `${userId}:${companyName}` — 3 sends per user per company per hour.
 
-const RATE_LIMIT_MAX = 10;
-const RATE_LIMIT_WINDOW_MS = 24 * 60 * 60 * 1000;
+const RATE_LIMIT_MAX = 3;
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 const rateLimiter = new Map<string, number[]>();
 
-function isRateLimited(userId: string): boolean {
+function isRateLimited(userId: string, companyName: string): boolean {
+  const key = `${userId}:${companyName}`;
   const now = Date.now();
   const cutoff = now - RATE_LIMIT_WINDOW_MS;
-  const timestamps = (rateLimiter.get(userId) ?? []).filter(t => t > cutoff);
+  const timestamps = (rateLimiter.get(key) ?? []).filter(t => t > cutoff);
   if (timestamps.length >= RATE_LIMIT_MAX) return true;
   timestamps.push(now);
-  rateLimiter.set(userId, timestamps);
+  rateLimiter.set(key, timestamps);
   return false;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function isEventEnabled(prefs: NotifPrefs | null, eventType: string): boolean {
-  if (!prefs) return true; // null = all events enabled (backwards-compatible default)
-  // prefs uses snake_case keys; legacy engine passes ALL_CAPS changeType.
-  // Unknown keys are treated as enabled until Part 5 maps call sites to snake_case.
-  const pref = (prefs as any)[eventType];
-  if (pref === undefined) return true;
-  return pref.enabled !== false;
+  if (!prefs) return true; // null = all events enabled (default)
+  const pref = (prefs as any)[eventType] as NotifPrefs[NotifEventType] | undefined;
+  if (pref === undefined) return true; // unmapped event types always pass through
+  return pref.enabled === true && pref.channels.email === true;
 }
 
 function esc(s: string): string {
@@ -184,23 +196,25 @@ async function sendViaResend(
 }
 
 // ── Audit logging ─────────────────────────────────────────────────────────────
+// Writes to notif_log (new schema). notif_engine_log is still read by
+// processQueuedEngineEvents to drain pre-Part-5 queued entries.
 
 async function logEvent(
   userId: string,
-  changeId: number,
+  changeId: number | undefined,
   eventType: string,
-  status: string,
-  opts?: { errorDetails?: string; providerMessageId?: string; deliverAfter?: Date },
+  companyName: string,
+  success: boolean,
+  opts?: { errorDetails?: string; providerMessageId?: string },
 ): Promise<void> {
   try {
-    await db.insert(notifEngineLog).values({
+    await db.insert(notifLog).values({
       userId,
-      changeId,
+      changeId: changeId ?? null,
       eventType,
       channel: "email",
-      status,
-      sentAt: status === "sent" ? new Date() : null,
-      deliverAfter: opts?.deliverAfter ?? null,
+      companyName,
+      success,
       providerMessageId: opts?.providerMessageId ?? null,
       errorDetails: opts?.errorDetails ?? null,
     });
@@ -213,12 +227,8 @@ async function logEvent(
 
 /**
  * Dispatches notifications for a single sponsor change event to all affected watchers.
- * Respects event-type preferences (notifPrefs), channel preferences, tier eligibility,
- * and the in-memory rate limiter.
- *
- * Starter plan users: queued for same-day delivery (written to notif_engine_log with
- * status='queued' + deliverAfter timestamp; picked up by processQueuedEngineEvents).
- * Pro/unlimited/enterprise: sent immediately via Resend.
+ * Checks notif_prefs (per-event enabled + channels.email), applies per-company rate limit
+ * (3/hour), and sends immediately via Resend. Writes results to notif_log.
  *
  * Call fire-and-forget from the sponsor monitor job:
  *   notifyUsersOfEvent(change).catch(err => console.error(...));
@@ -230,8 +240,11 @@ export async function notifyUsersOfEvent(change: SponsorChange): Promise<void> {
     return;
   }
 
-  const eventType = change.changeType as NotifEventType;
-  const normalizedOrg = normalizeName(change.organisationName);
+  // Resolve snake_case prefs key from DB changeType (ALL_CAPS).
+  // Unmapped types (e.g. NEW_LICENCE) pass through isEventEnabled as unknown → enabled.
+  const prefsKey: string = CHANGE_TYPE_MAP[change.changeType] ?? change.changeType;
+  const companyName = change.organisationName;
+  const normalizedOrg = normalizeName(companyName);
 
   try {
     const activeWatches = await db
@@ -271,7 +284,7 @@ export async function notifyUsersOfEvent(change: SponsorChange): Promise<void> {
     // Build email payload once, shared across all recipients
     const { subject, html } = buildEmail(
       change.changeType,
-      change.organisationName,
+      companyName,
       change.previousValue,
       change.newValue,
     );
@@ -285,17 +298,17 @@ export async function notifyUsersOfEvent(change: SponsorChange): Promise<void> {
         const tierConfig = getTierConfig(user.subscriptionStatus);
         if (!tierConfig.channels.includes("email")) continue;
 
-        // Event-type opt-out check (notifPrefs jsonb on users table)
-        if (!isEventEnabled(user.notifPrefs as NotifPrefs | null, eventType)) {
-          await logEvent(userId, changeId, eventType, "skipped", {
+        // Per-event, per-channel opt-out check (notif_prefs jsonb on users table)
+        if (!isEventEnabled(user.notifPrefs as NotifPrefs | null, prefsKey)) {
+          await logEvent(userId, changeId, prefsKey, companyName, false, {
             errorDetails: "Event type opted out",
           });
           continue;
         }
 
-        // In-memory rate limit: 10 sends per user per 24h
-        if (isRateLimited(userId)) {
-          await logEvent(userId, changeId, eventType, "skipped", {
+        // In-memory rate limit: 3 sends per user per company per hour
+        if (isRateLimited(userId, companyName)) {
+          await logEvent(userId, changeId, prefsKey, companyName, false, {
             errorDetails: "Rate limit exceeded",
           });
           continue;
@@ -307,35 +320,25 @@ export async function notifyUsersOfEvent(change: SponsorChange): Promise<void> {
         const recipientEmail = channelPrefs?.email ?? user.email;
 
         if (!emailEnabled || !recipientEmail) {
-          await logEvent(userId, changeId, eventType, "skipped", {
+          await logEvent(userId, changeId, prefsKey, companyName, false, {
             errorDetails: "Email disabled or no address on file",
           });
           continue;
         }
 
-        // Starter plan: defer to same-day delivery window (18:00 UTC)
-        const deliverAfter = getDeliverAfter(user.subscriptionStatus);
-        if (deliverAfter) {
-          await logEvent(userId, changeId, eventType, "queued", { deliverAfter });
-          console.log(
-            `[NotificationEngine] Queued ${eventType} for user ${userId} (deliver after ${deliverAfter.toISOString()})`,
-          );
-          continue;
-        }
-
-        // Pro / unlimited / enterprise: send immediately
+        // Send immediately (all tiers)
         const sendResult = await sendViaResend(recipientEmail, subject, html);
-        await logEvent(userId, changeId, eventType, sendResult.success ? "sent" : "failed", {
+        await logEvent(userId, changeId, prefsKey, companyName, sendResult.success, {
           errorDetails: sendResult.error,
           providerMessageId: sendResult.providerMessageId,
         });
 
         console.log(
-          `[NotificationEngine] ${sendResult.success ? "Sent" : "Failed"} ${eventType} to ${recipientEmail} (user ${userId})`,
+          `[NotificationEngine] ${sendResult.success ? "Sent" : "Failed"} ${prefsKey} to ${recipientEmail} (user ${userId})`,
         );
       } catch (err: any) {
         console.error(`[NotificationEngine] Error processing user ${userId}:`, err.message);
-        await logEvent(userId, changeId, eventType, "failed", { errorDetails: err.message });
+        await logEvent(userId, changeId, prefsKey, companyName, false, { errorDetails: err.message });
       }
     }
   } catch (err) {
@@ -344,8 +347,9 @@ export async function notifyUsersOfEvent(change: SponsorChange): Promise<void> {
 }
 
 /**
- * Processes notif_engine_log entries with status='queued' whose deliverAfter has passed.
- * Called hourly by the sponsor monitor cron alongside processDelayedNotifications().
+ * Drains pre-Part-5 queued entries from notif_engine_log (legacy table).
+ * New sends write to notif_log; this function is transitional and will be retired
+ * once the notif_engine_log queue is empty. Called hourly by the cron scheduler.
  */
 export async function processQueuedEngineEvents(): Promise<void> {
   const now = new Date();
