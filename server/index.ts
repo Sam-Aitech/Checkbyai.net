@@ -236,6 +236,19 @@ async function applyPendingMigrations() {
       `CREATE INDEX IF NOT EXISTS "idx_notif_engine_log_change_id" ON "notif_engine_log"("change_id")`,
       `CREATE INDEX IF NOT EXISTS "idx_notif_engine_log_status" ON "notif_engine_log"("status")`,
       `CREATE INDEX IF NOT EXISTS "idx_notif_engine_log_deliver_after" ON "notif_engine_log"("deliver_after")`,
+      `CREATE TABLE IF NOT EXISTS "notif_log" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        "user_id" varchar NOT NULL REFERENCES "users"("id"),
+        "change_id" integer REFERENCES "sponsor_changes"("id"),
+        "event_type" varchar NOT NULL,
+        "channel" varchar NOT NULL DEFAULT 'email',
+        "company_name" text NOT NULL,
+        "success" boolean NOT NULL,
+        "provider_message_id" varchar,
+        "error_details" text,
+        "sent_at" timestamp DEFAULT now()
+      )`,
+      `CREATE INDEX IF NOT EXISTS "idx_notif_log_user_sent" ON "notif_log"("user_id", "sent_at")`,
     ];
     for (const sql of migrations) {
       await client.query(sql);
