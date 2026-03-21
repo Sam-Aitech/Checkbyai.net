@@ -192,7 +192,7 @@ export async function runCsvDiff(
     );
   }
 
-  const keyArgs = keys.flatMap((k) => ["--primary-key", k]);
+  const keyArgs = keys.flatMap(() => ["--primary-key", "0"]);
   const start = Date.now();
 
   const { stdout } = await execFileAsync(

@@ -5,11 +5,13 @@ import {
   Bell, Building2, CheckCircle2, XCircle, Clock, Mail, Loader2,
   ArrowRight, Shield, AlertTriangle, Tag, MapPin, Activity, Zap,
   ChevronRight, RotateCcw, ArrowUp, ArrowDown, RefreshCw, Pencil,
+  MessageSquare, Smartphone,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -47,16 +49,37 @@ interface WatchEntry {
   recentChanges: SponsorChange[];
 }
 
-interface NotifPrefs {
-  emailEnabled: boolean;
-  email: string | null;
-  whatsappEnabled: boolean;
-  whatsappNumber: string | null;
-  whatsappVerified: boolean;
-  smsEnabled: boolean;
-  smsNumber: string | null;
-  smsVerified: boolean;
+type NotifEventType =
+  | "licence_revoked"
+  | "rating_downgraded"
+  | "licence_reinstated"
+  | "rating_upgraded"
+  | "route_added"
+  | "route_removed"
+  | "weekly_digest";
+
+interface NotifEventPref {
+  enabled: boolean;
+  channels: { email: boolean; inApp: boolean; sms: boolean };
 }
+
+type NotifPrefs = { [K in NotifEventType]: NotifEventPref };
+
+type NotifPrefPatch = Partial<
+  Record<NotifEventType, { enabled?: boolean; channels?: { email?: boolean; inApp?: boolean; sms?: boolean } }>
+>;
+
+// ─── Event metadata ───────────────────────────────────────────────────────────
+
+const EVENT_ROWS: Array<{ key: NotifEventType; label: string; subtitle: string }> = [
+  { key: "licence_revoked",    label: "Licence Revoked",    subtitle: "Removed from register" },
+  { key: "rating_downgraded",  label: "Rating Downgraded",  subtitle: "Rating decreased" },
+  { key: "licence_reinstated", label: "Licence Reinstated", subtitle: "Restored to register" },
+  { key: "rating_upgraded",    label: "Rating Upgraded",    subtitle: "Rating increased" },
+  { key: "route_added",        label: "Route Added",        subtitle: "New immigration route" },
+  { key: "route_removed",      label: "Route Removed",      subtitle: "Immigration route lost" },
+  { key: "weekly_digest",      label: "Weekly Digest",      subtitle: "Weekly summary email" },
+];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -179,16 +202,16 @@ function CompanyHeaderCard({
   );
 }
 
-function NotificationControlsCard({
+function NotificationMatrixCard({
   prefs,
   isLoading,
-  onToggleEmail,
-  isToggling,
+  onUpdate,
+  isUpdating,
 }: {
   prefs: NotifPrefs | undefined;
   isLoading: boolean;
-  onToggleEmail: (enabled: boolean) => void;
-  isToggling: boolean;
+  onUpdate: (patch: NotifPrefPatch) => void;
+  isUpdating: boolean;
 }) {
   return (
     <Card className="border border-border rounded-xl">
@@ -202,38 +225,86 @@ function NotificationControlsCard({
 
         {isLoading ? (
           <div className="space-y-3">
-            <Skeleton className="h-10 w-full" />
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} className="h-10 w-full" />
+            ))}
           </div>
         ) : (
-          <div className="space-y-3">
-            {/* Email row */}
-            <div className="flex items-center justify-between gap-3 py-2 border-b border-border/50">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="bg-muted rounded-lg p-1.5 shrink-0">
-                  <Mail className="w-4 h-4 text-muted-foreground" />
-                </div>
-                <div className="min-w-0">
-                  <Label htmlFor="email-toggle" className="text-sm text-foreground font-medium block">
-                    Email alerts
-                  </Label>
-                  {prefs?.email && (
-                    <p className="text-xs text-muted-foreground truncate max-w-[180px]">
-                      {prefs.email}
-                    </p>
-                  )}
-                </div>
-              </div>
-              <Switch
-                id="email-toggle"
-                checked={prefs?.emailEnabled ?? true}
-                onCheckedChange={onToggleEmail}
-                disabled={isToggling}
-                aria-label="Toggle email alerts"
-              />
+          <div>
+            {/* Column headers */}
+            <div className="grid grid-cols-[1fr_36px_28px_28px_28px] items-center mb-1 px-1">
+              <span className="text-xs text-muted-foreground">Event</span>
+              <span className="text-xs text-muted-foreground text-center">On</span>
+              <span className="flex justify-center" title="Email">
+                <Mail className="w-3.5 h-3.5 text-muted-foreground" />
+              </span>
+              <span className="flex justify-center" title="In-App">
+                <Smartphone className="w-3.5 h-3.5 text-muted-foreground" />
+              </span>
+              <span className="flex justify-center" title="SMS">
+                <MessageSquare className="w-3.5 h-3.5 text-muted-foreground" />
+              </span>
             </div>
 
-            <p className="text-xs text-muted-foreground pt-1">
-              You'll be alerted when this company's sponsor licence status changes on the GOV.UK register.
+            {/* Event rows */}
+            <div className="divide-y divide-border/50">
+              {EVENT_ROWS.map(({ key, label, subtitle }) => {
+                const pref = prefs?.[key];
+                const enabled = pref?.enabled ?? false;
+                const emailOn = pref?.channels?.email ?? false;
+                const inAppOn = pref?.channels?.inApp ?? false;
+                const smsOn   = pref?.channels?.sms   ?? false;
+
+                return (
+                  <div
+                    key={key}
+                    className="grid grid-cols-[1fr_36px_28px_28px_28px] items-center py-2.5 px-1"
+                  >
+                    <div className="min-w-0 pr-2">
+                      <p className={`text-sm leading-tight truncate ${enabled ? "text-foreground" : "text-muted-foreground"}`}>
+                        {label}
+                      </p>
+                      <p className="text-xs text-muted-foreground leading-tight">{subtitle}</p>
+                    </div>
+                    <div className="flex justify-center">
+                      <Switch
+                        checked={enabled}
+                        onCheckedChange={(v) => onUpdate({ [key]: { enabled: v } })}
+                        disabled={isUpdating}
+                        aria-label={`Enable ${label}`}
+                      />
+                    </div>
+                    <div className="flex justify-center">
+                      <Checkbox
+                        checked={emailOn}
+                        onCheckedChange={(v) => onUpdate({ [key]: { channels: { email: !!v } } })}
+                        disabled={isUpdating || !enabled}
+                        aria-label={`Email for ${label}`}
+                      />
+                    </div>
+                    <div className="flex justify-center">
+                      <Checkbox
+                        checked={inAppOn}
+                        onCheckedChange={(v) => onUpdate({ [key]: { channels: { inApp: !!v } } })}
+                        disabled={isUpdating || !enabled}
+                        aria-label={`In-app for ${label}`}
+                      />
+                    </div>
+                    <div className="flex justify-center">
+                      <Checkbox
+                        checked={smsOn}
+                        onCheckedChange={(v) => onUpdate({ [key]: { channels: { sms: !!v } } })}
+                        disabled={isUpdating || !enabled}
+                        aria-label={`SMS for ${label}`}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <p className="text-xs text-muted-foreground mt-3 pt-2 border-t border-border/50">
+              Changes are saved automatically. SMS requires a Pro plan.
             </p>
           </div>
         )}
@@ -425,22 +496,16 @@ export default function SponsorDashboard() {
   });
 
   const { data: prefs, isLoading: prefsLoading } = useQuery<NotifPrefs>({
-    queryKey: ["/api/notification-preferences"],
+    queryKey: ["/api/notifications/preferences"],
     enabled: isAuthenticated,
     staleTime: 30_000,
   });
 
-  const toggleEmailMutation = useMutation({
-    mutationFn: (enabled: boolean) =>
-      apiRequest("PUT", "/api/notification-preferences", {
-        email_enabled: enabled,
-        whatsapp_enabled: prefs?.whatsappEnabled ?? false,
-        whatsapp_number: prefs?.whatsappNumber ?? null,
-        sms_enabled: prefs?.smsEnabled ?? false,
-        sms_number: prefs?.smsNumber ?? null,
-      }),
+  const updatePrefsMutation = useMutation({
+    mutationFn: (patch: NotifPrefPatch) =>
+      apiRequest("PATCH", "/api/notifications/preferences", patch),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/notification-preferences"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/preferences"] });
       toast({ title: "Alert settings saved" });
     },
     onError: () => {
@@ -566,11 +631,11 @@ export default function SponsorDashboard() {
           )}
 
           {/* Section 2: Notification controls */}
-          <NotificationControlsCard
+          <NotificationMatrixCard
             prefs={prefs}
             isLoading={prefsLoading}
-            onToggleEmail={(enabled) => toggleEmailMutation.mutate(enabled)}
-            isToggling={toggleEmailMutation.isPending}
+            onUpdate={(patch) => updatePrefsMutation.mutate(patch)}
+            isUpdating={updatePrefsMutation.isPending}
           />
 
           {/* Section 3: Activity timeline */}
