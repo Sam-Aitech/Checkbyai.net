@@ -32,7 +32,7 @@ function FeatureCard({ icon, title, description, index }: { icon: React.ReactNod
   return (
     <motion.div ref={ref} initial={{ opacity: 0, y: 40 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ ...spring, delay: index * 0.12 }} className="group theme-card p-8 overflow-hidden">
       <div className="relative z-10">
-        <div className="mb-6 inline-flex items-center justify-center w-12 h-12 bg-primary/10 rounded-xl">{icon}</div>
+        <div className="mb-6 inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-2xl">{icon}</div>
         <h3 className="text-lg editorial-subheading text-foreground mb-3">{title}</h3>
         <p className="text-sm editorial-body text-muted-foreground">{description}</p>
       </div>
@@ -518,9 +518,9 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
           </div>
 
           <div className="grid md:grid-cols-3 gap-6 mb-10">
-            <FeatureCard icon={<ShieldMonitorIcon size={20} />} title="Home Office Compliance" description="Our tool cross-references your Certificate of Sponsorship against known Home Office document structure and formatting standards. Results are indicative only and do not constitute legal verification." index={0} />
-            <FeatureCard icon={<DocumentVerifyIcon size={20} />} title="Instant Assessment" description="Receive an automated assessment within seconds of upload. The system evaluates document structure, formatting consistency, and file integrity against Home Office-issued templates." index={1} />
-            <FeatureCard icon={<UKLockIcon size={20} />} title="UK Data Protection" description="Operates in full compliance with UK GDPR. No personal data is extracted, stored, or processed. Uploaded files are permanently deleted immediately upon completion of analysis." index={2} />
+            <FeatureCard icon={<ShieldMonitorIcon size={30} />} title="Home Office Compliance" description="Our tool cross-references your Certificate of Sponsorship against known Home Office document structure and formatting standards. Results are indicative only and do not constitute legal verification." index={0} />
+            <FeatureCard icon={<DocumentVerifyIcon size={30} />} title="Instant Assessment" description="Receive an automated assessment within seconds of upload. The system evaluates document structure, formatting consistency, and file integrity against Home Office-issued templates." index={1} />
+            <FeatureCard icon={<UKLockIcon size={30} />} title="UK Data Protection" description="Operates in full compliance with UK GDPR. No personal data is extracted, stored, or processed. Uploaded files are permanently deleted immediately upon completion of analysis." index={2} />
           </div>
 
           <div className="text-center">

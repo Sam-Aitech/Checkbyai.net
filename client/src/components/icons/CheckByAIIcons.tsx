@@ -12,46 +12,81 @@ interface IconProps {
 }
 
 // ─── Shield Monitor Icon ──────────────────────────────────────────────────────
-// Shield with heartbeat/pulse line inside — real-time monitoring
+// Premium: shield with layered gradient, inner glow, bold ECG pulse + soft glow filter
 export function ShieldMonitorIcon({ className = '', size = 24 }: IconProps) {
-  const id = 'shield-grad';
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 24 24"
+      viewBox="0 0 32 32"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
       aria-hidden="true"
     >
       <defs>
-        <linearGradient id={id} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#6366f1" />
-          <stop offset="100%" stopColor="#4338ca" />
+        <linearGradient id="shm-lg" x1="4" y1="4" x2="28" y2="28" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#818cf8" />
+          <stop offset="1" stopColor="#4338ca" />
         </linearGradient>
+        <radialGradient id="shm-rg" cx="16" cy="11" r="13" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#c7d2fe" stopOpacity="0.45" />
+          <stop offset="1" stopColor="#4338ca" stopOpacity="0" />
+        </radialGradient>
+        <filter id="shm-glow" x="-40%" y="-40%" width="180%" height="180%">
+          <feGaussianBlur stdDeviation="1.4" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
       </defs>
-      {/* Shield body */}
+
+      {/* Drop shadow layer */}
       <path
-        d="M12 2L4 5.5V11c0 4.55 3.4 8.74 8 9.93C16.6 19.74 20 15.55 20 11V5.5L12 2Z"
-        fill={`url(#${id})`}
-        opacity="0.15"
-        stroke={`url(#${id})`}
-        strokeWidth="1.5"
+        d="M16 4.5L5.5 9V16c0 6.4 4.8 12.2 10.5 13.5C21.7 28.2 26.5 22.4 26.5 16V9L16 4.5Z"
+        fill="#4338ca"
+        opacity="0.08"
+        transform="translate(0,1.2)"
+      />
+      {/* Shield outer body */}
+      <path
+        d="M16 4.5L5.5 9V16c0 6.4 4.8 12.2 10.5 13.5C21.7 28.2 26.5 22.4 26.5 16V9L16 4.5Z"
+        fill="url(#shm-lg)"
+        opacity="0.16"
+        stroke="url(#shm-lg)"
+        strokeWidth="1.6"
         strokeLinejoin="round"
       />
-      {/* Pulse / heartbeat line */}
-      <polyline
-        points="6.5,12 8.5,12 9.5,9.5 11,14.5 12.5,10 13.5,12 17.5,12"
-        stroke="#818cf8"
-        strokeWidth="1.5"
-        strokeLinecap="round"
+      {/* Inner radial glow fill */}
+      <path
+        d="M16 7L8 11V16c0 5.2 3.8 9.8 8 11 4.2-1.2 8-5.8 8-11V11L16 7Z"
+        fill="url(#shm-rg)"
+      />
+      {/* Inner border ring */}
+      <path
+        d="M16 7L8 11V16c0 5.2 3.8 9.8 8 11 4.2-1.2 8-5.8 8-11V11L16 7Z"
+        stroke="#a5b4fc"
+        strokeWidth="0.7"
+        strokeOpacity="0.45"
         strokeLinejoin="round"
         fill="none"
       />
-      {/* Pulse dot */}
-      <circle cx="6.5" cy="12" r="1" fill="#818cf8" />
-      <circle cx="17.5" cy="12" r="1" fill="#818cf8" />
+
+      {/* ECG / heartbeat pulse — bold with glow */}
+      <polyline
+        points="8.5,16.5 11,16.5 12.5,12.5 15.5,21 17.5,12 19,16.5 23.5,16.5"
+        stroke="#818cf8"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+        filter="url(#shm-glow)"
+      />
+
+      {/* End indicator dots */}
+      <circle cx="8.5" cy="16.5" r="1.6" fill="#c7d2fe" />
+      <circle cx="23.5" cy="16.5" r="1.6" fill="#c7d2fe" />
     </svg>
   );
 }
@@ -110,53 +145,67 @@ export function AlertBellIcon({ className = '', size = 24 }: IconProps) {
 }
 
 // ─── Document Verify Icon ─────────────────────────────────────────────────────
-// Document with magnifying glass that has a checkmark lens
+// Premium: document with fold + green verified badge (circle+checkmark) overlay with glow
 export function DocumentVerifyIcon({ className = '', size = 24 }: IconProps) {
-  const id = 'doc-grad';
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 24 24"
+      viewBox="0 0 32 32"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
       aria-hidden="true"
     >
       <defs>
-        <linearGradient id={id} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#a855f7" />
-          <stop offset="100%" stopColor="#7c3aed" />
+        <linearGradient id="dv-doc" x1="4" y1="2" x2="28" y2="30" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#c084fc" />
+          <stop offset="1" stopColor="#7c3aed" />
         </linearGradient>
+        <linearGradient id="dv-badge" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop stopColor="#4ade80" />
+          <stop offset="1" stopColor="#16a34a" />
+        </linearGradient>
+        <filter id="dv-glow" x="-40%" y="-40%" width="180%" height="180%">
+          <feGaussianBlur stdDeviation="1.8" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
       </defs>
-      {/* Document */}
+
+      {/* Document body */}
       <path
-        d="M6 2h8l4 4v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z"
-        fill={`url(#${id})`}
-        opacity="0.12"
-        stroke={`url(#${id})`}
-        strokeWidth="1.5"
+        d="M7 3h14l6 6v18a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"
+        fill="url(#dv-doc)"
+        opacity="0.13"
+        stroke="url(#dv-doc)"
+        strokeWidth="1.6"
         strokeLinejoin="round"
       />
       {/* Fold corner */}
       <polyline
-        points="14,2 14,6 18,6"
-        stroke="#a78bfa"
+        points="21,3 21,9 27,9"
+        stroke="#c084fc"
         strokeWidth="1.5"
         strokeLinejoin="round"
         fill="none"
       />
-      {/* Document lines */}
-      <line x1="8" y1="10" x2="12" y2="10" stroke="#a78bfa" strokeWidth="1.2" strokeLinecap="round" />
-      <line x1="8" y1="13" x2="11" y2="13" stroke="#a78bfa" strokeWidth="1.2" strokeLinecap="round" opacity="0.6" />
-      {/* Magnifying glass */}
-      <circle cx="15.5" cy="16" r="3.2" stroke="#c4b5fd" strokeWidth="1.5" fill="rgba(167,139,250,0.1)" />
-      <line x1="17.7" y1="18.2" x2="20" y2="20.5" stroke="#c4b5fd" strokeWidth="1.8" strokeLinecap="round" />
-      {/* Checkmark in lens */}
+      {/* Document content lines */}
+      <line x1="9" y1="14" x2="18" y2="14" stroke="#a78bfa" strokeWidth="1.6" strokeLinecap="round" />
+      <line x1="9" y1="18" x2="16" y2="18" stroke="#a78bfa" strokeWidth="1.3" strokeLinecap="round" opacity="0.65" />
+      <line x1="9" y1="22" x2="13" y2="22" stroke="#a78bfa" strokeWidth="1" strokeLinecap="round" opacity="0.35" />
+
+      {/* Badge backing (dark circle for contrast) */}
+      <circle cx="23" cy="23" r="7.5" fill="#0d0d1a" />
+      {/* Verified badge with glow */}
+      <circle cx="23" cy="23" r="7" fill="url(#dv-badge)" opacity="0.92" filter="url(#dv-glow)" />
+      {/* Checkmark */}
       <polyline
-        points="13.8,16 15,17.2 17.2,14.8"
-        stroke="#c4b5fd"
-        strokeWidth="1.2"
+        points="19.5,23 22,25.8 26.5,20"
+        stroke="white"
+        strokeWidth="2.2"
         strokeLinecap="round"
         strokeLinejoin="round"
         fill="none"
@@ -322,46 +371,60 @@ export function TripleChannelIcon({ className = '', size = 24 }: IconProps) {
 }
 
 // ─── UK Lock Icon ─────────────────────────────────────────────────────────────
-// Padlock with Union Jack pattern etched in — UK GDPR compliance
+// Premium: heavy padlock with Union Jack face, glowing white keyhole
 export function UKLockIcon({ className = '', size = 24 }: IconProps) {
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 24 24"
+      viewBox="0 0 32 32"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
       aria-hidden="true"
     >
-      {/* Lock shackle */}
+      <defs>
+        <linearGradient id="ukl-body" x1="5" y1="14" x2="27" y2="30" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#3b82f6" />
+          <stop offset="1" stopColor="#1d4ed8" />
+        </linearGradient>
+        <filter id="ukl-glow" x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="1.6" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+
+      {/* Shackle — thick, rounded */}
       <path
-        d="M8 11V7a4 4 0 0 1 8 0v4"
-        stroke="#94a3b8"
-        strokeWidth="1.5"
+        d="M10.5 15V10a5.5 5.5 0 1 1 11 0v5"
+        stroke="#93c5fd"
+        strokeWidth="2.6"
         strokeLinecap="round"
         fill="none"
       />
+
       {/* Lock body */}
-      <rect
-        x="4.5"
-        y="11"
-        width="15"
-        height="10"
-        rx="2"
-        fill="rgba(59,130,246,0.1)"
-        stroke="#3b82f6"
-        strokeWidth="1.5"
-      />
-      {/* Union Jack cross — horizontal + vertical */}
-      <line x1="4.5" y1="16" x2="19.5" y2="16" stroke="#ef4444" strokeWidth="1" opacity="0.6" />
-      <line x1="12" y1="11" x2="12" y2="21" stroke="#ef4444" strokeWidth="1" opacity="0.6" />
-      {/* Union Jack diagonals */}
-      <line x1="4.5" y1="11" x2="19.5" y2="21" stroke="#3b82f6" strokeWidth="0.7" opacity="0.4" />
-      <line x1="19.5" y1="11" x2="4.5" y2="21" stroke="#3b82f6" strokeWidth="0.7" opacity="0.4" />
-      {/* Keyhole */}
-      <circle cx="12" cy="15.5" r="1.5" fill="#3b82f6" opacity="0.8" />
-      <rect x="11.25" y="15.5" width="1.5" height="2.5" rx="0.5" fill="#3b82f6" opacity="0.8" />
+      <rect x="5" y="15" width="22" height="15" rx="3.5" fill="url(#ukl-body)" stroke="#60a5fa" strokeWidth="1.5" />
+
+      {/* Union Jack — diagonal bands (subtle St Andrew's cross) */}
+      <line x1="5" y1="15" x2="27" y2="30" stroke="#ffffff" strokeWidth="2.5" strokeOpacity="0.12" />
+      <line x1="27" y1="15" x2="5" y2="30" stroke="#ffffff" strokeWidth="2.5" strokeOpacity="0.12" />
+
+      {/* Union Jack — horizontal red band */}
+      <rect x="5" y="20.5" width="22" height="4" fill="#ef4444" opacity="0.45" />
+      {/* Union Jack — vertical red band */}
+      <rect x="14" y="15" width="4" height="15" fill="#ef4444" opacity="0.45" />
+
+      {/* Thin white cross overlay for crispness */}
+      <rect x="5" y="21.5" width="22" height="2" fill="white" opacity="0.18" />
+      <rect x="15" y="15" width="2" height="15" fill="white" opacity="0.18" />
+
+      {/* Keyhole — glowing white */}
+      <circle cx="16" cy="20.5" r="2.4" fill="white" opacity="0.95" filter="url(#ukl-glow)" />
+      <rect x="14.8" y="20.5" width="2.4" height="4" rx="0.7" fill="white" opacity="0.95" filter="url(#ukl-glow)" />
     </svg>
   );
 }
