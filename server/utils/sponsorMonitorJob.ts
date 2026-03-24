@@ -12,6 +12,9 @@ import { notifyUsersOfEvent, processQueuedEngineEvents } from "../services/notif
 import { generateHeadline, type RawDigestData } from "../services/aiDigest";
 import { withRetry } from "./dbRetry";
 import { sendAdminAlert } from "./adminAlert";
+import { logger } from "./logger";
+
+const log = logger.child({ module: "SponsorMonitorJob" });
 
 // Distributed advisory lock key — must be a unique integer per job.
 // Prevents duplicate execution across multiple server instances (horizontal scaling).
@@ -201,8 +204,8 @@ async function saveDiffResult(runDate: string, diff: CsvDiffResult): Promise<voi
       attributeChangeCount: diff.Modifications.length,
       diffDurationMs:       diff.durationMs,
     }).onConflictDoNothing();
-  } catch (err: any) {
-    console.warn("[SponsorMonitorJob] Failed to save diff result (non-fatal):", err?.message ?? String(err));
+  } catch (err: unknown) {
+    console.warn("[SponsorMonitorJob] Failed to save diff result (non-fatal):", err instanceof Error ? err.message : String(err));
   }
 }
 
@@ -254,12 +257,12 @@ export async function runSponsorMonitorJob(source: string = "cron", notifyOnFail
 
     await Promise.race([runJobCore(), watchdog]);
     return result; // reached only when runJobCore() completes without throwing
-  } catch (err: any) {
+  } catch (err: unknown) {
     // Handles: timeout, unexpected throws from runJobCore()
     // err?.message ?? String(err) ensures a non-null string even when the thrown
     // value is a plain string, null, undefined, or a non-standard error object.
-    const errorMsg = `Unexpected error: ${err?.message ?? String(err)}`;
-    console.error(`[SponsorMonitorJob] ${errorMsg}`, err);
+    const errorMsg = `Unexpected error: ${err instanceof Error ? err.message : String(err)}`;
+    log.error({ err }, errorMsg);
     if (notifyOnFailure) await sendAdminFailureAlert(errorMsg);
     const failDuration = Date.now() - startTime;
     const failTime = new Date();
@@ -598,8 +601,8 @@ async function seedInitialDigest(): Promise<void> {
     });
 
     console.log(`[SponsorMonitorJob] Initial digest seeded: "${headline}" (${active} active, ${revoked} revoked sponsors)`);
-  } catch (err: any) {
-    console.error("[SponsorMonitorJob] Failed to seed initial digest:", err?.message ?? String(err));
+  } catch (err: unknown) {
+    console.error("[SponsorMonitorJob] Failed to seed initial digest:", err instanceof Error ? err.message : String(err));
   }
 }
 

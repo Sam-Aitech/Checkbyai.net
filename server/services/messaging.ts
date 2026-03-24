@@ -37,9 +37,10 @@ export async function sendSMS(phoneNumber: string, message: string): Promise<Sen
 
     const data = await response.json();
     return { success: true, providerMessageId: data.messageId || data.reference || String(data.messageId) };
-  } catch (err: any) {
-    console.error("[Messaging] SMS send error:", err.message);
-    return { success: false, error: err.message || "Unknown SMS send error" };
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error("[Messaging] SMS send error:", errMsg);
+    return { success: false, error: errMsg || "Unknown SMS send error" };
   }
 }
 
@@ -66,8 +67,9 @@ export async function sendWhatsApp(phoneNumber: string, message: string): Promis
     });
 
     return { success: true, providerMessageId: result.sid };
-  } catch (err: any) {
-    console.error("[Messaging] WhatsApp send error:", err.message);
-    return { success: false, error: err.message || "Unknown WhatsApp send error" };
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error("[Messaging] WhatsApp send error:", errMsg);
+    return { success: false, error: errMsg || "Unknown WhatsApp send error" };
   }
 }

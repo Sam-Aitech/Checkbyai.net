@@ -15,7 +15,7 @@ export function registerChatRoutes(app: Express): void {
       res.json(conversations);
     } catch (error) {
       console.error("Error fetching conversations:", error);
-      res.status(500).json({ error: "Failed to fetch conversations" });
+      res.status(500).json({ message: "Failed to fetch conversations" });
     }
   });
 
@@ -25,13 +25,13 @@ export function registerChatRoutes(app: Express): void {
       const id = parseInt(req.params.id);
       const conversation = await chatStorage.getConversation(id);
       if (!conversation) {
-        return res.status(404).json({ error: "Conversation not found" });
+        return res.status(404).json({ message: "Conversation not found" });
       }
       const messages = await chatStorage.getMessagesByConversation(id);
       res.json({ ...conversation, messages });
     } catch (error) {
       console.error("Error fetching conversation:", error);
-      res.status(500).json({ error: "Failed to fetch conversation" });
+      res.status(500).json({ message: "Failed to fetch conversation" });
     }
   });
 
@@ -43,7 +43,7 @@ export function registerChatRoutes(app: Express): void {
       res.status(201).json(conversation);
     } catch (error) {
       console.error("Error creating conversation:", error);
-      res.status(500).json({ error: "Failed to create conversation" });
+      res.status(500).json({ message: "Failed to create conversation" });
     }
   });
 
@@ -55,7 +55,7 @@ export function registerChatRoutes(app: Express): void {
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting conversation:", error);
-      res.status(500).json({ error: "Failed to delete conversation" });
+      res.status(500).json({ message: "Failed to delete conversation" });
     }
   });
 
@@ -110,7 +110,7 @@ export function registerChatRoutes(app: Express): void {
         res.write(`data: ${JSON.stringify({ error: "Failed to send message" })}\n\n`);
         res.end();
       } else {
-        res.status(500).json({ error: "Failed to send message" });
+        res.status(500).json({ message: "Failed to send message" });
       }
     }
   });

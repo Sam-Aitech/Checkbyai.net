@@ -1,4 +1,5 @@
 import * as cron from "node-cron";
+import { getAppUrl } from "./appUrl";
 import { db } from "../db";
 import {
   companyWatches,
@@ -79,7 +80,7 @@ function buildJobDigestEmail(
       <div style="background:#f9fafb; padding:16px 30px; border:1px solid #e5e7eb; border-top:none; border-radius:0 0 10px 10px;">
         <p style="color:#9ca3af; font-size:11px; margin:0; text-align:center;">
           You are receiving job alerts for <strong>${companyName}</strong> on Check By AI Sponsor Monitor.<br/>
-          <a href="https://checkbyai.net/sponsor-monitor" style="color:#6366f1;">Manage job alerts →</a>
+          <a href="${getAppUrl()}/sponsor-monitor" style="color:#6366f1;">Manage job alerts →</a>
         </p>
       </div>
     </div>

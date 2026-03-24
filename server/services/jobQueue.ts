@@ -48,9 +48,9 @@ export async function initJobQueue(): Promise<void> {
     await probe.ping();
     redisAvailable = true;
     console.log('[JobQueue] Redis connected — BullMQ queues active.');
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.warn(
-      `[JobQueue] Redis unavailable (${err.message}). ` +
+      `[JobQueue] Redis unavailable (${err instanceof Error ? err.message : String(err)}). ` +
       `BullMQ disabled — sponsor sync will run inline.`
     );
     probe.disconnect();

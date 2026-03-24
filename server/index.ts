@@ -4,6 +4,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { storage } from "./storage";
 import { pool } from "./db";
+import { logger } from "./utils/logger";
 
 // Import the job queue setup
 import { initJobQueue, setupWorkers } from "./services/jobQueue";
@@ -21,7 +22,7 @@ const REQUIRED_ENV_VARS = [
 
 const missingVars = REQUIRED_ENV_VARS.filter((v) => !process.env[v]);
 if (missingVars.length > 0) {
-  missingVars.forEach((v) => console.error(`CRITICAL: Missing required environment variable: ${v}`));
+  missingVars.forEach((v) => logger.fatal({ envVar: v }, `CRITICAL: Missing required environment variable: ${v}`));
   if (process.env.NODE_ENV === "production") {
     process.exit(1);
   }
@@ -59,7 +60,7 @@ async function seedAdminUser() {
       log(`Admin user updated: ${adminEmail}`);
     }
   } catch (error) {
-    console.error("Failed to seed admin user:", error);
+    logger.error({ err: error }, "Failed to seed admin user");
   }
 }
 
@@ -154,15 +155,28 @@ app.use((req, res, next) => {
   next();
 });
 
-// Add CORS middleware
+// Add CORS middleware — explicit origin whitelist (never reflect Host header)
 app.use((req, res, next) => {
-  const allowedOrigin = req.headers.host ? `${req.protocol}://${req.headers.host}` : '';
-  res.header('Access-Control-Allow-Origin', allowedOrigin);
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  const ALLOWED_ORIGINS = [
+    'https://checkbyai.net',
+    'https://www.checkbyai.net',
+    ...(process.env.NODE_ENV !== 'production'
+      ? ['http://localhost:5000', 'http://localhost:3000', 'http://127.0.0.1:5000']
+      : []),
+    ...(process.env.APP_URL ? [process.env.APP_URL] : []),
+  ];
+
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+  }
+
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  
+
   if (req.method === 'OPTIONS') {
-    res.sendStatus(200);
+    res.sendStatus(204);
   } else {
     next();
   }
@@ -255,7 +269,7 @@ async function applyPendingMigrations() {
     }
     log("Schema migrations applied successfully");
   } catch (error) {
-    console.error("Failed to apply schema migrations:", error);
+    logger.error({ err: error }, "Failed to apply schema migrations");
   } finally {
     client.release();
   }
@@ -273,7 +287,7 @@ async function applyPendingMigrations() {
       res.status(status).json({ message });
     }
     
-    console.error('Server error:', err);
+    logger.error({ err, status }, "Unhandled server error");
   });
 
   // importantly only setup vite in development and after

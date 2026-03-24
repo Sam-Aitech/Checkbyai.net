@@ -147,14 +147,14 @@ async function findCsvUrlPrimary(): Promise<string> {
   let response: Response;
   try {
     response = await fetchWithTimeout(GOV_UK_PAGE_URL);
-  } catch (err: any) {
-    if (err.name === "AbortError") {
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === "AbortError") {
       throw new Error(
         `Timed out fetching gov.uk page at ${GOV_UK_PAGE_URL}. The site may be temporarily unavailable.`,
       );
     }
     throw new Error(
-      `Failed to fetch gov.uk page: ${err.message ?? "Unknown network error"}`,
+      `Failed to fetch gov.uk page: ${err instanceof Error ? err.message : "Unknown network error"}`,
     );
   }
 
@@ -349,14 +349,14 @@ export async function downloadAndParseSponsorList(): Promise<SponsorRecord[]> {
   let csvResponse: Response;
   try {
     csvResponse = await fetchWithTimeout(csvUrl, 60000);
-  } catch (err: any) {
-    if (err.name === "AbortError") {
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === "AbortError") {
       throw new Error(
         `Timed out downloading CSV file from ${csvUrl}. The file may be very large or the server is slow.`,
       );
     }
     throw new Error(
-      `Failed to download CSV file: ${err.message ?? "Unknown network error"}`,
+      `Failed to download CSV file: ${err instanceof Error ? err.message : "Unknown network error"}`,
     );
   }
 
@@ -379,9 +379,9 @@ export async function downloadAndParseSponsorList(): Promise<SponsorRecord[]> {
       relax_column_count: true,
       bom: true,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     throw new Error(
-      `Failed to parse CSV data: ${err.message ?? "Unknown parse error"}. The CSV format may have changed.`,
+      `Failed to parse CSV data: ${err instanceof Error ? err.message : "Unknown parse error"}. The CSV format may have changed.`,
     );
   }
 
@@ -453,11 +453,11 @@ export async function downloadAndStreamSponsorList(
   let csvResponse: Response;
   try {
     csvResponse = await fetchWithTimeout(csvUrl, 120_000);
-  } catch (err: any) {
+  } catch (err: unknown) {
     throw new Error(
-      err.name === "AbortError"
+      err instanceof Error && err.name === "AbortError"
         ? `Timed out downloading CSV (2 min limit). File may be unusually large.`
-        : `Failed to download CSV: ${err.message ?? "Unknown network error"}`,
+        : `Failed to download CSV: ${err instanceof Error ? err.message : "Unknown network error"}`,
     );
   }
 

@@ -273,10 +273,10 @@ export async function searchSponsorsFallback(
       page: Math.max(1, page),
       totalPages,
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
     // pg_trgm extension not installed yet (migration pending) — return empty
     // rather than crashing the request handler.
-    console.error("[SponsorSearch] pg_trgm fallback failed:", err.message);
+    console.error("[SponsorSearch] pg_trgm fallback failed:", err instanceof Error ? err.message : err);
     return { results: [], total: 0, page: 1, totalPages: 1 };
   }
 }

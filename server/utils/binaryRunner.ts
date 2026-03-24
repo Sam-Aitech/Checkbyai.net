@@ -101,9 +101,10 @@ export async function qsvValidate(filePath: string): Promise<QsvValidateResult> 
     });
     // Exit 0 = valid
     return { valid: true, recordCount: 0, errors: [] };
-  } catch (err: any) {
+  } catch (err: unknown) {
     // Exit 1 = validation errors — stderr has the details
-    const raw = (err.stderr || err.stdout || "").trim();
+    const execErr = err as { stderr?: string; stdout?: string };
+    const raw = (execErr.stderr || execErr.stdout || "").trim();
     const errors = raw.split("\n").filter(Boolean);
     return { valid: false, recordCount: 0, errors };
   }

@@ -150,10 +150,11 @@ Return ONLY valid JSON (no markdown):
       model: provider,
       validationPassed: true,
     };
-  } catch (err: any) {
-    console.error("[AIDigest] AI headline generation failed:", err.message);
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error("[AIDigest] AI headline generation failed:", errMsg);
     const fallback = deterministicHeadline(data);
-    await logGeneration(data.snapshotDate, fallback.headline, false, "fallback", err.message);
+    await logGeneration(data.snapshotDate, fallback.headline, false, "fallback", errMsg);
     return fallback;
   }
 }

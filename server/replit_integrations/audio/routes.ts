@@ -13,7 +13,7 @@ export function registerAudioRoutes(app: Express): void {
       res.json(conversations);
     } catch (error) {
       console.error("Error fetching conversations:", error);
-      res.status(500).json({ error: "Failed to fetch conversations" });
+      res.status(500).json({ message: "Failed to fetch conversations" });
     }
   });
 
@@ -23,13 +23,13 @@ export function registerAudioRoutes(app: Express): void {
       const id = parseInt(req.params.id);
       const conversation = await chatStorage.getConversation(id);
       if (!conversation) {
-        return res.status(404).json({ error: "Conversation not found" });
+        return res.status(404).json({ message: "Conversation not found" });
       }
       const messages = await chatStorage.getMessagesByConversation(id);
       res.json({ ...conversation, messages });
     } catch (error) {
       console.error("Error fetching conversation:", error);
-      res.status(500).json({ error: "Failed to fetch conversation" });
+      res.status(500).json({ message: "Failed to fetch conversation" });
     }
   });
 
@@ -41,7 +41,7 @@ export function registerAudioRoutes(app: Express): void {
       res.status(201).json(conversation);
     } catch (error) {
       console.error("Error creating conversation:", error);
-      res.status(500).json({ error: "Failed to create conversation" });
+      res.status(500).json({ message: "Failed to create conversation" });
     }
   });
 
@@ -53,7 +53,7 @@ export function registerAudioRoutes(app: Express): void {
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting conversation:", error);
-      res.status(500).json({ error: "Failed to delete conversation" });
+      res.status(500).json({ message: "Failed to delete conversation" });
     }
   });
 
@@ -66,7 +66,7 @@ export function registerAudioRoutes(app: Express): void {
       const { audio, voice = "alloy" } = req.body;
 
       if (!audio) {
-        return res.status(400).json({ error: "Audio data (base64) is required" });
+        return res.status(400).json({ message: "Audio data (base64) is required" });
       }
 
       // 1. Auto-detect format and convert to OpenAI-compatible format
@@ -129,7 +129,7 @@ export function registerAudioRoutes(app: Express): void {
         res.write(`data: ${JSON.stringify({ type: "error", error: "Failed to process voice message" })}\n\n`);
         res.end();
       } else {
-        res.status(500).json({ error: "Failed to process voice message" });
+        res.status(500).json({ message: "Failed to process voice message" });
       }
     }
   });

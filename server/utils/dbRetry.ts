@@ -13,8 +13,8 @@ const RETRYABLE_ERRORS = [
   "timeout expired",
 ];
 
-function isRetryableError(err: any): boolean {
-  const msg = err?.message || String(err);
+function isRetryableError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
   return RETRYABLE_ERRORS.some(pattern => msg.includes(pattern));
 }
 
@@ -38,16 +38,16 @@ export async function withRetry<T>(
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       return await operation();
-    } catch (err: any) {
-      lastError = err;
+    } catch (err: unknown) {
+      lastError = err instanceof Error ? err : new Error(String(err));
       if (isRetryableError(err)) {
         if (attempt < maxRetries) {
           const wait = delayMs * attempt;
-          console.warn(`[DBRetry] ${label} failed (attempt ${attempt}/${maxRetries}): ${err.message}. Warming connection and retrying in ${wait}ms...`);
+          console.warn(`[DBRetry] ${label} failed (attempt ${attempt}/${maxRetries}): ${lastError.message}. Warming connection and retrying in ${wait}ms...`);
           await new Promise(resolve => setTimeout(resolve, wait));
           await warmConnection();
         } else {
-          console.error(`[DBRetry] ${label} failed on final attempt ${attempt}/${maxRetries}: ${err.message}`);
+          console.error(`[DBRetry] ${label} failed on final attempt ${attempt}/${maxRetries}: ${lastError.message}`);
         }
       } else {
         throw err;

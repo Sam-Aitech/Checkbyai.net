@@ -198,12 +198,12 @@ export async function ensureTodaysArchive(
       signal: connectController.signal,
       headers: FETCH_HEADERS,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     clearTimeout(connectTimer);
     throw new Error(
-      err.name === "AbortError"
+      err instanceof Error && err.name === "AbortError"
         ? `[CsvArchiver] CSV download connect timed out (30 s) from ${csvUrl}`
-        : `[CsvArchiver] CSV download failed: ${err?.message ?? String(err)}`,
+        : `[CsvArchiver] CSV download failed: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
   clearTimeout(connectTimer);
@@ -276,13 +276,13 @@ export async function ensureTodaysArchive(
   const writeStream = fs.createWriteStream(filePath);
   try {
     await pipeline(nodeReadable, writeStream, { signal: bodyController.signal });
-  } catch (err: any) {
+  } catch (err: unknown) {
     // Clean up partial file on failure (pipeline destroys both streams on throw)
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
     throw new Error(
-      err.name === "AbortError"
+      err instanceof Error && err.name === "AbortError"
         ? `[CsvArchiver] CSV body stream timed out after 120 s from ${csvUrl}. Server stalled mid-download.`
-        : `[CsvArchiver] Failed to write CSV to disk: ${err?.message ?? String(err)}`,
+        : `[CsvArchiver] Failed to write CSV to disk: ${err instanceof Error ? err.message : String(err)}`,
     );
   } finally {
     clearTimeout(bodyTimer);

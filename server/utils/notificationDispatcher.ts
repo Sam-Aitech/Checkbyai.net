@@ -3,6 +3,7 @@ import { eq, and, gte, lte, sql, inArray } from "drizzle-orm";
 import { companyWatches, notificationPreferences, notificationLog, users, sponsorChanges } from "@shared/schema";
 import type { SponsorChange } from "./sponsorListFetcher";
 import { normalizeName } from "./sponsorListFetcher";
+import { getAppUrl } from "./appUrl";
 import { sendSMS, sendWhatsApp } from "../services/messaging";
 import { decryptPhone } from "./phoneCrypto";
 import { getTierConfig, getDeliverAfter, isChannelAllowed } from "./tierConfig";
@@ -44,8 +45,8 @@ async function sendViaResend(to: string, subject: string, html: string): Promise
 
     const data = await response.json();
     return { success: true, providerMessageId: data.id };
-  } catch (err: any) {
-    return { success: false, error: err.message || "Unknown send error" };
+  } catch (err: unknown) {
+    return { success: false, error: (err instanceof Error ? err.message : String(err)) || "Unknown send error" };
   }
 }
 
@@ -176,7 +177,7 @@ function buildEmailHtml(changeType: string, companyName: string, previousValue?:
           You are receiving this because you are watching <strong>${safeCompanyName}</strong> on Check By AI Sponsor Monitor.
         </p>
         <p style="color: #999; font-size: 11px; margin: 0; text-align: center;">
-          To manage your notification preferences, visit your <a href="https://checkbyai.net/sponsor-monitor" style="color: ${colors.accent};">Sponsor Monitor dashboard</a>.
+          To manage your notification preferences, visit your <a href="${getAppUrl()}/sponsor-monitor" style="color: ${colors.accent};">Sponsor Monitor dashboard</a>.
         </p>
       </div>
     </div>
@@ -443,9 +444,9 @@ export async function notifyAffectedUsers(change: SponsorChange): Promise<{ sent
           }
         }
         await Promise.all(channelPromises);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error(`[NotificationDispatcher] Error processing user ${watch.userId}:`, err);
-        await logNotification(watch.userId, changeId, "email", "failed", undefined, err.message || "Internal error");
+        await logNotification(watch.userId, changeId, "email", "failed", undefined, (err instanceof Error ? err.message : String(err)) || "Internal error");
         stats.failed++;
       }
     }
@@ -554,11 +555,12 @@ export async function processDelayedNotifications(): Promise<{ delivered: number
           }).where(eq(notificationLog.id, notif.logId));
           result.failed++;
         }
-      } catch (err: any) {
-        console.error(`[NotificationDispatcher] Error delivering queued notification ${notif.logId}:`, err.message);
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        console.error(`[NotificationDispatcher] Error delivering queued notification ${notif.logId}:`, errMsg);
         await db.update(notificationLog).set({
           status: "failed",
-          errorDetails: err.message || "Internal delivery error",
+          errorDetails: errMsg || "Internal delivery error",
         }).where(eq(notificationLog.id, notif.logId));
         result.failed++;
       }

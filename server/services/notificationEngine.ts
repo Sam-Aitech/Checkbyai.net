@@ -25,6 +25,10 @@ import type { NotifPrefs } from "@shared/schema";
 import type { SponsorChange } from "../utils/sponsorListFetcher";
 import { normalizeName } from "../utils/sponsorListFetcher";
 import { getTierConfig } from "../utils/tierConfig";
+import { getAppUrl } from "../utils/appUrl";
+import { logger } from "../utils/logger";
+
+const log = logger.child({ module: "NotificationEngine" });
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -153,7 +157,7 @@ function buildEmail(
         </p>
         <p style="color:#999;font-size:11px;margin:0;text-align:center;">
           Manage your preferences at
-          <a href="https://checkbyai.net/dashboard/sponsor" style="color:#0066CC;">checkbyai.net/dashboard/sponsor</a>
+          <a href="${getAppUrl()}/dashboard/sponsor" style="color:#0066CC;">checkbyai.net/dashboard/sponsor</a>
         </p>
       </div>
     </div>`;
@@ -190,8 +194,8 @@ async function sendViaResend(
 
     const data: any = await response.json();
     return { success: true, providerMessageId: data.id };
-  } catch (err: any) {
-    return { success: false, error: err.message ?? "Unknown send error" };
+  } catch (err: unknown) {
+    return { success: false, error: (err instanceof Error ? err.message : String(err)) ?? "Unknown send error" };
   }
 }
 
@@ -336,13 +340,14 @@ export async function notifyUsersOfEvent(change: SponsorChange): Promise<void> {
         console.log(
           `[NotificationEngine] ${sendResult.success ? "Sent" : "Failed"} ${prefsKey} to ${recipientEmail} (user ${userId})`,
         );
-      } catch (err: any) {
-        console.error(`[NotificationEngine] Error processing user ${userId}:`, err.message);
-        await logEvent(userId, changeId, prefsKey, companyName, false, { errorDetails: err.message });
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        log.error({ err, userId, changeId }, `Error processing user ${userId}: ${errMsg}`);
+        await logEvent(userId, changeId, prefsKey, companyName, false, { errorDetails: errMsg });
       }
     }
   } catch (err) {
-    console.error("[NotificationEngine] Fatal error for change", changeId, ":", err);
+    log.error({ err, changeId }, "Fatal error for change");
   }
 }
 
@@ -438,14 +443,14 @@ export async function processQueuedEngineEvents(): Promise<void> {
         console.log(
           `[NotificationEngine] Deferred ${entry.eventType}: ${sendResult.success ? "sent" : "failed"} to ${recipientEmail}`,
         );
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error(
           `[NotificationEngine] Error delivering queued entry ${entry.id}:`,
-          err.message,
+          err instanceof Error ? err.message : String(err),
         );
         await db
           .update(notifEngineLog)
-          .set({ status: "failed", errorDetails: err.message })
+          .set({ status: "failed", errorDetails: err instanceof Error ? err.message : String(err) })
           .where(eq(notifEngineLog.id, entry.id));
       }
     }

@@ -61,8 +61,8 @@ export async function scrapeJobsForCompany(
       data.boards_failed.length ? `(failed: ${data.boards_failed.join(", ")})` : "",
     );
     return data;
-  } catch (err: any) {
-    console.error(`[JobScraper] Scrape failed for "${companyName}":`, err.message);
+  } catch (err: unknown) {
+    console.error(`[JobScraper] Scrape failed for "${companyName}":`, err instanceof Error ? err.message : err);
     return empty;
   }
 }
