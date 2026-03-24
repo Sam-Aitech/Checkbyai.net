@@ -6,6 +6,7 @@ import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
 import crypto from "crypto";
 import { otpLimiter } from "./middleware/rateLimiter";
+import { getAppUrl } from "./utils/appUrl";
 
 
 if (process.env.NODE_ENV === "production" && !process.env.REPLIT_DOMAINS) {
@@ -186,7 +187,7 @@ export async function sendMasterPackageNotification(userEmail: string, userId: s
                 Please log in to the admin portal to review pending expert requests.
               </p>
               <div style="text-align: center; margin-top: 25px;">
-                <a href="https://checkbyai.net/admin" style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+                <a href="${getAppUrl()}/admin" style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">
                   Go to Admin Portal
                 </a>
               </div>
@@ -231,7 +232,7 @@ export async function sendMasterPackageNotification(userEmail: string, userId: s
                 If you have any questions, please contact our support team.
               </p>
               <div style="text-align: center; margin-top: 25px;">
-                <a href="https://checkbyai.net/dashboard" style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+                <a href="${getAppUrl()}/dashboard" style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">
                   Upload Your Document
                 </a>
               </div>
@@ -457,14 +458,14 @@ export async function setupAuth(app: Express) {
       const { email } = req.body;
       
       if (!email || !email.includes("@")) {
-        return res.status(400).json({ error: "Valid email required" });
+        return res.status(400).json({ message: "Valid email required" });
       }
 
       // Check if email matches ADMIN_EMAIL
       const envAdminEmail = process.env.ADMIN_EMAIL;
-      
+
       if (!envAdminEmail || email.toLowerCase() !== envAdminEmail.toLowerCase()) {
-        return res.status(403).json({ error: "This email is not authorized for admin access" });
+        return res.status(403).json({ message: "This email is not authorized for admin access" });
       }
 
       // Generate OTP and set expiry (10 minutes)
@@ -491,13 +492,13 @@ export async function setupAuth(app: Express) {
       const sent = await sendAdminOTPViaResend(email, code);
       
       if (!sent) {
-        return res.status(500).json({ error: "Failed to send verification email. Please check Resend API configuration." });
+        return res.status(500).json({ message: "Failed to send verification email. Please check Resend API configuration." });
       }
 
       res.json({ message: "Verification code sent to your email" });
     } catch (error) {
       console.error("Error sending admin OTP:", error);
-      res.status(500).json({ error: "Failed to send verification code" });
+      res.status(500).json({ message: "Failed to send verification code" });
     }
   });
 
@@ -507,29 +508,29 @@ export async function setupAuth(app: Express) {
       const { email, code } = req.body;
       
       if (!email || !code) {
-        return res.status(400).json({ error: "Email and code required" });
+        return res.status(400).json({ message: "Email and code required" });
       }
 
       // Check if email matches ADMIN_EMAIL
       const envAdminEmail = process.env.ADMIN_EMAIL;
-      
+
       if (!envAdminEmail || email.toLowerCase() !== envAdminEmail.toLowerCase()) {
-        return res.status(403).json({ error: "This email is not authorized for admin access" });
+        return res.status(403).json({ message: "This email is not authorized for admin access" });
       }
 
       const user = await storage.getUserByEmail(email);
-      
+
       if (!user) {
-        return res.status(404).json({ error: "User not found" });
+        return res.status(404).json({ message: "User not found" });
       }
 
       // Check code and expiry
       if (user.verificationCode !== code) {
-        return res.status(400).json({ error: "Invalid verification code" });
+        return res.status(400).json({ message: "Invalid verification code" });
       }
 
       if (!user.codeExpiry || new Date() > user.codeExpiry) {
-        return res.status(400).json({ error: "Verification code expired" });
+        return res.status(400).json({ message: "Verification code expired" });
       }
 
       // Clear verification code and ensure admin role
@@ -553,13 +554,13 @@ export async function setupAuth(app: Express) {
 
       req.login(sessionUser, (err) => {
         if (err) {
-          return res.status(500).json({ error: "Failed to create session" });
+          return res.status(500).json({ message: "Failed to create session" });
         }
         res.json({ message: "Login successful", user: sessionUser });
       });
     } catch (error) {
       console.error("Error verifying admin OTP:", error);
-      res.status(500).json({ error: "Failed to verify code" });
+      res.status(500).json({ message: "Failed to verify code" });
     }
   });
 

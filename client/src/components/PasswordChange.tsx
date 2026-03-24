@@ -11,48 +11,56 @@ export default function PasswordChange() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState('');
+
+  // Inline field-level errors (shown as user types after first interaction)
+  const [touched, setTouched] = useState({ current: false, new: false, confirm: false });
+  const [serverError, setServerError] = useState('');
   const [success, setSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Derived inline errors
+  const newPasswordError =
+    touched.new && newPassword.length > 0 && newPassword.length < 8
+      ? 'Must be at least 8 characters'
+      : '';
+  const confirmPasswordError =
+    touched.confirm && confirmPassword.length > 0 && confirmPassword !== newPassword
+      ? 'Passwords do not match'
+      : '';
+  const isValid =
+    currentPassword.length > 0 &&
+    newPassword.length >= 8 &&
+    confirmPassword === newPassword;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setServerError('');
     setSuccess(false);
+    setTouched({ current: true, new: true, confirm: true });
 
-    // Validation
     if (!currentPassword || !newPassword || !confirmPassword) {
-      setError('All fields are required');
+      setServerError('All fields are required');
       return;
     }
-
     if (newPassword.length < 8) {
-      setError('New password must be at least 8 characters');
+      setServerError('New password must be at least 8 characters');
       return;
     }
-
     if (newPassword !== confirmPassword) {
-      setError('New passwords do not match');
+      setServerError('New passwords do not match');
       return;
     }
 
     setIsLoading(true);
-
     try {
-      await apiRequest('/api/auth/change-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ currentPassword, newPassword }),
-      });
-
+      await apiRequest('POST', '/api/auth/change-password', { currentPassword, newPassword });
       setSuccess(true);
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-    } catch (err: any) {
-      setError(err.message || 'Failed to change password');
+      setTouched({ current: false, new: false, confirm: false });
+    } catch (err: unknown) {
+      setServerError(err instanceof Error ? err.message : 'Failed to change password');
     } finally {
       setIsLoading(false);
     }
@@ -71,10 +79,10 @@ export default function PasswordChange() {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
+          {serverError && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription>{serverError}</AlertDescription>
             </Alert>
           )}
 
@@ -85,13 +93,14 @@ export default function PasswordChange() {
             </Alert>
           )}
 
-          <div className="space-y-2">
+          <div className="space-y-1">
             <Label htmlFor="current-password">Current Password</Label>
             <Input
               id="current-password"
               type="password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
+              onBlur={() => setTouched((t) => ({ ...t, current: true }))}
               placeholder="Enter current password"
               required
               data-testid="input-current-password"
@@ -99,38 +108,51 @@ export default function PasswordChange() {
             />
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1">
             <Label htmlFor="new-password">New Password</Label>
             <Input
               id="new-password"
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
+              onBlur={() => setTouched((t) => ({ ...t, new: true }))}
               placeholder="Enter new password (min 8 characters)"
               required
-              minLength={8}
+              aria-describedby={newPasswordError ? "new-password-error" : undefined}
               data-testid="input-new-password"
               autoComplete="new-password"
             />
+            {newPasswordError && (
+              <p id="new-password-error" role="alert" className="text-xs text-destructive">
+                {newPasswordError}
+              </p>
+            )}
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1">
             <Label htmlFor="confirm-password">Confirm New Password</Label>
             <Input
               id="confirm-password"
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
+              onBlur={() => setTouched((t) => ({ ...t, confirm: true }))}
               placeholder="Confirm new password"
               required
+              aria-describedby={confirmPasswordError ? "confirm-password-error" : undefined}
               data-testid="input-confirm-password"
               autoComplete="new-password"
             />
+            {confirmPasswordError && (
+              <p id="confirm-password-error" role="alert" className="text-xs text-destructive">
+                {confirmPasswordError}
+              </p>
+            )}
           </div>
 
           <Button
             type="submit"
-            disabled={isLoading}
+            disabled={isLoading || !isValid}
             className="w-full"
             data-testid="button-change-password"
           >

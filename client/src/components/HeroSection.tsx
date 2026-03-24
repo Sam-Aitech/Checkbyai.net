@@ -136,7 +136,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
           <div className="relative z-10 max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
             <nav className="flex justify-between items-center py-4 mb-6">
               <Link href="/" className="flex items-center gap-2.5">
-                <img src={logoImg} alt="CheckByAi.net" className="h-10 sm:h-12 w-auto object-contain" />
+                <img src={logoImg} alt="CheckByAi.net" width={160} height={40} className="h-10 sm:h-12 w-auto object-contain" />
               </Link>
               <div className="hidden md:flex items-center gap-1">
                 {[

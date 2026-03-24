@@ -337,7 +337,7 @@ export default function LoginPage() {
                 >
                   <form onSubmit={handleVerifyOTP} className="space-y-4">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-                    <img src={logoImg} alt="CheckByAi" className="h-12 w-auto mb-6 object-contain" />
+                    <img src={logoImg} alt="CheckByAi" width={160} height={40} className="h-12 w-auto mb-6 object-contain" />
                       <span>Code sent to <strong className="text-foreground">{email}</strong></span>
                     </div>
 

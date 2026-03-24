@@ -3,6 +3,7 @@ import { Link } from 'wouter';
 import FileUploadSimple from './FileUploadSimple';
 import Enhanced3DDemo from './Enhanced3DDemo';
 import { useAuth } from '@/hooks/useAuth';
+import { Skeleton } from '@/components/ui/skeleton';
 import { queryClient } from '@/lib/queryClient';
 
 interface VerificationResult {
@@ -109,6 +110,18 @@ export default function COSDashboard() {
     setDemoStep(0);
     setIsAnimating(false);
   };
+
+  // Auth still resolving — show skeleton to avoid layout flash
+  if (authLoading) {
+    return (
+      <div className="max-w-3xl mx-auto px-6 py-12 space-y-6">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-5 w-80" />
+        <Skeleton className="h-48 w-full rounded-xl" />
+        <Skeleton className="h-48 w-full rounded-xl" />
+      </div>
+    );
+  }
 
   // Beta gate — not logged in
   if (!authLoading && !isAuthenticated) {
