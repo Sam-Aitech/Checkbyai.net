@@ -106,7 +106,7 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
               </Link>
 
               <div className="hidden lg:flex items-center gap-2">
-                {navLinks.map((link) => {
+                {navLinks.filter(link => !(location === "/" && link.href === "/dashboard")).map((link) => {
                   const isActive = location === link.href;
                   return (
                     <Link
@@ -161,7 +161,7 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
                 className="lg:hidden border-t border-border/50 bg-white/95 dark:bg-background/95 backdrop-blur-xl overflow-hidden"
               >
                 <div className="px-6 py-4 space-y-1">
-                  {navLinks.map((link) => {
+                  {navLinks.filter(link => !(location === "/" && link.href === "/dashboard")).map((link) => {
                     const isActive = location === link.href;
                     return (
                       <Link
