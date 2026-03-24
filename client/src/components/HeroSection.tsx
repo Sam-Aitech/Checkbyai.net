@@ -510,17 +510,17 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
           <div className="text-center max-w-2xl mx-auto mb-14">
             <span className="editorial-caption text-primary block mb-4">Also Available</span>
             <h2 className="text-3xl sm:text-4xl editorial-subheading text-foreground mb-4">
-              AI Certificate of Sponsorship Verification
+              AI-Assisted Certificate of Sponsorship Authenticity Check
             </h2>
             <p className="text-base editorial-body text-muted-foreground">
-              Received a CoS from your employer? Upload it to check if it is genuine, edited, or fabricated. AI forensic analysis against Home Office standards.
+              Received a Certificate of Sponsorship from a prospective employer? Upload the PDF to assess whether the document appears unaltered or has been modified. No personal data is retained at any stage.
             </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-6 mb-10">
-            <FeatureCard icon={<ShieldMonitorIcon size={20} />} title="Home Office Compliance" description="Our AI analyzes your Certificate of Sponsorship against official document patterns. Detect fake CoS documents before submitting your visa." index={0} />
-            <FeatureCard icon={<DocumentVerifyIcon size={20} />} title="Instant Verification" description="Get results in seconds. Upload your document and know immediately if it matches genuine Home Office formatting and metadata." index={1} />
-            <FeatureCard icon={<UKLockIcon size={20} />} title="UK Data Protection" description="Processed under UK GDPR. We analyze metadata only. Documents are permanently deleted after verification. No data stored." index={2} />
+            <FeatureCard icon={<ShieldMonitorIcon size={20} />} title="Home Office Compliance" description="Our tool cross-references your Certificate of Sponsorship against known Home Office document structure and formatting standards. Results are indicative only and do not constitute legal verification." index={0} />
+            <FeatureCard icon={<DocumentVerifyIcon size={20} />} title="Instant Assessment" description="Receive an automated assessment within seconds of upload. The system evaluates document structure, formatting consistency, and file integrity against Home Office-issued templates." index={1} />
+            <FeatureCard icon={<UKLockIcon size={20} />} title="UK Data Protection" description="Operates in full compliance with UK GDPR. No personal data is extracted, stored, or processed. Uploaded files are permanently deleted immediately upon completion of analysis." index={2} />
           </div>
 
           <div className="text-center">
