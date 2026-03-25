@@ -190,8 +190,22 @@ export default function LoginPage() {
 
       const params = new URLSearchParams(search);
       const redirectTo = params.get("redirect");
-      const safeRedirect = redirectTo && redirectTo.startsWith("/") ? redirectTo : "/sponsor-monitor";
-      setLocation(safeRedirect);
+
+      // Fetch fresh user data to determine plan-based redirect
+      let destination = redirectTo && redirectTo.startsWith("/") ? redirectTo : null;
+      if (!destination) {
+        try {
+          const userData = await queryClient.fetchQuery<any>({
+            queryKey: ["/api/auth/user"],
+            staleTime: 0,
+          });
+          const proPlan = ["starter","pro","unlimited","enterprise","notification_starter","notification_pro"];
+          destination = proPlan.includes(userData?.subscriptionStatus || "") ? "/pro-dashboard" : "/sponsor-monitor";
+        } catch {
+          destination = "/sponsor-monitor";
+        }
+      }
+      setLocation(destination);
     } catch (error: any) {
       toast({
         title: "Verification failed",

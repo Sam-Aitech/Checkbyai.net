@@ -30,6 +30,9 @@ import {
   type NotifPrefs,
   type NotifEventType,
   DEFAULT_NOTIF_PREFS,
+  supportTickets,
+  type SupportTicket,
+  type InsertSupportTicket,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, gte, count, avg, sql, inArray, isNull, and, getTableColumns } from "drizzle-orm";
@@ -137,7 +140,13 @@ export interface IStorage {
     accuracyBreakdown: { correct: number; incorrect: number; unsure: number };
     recentFeedback: Feedback[];
   }>;
-  
+
+  // Support ticket operations
+  createSupportTicket(userId: string, data: InsertSupportTicket): Promise<SupportTicket>;
+  getUserSupportTickets(userId: string): Promise<SupportTicket[]>;
+  getAllSupportTickets(): Promise<SupportTicket[]>;
+  replySupportTicket(id: number, adminReply: string): Promise<SupportTicket>;
+
   // Paid submissions operations
   createPaidSubmission(data: InsertPaidSubmission): Promise<PaidSubmission>;
   getPaidSubmission(id: number): Promise<PaidSubmission | undefined>;
@@ -899,6 +908,28 @@ export class DatabaseStorage implements IStorage {
       },
       recentFeedback,
     };
+  }
+
+  // Support ticket operations
+  async createSupportTicket(userId: string, data: InsertSupportTicket): Promise<SupportTicket> {
+    const [ticket] = await db.insert(supportTickets).values({ ...data, userId }).returning();
+    return ticket;
+  }
+
+  async getUserSupportTickets(userId: string): Promise<SupportTicket[]> {
+    return db.select().from(supportTickets).where(eq(supportTickets.userId, userId)).orderBy(desc(supportTickets.createdAt));
+  }
+
+  async getAllSupportTickets(): Promise<SupportTicket[]> {
+    return db.select().from(supportTickets).orderBy(desc(supportTickets.createdAt));
+  }
+
+  async replySupportTicket(id: number, adminReply: string): Promise<SupportTicket> {
+    const [ticket] = await db.update(supportTickets)
+      .set({ adminReply, status: "resolved", repliedAt: new Date() })
+      .where(eq(supportTickets.id, id))
+      .returning();
+    return ticket;
   }
 
   // Paid submissions operations

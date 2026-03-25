@@ -762,3 +762,29 @@ export const insertSponsorWatchSchema = createInsertSchema(sponsorWatches).omit(
   status: true,
 });
 export type InsertSponsorWatch = z.infer<typeof insertSponsorWatchSchema>;
+
+// ─── Support Tickets ──────────────────────────────────────────────────────────
+export const supportTickets = pgTable(
+  "support_tickets",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    subject: text("subject").notNull(),
+    message: text("message").notNull(),
+    status: varchar("status", { enum: ["open", "resolved"] }).notNull().default("open"),
+    adminReply: text("admin_reply"),
+    repliedAt: timestamp("replied_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_support_tickets_user_id").on(table.userId),
+    index("idx_support_tickets_status").on(table.status),
+    index("idx_support_tickets_created").on(table.createdAt),
+  ]
+);
+
+export type SupportTicket = typeof supportTickets.$inferSelect;
+export const insertSupportTicketSchema = createInsertSchema(supportTickets).omit({
+  id: true, status: true, adminReply: true, repliedAt: true, createdAt: true, userId: true,
+});
+export type InsertSupportTicket = z.infer<typeof insertSupportTicketSchema>;
