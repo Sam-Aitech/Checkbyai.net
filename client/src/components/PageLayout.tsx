@@ -1,10 +1,11 @@
 import { Link, useLocation } from "wouter";
-import { Menu, X } from "lucide-react";
+import { Menu, X, LayoutDashboard } from "lucide-react";
 import UserProfile from "./UserProfile";
 import Footer from "./Footer";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import logoImg from "@assets/logo_material.png";
+import { useAuth } from "@/hooks/useAuth";
 
 interface PageLayoutProps {
   children: React.ReactNode;
@@ -27,6 +28,7 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const shouldReduceMotion = useReducedMotion();
+  const { isAuthenticated, isPro, isAdmin } = useAuth();
 
   // ── Focus-trap refs ──────────────────────────────────────────────────────────
   const menuButtonRef = useRef<HTMLButtonElement>(null);
@@ -127,9 +129,16 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
 
               <div className="flex items-center gap-3">
                 <div className="hidden sm:flex items-center mr-2">
-                  <Link href="/pricing" className="px-5 py-2 text-sm font-semibold text-white bg-primary hover:bg-primary/90 rounded-full shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
-                    Get Alerts
-                  </Link>
+                  {(isAuthenticated && (isPro || isAdmin)) ? (
+                    <Link href="/pro-dashboard" className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-primary hover:bg-primary/90 rounded-full shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
+                      <LayoutDashboard className="w-4 h-4" />
+                      My Dashboard
+                    </Link>
+                  ) : (
+                    <Link href="/pricing" className="px-5 py-2 text-sm font-semibold text-white bg-primary hover:bg-primary/90 rounded-full shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
+                      Get Alerts
+                    </Link>
+                  )}
                 </div>
                 <UserProfile />
                 <button
@@ -161,6 +170,21 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
                 className="lg:hidden border-t border-border/50 bg-white/95 dark:bg-background/95 backdrop-blur-xl overflow-hidden"
               >
                 <div className="px-6 py-4 space-y-1">
+                  {(isAuthenticated && (isPro || isAdmin)) && (
+                    <Link
+                      href="/pro-dashboard"
+                      onClick={closeMobileMenu}
+                      aria-current={location === "/pro-dashboard" ? "page" : undefined}
+                      className={`flex items-center gap-2 px-4 py-3 text-sm font-semibold rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                        location === "/pro-dashboard"
+                          ? "text-primary bg-primary/20"
+                          : "text-primary bg-primary/10 hover:bg-primary/20"
+                      }`}
+                    >
+                      <LayoutDashboard className="w-4 h-4" />
+                      My Dashboard
+                    </Link>
+                  )}
                   {navLinks.filter(link => !(location === "/" && link.href === "/dashboard")).map((link) => {
                     const isActive = location === link.href;
                     return (

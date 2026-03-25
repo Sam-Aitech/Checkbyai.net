@@ -58,9 +58,7 @@ export default function CheckoutSuccess() {
 
   const isNotificationPlan = verifyResult?.packageType === 'notification_starter' || verifyResult?.packageType === 'notification_pro';
 
-  const sponsorDashboardUrl = verifyResult?.companyName
-    ? `/dashboard/sponsor?company=${encodeURIComponent(verifyResult.companyName)}`
-    : '/dashboard/sponsor';
+  const sponsorDashboardUrl = '/pro-dashboard';
 
   // Auto-redirect notification plan purchases to sponsor dashboard after 2s
   useEffect(() => {
