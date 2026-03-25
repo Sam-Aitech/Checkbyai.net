@@ -260,6 +260,7 @@ export function registerBillingRoutes(app: Express): void {
           const user = await storage.getUserByStripeCustomerId(customerId);
           if (user) {
             const subPkgType = subscription.metadata?.packageType;
+            const prevStatus = user.subscriptionStatus || 'free';
             if (subscription.status === 'active') {
               if (subPkgType === 'cos_check') {
                 await storage.updateCosCheckSubscription(user.id, true);
@@ -270,6 +271,15 @@ export function registerBillingRoutes(app: Express): void {
                   stripeSubscriptionId: subscription.id,
                   stripeCustomerId: customerId,
                 });
+                storage.logSubscriptionChange({
+                  userId: user.id,
+                  changedBy: 'stripe',
+                  source: 'stripe_webhook',
+                  previousStatus: prevStatus,
+                  newStatus: subStatus,
+                  reason: `Stripe subscription active (${event.type})`,
+                  metadata: { stripeEventId: event.id, subscriptionId: subscription.id, packageType: subPkgType },
+                }).catch(() => {});
               }
             } else if (subscription.status === 'canceled' || subscription.status === 'unpaid' || event.type === 'customer.subscription.deleted') {
               if (subPkgType === 'cos_check') {
@@ -279,6 +289,15 @@ export function registerBillingRoutes(app: Express): void {
                   subscriptionStatus: 'free',
                   stripeSubscriptionId: null,
                 });
+                storage.logSubscriptionChange({
+                  userId: user.id,
+                  changedBy: 'stripe',
+                  source: 'stripe_webhook',
+                  previousStatus: prevStatus,
+                  newStatus: 'free',
+                  reason: `Stripe subscription ${subscription.status} (${event.type})`,
+                  metadata: { stripeEventId: event.id, subscriptionId: subscription.id, packageType: subPkgType },
+                }).catch(() => {});
               }
             }
           }
@@ -297,6 +316,27 @@ export function registerBillingRoutes(app: Express): void {
                 stripeSubscriptionId: invoice.subscription,
                 stripeCustomerId: customerId,
               });
+
+              // ── Phase 3A: Monthly credit top-up for notification_pro renewals ──
+              // notification_pro grants 5 CoS credits per billing cycle.
+              // Only fires on renewal invoices (billing_reason='subscription_cycle'), not the first payment.
+              const billingReason = invoice.billing_reason;
+              const subMeta = (invoice.lines?.data?.[0]?.metadata ?? {}) as Record<string, string>;
+              const linePackageType = subMeta.packageType;
+              const isNotifPro = linePackageType === 'notification_pro' || user.subscriptionStatus === 'pro';
+              if (isNotifPro && billingReason === 'subscription_cycle') {
+                await storage.addCredits(user.id, 5);
+                storage.logSubscriptionChange({
+                  userId: user.id,
+                  changedBy: 'stripe',
+                  source: 'stripe_webhook',
+                  previousStatus: user.subscriptionStatus,
+                  newStatus: user.subscriptionStatus,
+                  reason: 'Monthly notification_pro credit top-up (+5 credits)',
+                  metadata: { stripeEventId: event.id, invoiceId: invoice.id, creditsAdded: 5 },
+                }).catch(() => {});
+                console.log(`[Billing] Added 5 monthly credits to notification_pro user ${user.id}`);
+              }
             }
           }
         }
@@ -308,9 +348,19 @@ export function registerBillingRoutes(app: Express): void {
         if (customerId) {
           const user = await storage.getUserByStripeCustomerId(customerId);
           if (user) {
+            const prevStatus = user.subscriptionStatus || 'free';
             await storage.updateUserSubscription(user.id, {
               subscriptionStatus: 'past_due',
             });
+            storage.logSubscriptionChange({
+              userId: user.id,
+              changedBy: 'stripe',
+              source: 'stripe_webhook',
+              previousStatus: prevStatus,
+              newStatus: 'past_due',
+              reason: 'Stripe invoice payment failed',
+              metadata: { stripeEventId: event.id, invoiceId: invoice.id },
+            }).catch(() => {});
           }
         }
         break;
@@ -333,6 +383,8 @@ export function registerBillingRoutes(app: Express): void {
         if (userId && packageType && session.payment_status === 'paid' && !(await isSessionProcessed(session.id))) {
           await markSessionProcessed(session.id);
           const sessionEmail = session.customer_details?.email || session.customer_email || undefined;
+          const prevUser = await storage.getUser(userId);
+          const prevStatus = prevUser?.subscriptionStatus || 'free';
           if (packageType === 'starter') {
             await withRetry(() => db.transaction(async (tx) => {
               await tx.update(users).set({
@@ -344,6 +396,7 @@ export function registerBillingRoutes(app: Express): void {
               }).where(eq(users.id, userId));
             }), 'webhook-checkout-starter');
             sendSubscriptionNotifications(userId, 'CoS Check Starter', 'starter', sessionEmail).catch((err) => console.error('[Subscription] Notification failed:', err));
+            storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'starter', reason: 'Checkout: CoS Check Starter', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch(() => {});
           } else if (packageType === 'pro') {
             await withRetry(() => db.transaction(async (tx) => {
               await tx.update(users).set({
@@ -355,6 +408,7 @@ export function registerBillingRoutes(app: Express): void {
               }).where(eq(users.id, userId));
             }), 'webhook-checkout-pro');
             sendSubscriptionNotifications(userId, 'CoS Check Pro', 'pro', sessionEmail).catch((err) => console.error('[Subscription] Notification failed:', err));
+            storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'pro', reason: 'Checkout: CoS Check Pro', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch(() => {});
           } else if (packageType === 'unlimited') {
             await withRetry(() => db.transaction(async (tx) => {
               await tx.update(users).set({
@@ -365,6 +419,7 @@ export function registerBillingRoutes(app: Express): void {
               }).where(eq(users.id, userId));
             }), 'webhook-checkout-unlimited');
             sendSubscriptionNotifications(userId, 'CoS Check Unlimited', 'unlimited', sessionEmail).catch((err) => console.error('[Subscription] Notification failed:', err));
+            storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'unlimited', reason: 'Checkout: CoS Check Unlimited', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch(() => {});
           } else if (packageType === 'master') {
             await storage.createPaidSubmission({
               email: session.customer_details?.email || '',
@@ -384,6 +439,7 @@ export function registerBillingRoutes(app: Express): void {
               }).where(eq(users.id, userId));
             }), 'webhook-checkout-notification-starter');
             sendSubscriptionNotifications(userId, 'Notification Engine Starter', 'notification_starter', sessionEmail).catch((err) => console.error('[Subscription] Notification failed:', err));
+            storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'starter', reason: 'Checkout: Sponsor Monitor Starter', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch(() => {});
           } else if (packageType === 'notification_pro') {
             await withRetry(() => db.transaction(async (tx) => {
               await tx.update(users).set({
@@ -395,6 +451,7 @@ export function registerBillingRoutes(app: Express): void {
               }).where(eq(users.id, userId));
             }), 'webhook-checkout-notification-pro');
             sendSubscriptionNotifications(userId, 'Notification Engine Pro', 'notification_pro', sessionEmail).catch((err) => console.error('[Subscription] Notification failed:', err));
+            storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'pro', reason: 'Checkout: Sponsor Monitor Pro', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch(() => {});
           } else if (packageType === 'cos_check') {
             await withRetry(() => db.transaction(async (tx) => {
               await tx.update(users).set({

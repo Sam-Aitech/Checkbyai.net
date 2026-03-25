@@ -7,7 +7,7 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import FileUpload from "./FileUpload";
 import type { StatsResponse, TrustedPattern, VerificationResult, AnalysisDocument } from "@shared/api-types";
 
-import { Database, CheckCircle, AlertTriangle, TrendingUp, Search, Trash2, Download, Plus, Lock, ShieldCheck, FileSearch, Code, Save, X, Eye, MessageSquare, Settings, Users, Bell, FileCheck, WifiOff, Wifi, ChevronDown, ChevronUp, Ban, RefreshCw } from "lucide-react";
+import { Database, CheckCircle, AlertTriangle, TrendingUp, Search, Trash2, Download, Plus, Lock, ShieldCheck, FileSearch, Code, Save, X, Eye, MessageSquare, Settings, Users, Bell, FileCheck, WifiOff, Wifi, ChevronDown, ChevronUp, Ban, RefreshCw, Building2, History, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import FeedbackAnalytics from "./FeedbackAnalytics";
 
 export default function AdminPortal() {
@@ -32,12 +33,45 @@ export default function AdminPortal() {
   const [userPage, setUserPage] = useState(1);
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [limitInputs, setLimitInputs] = useState<Record<string, string>>({});
+  const [creditInputs, setCreditInputs] = useState<Record<string, string>>({});
 
   // System settings state
   const [globalLimitInput, setGlobalLimitInput] = useState("");
 
   // Delete user confirmation state
   const [userToDelete, setUserToDelete] = useState<{ id: string; name: string } | null>(null);
+
+  // Audit log panel state — tracks which user's audit log is visible
+  const [auditLogUserId, setAuditLogUserId] = useState<string | null>(null);
+
+  interface SubAuditEntry {
+    id: number;
+    userId: string;
+    changedBy: string | null;
+    source: string;
+    previousStatus: string;
+    newStatus: string;
+    reason: string | null;
+    metadata: Record<string, unknown> | null;
+    createdAt: string;
+  }
+
+  const { data: auditLogData, isLoading: auditLogLoading } = useQuery<SubAuditEntry[]>({
+    queryKey: ['/api/admin/users', auditLogUserId, 'subscription-audit'],
+    queryFn: () => fetch(`/api/admin/users/${auditLogUserId}/subscription-audit`, { credentials: 'include' }).then(r => r.json()),
+    enabled: !!auditLogUserId && isAuthenticated && isAdmin && activeTab === 'users',
+  });
+
+  // Sponsor Monitor plan change confirmation state
+  const [pendingPlanChange, setPendingPlanChange] = useState<{
+    userId: string;
+    userName: string;
+    currentPlan: string;
+    newPlan: 'free' | 'starter' | 'pro';
+    hasStripeSubscription: boolean;
+    activeWatchCount: number;
+    newWatchLimit: number;
+  } | null>(null);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -116,6 +150,7 @@ export default function AdminPortal() {
     lastName: string | null;
     role: string | null;
     subscriptionStatus: string | null;
+    stripeSubscriptionId: string | null;
     cosCheckApproved: boolean | null;
     cosCheckSubscription: boolean | null;
     ipExempt: boolean | null;
@@ -209,6 +244,27 @@ export default function AdminPortal() {
       setUserToDelete(null);
       toast({ title: 'Error', description: 'Failed to delete user.', variant: 'destructive' });
     },
+  });
+
+  const creditsMutation = useMutation({
+    mutationFn: ({ userId, operation, amount, reason }: { userId: string; operation: 'add' | 'deduct' | 'set'; amount: number; reason?: string }) =>
+      apiRequest('PATCH', `/api/admin/users/${userId}/credits`, { operation, amount, reason }),
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      toast({ title: 'Credits updated', description: `${data.creditsBefore} → ${data.creditsAfter} credits.` });
+    },
+    onError: () => toast({ title: 'Error', description: 'Failed to update credits.', variant: 'destructive' }),
+  });
+
+  const sponsorMonitorPlanMutation = useMutation({
+    mutationFn: ({ userId, plan }: { userId: string; plan: 'free' | 'starter' | 'pro' }) =>
+      apiRequest('PATCH', `/api/admin/users/${userId}/sponsor-monitor-plan`, { plan }),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      const labels = { free: 'Free', starter: 'Starter', pro: 'Pro' };
+      toast({ title: 'Plan updated', description: `Sponsor Monitor plan set to ${labels[variables.plan]}. Email sent to user.` });
+    },
+    onError: () => toast({ title: 'Error', description: 'Failed to update Sponsor Monitor plan.', variant: 'destructive' }),
   });
 
   const [selectedSubmission, setSelectedSubmission] = useState<PaidSubmission | null>(null);
@@ -1361,6 +1417,7 @@ export default function AdminPortal() {
 
             {/* Legend */}
             <div className="flex flex-wrap gap-3 mb-4 text-xs text-gray-500 dark:text-gray-400">
+              <span className="flex items-center gap-1"><Building2 className="w-3 h-3 text-indigo-500" /> Sponsor Monitor plan (Starter/Pro)</span>
               <span className="flex items-center gap-1"><Bell className="w-3 h-3 text-blue-500" /> Notification Engine subscription</span>
               <span className="flex items-center gap-1"><FileCheck className="w-3 h-3 text-green-500" /> COS Check subscription</span>
               <span className="flex items-center gap-1"><Wifi className="w-3 h-3 text-purple-500" /> IP Exempt (no daily IP limit)</span>
@@ -1537,6 +1594,95 @@ export default function AdminPortal() {
                                   />
                                 </div>
 
+                                {/* Sponsor Monitor Plan */}
+                                {(() => {
+                                  const WATCH_LIMITS: Record<string, number> = { free: 1, starter: 2, pro: 5, unlimited: -1, enterprise: -1 };
+                                  const isFullPlan = notifTier === 'unlimited' || notifTier === 'enterprise';
+                                  const isPastDue  = notifTier === 'past_due';
+                                  const dropdownValue = (['free', 'starter', 'pro'].includes(notifTier) ? notifTier : 'free') as 'free' | 'starter' | 'pro';
+                                  return (
+                                    <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+                                      <p className="text-sm font-medium flex items-center gap-2 mb-1">
+                                        <Building2 className="w-4 h-4 text-indigo-500" />
+                                        Sponsor Monitor Plan
+                                      </p>
+                                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                                        Override the user's Sponsor Monitor tier. Excess watches are deactivated automatically on downgrade.
+                                      </p>
+
+                                      {/* Stripe subscription warning — Phase 1D */}
+                                      {u.stripeSubscriptionId && (
+                                        <div className="flex items-start gap-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md p-2 mb-3">
+                                          <AlertTriangle className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
+                                          <p className="text-xs text-amber-700 dark:text-amber-400">
+                                            Active Stripe subscription detected (<code className="text-xs">{u.stripeSubscriptionId.slice(0, 14)}…</code>). DB override will be reverted on next Stripe billing cycle unless the subscription is also cancelled.
+                                          </p>
+                                        </div>
+                                      )}
+
+                                      {/* Past due warning */}
+                                      {isPastDue && (
+                                        <div className="flex items-start gap-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-md p-2 mb-3">
+                                          <AlertTriangle className="w-3.5 h-3.5 text-red-500 mt-0.5 shrink-0" />
+                                          <p className="text-xs text-red-700 dark:text-red-400">
+                                            User's subscription is <strong>past due</strong>. Stripe enforces this plan; consider resolving billing first.
+                                          </p>
+                                        </div>
+                                      )}
+
+                                      {/* Locked display for unlimited / enterprise */}
+                                      {isFullPlan ? (
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex flex-wrap gap-1 text-xs">
+                                            <span className="bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">Free: 1 watch</span>
+                                            <span className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded">Starter: 2 watches</span>
+                                            <span className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 px-2 py-0.5 rounded">Pro: 5 watches</span>
+                                          </div>
+                                          <Badge variant="outline" className="text-violet-600 border-violet-300 text-xs capitalize shrink-0">
+                                            {notifTier} — managed separately
+                                          </Badge>
+                                        </div>
+                                      ) : (
+                                        /* Editable dropdown — Phase 1A */
+                                        <div className="flex items-center justify-between gap-3">
+                                          <div className="flex flex-wrap gap-1 text-xs text-gray-400">
+                                            <span className="bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">Free: 1 watch</span>
+                                            <span className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded">Starter: 2 watches, same-day</span>
+                                            <span className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 px-2 py-0.5 rounded">Pro: 5 watches, immediate</span>
+                                          </div>
+                                          <Select
+                                            value={dropdownValue}
+                                            onValueChange={(value) => {
+                                              const newPlan = value as 'free' | 'starter' | 'pro';
+                                              if (newPlan === dropdownValue) return;
+                                              // Phase 1B — stage change, show confirmation dialog
+                                              setPendingPlanChange({
+                                                userId: u.id,
+                                                userName: displayName,
+                                                currentPlan: dropdownValue,
+                                                newPlan,
+                                                hasStripeSubscription: !!u.stripeSubscriptionId,
+                                                activeWatchCount: 0, // server enforces; shown in dialog as context
+                                                newWatchLimit: WATCH_LIMITS[newPlan] ?? 1,
+                                              });
+                                            }}
+                                            disabled={sponsorMonitorPlanMutation.isPending}
+                                          >
+                                            <SelectTrigger className="w-32 text-sm shrink-0">
+                                              <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              <SelectItem value="free">Free</SelectItem>
+                                              <SelectItem value="starter">Starter</SelectItem>
+                                              <SelectItem value="pro">Pro</SelectItem>
+                                            </SelectContent>
+                                          </Select>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
+
                                 {/* Verification Limit */}
                                 <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
                                   <p className="text-sm font-medium mb-2">Verification Limit</p>
@@ -1577,6 +1723,68 @@ export default function AdminPortal() {
                                   </div>
                                 </div>
 
+                                {/* Phase 3B — Credits Management */}
+                                <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+                                  <p className="text-sm font-medium flex items-center gap-2 mb-1">
+                                    <CreditCard className="w-4 h-4 text-amber-500" />
+                                    CoS Credits
+                                  </p>
+                                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                                    Current balance: <strong>{u.credits ?? 0}</strong> credits. Add, deduct, or set a precise amount.
+                                  </p>
+                                  <div className="flex gap-2">
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      placeholder="Amount"
+                                      value={creditInputs[u.id] ?? ''}
+                                      onChange={(e) => setCreditInputs(prev => ({ ...prev, [u.id]: e.target.value }))}
+                                      className="flex-1 text-sm"
+                                    />
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-emerald-600 border-emerald-300 hover:bg-emerald-50"
+                                      onClick={() => {
+                                        const amt = parseInt(creditInputs[u.id] ?? '', 10);
+                                        if (isNaN(amt) || amt < 0) { toast({ title: 'Invalid', description: 'Enter a non-negative number.', variant: 'destructive' }); return; }
+                                        creditsMutation.mutate({ userId: u.id, operation: 'add', amount: amt, reason: 'Admin manual credit grant' });
+                                        setCreditInputs(prev => ({ ...prev, [u.id]: '' }));
+                                      }}
+                                      disabled={creditsMutation.isPending}
+                                    >
+                                      + Add
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-red-600 border-red-300 hover:bg-red-50"
+                                      onClick={() => {
+                                        const amt = parseInt(creditInputs[u.id] ?? '', 10);
+                                        if (isNaN(amt) || amt < 0) { toast({ title: 'Invalid', description: 'Enter a non-negative number.', variant: 'destructive' }); return; }
+                                        creditsMutation.mutate({ userId: u.id, operation: 'deduct', amount: amt, reason: 'Admin manual credit deduction' });
+                                        setCreditInputs(prev => ({ ...prev, [u.id]: '' }));
+                                      }}
+                                      disabled={creditsMutation.isPending}
+                                    >
+                                      − Deduct
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => {
+                                        const amt = parseInt(creditInputs[u.id] ?? '', 10);
+                                        if (isNaN(amt) || amt < 0) { toast({ title: 'Invalid', description: 'Enter a non-negative number.', variant: 'destructive' }); return; }
+                                        creditsMutation.mutate({ userId: u.id, operation: 'set', amount: amt, reason: 'Admin manual credit set' });
+                                        setCreditInputs(prev => ({ ...prev, [u.id]: '' }));
+                                      }}
+                                      disabled={creditsMutation.isPending}
+                                    >
+                                      <Save className="w-3 h-3 mr-1" /> Set
+                                    </Button>
+                                  </div>
+                                </div>
+
                                 {/* Restrict user */}
                                 <div className="flex items-center justify-between bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
                                   <div>
@@ -1603,6 +1811,64 @@ export default function AdminPortal() {
                               <p className="text-sm text-gray-500 dark:text-gray-400 italic">Admin accounts cannot be modified from this panel.</p>
                             )}
 
+                            {/* Phase 2C — Subscription Audit Log timeline */}
+                            <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                              <button
+                                className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                onClick={() => setAuditLogUserId(auditLogUserId === u.id ? null : u.id)}
+                              >
+                                <span className="flex items-center gap-2">
+                                  <History className="w-4 h-4 text-gray-400" />
+                                  Subscription Audit History
+                                </span>
+                                {auditLogUserId === u.id ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                              </button>
+                              {auditLogUserId === u.id && (
+                                <div className="p-3 bg-white dark:bg-gray-900">
+                                  {auditLogLoading ? (
+                                    <p className="text-xs text-gray-400 text-center py-3">Loading audit history…</p>
+                                  ) : !auditLogData || auditLogData.length === 0 ? (
+                                    <p className="text-xs text-gray-400 text-center py-3">No subscription changes recorded yet.</p>
+                                  ) : (
+                                    <div className="space-y-2">
+                                      {auditLogData.map((entry) => {
+                                        const sourceColors: Record<string, string> = {
+                                          admin_override: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
+                                          stripe_webhook: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+                                          system: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
+                                        };
+                                        const planColor: Record<string, string> = {
+                                          free: 'text-gray-500', starter: 'text-emerald-600', pro: 'text-indigo-600',
+                                          unlimited: 'text-violet-600', enterprise: 'text-violet-700', past_due: 'text-red-500',
+                                        };
+                                        return (
+                                          <div key={entry.id} className="flex items-start gap-3 text-xs border-l-2 border-gray-200 dark:border-gray-700 pl-3">
+                                            <div className="flex-1 min-w-0">
+                                              <div className="flex items-center gap-2 flex-wrap">
+                                                <span className={`font-semibold capitalize ${planColor[entry.previousStatus] || 'text-gray-500'}`}>{entry.previousStatus}</span>
+                                                <span className="text-gray-400">→</span>
+                                                <span className={`font-semibold capitalize ${planColor[entry.newStatus] || 'text-gray-500'}`}>{entry.newStatus}</span>
+                                                <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${sourceColors[entry.source] || 'bg-gray-100 text-gray-600'}`}>
+                                                  {entry.source === 'admin_override' ? 'Admin' : entry.source === 'stripe_webhook' ? 'Stripe' : 'System'}
+                                                </span>
+                                              </div>
+                                              {entry.reason && <p className="text-gray-400 mt-0.5 truncate">{entry.reason}</p>}
+                                              {entry.metadata && (entry.metadata as any).deactivatedWatches > 0 && (
+                                                <p className="text-amber-500 mt-0.5">{(entry.metadata as any).deactivatedWatches} watch(es) deactivated</p>
+                                              )}
+                                            </div>
+                                            <span className="text-gray-400 shrink-0 whitespace-nowrap">
+                                              {new Date(entry.createdAt).toLocaleDateString()} {new Date(entry.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+
                             <div className="flex items-center justify-between mt-1">
                               <p className="text-xs text-gray-400 dark:text-gray-600">
                                 Credits: {u.credits ?? 0} &bull; Member since: {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'Unknown'} &bull; ID: {u.id}
@@ -1625,6 +1891,82 @@ export default function AdminPortal() {
                     );
                   })}
                 </div>
+
+                {/* Phase 1B — Sponsor Monitor plan change confirmation dialog */}
+                <AlertDialog open={!!pendingPlanChange} onOpenChange={(open) => { if (!open) setPendingPlanChange(null); }}>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="flex items-center gap-2">
+                        <Building2 className="w-5 h-5 text-indigo-500" />
+                        Confirm Plan Change
+                      </AlertDialogTitle>
+                      <AlertDialogDescription asChild>
+                        <div className="space-y-3 text-sm text-gray-700 dark:text-gray-300">
+                          <p>
+                            You are changing <strong>{pendingPlanChange?.userName}</strong>'s Sponsor Monitor plan:
+                          </p>
+                          <div className="flex items-center gap-3 bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                            <Badge variant="outline" className="capitalize">{pendingPlanChange?.currentPlan}</Badge>
+                            <span className="text-gray-400">→</span>
+                            <Badge variant="outline" className={`capitalize ${pendingPlanChange?.newPlan === 'pro' ? 'text-indigo-600 border-indigo-300' : pendingPlanChange?.newPlan === 'starter' ? 'text-emerald-600 border-emerald-300' : 'text-gray-600'}`}>
+                              {pendingPlanChange?.newPlan}
+                            </Badge>
+                          </div>
+
+                          {/* Downgrade consequences */}
+                          {pendingPlanChange && (['free', 'starter'].includes(pendingPlanChange.newPlan)) && pendingPlanChange.currentPlan === 'pro' && (
+                            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md p-3 text-xs text-amber-800 dark:text-amber-300">
+                              <p className="font-semibold mb-1">⚠ Downgrade consequences:</p>
+                              <ul className="list-disc pl-4 space-y-1">
+                                <li>Watch limit drops to <strong>{pendingPlanChange.newWatchLimit === -1 ? 'unlimited' : pendingPlanChange.newWatchLimit}</strong></li>
+                                <li>Watches exceeding the new limit will be <strong>deactivated automatically</strong></li>
+                                <li>SMS notifications will be disabled</li>
+                                {pendingPlanChange.newPlan === 'free' && <li>All notifications will stop immediately</li>}
+                              </ul>
+                            </div>
+                          )}
+                          {pendingPlanChange && pendingPlanChange.newPlan === 'free' && pendingPlanChange.currentPlan === 'starter' && (
+                            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md p-3 text-xs text-amber-800 dark:text-amber-300">
+                              <p className="font-semibold mb-1">⚠ Downgrade consequences:</p>
+                              <ul className="list-disc pl-4 space-y-1">
+                                <li>Watch limit drops to <strong>1</strong> — excess watches deactivated</li>
+                                <li>All email and WhatsApp notifications will stop</li>
+                              </ul>
+                            </div>
+                          )}
+
+                          {/* Stripe warning */}
+                          {pendingPlanChange?.hasStripeSubscription && (
+                            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-md p-3 text-xs text-red-800 dark:text-red-300">
+                              <p className="font-semibold mb-1">⚠ Active Stripe subscription detected</p>
+                              <p>This DB override will be reverted when Stripe next processes a renewal or update event. Cancel the Stripe subscription separately if a permanent change is required.</p>
+                            </div>
+                          )}
+
+                          <p className="text-xs text-gray-500">An email notification will be sent to the user.</p>
+                        </div>
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel disabled={sponsorMonitorPlanMutation.isPending} onClick={() => setPendingPlanChange(null)}>
+                        Cancel
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        className={pendingPlanChange?.newPlan === 'pro' ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : pendingPlanChange?.newPlan === 'starter' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-gray-600 hover:bg-gray-700 text-white'}
+                        disabled={sponsorMonitorPlanMutation.isPending}
+                        onClick={() => {
+                          if (!pendingPlanChange) return;
+                          sponsorMonitorPlanMutation.mutate(
+                            { userId: pendingPlanChange.userId, plan: pendingPlanChange.newPlan },
+                            { onSettled: () => setPendingPlanChange(null) }
+                          );
+                        }}
+                      >
+                        {sponsorMonitorPlanMutation.isPending ? 'Saving…' : `Set to ${pendingPlanChange?.newPlan === 'pro' ? 'Pro' : pendingPlanChange?.newPlan === 'starter' ? 'Starter' : 'Free'}`}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
 
                 {/* Delete user confirmation dialog */}
                 <AlertDialog open={!!userToDelete} onOpenChange={(open) => { if (!open) setUserToDelete(null); }}>

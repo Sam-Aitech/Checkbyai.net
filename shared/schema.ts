@@ -603,6 +603,27 @@ export const diffResults = pgTable(
   ]
 );
 
+// Subscription audit log — tracks every plan change with source, actor, and reason
+export const subscriptionAuditLog = pgTable(
+  "subscription_audit_log",
+  {
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+    userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    changedBy: varchar("changed_by"),              // admin userId, 'stripe', or 'system'
+    source: varchar("source").notNull(),           // 'stripe_webhook' | 'admin_override' | 'system'
+    previousStatus: varchar("previous_status").notNull(),
+    newStatus: varchar("new_status").notNull(),
+    reason: text("reason"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_sub_audit_user_id").on(table.userId),
+    index("idx_sub_audit_created").on(table.createdAt),
+    index("idx_sub_audit_source").on(table.source),
+  ]
+);
+
 // Type exports
 export type DailyDigest = typeof dailyDigest.$inferSelect;
 export type AiGenerationLog = typeof aiGenerationLogs.$inferSelect;
@@ -625,6 +646,7 @@ export type NotifEngineLogEntry = typeof notifEngineLog.$inferSelect; // depreca
 export type NotifLogEntry = typeof notifLog.$inferSelect;
 export type CsvArchiveEntry = typeof csvArchive.$inferSelect;
 export type DiffResultEntry = typeof diffResults.$inferSelect;
+export type SubscriptionAuditLogEntry = typeof subscriptionAuditLog.$inferSelect;
 
 // Zod schemas
 export const insertUserSchema = createInsertSchema(users);

@@ -9,6 +9,8 @@ import {
   expertRequests,
   systemSettings,
   sponsorWatches,
+  subscriptionAuditLog,
+  type SubscriptionAuditLogEntry,
   type User,
   type UpsertUser,
   type IpVerification,
@@ -158,7 +160,17 @@ export interface IStorage {
     totalPages: number;
   }>;
   updateUserRestriction(userId: string, restricted: boolean, reason?: string): Promise<void>;
-  
+  logSubscriptionChange(entry: {
+    userId: string;
+    changedBy?: string;
+    source: 'stripe_webhook' | 'admin_override' | 'system';
+    previousStatus: string;
+    newStatus: string;
+    reason?: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<void>;
+  getSubscriptionAuditLog(userId: string, limit?: number): Promise<SubscriptionAuditLogEntry[]>;
+
   // HITL (Human-in-the-Loop) operations
   updateVerificationFeedback(id: number, data: {
     adminStatus: string;
@@ -1000,6 +1012,35 @@ export class DatabaseStorage implements IStorage {
         updatedAt: new Date(),
       })
       .where(eq(users.id, userId));
+  }
+
+  async logSubscriptionChange(entry: {
+    userId: string;
+    changedBy?: string;
+    source: 'stripe_webhook' | 'admin_override' | 'system';
+    previousStatus: string;
+    newStatus: string;
+    reason?: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<void> {
+    await db.insert(subscriptionAuditLog).values({
+      userId: entry.userId,
+      changedBy: entry.changedBy ?? null,
+      source: entry.source,
+      previousStatus: entry.previousStatus,
+      newStatus: entry.newStatus,
+      reason: entry.reason ?? null,
+      metadata: entry.metadata ?? {},
+    });
+  }
+
+  async getSubscriptionAuditLog(userId: string, limit = 20): Promise<SubscriptionAuditLogEntry[]> {
+    return db
+      .select()
+      .from(subscriptionAuditLog)
+      .where(eq(subscriptionAuditLog.userId, userId))
+      .orderBy(desc(subscriptionAuditLog.createdAt))
+      .limit(limit);
   }
 
   // HITL (Human-in-the-Loop) operations

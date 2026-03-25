@@ -3,7 +3,7 @@ import type { SponsorChange } from "../utils/sponsorListFetcher";
 import * as crypto from "crypto";
 import * as fs from "fs";
 import { db } from "../db";
-import { sql, eq, and, desc, gte } from "drizzle-orm";
+import { sql, eq, and, desc, gte, asc } from "drizzle-orm";
 import {
   insertFeedbackSchema,
   sponsorCanonical,
@@ -25,6 +25,7 @@ import { getAppUrl } from "../utils/appUrl";
 import { checkBinaryHealth } from "../utils/binaryRunner";
 import { isJobRunning, getLastRunInfo, runSponsorMonitorJob } from "../utils/sponsorMonitorJob";
 import { isQueueAvailable, getSponsorRefreshQueue } from "../services/jobQueue";
+import { getWatchLimit } from "../utils/tierConfig";
 
 const SPONSOR_JOB_LOCK_KEY = 7483920; // Same key as sponsorMonitorJob — init and nightly are mutually exclusive
 
@@ -1904,6 +1905,208 @@ Format your response in clear, professional markdown.`;
     } catch (error) {
       console.error('Error fetching knowledge base:', error);
       res.status(500).json({ message: 'Failed to fetch knowledge base' });
+    }
+  });
+
+  // ── Sponsor Monitor Plan Override ─────────────────────────────────────────
+  app.patch('/api/admin/users/:id/sponsor-monitor-plan', isAdmin, async (req: any, res) => {
+    try {
+      const userId = req.params.id;
+      const planSchema = z.object({
+        plan: z.enum(['free', 'starter', 'pro']),
+      });
+      const parsed = planSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "plan must be 'free', 'starter', or 'pro'" });
+      }
+      const { plan } = parsed.data;
+
+      const targetUser = await storage.getUser(userId);
+      if (!targetUser) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      if (targetUser.role === 'admin') {
+        return res.status(403).json({ message: 'Admin accounts cannot be modified' });
+      }
+
+      const previousStatus = targetUser.subscriptionStatus || 'free';
+      const updatedUser = await storage.updateUserSubscription(userId, {
+        subscriptionStatus: plan,
+      });
+
+      // ── Phase 2B: Write to subscription audit log (updated after watch cleanup) ──
+
+      // ── Phase 1C: Deactivate excess watches on downgrade ─────────────────
+      const newWatchLimit = getWatchLimit(plan);
+      let deactivatedWatchCount = 0;
+
+      if (newWatchLimit !== -1) {
+        const activeWatches = await db
+          .select({ id: companyWatches.id })
+          .from(companyWatches)
+          .where(and(
+            eq(companyWatches.userId, userId),
+            eq(companyWatches.isActive, true),
+          ))
+          .orderBy(asc(companyWatches.createdAt)); // oldest first — keep oldest watches
+
+        if (activeWatches.length > newWatchLimit) {
+          const watchesToDeactivate = activeWatches.slice(newWatchLimit);
+          for (const watch of watchesToDeactivate) {
+            await db
+              .update(companyWatches)
+              .set({ isActive: false })
+              .where(eq(companyWatches.id, watch.id));
+          }
+          deactivatedWatchCount = watchesToDeactivate.length;
+          console.log(`[AdminPlanOverride] Deactivated ${deactivatedWatchCount} excess watches for user ${userId} (${previousStatus} → ${plan}, limit=${newWatchLimit})`);
+        }
+      }
+
+      // ── Phase 2B: Audit log write (after watch cleanup count is known) ────
+      await storage.logSubscriptionChange({
+        userId,
+        changedBy: (req.user as any)?.id ?? 'admin',
+        source: 'admin_override',
+        previousStatus,
+        newStatus: plan,
+        reason: 'Admin plan override via admin panel',
+        metadata: { deactivatedWatches: deactivatedWatchCount },
+      }).catch((err) => console.error('[AdminPlanOverride] Audit log write failed:', err));
+
+      const planLabels: Record<string, string> = {
+        free: 'Free',
+        starter: 'Sponsor Monitor Starter',
+        pro: 'Sponsor Monitor Pro',
+      };
+      const planFeatures: Record<string, string> = {
+        free: 'No company watches or notifications.',
+        starter: '2 company watches · Same-day alerts · Email & WhatsApp notifications.',
+        pro: '5 company watches · Immediate alerts · Email, WhatsApp & SMS · Enriched intelligence.',
+      };
+
+      const apiKey = process.env.RESEND_API_KEY;
+      if (apiKey && updatedUser.email) {
+        const isUpgrade = plan !== 'free';
+        const headerColor = plan === 'pro' ? '#7c3aed' : plan === 'starter' ? '#059669' : '#6b7280';
+        const watchNote = deactivatedWatchCount > 0
+          ? `<p style="color:#b45309;font-size:13px;background:#fffbeb;border:1px solid #fde68a;padding:10px 14px;border-radius:6px;margin:12px 0;">${deactivatedWatchCount} company watch${deactivatedWatchCount > 1 ? 'es were' : ' was'} removed to match your new plan limit.</p>`
+          : '';
+        const html = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+          <div style="background:linear-gradient(135deg,${headerColor} 0%,${headerColor}cc 100%);padding:28px;border-radius:10px 10px 0 0;">
+            <h1 style="color:#fff;margin:0;text-align:center;font-size:20px;">${isUpgrade ? '🎉 ' : ''}Sponsor Monitor Plan ${isUpgrade ? 'Updated' : 'Removed'}</h1>
+          </div>
+          <div style="background:#fff;padding:28px;border:1px solid #e0e0e0;border-top:none;border-radius:0 0 10px 10px;">
+            <p style="color:#333;font-size:15px;margin-top:0;">Your Sponsor Monitor plan has been updated by an administrator.</p>
+            <div style="background:#f5f5f5;padding:16px;border-radius:8px;margin:16px 0;text-align:center;">
+              <span style="font-size:20px;font-weight:bold;color:${headerColor};">${planLabels[plan]}</span>
+              <p style="color:#555;font-size:13px;margin:8px 0 0;">${planFeatures[plan]}</p>
+            </div>
+            ${watchNote}
+            ${isUpgrade ? `<div style="text-align:center;margin:24px 0;">
+              <a href="${getAppUrl()}/sponsor-monitor" style="background:${headerColor};color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:15px;display:inline-block;">Go to Sponsor Monitor</a>
+            </div>` : ''}
+            <p style="color:#999;font-size:12px;margin-top:24px;text-align:center;">Questions? <a href="mailto:support@checkbyai.net" style="color:#1d4ed8;">support@checkbyai.net</a></p>
+          </div>
+        </div>`;
+        sendEmailReliably(
+          {
+            from: 'CheckByAI <noreply@checkbyai.net>',
+            to: [updatedUser.email],
+            subject: isUpgrade
+              ? `Your Sponsor Monitor plan has been updated to ${planLabels[plan]}`
+              : 'Your Sponsor Monitor subscription has been removed',
+            html,
+          },
+          '[SponsorMonitorPlan]',
+        );
+      }
+
+      res.json({
+        message: `Sponsor Monitor plan set to '${plan}'`,
+        userId,
+        previousStatus,
+        subscriptionStatus: plan,
+        deactivatedWatches: deactivatedWatchCount,
+      });
+    } catch (error) {
+      console.error('Error updating sponsor monitor plan:', error);
+      res.status(500).json({ message: 'Failed to update sponsor monitor plan' });
+    }
+  });
+
+  // ── Manual Credit Management ───────────────────────────────────────────────
+  app.patch('/api/admin/users/:id/credits', isAdmin, async (req: any, res) => {
+    try {
+      const userId = req.params.id;
+      const creditSchema = z.object({
+        operation: z.enum(['add', 'deduct', 'set']),
+        amount: z.number().int().min(0),
+        reason: z.string().max(200).optional(),
+      });
+      const parsed = creditSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: 'operation must be add/deduct/set, amount must be a non-negative integer' });
+      }
+      const { operation, amount, reason } = parsed.data;
+
+      const targetUser = await storage.getUser(userId);
+      if (!targetUser) return res.status(404).json({ message: 'User not found' });
+      if (targetUser.role === 'admin') return res.status(403).json({ message: 'Admin accounts cannot be modified' });
+
+      const prevCredits = targetUser.credits ?? 0;
+      let updatedUser: typeof targetUser;
+
+      if (operation === 'add') {
+        updatedUser = await storage.addCredits(userId, amount);
+      } else if (operation === 'deduct') {
+        updatedUser = await storage.deductCredits(userId, amount);
+      } else {
+        // 'set' — direct assignment using already-imported db and users table
+        const [u] = await db
+          .update(users)
+          .set({ credits: amount, updatedAt: new Date() })
+          .where(eq(users.id, userId))
+          .returning();
+        updatedUser = u;
+      }
+
+      const newCredits = updatedUser?.credits ?? 0;
+      const delta = newCredits - prevCredits;
+      console.log(`[AdminCredits] User ${userId}: ${prevCredits} → ${newCredits} (${operation} ${amount}, reason: ${reason ?? 'none'})`);
+
+      // Audit log
+      storage.logSubscriptionChange({
+        userId,
+        changedBy: (req.user as any)?.id ?? 'admin',
+        source: 'admin_override',
+        previousStatus: targetUser.subscriptionStatus || 'free',
+        newStatus: targetUser.subscriptionStatus || 'free',
+        reason: reason ? `Credits ${operation}: ${reason}` : `Credits ${operation} by admin`,
+        metadata: { creditsBefore: prevCredits, creditsAfter: newCredits, delta, operation, amount },
+      }).catch(() => {});
+
+      res.json({
+        message: `Credits updated: ${prevCredits} → ${newCredits}`,
+        userId,
+        creditsBefore: prevCredits,
+        creditsAfter: newCredits,
+      });
+    } catch (error) {
+      console.error('Error updating credits:', error);
+      res.status(500).json({ message: 'Failed to update credits' });
+    }
+  });
+
+  app.get('/api/admin/users/:id/subscription-audit', isAdmin, async (req, res) => {
+    try {
+      const userId = req.params.id;
+      const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
+      const log = await storage.getSubscriptionAuditLog(userId, limit);
+      res.json(log);
+    } catch (error) {
+      console.error('Error fetching subscription audit log:', error);
+      res.status(500).json({ message: 'Failed to fetch subscription audit log' });
     }
   });
 
