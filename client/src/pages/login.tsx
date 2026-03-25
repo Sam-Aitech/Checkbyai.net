@@ -199,8 +199,12 @@ export default function LoginPage() {
             queryKey: ["/api/auth/user"],
             staleTime: 0,
           });
-          const proPlan = ["starter","pro","unlimited","enterprise","notification_starter","notification_pro"];
-          destination = proPlan.includes(userData?.subscriptionStatus || "") ? "/pro-dashboard" : "/sponsor-monitor";
+          if (userData?.role === "admin") {
+            destination = "/admin";
+          } else {
+            const proPlan = ["starter","pro","unlimited","enterprise","notification_starter","notification_pro"];
+            destination = proPlan.includes(userData?.subscriptionStatus || "") ? "/pro-dashboard" : "/sponsor-monitor";
+          }
         } catch {
           destination = "/sponsor-monitor";
         }
