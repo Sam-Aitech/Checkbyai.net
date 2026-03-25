@@ -12,6 +12,7 @@
  */
 
 import { db } from "../db";
+import { storage } from "../storage";
 import { eq, and, inArray, lte } from "drizzle-orm";
 import {
   companyWatches,
@@ -238,6 +239,13 @@ async function logEvent(
  *   notifyUsersOfEvent(change).catch(err => console.error(...));
  */
 export async function notifyUsersOfEvent(change: SponsorChange): Promise<void> {
+  // Global kill switch — admin can pause all notifications via /api/admin/notifications/pause
+  const pausedFlag = await storage.getSystemSetting('notifications_paused');
+  if (pausedFlag === 'true') {
+    log.info({ organisationName: change.organisationName }, 'Notifications paused by admin — skipping dispatch');
+    return;
+  }
+
   const changeId = change.id;
   if (changeId === undefined) {
     console.warn("[NotificationEngine] changeId not set, skipping:", change.organisationName);

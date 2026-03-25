@@ -1,4 +1,5 @@
 import { db } from "../db";
+import { storage } from "../storage";
 import { eq, and, gte, lte, sql, inArray } from "drizzle-orm";
 import { companyWatches, notificationPreferences, notificationLog, users, sponsorChanges } from "@shared/schema";
 import type { SponsorChange } from "./sponsorListFetcher";
@@ -285,6 +286,13 @@ async function sendNotificationViaChannel(
 
 export async function notifyAffectedUsers(change: SponsorChange): Promise<{ sent: number; skipped: number; failed: number; queued: number }> {
   const stats = { sent: 0, skipped: 0, failed: 0, queued: 0 };
+
+  // Global kill switch — admin can pause all notifications via /api/admin/notifications/pause
+  const pausedFlag = await storage.getSystemSetting('notifications_paused');
+  if (pausedFlag === 'true') {
+    console.log(`[NotificationDispatcher] Notifications paused by admin — skipping dispatch for "${change.organisationName}"`);
+    return stats;
+  }
 
   // changeId is populated by batchedInsertChanges() in the state machine before
   // this function is called. Guard defensively in case of unexpected flow.

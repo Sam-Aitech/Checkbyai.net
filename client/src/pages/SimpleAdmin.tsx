@@ -176,6 +176,20 @@ export default function SimpleAdmin() {
   const [cosBetaDialog, setCosBetaDialog] = useState<{ open: boolean; userId: string; currentLimit: number | null } | null>(null);
   const [cosBetaLimitInput, setCosBetaLimitInput] = useState<string>('');
 
+  // ── Notification Portal state ──────────────────────────────────────────────
+  const [notifPaused, setNotifPaused] = useState<boolean | null>(null);
+  const [notifPausedLoading, setNotifPausedLoading] = useState(false);
+  const [notifUsers, setNotifUsers] = useState<any[]>([]);
+  const [notifUsersTotal, setNotifUsersTotal] = useState(0);
+  const [notifUsersPage, setNotifUsersPage] = useState(1);
+  const [notifUsersSearch, setNotifUsersSearch] = useState('');
+  const [notifUsersLoading, setNotifUsersLoading] = useState(false);
+  const [expandedNotifUser, setExpandedNotifUser] = useState<string | null>(null);
+  const [notifLogEntries, setNotifLogEntries] = useState<any[]>([]);
+  const [notifLogTotal, setNotifLogTotal] = useState(0);
+  const [notifLogPage, setNotifLogPage] = useState(1);
+  const [notifLogLoading, setNotifLogLoading] = useState(false);
+
   // Domain-level navigation — synced to /admin/sponsor or /admin/cos via Wouter
   const [location, setLocation] = useLocation();
   const domain = location.startsWith('/admin/sponsor') ? 'sponsor' : 'cos';
@@ -375,6 +389,49 @@ export default function SimpleAdmin() {
       setUsersLoading(false);
     }
   }, [usersPage, usersSearch, usersPaidOnly]);
+
+  // ── Notification Portal loaders ────────────────────────────────────────────
+
+  const loadNotifStatus = useCallback(async () => {
+    try {
+      const r = await fetch('/api/admin/notifications/status', { credentials: 'include' });
+      if (r.ok) { const d = await r.json(); setNotifPaused(d.paused); }
+    } catch { /* silent */ }
+  }, []);
+
+  const toggleNotifPaused = async () => {
+    setNotifPausedLoading(true);
+    try {
+      const endpoint = notifPaused ? '/api/admin/notifications/resume' : '/api/admin/notifications/pause';
+      const r = await fetch(endpoint, { method: 'POST', credentials: 'include' });
+      if (r.ok) {
+        const d = await r.json();
+        setNotifPaused(d.paused);
+        toast({ title: d.paused ? 'Notifications paused' : 'Notifications resumed', description: d.paused ? 'No alerts will be sent until resumed.' : 'All alerts are now active.' });
+      }
+    } catch { toast({ title: 'Error', description: 'Failed to toggle notification state', variant: 'destructive' }); }
+    finally { setNotifPausedLoading(false); }
+  };
+
+  const loadNotifUsers = useCallback(async () => {
+    setNotifUsersLoading(true);
+    try {
+      const params = new URLSearchParams({ page: notifUsersPage.toString(), limit: '20', search: notifUsersSearch });
+      const r = await fetch(`/api/admin/notifications/users?${params}`, { credentials: 'include' });
+      if (r.ok) { const d = await r.json(); setNotifUsers(d.data); setNotifUsersTotal(d.total); }
+    } catch { /* silent */ }
+    finally { setNotifUsersLoading(false); }
+  }, [notifUsersPage, notifUsersSearch]);
+
+  const loadNotifLog = useCallback(async () => {
+    setNotifLogLoading(true);
+    try {
+      const params = new URLSearchParams({ page: notifLogPage.toString(), limit: '25' });
+      const r = await fetch(`/api/admin/notifications/log?${params}`, { credentials: 'include' });
+      if (r.ok) { const d = await r.json(); setNotifLogEntries(d.data); setNotifLogTotal(d.total); }
+    } catch { /* silent */ }
+    finally { setNotifLogLoading(false); }
+  }, [notifLogPage]);
 
   const handleDeleteUser = async (userId: string) => {
     setDeletingUserId(userId);
@@ -766,6 +823,22 @@ export default function SimpleAdmin() {
       loadJobHistory();
     }
   }, [isAuthenticated, activeTab, loadGlobalRules, loadSponsorMonitorData, loadStorageStats, loadJobHistory]);
+
+  useEffect(() => {
+    if (isAuthenticated && activeTab === 'notifications') {
+      loadNotifStatus();
+      loadNotifUsers();
+      loadNotifLog();
+    }
+  }, [isAuthenticated, activeTab, loadNotifStatus, loadNotifUsers, loadNotifLog]);
+
+  useEffect(() => {
+    if (isAuthenticated && activeTab === 'notifications') loadNotifUsers();
+  }, [isAuthenticated, notifUsersPage, notifUsersSearch]); // eslint-disable-line
+
+  useEffect(() => {
+    if (isAuthenticated && activeTab === 'notifications') loadNotifLog();
+  }, [isAuthenticated, notifLogPage]); // eslint-disable-line
 
   // Keep activeTab in sync when user navigates via browser back/forward
   useEffect(() => {
@@ -1659,6 +1732,10 @@ export default function SimpleAdmin() {
                     <Brain className="w-4 h-4 shrink-0" />
                     <span className="text-xs sm:text-sm">AI Rules</span>
                   </TabsTrigger>
+                  <TabsTrigger value="notifications" className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap data-[state=active]:bg-amber-50 data-[state=active]:text-amber-700 dark:data-[state=active]:bg-amber-900/30 dark:data-[state=active]:text-amber-400">
+                    <Bell className="w-4 h-4 shrink-0" />
+                    <span className="text-xs sm:text-sm">Notifications</span>
+                  </TabsTrigger>
                 </>
               )}
             </TabsList>
@@ -2202,6 +2279,288 @@ export default function SimpleAdmin() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* ── Notification Portal ── */}
+          <TabsContent value="notifications">
+            <div className="space-y-6">
+
+              {/* Section 1: Global Kill Switch */}
+              <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-gray-900 dark:text-white flex items-center gap-2">
+                        <Bell className="w-5 h-5" />
+                        Global Notification Control
+                      </CardTitle>
+                      <CardDescription className="text-gray-500 dark:text-slate-400 mt-1">
+                        Pause all outbound alerts (email, SMS) instantly. Use when testing or updating the system.
+                      </CardDescription>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {notifPaused === null ? (
+                        <span className="text-sm text-gray-400">Loading…</span>
+                      ) : (
+                        <>
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold ${notifPaused ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'}`}>
+                            <span className={`w-2 h-2 rounded-full ${notifPaused ? 'bg-red-500' : 'bg-emerald-500'}`} />
+                            {notifPaused ? 'PAUSED' : 'ACTIVE'}
+                          </span>
+                          <Button
+                            variant={notifPaused ? 'default' : 'destructive'}
+                            size="sm"
+                            onClick={toggleNotifPaused}
+                            disabled={notifPausedLoading}
+                            className={notifPaused ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}
+                          >
+                            {notifPausedLoading ? 'Saving…' : notifPaused ? 'Resume Notifications' : 'Pause All Notifications'}
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </CardHeader>
+                {notifPaused && (
+                  <CardContent>
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-700 dark:text-red-300">
+                      Notifications are currently <strong>paused</strong>. No email or SMS alerts will be sent to any user until you resume.
+                    </div>
+                  </CardContent>
+                )}
+              </Card>
+
+              {/* Section 2: Per-User Notification Matrix */}
+              <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
+                <CardHeader>
+                  <div className="flex items-center justify-between flex-wrap gap-3">
+                    <div>
+                      <CardTitle className="text-gray-900 dark:text-white">User Notification Preferences</CardTitle>
+                      <CardDescription className="text-gray-500 dark:text-slate-400">
+                        {notifUsersTotal} users · Click a row to view or edit their event/channel settings
+                      </CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+                        <Input
+                          placeholder="Search users..."
+                          value={notifUsersSearch}
+                          onChange={(e) => { setNotifUsersSearch(e.target.value); setNotifUsersPage(1); }}
+                          className="pl-8 w-48 text-sm"
+                        />
+                      </div>
+                      <Button variant="outline" size="sm" onClick={loadNotifUsers}>
+                        <RefreshCw className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {notifUsersLoading ? (
+                    <div className="flex justify-center py-8"><RefreshCw className="w-5 h-5 animate-spin text-gray-400" /></div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
+                            <th className="text-left px-4 py-2.5 font-medium text-gray-600 dark:text-slate-400">Email</th>
+                            <th className="text-left px-4 py-2.5 font-medium text-gray-600 dark:text-slate-400">Plan</th>
+                            <th className="text-left px-4 py-2.5 font-medium text-gray-600 dark:text-slate-400 hidden md:table-cell">Events enabled</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {notifUsers.map((u: any) => {
+                            const prefs = u.notifPrefs ?? {};
+                            const EVENT_LABELS: Record<string, string> = {
+                              licence_revoked: 'Revoked',
+                              rating_downgraded: 'Downgraded',
+                              licence_reinstated: 'Reinstated',
+                              rating_upgraded: 'Upgraded',
+                              route_added: 'Route+',
+                              route_removed: 'Route−',
+                              weekly_digest: 'Digest',
+                            };
+                            const enabledEvents = Object.entries(EVENT_LABELS)
+                              .filter(([k]) => prefs[k]?.enabled !== false)
+                              .map(([, label]) => label);
+
+                            return (
+                              <>
+                                <tr
+                                  key={u.id}
+                                  className="border-b border-gray-50 dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700/30 cursor-pointer"
+                                  onClick={() => setExpandedNotifUser(expandedNotifUser === u.id ? null : u.id)}
+                                >
+                                  <td className="px-4 py-2.5 font-mono text-xs text-gray-800 dark:text-slate-200">{u.email}</td>
+                                  <td className="px-4 py-2.5">
+                                    <span className={`px-2 py-0.5 rounded text-xs font-semibold ${u.subscriptionStatus === 'pro' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : u.subscriptionStatus === 'starter' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
+                                      {u.subscriptionStatus ?? 'free'}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-2.5 hidden md:table-cell">
+                                    <div className="flex flex-wrap gap-1">
+                                      {enabledEvents.map(label => (
+                                        <span key={label} className="px-1.5 py-0.5 bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 rounded text-xs">{label}</span>
+                                      ))}
+                                    </div>
+                                  </td>
+                                </tr>
+                                {expandedNotifUser === u.id && (
+                                  <tr key={`${u.id}-expanded`} className="bg-amber-50/50 dark:bg-amber-900/10">
+                                    <td colSpan={3} className="px-4 py-4">
+                                      <div className="text-xs font-semibold text-gray-500 dark:text-slate-400 mb-3">Edit notification preferences for <strong>{u.email}</strong></div>
+                                      <div className="overflow-x-auto">
+                                        <table className="text-xs border-collapse">
+                                          <thead>
+                                            <tr>
+                                              <th className="text-left pr-6 pb-2 font-medium text-gray-500">Event</th>
+                                              <th className="pr-4 pb-2 font-medium text-gray-500">Enabled</th>
+                                              <th className="pr-4 pb-2 font-medium text-gray-500">Email</th>
+                                              <th className="pr-4 pb-2 font-medium text-gray-500">In-App</th>
+                                              <th className="pr-4 pb-2 font-medium text-gray-500">SMS</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {Object.entries(EVENT_LABELS).map(([key, label]) => {
+                                              const eventPrefs = prefs[key] ?? { enabled: true, channels: { email: true, inApp: true, sms: false } };
+                                              const save = async (patch: any) => {
+                                                const r = await fetch(`/api/admin/notifications/users/${u.id}/prefs`, {
+                                                  method: 'PATCH',
+                                                  headers: { 'Content-Type': 'application/json' },
+                                                  credentials: 'include',
+                                                  body: JSON.stringify({ [key]: patch }),
+                                                });
+                                                if (r.ok) {
+                                                  const d = await r.json();
+                                                  setNotifUsers(prev => prev.map(uu => uu.id === u.id ? { ...uu, notifPrefs: d.notifPrefs } : uu));
+                                                  toast({ title: 'Prefs saved', description: `${label} updated for ${u.email}` });
+                                                }
+                                              };
+                                              return (
+                                                <tr key={key} className="border-b border-amber-100 dark:border-amber-900/20">
+                                                  <td className="pr-6 py-1.5 font-medium text-gray-700 dark:text-slate-300">{label}</td>
+                                                  <td className="pr-4 py-1.5 text-center">
+                                                    <Switch checked={eventPrefs.enabled} onCheckedChange={(v) => save({ ...eventPrefs, enabled: v })} />
+                                                  </td>
+                                                  <td className="pr-4 py-1.5 text-center">
+                                                    <Switch checked={eventPrefs.channels?.email ?? true} onCheckedChange={(v) => save({ ...eventPrefs, channels: { ...eventPrefs.channels, email: v } })} />
+                                                  </td>
+                                                  <td className="pr-4 py-1.5 text-center">
+                                                    <Switch checked={eventPrefs.channels?.inApp ?? true} onCheckedChange={(v) => save({ ...eventPrefs, channels: { ...eventPrefs.channels, inApp: v } })} />
+                                                  </td>
+                                                  <td className="pr-4 py-1.5 text-center">
+                                                    <Switch checked={eventPrefs.channels?.sms ?? false} onCheckedChange={(v) => save({ ...eventPrefs, channels: { ...eventPrefs.channels, sms: v } })} />
+                                                  </td>
+                                                </tr>
+                                              );
+                                            })}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                              </>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                      {/* Pagination */}
+                      {notifUsersTotal > 20 && (
+                        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-slate-700">
+                          <span className="text-sm text-gray-500">{notifUsersTotal} users</span>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" disabled={notifUsersPage <= 1} onClick={() => setNotifUsersPage(p => p - 1)}>
+                              <ChevronLeft className="w-4 h-4" />
+                            </Button>
+                            <span className="text-sm px-2 py-1">{notifUsersPage}</span>
+                            <Button variant="outline" size="sm" disabled={notifUsersPage * 20 >= notifUsersTotal} onClick={() => setNotifUsersPage(p => p + 1)}>
+                              <ChevronRight className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Section 3: Notification Activity Log */}
+              <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-gray-900 dark:text-white">Notification Activity Log</CardTitle>
+                      <CardDescription className="text-gray-500 dark:text-slate-400">
+                        {notifLogTotal} total events · Recent outbound alerts
+                      </CardDescription>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={loadNotifLog}>
+                      <RefreshCw className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {notifLogLoading ? (
+                    <div className="flex justify-center py-8"><RefreshCw className="w-5 h-5 animate-spin text-gray-400" /></div>
+                  ) : notifLogEntries.length === 0 ? (
+                    <div className="text-center py-8 text-gray-400 text-sm">No notification activity yet.</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
+                            <th className="text-left px-4 py-2.5 font-medium text-gray-600 dark:text-slate-400">User</th>
+                            <th className="text-left px-4 py-2.5 font-medium text-gray-600 dark:text-slate-400 hidden sm:table-cell">Company</th>
+                            <th className="text-left px-4 py-2.5 font-medium text-gray-600 dark:text-slate-400">Event</th>
+                            <th className="text-left px-4 py-2.5 font-medium text-gray-600 dark:text-slate-400 hidden md:table-cell">Channel</th>
+                            <th className="text-left px-4 py-2.5 font-medium text-gray-600 dark:text-slate-400">Status</th>
+                            <th className="text-left px-4 py-2.5 font-medium text-gray-600 dark:text-slate-400 hidden lg:table-cell">Time</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {notifLogEntries.map((entry: any) => (
+                            <tr key={entry.id} className="border-b border-gray-50 dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700/30">
+                              <td className="px-4 py-2 font-mono text-xs text-gray-700 dark:text-slate-300 max-w-[140px] truncate">{entry.userEmail ?? entry.userId}</td>
+                              <td className="px-4 py-2 text-gray-600 dark:text-slate-400 hidden sm:table-cell max-w-[160px] truncate">{entry.companyName}</td>
+                              <td className="px-4 py-2">
+                                <span className="px-1.5 py-0.5 bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 rounded text-xs">{entry.eventType}</span>
+                              </td>
+                              <td className="px-4 py-2 text-gray-500 dark:text-slate-500 text-xs hidden md:table-cell">{entry.channel}</td>
+                              <td className="px-4 py-2">
+                                {entry.success ? (
+                                  <span className="inline-flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-400"><CheckCircle className="w-3 h-3" />sent</span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-xs text-red-600 dark:text-red-400" title={entry.errorDetails ?? ''}><XCircle className="w-3 h-3" />failed</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-2 text-xs text-gray-400 hidden lg:table-cell">
+                                {entry.sentAt ? new Date(entry.sentAt).toLocaleString() : '—'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      {notifLogTotal > 25 && (
+                        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-slate-700">
+                          <span className="text-sm text-gray-500">{notifLogTotal} total</span>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" disabled={notifLogPage <= 1} onClick={() => setNotifLogPage(p => p - 1)}>
+                              <ChevronLeft className="w-4 h-4" />
+                            </Button>
+                            <span className="text-sm px-2 py-1">{notifLogPage}</span>
+                            <Button variant="outline" size="sm" disabled={notifLogPage * 25 >= notifLogTotal} onClick={() => setNotifLogPage(p => p + 1)}>
+                              <ChevronRight className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           {/* COS Beta Enable Dialog */}

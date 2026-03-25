@@ -289,6 +289,8 @@ async function applyPendingMigrations() {
       `CREATE INDEX IF NOT EXISTS "idx_sub_audit_user_id" ON "subscription_audit_log"("user_id")`,
       `CREATE INDEX IF NOT EXISTS "idx_sub_audit_created" ON "subscription_audit_log"("created_at" DESC)`,
       `CREATE INDEX IF NOT EXISTS "idx_sub_audit_source" ON "subscription_audit_log"("source")`,
+      // Seed global notification kill switch — false = notifications active
+      `INSERT INTO "system_settings" ("key", "value") VALUES ('notifications_paused', 'false') ON CONFLICT DO NOTHING`,
     ];
     for (const sql of migrations) {
       await client.query(sql);

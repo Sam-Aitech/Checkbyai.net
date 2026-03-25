@@ -3,17 +3,20 @@ import type { SponsorChange } from "../utils/sponsorListFetcher";
 import * as crypto from "crypto";
 import * as fs from "fs";
 import { db } from "../db";
-import { sql, eq, and, desc, gte, asc } from "drizzle-orm";
+import { sql, eq, and, desc, gte, asc, inArray } from "drizzle-orm";
 import {
   insertFeedbackSchema,
   sponsorCanonical,
   sponsorChanges,
   companyWatches,
   notificationLog,
+  notifLog,
   monitorJobRuns,
   csvArchive,
   users,
   sessions,
+  DEFAULT_NOTIF_PREFS,
+  type NotifPrefs,
 } from "@shared/schema";
 import { z } from "zod";
 import { isAdmin } from "../auth";
@@ -2122,6 +2125,169 @@ Format your response in clear, professional markdown.`;
     } catch (error) {
       console.error('Error fetching HITL logs:', error);
       res.status(500).json({ message: 'Failed to fetch logs' });
+    }
+  });
+
+  // ── Notification Portal ───────────────────────────────────────────────────
+
+  // GET /api/admin/notifications/status — kill switch state
+  app.get('/api/admin/notifications/status', isAdmin, async (_req, res) => {
+    try {
+      const value = await storage.getSystemSetting('notifications_paused');
+      const paused = value === 'true';
+      res.json({ paused });
+    } catch (error) {
+      console.error('Error fetching notification status:', error);
+      res.status(500).json({ message: 'Failed to fetch notification status' });
+    }
+  });
+
+  // POST /api/admin/notifications/pause — activate kill switch
+  app.post('/api/admin/notifications/pause', isAdmin, async (req: any, res) => {
+    try {
+      await storage.setSystemSetting('notifications_paused', 'true');
+      console.log(`[Admin] Notifications PAUSED by ${req.user?.email ?? req.user?.id}`);
+      res.json({ paused: true });
+    } catch (error) {
+      console.error('Error pausing notifications:', error);
+      res.status(500).json({ message: 'Failed to pause notifications' });
+    }
+  });
+
+  // POST /api/admin/notifications/resume — deactivate kill switch
+  app.post('/api/admin/notifications/resume', isAdmin, async (req: any, res) => {
+    try {
+      await storage.setSystemSetting('notifications_paused', 'false');
+      console.log(`[Admin] Notifications RESUMED by ${req.user?.email ?? req.user?.id}`);
+      res.json({ paused: false });
+    } catch (error) {
+      console.error('Error resuming notifications:', error);
+      res.status(500).json({ message: 'Failed to resume notifications' });
+    }
+  });
+
+  // GET /api/admin/notifications/users — paginated user notif_prefs
+  app.get('/api/admin/notifications/users', isAdmin, async (req, res) => {
+    try {
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(50, parseInt(req.query.limit as string) || 20);
+      const search = (req.query.search as string)?.trim() ?? '';
+      const offset = (page - 1) * limit;
+
+      const searchFilter = search
+        ? sql`${users.email} ILIKE ${'%' + search + '%'} AND ${users.deletedAt} IS NULL`
+        : sql`${users.deletedAt} IS NULL`;
+
+      const [rows, [{ total }]] = await Promise.all([
+        db
+          .select({
+            id: users.id,
+            email: users.email,
+            subscriptionStatus: users.subscriptionStatus,
+            notifPrefs: users.notifPrefs,
+          })
+          .from(users)
+          .where(searchFilter)
+          .orderBy(desc(users.subscriptionStatus), asc(users.email))
+          .limit(limit)
+          .offset(offset),
+        db
+          .select({ total: sql<number>`count(*)::int` })
+          .from(users)
+          .where(searchFilter),
+      ]);
+
+      res.json({
+        data: rows,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      });
+    } catch (error) {
+      console.error('Error fetching notification user list:', error);
+      res.status(500).json({ message: 'Failed to fetch users' });
+    }
+  });
+
+  // PATCH /api/admin/notifications/users/:id/prefs — deep-merge override a user's notif_prefs
+  app.patch('/api/admin/notifications/users/:id/prefs', isAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const patch = req.body as Partial<NotifPrefs>;
+
+      const [existing] = await db
+        .select({ notifPrefs: users.notifPrefs })
+        .from(users)
+        .where(eq(users.id, id));
+
+      if (!existing) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      const base = (existing.notifPrefs as NotifPrefs | null) ?? DEFAULT_NOTIF_PREFS;
+      const merged: NotifPrefs = { ...base };
+      for (const [k, v] of Object.entries(patch)) {
+        const key = k as keyof NotifPrefs;
+        if (merged[key]) {
+          merged[key] = { ...merged[key], ...v, channels: { ...merged[key].channels, ...(v as any).channels } };
+        }
+      }
+
+      await db
+        .update(users)
+        .set({ notifPrefs: merged })
+        .where(eq(users.id, id));
+
+      console.log(`[Admin] notif_prefs updated for user ${id} by ${req.user?.email ?? req.user?.id}`);
+      res.json({ notifPrefs: merged });
+    } catch (error) {
+      console.error('Error updating notif_prefs:', error);
+      res.status(500).json({ message: 'Failed to update preferences' });
+    }
+  });
+
+  // GET /api/admin/notifications/log — paginated notif_log entries with user email join
+  app.get('/api/admin/notifications/log', isAdmin, async (req, res) => {
+    try {
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(100, parseInt(req.query.limit as string) || 25);
+      const userId = req.query.userId as string | undefined;
+      const offset = (page - 1) * limit;
+
+      const filter = userId
+        ? eq(notifLog.userId, userId)
+        : undefined;
+
+      const [rows, [{ total }]] = await Promise.all([
+        db
+          .select({
+            id: notifLog.id,
+            userId: notifLog.userId,
+            userEmail: users.email,
+            eventType: notifLog.eventType,
+            channel: notifLog.channel,
+            companyName: notifLog.companyName,
+            success: notifLog.success,
+            errorDetails: notifLog.errorDetails,
+            sentAt: notifLog.sentAt,
+          })
+          .from(notifLog)
+          .leftJoin(users, eq(notifLog.userId, users.id))
+          .where(filter)
+          .orderBy(desc(notifLog.sentAt))
+          .limit(limit)
+          .offset(offset),
+        db
+          .select({ total: sql<number>`count(*)::int` })
+          .from(notifLog)
+          .where(filter),
+      ]);
+
+      res.json({ data: rows, total, page, limit, totalPages: Math.ceil(total / limit) });
+    } catch (error) {
+      console.error('Error fetching notif_log:', error);
+      res.status(500).json({ message: 'Failed to fetch notification log' });
     }
   });
 }
