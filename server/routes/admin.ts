@@ -864,8 +864,9 @@ Format your response in clear, professional markdown.`;
       const page = parseInt(req.query.page as string) || 1;
       const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
       const search = req.query.search as string | undefined;
+      const paidOnly = req.query.paidOnly === 'true';
 
-      const result = await storage.getPaginatedUsers({ page, limit, search });
+      const result = await storage.getPaginatedUsers({ page, limit, search, paidOnly });
       res.json(result);
     } catch (error) {
       console.error("Error fetching users:", error);

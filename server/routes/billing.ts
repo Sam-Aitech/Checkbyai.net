@@ -4,7 +4,7 @@ import Stripe from "stripe";
 import { db } from "../db";
 import { sql, eq, lt } from "drizzle-orm";
 import { withRetry } from "../utils/dbRetry";
-import { users, processedCheckouts } from "@shared/schema";
+import { users, processedCheckouts, DEFAULT_NOTIF_PREFS } from "@shared/schema";
 import { sendEmailReliably } from "../utils/resilientEmail";
 import { getAppUrl } from "../utils/appUrl";
 import { isAuthenticated } from "../auth";
@@ -242,7 +242,15 @@ export function registerBillingRoutes(app: Express): void {
         console.error('Webhook error: rawBody not available — ensure express.json verify callback is configured');
         return res.status(400).send('Webhook raw body unavailable');
       }
-      event = stripe.webhooks.constructEvent(rawBody, sig!, process.env.STRIPE_WEBHOOK_SECRET!);
+      if (!process.env.STRIPE_WEBHOOK_SECRET) {
+        console.error(
+          'Webhook error: STRIPE_WEBHOOK_SECRET is not set. ' +
+          'All plan activations via webhook are failing. ' +
+          'Set STRIPE_WEBHOOK_SECRET to the whsec_... value from Stripe dashboard → Webhooks.'
+        );
+        return res.status(500).send('Webhook secret not configured');
+      }
+      event = stripe.webhooks.constructEvent(rawBody, sig!, process.env.STRIPE_WEBHOOK_SECRET);
     } catch (err: unknown) {
       console.error('Webhook signature verification failed:', err instanceof Error ? err.message : err);
       return res.status(400).send('Webhook signature verification failed');
@@ -435,6 +443,7 @@ export function registerBillingRoutes(app: Express): void {
                 subscriptionStatus: 'starter',
                 stripeSubscriptionId: session.subscription,
                 stripeCustomerId: session.customer,
+                notifPrefs: sql`COALESCE(${users.notifPrefs}, ${JSON.stringify(DEFAULT_NOTIF_PREFS)}::jsonb)`,
                 updatedAt: new Date(),
               }).where(eq(users.id, userId));
             }), 'webhook-checkout-notification-starter');
@@ -447,6 +456,7 @@ export function registerBillingRoutes(app: Express): void {
                 subscriptionStatus: 'pro',
                 stripeSubscriptionId: session.subscription,
                 stripeCustomerId: session.customer,
+                notifPrefs: sql`COALESCE(${users.notifPrefs}, ${JSON.stringify(DEFAULT_NOTIF_PREFS)}::jsonb)`,
                 updatedAt: new Date(),
               }).where(eq(users.id, userId));
             }), 'webhook-checkout-notification-pro');
@@ -658,6 +668,7 @@ export function registerBillingRoutes(app: Express): void {
                   subscriptionStatus: 'starter',
                   stripeSubscriptionId: session.subscription as string,
                   stripeCustomerId: session.customer as string,
+                  notifPrefs: sql`COALESCE(${users.notifPrefs}, ${JSON.stringify(DEFAULT_NOTIF_PREFS)}::jsonb)`,
                   updatedAt: new Date(),
                 }).where(eq(users.id, sessionUserId));
               }), 'checkout-verify-notification-starter');
@@ -668,6 +679,7 @@ export function registerBillingRoutes(app: Express): void {
                   subscriptionStatus: 'pro',
                   stripeSubscriptionId: session.subscription as string,
                   stripeCustomerId: session.customer as string,
+                  notifPrefs: sql`COALESCE(${users.notifPrefs}, ${JSON.stringify(DEFAULT_NOTIF_PREFS)}::jsonb)`,
                   updatedAt: new Date(),
                 }).where(eq(users.id, sessionUserId));
               }), 'checkout-verify-notification-pro');

@@ -28,6 +28,16 @@ if (missingVars.length > 0) {
   }
 }
 
+// STRIPE_WEBHOOK_SECRET is not hard-required (app starts without it) but webhooks
+// will silently return 400 and plans will never activate if it is missing.
+if (!process.env.STRIPE_WEBHOOK_SECRET) {
+  logger.warn(
+    "STRIPE_WEBHOOK_SECRET is not set. Stripe webhooks will fail signature verification " +
+    "and all plan activations via webhook will silently fail. " +
+    "Set this to the whsec_... value from your Stripe dashboard → Webhooks.",
+  );
+}
+
 async function seedAdminUser() {
   try {
     const adminEmail = process.env.ADMIN_EMAIL;

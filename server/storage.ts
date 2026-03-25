@@ -152,6 +152,7 @@ export interface IStorage {
     page: number;
     limit: number;
     search?: string;
+    paidOnly?: boolean;
   }): Promise<{
     data: User[];
     total: number;
@@ -964,6 +965,7 @@ export class DatabaseStorage implements IStorage {
     page: number;
     limit: number;
     search?: string;
+    paidOnly?: boolean;
   }): Promise<{
     data: User[];
     total: number;
@@ -971,13 +973,18 @@ export class DatabaseStorage implements IStorage {
     limit: number;
     totalPages: number;
   }> {
-    const { page, limit, search } = options;
+    const { page, limit, search, paidOnly } = options;
     const offset = (page - 1) * limit;
 
     const notDeleted = isNull(users.deletedAt);
-    const whereClause = search
-      ? and(notDeleted, sql`(${users.email} ILIKE ${'%' + search + '%'} OR ${users.username} ILIKE ${'%' + search + '%'})`)
-      : notDeleted;
+    const paidFilter = paidOnly
+      ? sql`${users.subscriptionStatus} != 'free' AND ${users.subscriptionStatus} IS NOT NULL`
+      : undefined;
+    const searchFilter = search
+      ? sql`(${users.email} ILIKE ${'%' + search + '%'} OR ${users.username} ILIKE ${'%' + search + '%'})`
+      : undefined;
+
+    const whereClause = and(notDeleted, paidFilter, searchFilter);
 
     const [countResult] = await db
       .select({ count: count() })

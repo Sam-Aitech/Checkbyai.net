@@ -171,6 +171,7 @@ export default function SimpleAdmin() {
   const [usersSearch, setUsersSearch] = useState('');
   const [usersSearchInput, setUsersSearchInput] = useState('');
   const usersSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [usersPaidOnly, setUsersPaidOnly] = useState(false);
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
   const [cosBetaDialog, setCosBetaDialog] = useState<{ open: boolean; userId: string; currentLimit: number | null } | null>(null);
   const [cosBetaLimitInput, setCosBetaLimitInput] = useState<string>('');
@@ -358,6 +359,7 @@ export default function SimpleAdmin() {
         page: usersPage.toString(),
         limit: '25',
         search: usersSearch,
+        ...(usersPaidOnly ? { paidOnly: 'true' } : {}),
       });
       
       const res = await fetch(`/api/admin/users?${params}`, {
@@ -372,7 +374,7 @@ export default function SimpleAdmin() {
     } finally {
       setUsersLoading(false);
     }
-  }, [usersPage, usersSearch]);
+  }, [usersPage, usersSearch, usersPaidOnly]);
 
   const handleDeleteUser = async (userId: string) => {
     setDeletingUserId(userId);
@@ -1920,10 +1922,20 @@ export default function SimpleAdmin() {
                   <div>
                     <CardTitle className="text-gray-900 dark:text-white">User Management</CardTitle>
                     <CardDescription className="text-gray-500 dark:text-slate-400">
-                      {users?.total || 0} registered users
+                      {users?.total || 0} {usersPaidOnly ? 'paid' : 'registered'} users
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
+                    <Button
+                      variant={usersPaidOnly ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => { setUsersPaidOnly(v => !v); setUsersPage(1); }}
+                      className={usersPaidOnly
+                        ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600"
+                        : "border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700"}
+                    >
+                      Paid Only
+                    </Button>
                     <div className="relative">
                       <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-slate-400" />
                       <Input
