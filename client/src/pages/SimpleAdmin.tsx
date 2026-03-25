@@ -2011,14 +2011,37 @@ export default function SimpleAdmin() {
                               <td className="py-3 px-4">
                                 {u.isRestricted ? (
                                   <Badge className="bg-red-500/20 text-red-400">Restricted</Badge>
-                                ) : u.subscriptionStatus === 'unlimited' || u.subscriptionStatus === 'enterprise' ? (
-                                  <Badge className="bg-purple-500/20 text-purple-400">Unlimited</Badge>
-                                ) : u.subscriptionStatus === 'pro' ? (
-                                  <Badge className="bg-green-500/20 text-green-400">Pro</Badge>
-                                ) : u.subscriptionStatus === 'starter' ? (
-                                  <Badge className="bg-blue-500/20 text-blue-400">Starter</Badge>
+                                ) : u.role === 'admin' ? (
+                                  <Badge className="bg-purple-500/20 text-purple-400">Admin</Badge>
                                 ) : (
-                                  <Badge className="bg-slate-500/20 text-gray-500 dark:text-slate-400">Free</Badge>
+                                  <select
+                                    className="bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white text-sm rounded px-2 py-1"
+                                    value={u.subscriptionStatus === 'unlimited' || u.subscriptionStatus === 'enterprise' ? 'pro' : u.subscriptionStatus || 'free'}
+                                    onChange={async (e) => {
+                                      const plan = e.target.value as 'free' | 'starter' | 'pro';
+                                      try {
+                                        const r = await fetch(`/api/admin/users/${u.id}/sponsor-monitor-plan`, {
+                                          method: 'PATCH',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({ plan }),
+                                          credentials: 'include',
+                                        });
+                                        if (r.ok) {
+                                          toast({ title: 'Plan updated', description: `${u.email} → ${plan.charAt(0).toUpperCase() + plan.slice(1)}` });
+                                          loadUsers();
+                                        } else {
+                                          const body = await r.json().catch(() => ({}));
+                                          toast({ title: body.message || 'Failed to update plan', variant: 'destructive' });
+                                        }
+                                      } catch {
+                                        toast({ title: 'Failed to update plan', variant: 'destructive' });
+                                      }
+                                    }}
+                                  >
+                                    <option value="free">Free</option>
+                                    <option value="starter">Starter</option>
+                                    <option value="pro">Pro</option>
+                                  </select>
                                 )}
                               </td>
                               <td className="py-3 px-4">
