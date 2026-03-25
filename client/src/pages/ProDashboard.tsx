@@ -22,21 +22,21 @@ import {
   Mail, Smartphone, Loader2, Trash2, ChevronDown, ChevronRight, Zap,
 } from "lucide-react";
 
-// ─── Design tokens (from Stitch) ─────────────────────────────────────────────
+// ─── Design tokens — maps to site CSS variables ───────────────────────────────
 const T = {
-  bg:           "#0A0A0E",
-  sidebar:      "#0D0D12",
-  card:         "rgba(17,17,20,0.85)",
-  cardSolid:    "#111114",
-  border:       "#1E1E24",
-  violet:       "#7C3AED",
-  violetDim:    "rgba(124,58,237,0.07)",
-  violetBorder: "rgba(124,58,237,0.22)",
-  indigo:       "#4F46E5",
-  text:         "#F4F4F5",
-  sub:          "#A1A1AA",
-  muted:        "#71717A",
-  activeText:   "#A78BFA",
+  bg:           "var(--background)",
+  sidebar:      "var(--card)",
+  card:         "var(--card)",
+  cardSolid:    "var(--card)",
+  border:       "var(--border)",
+  violet:       "var(--primary)",
+  violetDim:    "color-mix(in srgb, var(--primary) 8%, transparent)",
+  violetBorder: "color-mix(in srgb, var(--primary) 22%, transparent)",
+  indigo:       "var(--primary)",
+  text:         "var(--foreground)",
+  sub:          "var(--muted-foreground)",
+  muted:        "var(--muted-foreground)",
+  activeText:   "var(--primary)",
   emerald:      "#10B981",
   amber:        "#F59E0B",
   red:          "#EF4444",
@@ -44,17 +44,15 @@ const T = {
 } as const;
 
 const cardStyle: CSSProperties = {
-  background: T.card,
-  backdropFilter: "blur(12px)",
-  WebkitBackdropFilter: "blur(12px)",
-  border: `1px solid ${T.border}`,
+  background: "var(--card)",
+  border: `1px solid var(--border)`,
   borderRadius: 16,
-  boxShadow: "0 0 0 0 transparent, 0 4px 24px rgba(0,0,0,0.4)",
+  boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.06)",
 };
 
 const glowCardStyle: CSSProperties = {
   ...cardStyle,
-  boxShadow: `0 0 24px rgba(124,58,237,0.08), 0 4px 24px rgba(0,0,0,0.4)`,
+  boxShadow: `0 0 24px color-mix(in srgb, var(--primary) 8%, transparent), 0 4px 16px rgba(0,0,0,0.06)`,
 };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -144,7 +142,7 @@ function StatusPill({ status }: { status?: string }) {
 
 function PlanPill({ plan }: { plan: string }) {
   return (
-    <span style={{ background: `linear-gradient(135deg, ${T.violet}, ${T.indigo})`, color: "#fff", fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 99, display: "inline-flex", alignItems: "center", gap: 4, boxShadow: "0 2px 8px rgba(124,58,237,0.3)" }}>
+    <span style={{ background: "var(--primary)", color: "var(--primary-foreground)", fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 99, display: "inline-flex", alignItems: "center", gap: 4, boxShadow: "0 2px 8px color-mix(in srgb, var(--primary) 28%, transparent)" }}>
       <Crown style={{ width: 11, height: 11 }} />
       {PLAN_LABEL[plan] || plan}
     </span>
@@ -158,7 +156,7 @@ function StatCard({ label, value, sub, gradient, Icon, loading }: StatCardProps)
       initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 100, damping: 14 }}
-      whileHover={{ y: -2, boxShadow: `0 0 28px rgba(124,58,237,0.12), 0 8px 32px rgba(0,0,0,0.5)` }}
+      whileHover={{ y: -2, boxShadow: "0 0 28px color-mix(in srgb, var(--primary) 12%, transparent), 0 8px 24px rgba(0,0,0,0.1)" }}
       style={{ ...cardStyle, padding: 20, cursor: "default" }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -367,7 +365,7 @@ function MonitorTab({ user }: { user: any }) {
         </div>
         <motion.button whileTap={{scale:0.97}}
           onClick={() => setShowSearch(!showSearch)}
-          style={{ background:`linear-gradient(135deg,${T.violet},${T.indigo})`, color:"#fff", border:"none", borderRadius:99, padding:"9px 18px", fontSize:13, fontWeight:700, display:"flex", alignItems:"center", gap:7, cursor:"pointer", flexShrink:0, boxShadow:"0 2px 12px rgba(124,58,237,0.35)" }}
+          style={{ background:"var(--primary)", color:"var(--primary-foreground)", border:"none", borderRadius:99, padding:"9px 18px", fontSize:13, fontWeight:700, display:"flex", alignItems:"center", gap:7, cursor:"pointer", flexShrink:0, boxShadow:"0 2px 12px color-mix(in srgb, var(--primary) 30%, transparent)" }}
         >
           {showSearch ? <><X style={{width:14,height:14}}/> Cancel</> : <><Plus style={{width:14,height:14}}/> Add Sponsor</>}
         </motion.button>
@@ -377,12 +375,12 @@ function MonitorTab({ user }: { user: any }) {
       <AnimatePresence>
         {showSearch && (
           <motion.div initial={{opacity:0,height:0}} animate={{opacity:1,height:"auto"}} exit={{opacity:0,height:0}} transition={{type:"spring",stiffness:120,damping:18}} style={{overflow:"hidden",marginBottom:20}}>
-            <div style={{ background:"rgba(124,58,237,0.05)", border:`1px solid ${T.violetBorder}`, borderRadius:16, padding:20 }}>
+            <div style={{ background:"color-mix(in srgb, var(--primary) 5%, transparent)", border:`1px solid ${T.violetBorder}`, borderRadius:16, padding:20 }}>
               <p style={{ fontSize:13, fontWeight:600, color:T.text, marginBottom:12 }}>Search the UK sponsor register</p>
               <div style={{ position:"relative" }}>
                 <Search style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", width:15, height:15, color:T.muted }} />
                 <input value={query} onChange={e=>setQuery(e.target.value)} autoFocus placeholder="Company name..."
-                  style={{ width:"100%", paddingLeft:38, paddingRight:36, paddingTop:10, paddingBottom:10, background:"rgba(255,255,255,0.04)", border:`1px solid ${T.border}`, borderRadius:10, color:T.text, fontSize:14, outline:"none", boxSizing:"border-box" }}
+                  style={{ width:"100%", paddingLeft:38, paddingRight:36, paddingTop:10, paddingBottom:10, background:"var(--background)", border:`1px solid var(--border)`, borderRadius:10, color:"var(--foreground)", fontSize:14, outline:"none", boxSizing:"border-box" }}
                 />
                 {searching && <Loader2 style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", width:14, height:14, color:T.muted }} className="animate-spin" />}
               </div>
@@ -392,7 +390,7 @@ function MonitorTab({ user }: { user: any }) {
                   {results.map(s => {
                     const alreadyWatched = watched.has(s.fingerprint);
                     return (
-                      <div key={s.fingerprint} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:10, background:"rgba(255,255,255,0.03)", border:`1px solid ${T.border}`, borderRadius:10, padding:"10px 12px" }}>
+                      <div key={s.fingerprint} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:10, background:"var(--secondary)", border:`1px solid var(--border)`, borderRadius:10, padding:"10px 12px" }}>
                         <div style={{minWidth:0}}>
                           <p style={{ fontSize:13, fontWeight:600, color:T.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{s.organisationName}</p>
                           <p style={{ fontSize:12, color:T.muted }}>{s.townCity||"—"} · {s.typeRating||"Unknown"}</p>
@@ -400,7 +398,7 @@ function MonitorTab({ user }: { user: any }) {
                         <div style={{ display:"flex", alignItems:"center", gap:8, flexShrink:0 }}>
                           <StatusPill status={s.status} />
                           <button disabled={alreadyWatched||addM.isPending} onClick={() => !alreadyWatched && addM.mutate(s)}
-                            style={{ background: alreadyWatched ? "rgba(255,255,255,0.06)" : `linear-gradient(135deg,${T.violet},${T.indigo})`, color: alreadyWatched ? T.muted : "#fff", border:"none", borderRadius:8, padding:"5px 12px", fontSize:12, fontWeight:600, cursor: alreadyWatched ? "default" : "pointer" }}>
+                            style={{ background: alreadyWatched ? "var(--secondary)" : "var(--primary)", color: alreadyWatched ? "var(--muted-foreground)" : "var(--primary-foreground)", border:"none", borderRadius:8, padding:"5px 12px", fontSize:12, fontWeight:600, cursor: alreadyWatched ? "default" : "pointer" }}>
                             {alreadyWatched ? "Watching" : "Watch"}
                           </button>
                         </div>
@@ -427,7 +425,7 @@ function MonitorTab({ user }: { user: any }) {
           <Crown style={{ width:32, height:32, color:T.violet, margin:"0 auto 12px" }} />
           <p style={{ fontSize:16, fontWeight:700, color:T.text, marginBottom:6 }}>Upgrade to monitor sponsors</p>
           <p style={{ fontSize:14, color:T.sub, marginBottom:20 }}>Get instant alerts when a sponsor's licence is revoked or downgraded.</p>
-          <a href="/pricing" style={{ background:`linear-gradient(135deg,${T.violet},${T.indigo})`, color:"#fff", padding:"10px 22px", borderRadius:99, fontSize:14, fontWeight:700, textDecoration:"none", boxShadow:"0 2px 12px rgba(124,58,237,0.35)" }}>View Plans</a>
+          <a href="/pricing" style={{ background:"var(--primary)", color:"var(--primary-foreground)", padding:"10px 22px", borderRadius:99, fontSize:14, fontWeight:700, textDecoration:"none", boxShadow:"0 2px 12px color-mix(in srgb, var(--primary) 30%, transparent)" }}>View Plans</a>
         </div>
       ) : watches?.length === 0 ? (
         <div style={{ ...cardStyle, padding:48, textAlign:"center", borderStyle:"dashed" }}>
@@ -459,7 +457,7 @@ function MonitorTab({ user }: { user: any }) {
                   </div>
                   <div style={{ display:"flex", alignItems:"center", gap:8, flexShrink:0 }}>
                     {w.recentChanges?.length > 0 && (
-                      <span style={{ background:"rgba(255,255,255,0.06)", color:T.sub, fontSize:11, fontWeight:600, padding:"2px 8px", borderRadius:99, border:`1px solid ${T.border}` }}>{w.recentChanges.length} changes</span>
+                      <span style={{ background:"var(--secondary)", color:"var(--muted-foreground)", fontSize:11, fontWeight:600, padding:"2px 8px", borderRadius:99, border:`1px solid var(--border)` }}>{w.recentChanges.length} changes</span>
                     )}
                     <ChevronDown style={{ width:15, height:15, color:T.muted, transition:"transform 0.2s", transform: expanded===w.id ? "rotate(180deg)" : "none" }} />
                   </div>
@@ -553,7 +551,7 @@ function VerifyTab({ user }: { user: any }) {
         {/* Upload */}
         <div style={{ ...cardStyle, padding:24 }}>
           <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:20 }}>
-            <div style={{ background:`linear-gradient(135deg,${T.violet},${T.indigo})`, borderRadius:12, padding:10, boxShadow:"0 2px 12px rgba(124,58,237,0.3)" }}>
+            <div style={{ background:"var(--primary)", borderRadius:12, padding:10, boxShadow:"0 2px 12px color-mix(in srgb, var(--primary) 25%, transparent)" }}>
               <Shield style={{ width:18, height:18, color:"#fff" }} />
             </div>
             <div>
@@ -579,12 +577,12 @@ function VerifyTab({ user }: { user: any }) {
             <div style={{ position:"absolute", left:13, top:14, bottom:14, width:2, background:`linear-gradient(to bottom, ${T.emerald}, ${T.violet}, ${T.border})`, opacity:0.4, borderRadius:2 }} />
             {STEPS.map((step, i) => {
               const s = stepStates[i];
-              const circleBg = s==="done" ? T.emerald : s==="active" ? T.violet : "rgba(255,255,255,0.06)";
+              const circleBg = s==="done" ? T.emerald : s==="active" ? "var(--primary)" : "var(--muted)";
               const titleCol  = s==="done" ? T.emerald : s==="active" ? T.activeText : T.sub;
               return (
                 <motion.div key={i} animate={{ opacity: running && s==="pending" ? 0.4 : 1 }} transition={{duration:0.3}}
                   style={{ display:"flex", alignItems:"flex-start", gap:12, paddingBottom:i<STEPS.length-1?20:0, position:"relative", zIndex:1 }}>
-                  <div style={{ width:28, height:28, borderRadius:"50%", background:circleBg, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, transition:"background 0.4s", boxShadow: s==="active"?`0 0 12px rgba(124,58,237,0.5)`:"none" }}>
+                  <div style={{ width:28, height:28, borderRadius:"50%", background:circleBg, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, transition:"background 0.4s", boxShadow: s==="active"?"0 0 12px color-mix(in srgb, var(--primary) 45%, transparent)":"none" }}>
                     {s==="done"   ? <CheckCircle2 style={{ width:15, height:15, color:"#fff" }} /> :
                      s==="active" ? <Loader2 style={{ width:14, height:14, color:"#fff" }} className="animate-spin" /> :
                      <span style={{ fontSize:11, fontWeight:700, color:T.muted }}>{i+1}</span>}
@@ -613,7 +611,7 @@ function VerifyTab({ user }: { user: any }) {
                       <p style={{ fontSize:12, color:T.sub }}>{rc.sub}</p>
                     </div>
                   </div>
-                  <div style={{ background:"rgba(0,0,0,0.2)", borderRadius:99, height:6, overflow:"hidden", marginTop:10 }}>
+                  <div style={{ background:"var(--muted)", borderRadius:99, height:6, overflow:"hidden", marginTop:10 }}>
                     <div style={{ width:`${Math.round(result.confidence*100)}%`, height:"100%", background:rc.title, borderRadius:99, transition:"width 0.8s ease" }} />
                   </div>
                   <p style={{ fontSize:12, color:T.muted, marginTop:5 }}>{Math.round(result.confidence*100)}% confidence</p>
@@ -669,7 +667,7 @@ function NotificationsTab() {
 
       <div style={{ ...cardStyle, borderRadius:16, overflow:"hidden" }}>
         {/* Header row */}
-        <div style={{ display:"flex", alignItems:"center", padding:"12px 20px", background:"rgba(255,255,255,0.03)", borderBottom:`1px solid ${T.border}` }}>
+        <div style={{ display:"flex", alignItems:"center", padding:"12px 20px", background:"var(--secondary)", borderBottom:`1px solid var(--border)` }}>
           <div style={{ flex:1, fontSize:11, fontWeight:700, color:T.muted, textTransform:"uppercase", letterSpacing:"0.08em" }}>Event</div>
           {CH.map(ch => (
             <div key={ch.key} style={{ width:72, display:"flex", flexDirection:"column", alignItems:"center", gap:3 }}>
@@ -715,7 +713,7 @@ function NotificationsTab() {
         )}
 
         {patchM.isPending && (
-          <div style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 20px", background:"rgba(255,255,255,0.02)", borderTop:`1px solid ${T.border}` }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 20px", background:"var(--muted)", borderTop:`1px solid var(--border)` }}>
             <Loader2 style={{ width:13, height:13, color:T.muted }} className="animate-spin" />
             <span style={{ fontSize:12, color:T.muted }}>Saving…</span>
           </div>
@@ -757,7 +755,7 @@ function HistoryTab() {
       {total > 0 && (
         <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12, marginBottom:24 }}>
           {[
-            { label:"Total Verified", val:total,   col:T.sub,    bg:"rgba(255,255,255,0.04)" },
+            { label:"Total Verified", val:total,   col:"var(--muted-foreground)", bg:"var(--secondary)" },
             { label:"Genuine",        val:genuine,  col:T.emerald, bg:"rgba(16,185,129,0.07)" },
             { label:"Flagged",        val:flagged,  col:T.amber,  bg:"rgba(245,158,11,0.07)" },
           ].map(s => (
@@ -807,7 +805,7 @@ function HistoryTab() {
                     </div>
                   </div>
                   <div style={{ display:"flex", alignItems:"center", gap:8, flexShrink:0 }}>
-                    <span style={{ background:"rgba(0,0,0,0.25)", border:`1px solid ${rc.border}`, color:rc.icon, fontSize:10, fontWeight:700, padding:"2px 8px", borderRadius:99, textTransform:"uppercase", letterSpacing:"0.06em" }}>{rc.label}</span>
+                    <span style={{ background:"var(--secondary)", border:`1px solid ${rc.border}`, color:rc.icon, fontSize:10, fontWeight:700, padding:"2px 8px", borderRadius:99, textTransform:"uppercase", letterSpacing:"0.06em" }}>{rc.label}</span>
                     <ChevronDown style={{ width:14, height:14, color:T.muted, transition:"transform 0.2s", transform:isOpen?"rotate(180deg)":"none" }} />
                   </div>
                 </button>
@@ -873,9 +871,9 @@ export default function ProDashboard() {
   };
 
   if (authLoading) return (
-    <div style={{ background:T.bg, height:"100vh", display:"flex", alignItems:"center", justifyContent:"center" }}>
+    <div style={{ background:"var(--background)", height:"100vh", display:"flex", alignItems:"center", justifyContent:"center" }}>
       <div style={{ textAlign:"center" }}>
-        <div style={{ width:44, height:44, borderRadius:12, background:`linear-gradient(135deg,${T.violet},${T.indigo})`, margin:"0 auto 14px", animation:"pulse 1.5s infinite" }} />
+        <div style={{ width:44, height:44, borderRadius:12, background:"var(--primary)", margin:"0 auto 14px", animation:"pulse 1.5s infinite" }} />
         <p style={{ fontSize:14, color:T.muted }}>Loading your dashboard…</p>
       </div>
     </div>
@@ -928,7 +926,7 @@ export default function ProDashboard() {
       {/* User */}
       <div style={{ padding:"12px 8px", borderTop:`1px solid ${T.border}`, display:"flex", flexDirection:"column", gap:6 }}>
         <div style={{ display:"flex", alignItems:"center", gap:10, padding:"6px 10px" }}>
-          <div style={{ width:32, height:32, borderRadius:"50%", background:`linear-gradient(135deg,${T.violet},${T.indigo})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:"#fff", flexShrink:0 }}>{initials}</div>
+          <div style={{ width:32, height:32, borderRadius:"50%", background:"var(--primary)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:"var(--primary-foreground)", flexShrink:0 }}>{initials}</div>
           <div style={{ minWidth:0 }}>
             <p style={{ fontSize:13, fontWeight:600, color:T.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{fullName}</p>
             <PlanPill plan={plan} />
@@ -956,7 +954,7 @@ export default function ProDashboard() {
             onClick={() => setDrawerOpen(false)} />
           <motion.aside initial={{x:-264}} animate={{x:0}} exit={{x:-264}} transition={{type:"spring",stiffness:140,damping:20}}
             style={{ position:"fixed", left:0, top:0, bottom:0, width:260, zIndex:50, background:T.sidebar, borderRight:`1px solid ${T.border}`, display:"flex", flexDirection:"column" }}>
-            <button onClick={() => setDrawerOpen(false)} style={{ position:"absolute", top:14, right:14, background:"rgba(255,255,255,0.06)", border:"none", borderRadius:8, padding:6, cursor:"pointer", color:T.muted }}>
+            <button onClick={() => setDrawerOpen(false)} style={{ position:"absolute", top:14, right:14, background:"var(--secondary)", border:"none", borderRadius:8, padding:6, cursor:"pointer", color:"var(--muted-foreground)" }}>
               <X style={{ width:14, height:14 }} />
             </button>
             {Sidebar}
@@ -967,9 +965,9 @@ export default function ProDashboard() {
       {/* Main */}
       <div style={{ flex:1, display:"flex", flexDirection:"column", minWidth:0, overflow:"hidden" }}>
         {/* Topbar */}
-        <header style={{ height:54, flexShrink:0, background:"rgba(10,10,14,0.9)", backdropFilter:"blur(12px)", borderBottom:`1px solid ${T.border}`, display:"flex", alignItems:"center", justifyContent:"space-between", padding:"0 20px", gap:12 }}>
+        <header style={{ height:54, flexShrink:0, background:"var(--card)", borderBottom:`1px solid var(--border)`, display:"flex", alignItems:"center", justifyContent:"space-between", padding:"0 20px", gap:12 }}>
           <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-            <button className="lg:hidden" onClick={() => setDrawerOpen(true)} style={{ background:"rgba(255,255,255,0.05)", border:"none", borderRadius:8, padding:7, cursor:"pointer", color:T.muted, display:"flex" }}>
+            <button className="lg:hidden" onClick={() => setDrawerOpen(true)} style={{ background:"var(--secondary)", border:"none", borderRadius:8, padding:7, cursor:"pointer", color:"var(--muted-foreground)", display:"flex" }}>
               <Menu style={{ width:16, height:16 }} />
             </button>
             <div className="hidden sm:flex" style={{ alignItems:"center", gap:6, fontSize:13, color:T.muted }}>
@@ -980,7 +978,7 @@ export default function ProDashboard() {
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:12 }}>
             <div className="hidden sm:block"><PlanPill plan={plan} /></div>
-            <div style={{ width:32, height:32, borderRadius:"50%", background:`linear-gradient(135deg,${T.violet},${T.indigo})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:"#fff", flexShrink:0 }}>{initials}</div>
+            <div style={{ width:32, height:32, borderRadius:"50%", background:"var(--primary)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:"var(--primary-foreground)", flexShrink:0 }}>{initials}</div>
           </div>
         </header>
 
@@ -995,7 +993,7 @@ export default function ProDashboard() {
       </div>
 
       {/* Mobile bottom nav */}
-      <nav className="lg:hidden" style={{ position:"fixed", bottom:0, left:0, right:0, zIndex:30, height:60, background:"rgba(13,13,18,0.97)", backdropFilter:"blur(16px)", borderTop:`1px solid ${T.border}`, display:"flex", alignItems:"center", justifyContent:"space-around", padding:"0 8px" }}>
+      <nav className="lg:hidden" style={{ position:"fixed", bottom:0, left:0, right:0, zIndex:30, height:60, background:"var(--card)", backdropFilter:"blur(16px)", borderTop:`1px solid var(--border)`, display:"flex", alignItems:"center", justifyContent:"space-around", padding:"0 8px" }}>
         {NAV.map(({ id, label, Icon }) => {
           const active = activeTab === id;
           return (
