@@ -263,6 +263,22 @@ async function applyPendingMigrations() {
         "sent_at" timestamp DEFAULT now()
       )`,
       `CREATE INDEX IF NOT EXISTS "idx_notif_log_user_sent" ON "notif_log"("user_id", "sent_at")`,
+      `CREATE INDEX IF NOT EXISTS "idx_users_deleted_at" ON "users"("deleted_at")`,
+      `CREATE INDEX IF NOT EXISTS "idx_notif_log_company_name" ON "notif_log"("company_name")`,
+      `CREATE TABLE IF NOT EXISTS "subscription_audit_log" (
+        "id" BIGSERIAL PRIMARY KEY,
+        "user_id" VARCHAR NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+        "changed_by" VARCHAR,
+        "source" VARCHAR NOT NULL,
+        "previous_status" VARCHAR NOT NULL,
+        "new_status" VARCHAR NOT NULL,
+        "reason" TEXT,
+        "metadata" JSONB DEFAULT '{}'::jsonb,
+        "created_at" TIMESTAMP DEFAULT NOW() NOT NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS "idx_sub_audit_user_id" ON "subscription_audit_log"("user_id")`,
+      `CREATE INDEX IF NOT EXISTS "idx_sub_audit_created" ON "subscription_audit_log"("created_at" DESC)`,
+      `CREATE INDEX IF NOT EXISTS "idx_sub_audit_source" ON "subscription_audit_log"("source")`,
     ];
     for (const sql of migrations) {
       await client.query(sql);
