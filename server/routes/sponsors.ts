@@ -51,10 +51,7 @@ const directoryRateLimit = rateLimit({
   max: 60,
   standardHeaders: true,  // RateLimit-* headers (RFC 6585)
   legacyHeaders: false,
-  keyGenerator: (req) =>
-    (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
-    req.ip ||
-    "unknown",
+  // No custom keyGenerator — express-rate-limit v8's built-in ipKeyGenerator handles IPv6
   message: { message: "Too many requests. Please wait before browsing the directory again." },
 });
 
@@ -63,10 +60,7 @@ const changesRateLimit = rateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) =>
-    (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
-    req.ip ||
-    "unknown",
+  // No custom keyGenerator — express-rate-limit v8's built-in ipKeyGenerator handles IPv6
   message: { message: "Too many requests. Please wait before fetching sponsor changes again." },
 });
 
