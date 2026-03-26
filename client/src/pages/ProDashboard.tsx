@@ -360,7 +360,15 @@ function MonitorTab({ user }: { user: any }) {
   const addM = useMutation({
     mutationFn: (s: SponsorSearchResult) => apiRequest("POST","/api/watches",{ organisation_name:s.organisationName, town_city:s.townCity, fingerprint:s.fingerprint }),
     onSuccess: (_,s) => { qc.invalidateQueries({queryKey:["/api/watches"]}); toast({title:"Added to watchlist", description:`Monitoring ${s.organisationName}`}); setQuery(""); setShowSearch(false); },
-    onError: () => toast({title:"Could not add",description:"Check your plan limits.",variant:"destructive"}),
+    onError: (err: any) => {
+      let msg = "Something went wrong. Please try again.";
+      try {
+        const raw = err?.message || "";
+        const jsonStart = raw.indexOf("{");
+        if (jsonStart >= 0) { msg = JSON.parse(raw.slice(jsonStart)).message || msg; }
+      } catch {}
+      toast({title:"Could not add",description:msg,variant:"destructive"});
+    },
   });
 
   const delM = useMutation({

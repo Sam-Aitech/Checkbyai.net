@@ -468,6 +468,8 @@ export function registerSponsorRoutes(app: Express): void {
       const userId = req.user.id;
       const normalized = normalizeName(organisation_name.trim());
 
+      const watchableStatuses = ["ACTIVE", "NEWLY_GRANTED"];
+
       let canonicalMatch;
       if (fpParam) {
         const match = await db
@@ -475,7 +477,7 @@ export function registerSponsorRoutes(app: Express): void {
           .from(sponsorCanonical)
           .where(and(
             eq(sponsorCanonical.fingerprint, fpParam),
-            eq(sponsorCanonical.status, "ACTIVE"),
+            inArray(sponsorCanonical.status, watchableStatuses),
           ))
           .limit(1);
         canonicalMatch = match[0] || null;
@@ -488,7 +490,7 @@ export function registerSponsorRoutes(app: Express): void {
           .from(sponsorCanonical)
           .where(and(
             eq(sponsorCanonical.fingerprint, fp),
-            eq(sponsorCanonical.status, "ACTIVE"),
+            inArray(sponsorCanonical.status, watchableStatuses),
           ))
           .limit(1);
         canonicalMatch = fpMatch[0] || null;
@@ -499,7 +501,7 @@ export function registerSponsorRoutes(app: Express): void {
         const activeRecords = await db
           .select()
           .from(sponsorCanonical)
-          .where(eq(sponsorCanonical.status, "ACTIVE"));
+          .where(inArray(sponsorCanonical.status, watchableStatuses));
 
         canonicalMatch = activeRecords.find(m => {
           const mNorm = normalizeName(m.currentName);

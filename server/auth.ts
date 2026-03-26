@@ -311,8 +311,18 @@ export async function setupAuth(app: Express) {
     }));
   }
 
-  passport.serializeUser((user: any, cb) => cb(null, user));
-  passport.deserializeUser((user: any, cb) => cb(null, user));
+  passport.serializeUser((user: any, cb) => cb(null, user.id));
+  passport.deserializeUser(async (data: any, cb) => {
+    try {
+      // Handle both old sessions (full user object) and new sessions (just ID string)
+      const userId = typeof data === "string" ? data : data?.id;
+      if (!userId) return cb(null, false);
+      const user = await storage.getUser(userId);
+      cb(null, user || false);
+    } catch (err) {
+      cb(err, null);
+    }
+  });
 
   // Google OAuth routes
   if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
