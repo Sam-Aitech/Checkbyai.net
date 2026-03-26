@@ -351,11 +351,6 @@ async function applyPendingMigrations() {
       `CREATE INDEX IF NOT EXISTS "idx_enrichment_queue_poll" ON "enrichment_queue"("status", "next_attempt_at") WHERE status IN ('pending', 'rate_limited')`,
       `CREATE INDEX IF NOT EXISTS "idx_enrichment_queue_fingerprint" ON "enrichment_queue"("fingerprint")`,
       `CREATE UNIQUE INDEX IF NOT EXISTS "idx_enrichment_queue_unique" ON "enrichment_queue"("fingerprint", "job_type")`,
-      `CREATE INDEX IF NOT EXISTS "idx_sc_status_name" ON "sponsor_canonical"("status", "current_name")`,
-      `CREATE INDEX IF NOT EXISTS "idx_sc_status_town" ON "sponsor_canonical"("status", "town_city")`,
-      `CREATE INDEX IF NOT EXISTS "idx_sc_status_type" ON "sponsor_canonical"("status", "type_rating")`,
-      `CREATE INDEX IF NOT EXISTS "idx_changes_date_type" ON "sponsor_changes"("snapshot_date" DESC, "change_type")`,
-      `CREATE INDEX IF NOT EXISTS "idx_changes_fp_detected" ON "sponsor_changes"("fingerprint", "detected_at" DESC) WHERE "fingerprint" IS NOT NULL`,
       `ALTER TABLE "diff_results" ADD COLUMN IF NOT EXISTS "diff_json" JSONB`,
       `ALTER TABLE "csv_archive" ADD COLUMN IF NOT EXISTS "sync_status" TEXT NOT NULL DEFAULT 'SYNCED'`,
       `CREATE INDEX IF NOT EXISTS "idx_csv_archive_sync_status" ON "csv_archive"("sync_status", "snapshot_date" DESC) WHERE "sync_status" != 'SYNCED'`,
@@ -368,6 +363,22 @@ async function applyPendingMigrations() {
     logger.error({ err: error }, "Failed to apply schema migrations");
   } finally {
     client.release();
+  }
+
+  const concurrentIndexes = [
+    `CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_sc_status_name" ON "sponsor_canonical"("status", "current_name")`,
+    `CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_sc_status_town" ON "sponsor_canonical"("status", "town_city")`,
+    `CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_sc_status_type" ON "sponsor_canonical"("status", "type_rating")`,
+    `CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_changes_date_type" ON "sponsor_changes"("snapshot_date" DESC, "change_type")`,
+    `CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_changes_fp_detected" ON "sponsor_changes"("fingerprint", "detected_at" DESC) WHERE "fingerprint" IS NOT NULL`,
+  ];
+  for (const sql of concurrentIndexes) {
+    try {
+      await pool.query(sql);
+    } catch (err: any) {
+      if (err?.code === '42P07') continue;
+      logger.warn({ err }, "Non-blocking: concurrent index creation failed (will retry next boot)");
+    }
   }
 }
 
