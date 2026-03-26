@@ -218,6 +218,58 @@ function NightlyStatsBar() {
   );
 }
 
+// ── Latest change toast ───────────────────────────────────────────────────
+
+interface LatestChange {
+  changeType:    string;
+  previousValue: string | null;
+  newValue:      string | null;
+  detectedAt:    string;
+  companyName:   string;
+  companyId:     number;
+}
+
+function changeLabel(c: LatestChange): string {
+  const name = c.companyName;
+  const date = new Date(c.detectedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  switch (c.changeType) {
+    case "REMOVED_REVOKED":
+      return `'${name}' had its licence revoked — detected ${date}.`;
+    case "DOWNGRADED":
+      return `'${name}' was downgraded${c.previousValue && c.newValue ? ` from ${c.previousValue} to ${c.newValue}` : ""} — detected ${date}.`;
+    case "UPGRADED":
+      return `'${name}' was upgraded${c.previousValue && c.newValue ? ` from ${c.previousValue} to ${c.newValue}` : ""} — detected ${date}.`;
+    default:
+      return `Change detected for '${name}' on ${date}.`;
+  }
+}
+
+function LatestChangeToast() {
+  const { data, isLoading } = useQuery<LatestChange | null>({
+    queryKey: ["/api/sponsors/latest-change"],
+    staleTime: 60 * 60 * 1_000,
+  });
+
+  if (isLoading || !data) return null;
+
+  const slug = toHeroSlug(data.companyName);
+  const href = `/sponsor/${data.companyId}/${slug}`;
+
+  return (
+    <div className="bg-slate-900 dark:bg-slate-800 text-white rounded-xl p-4 mb-8 flex items-start gap-3">
+      <Activity className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5 animate-pulse" />
+      <p className="text-sm">
+        <span className="font-bold text-emerald-400">Latest detection: </span>
+        <Link href={href} className="hover:underline">{changeLabel(data)}</Link>
+        {" "}
+        <Link href="/sponsor-monitor" className="text-emerald-400 font-semibold hover:underline whitespace-nowrap">
+          Monitor your employer →
+        </Link>
+      </p>
+    </div>
+  );
+}
+
 // ── Urgency banner ────────────────────────────────────────────────────────
 
 function UrgencyBanner() {
@@ -681,13 +733,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
 
       <section className="py-12 bg-background border-y border-border/50">
         <div className="max-w-4xl mx-auto px-6">
-          <div className="bg-slate-900 dark:bg-slate-800 text-white rounded-xl p-4 mb-8 flex items-start gap-3">
-            <Activity className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5 animate-pulse" />
-            <p className="text-sm">
-              <span className="font-bold text-emerald-400">Recent alert:</span>{" "}
-              Alert sent to 43 users monitoring 'TechSolutions Ltd' on 14 Jan at 00:33 AM. Licence downgraded from A to B-Rating.
-            </p>
-          </div>
+          <LatestChangeToast />
           <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
             <CardContent className="py-8">
               <div className="flex items-start gap-4">

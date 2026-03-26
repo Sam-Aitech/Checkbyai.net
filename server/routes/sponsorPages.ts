@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { db } from "../db";
-import { sql, eq, inArray, desc } from "drizzle-orm";
+import { sql, eq, inArray, desc, and } from "drizzle-orm";
 import { sponsorCanonical, sponsorChanges, sponsorEnrichment, dailyDigest } from "@shared/schema";
 import { cacheGet, cacheSet } from "../utils/redisClient";
 import { getAppUrl } from "../utils/appUrl";
@@ -297,6 +297,44 @@ export function registerSponsorPageRoutes(app: Express): void {
     } catch (err) {
       console.error("Nightly stats error:", err);
       res.status(500).json({ message: "Stats unavailable." });
+    }
+  });
+
+  // ── Latest notable change ─────────────────────────────────────────────────
+  // Powers the "recent alert" activity toast on the homepage.
+  // Returns the single most recent high-signal change (revocation, downgrade,
+  // or upgrade) with the sponsor's display name. Cached 1hr.
+  app.get("/api/sponsors/latest-change", async (_req: any, res) => {
+    const cacheKey = "sponsors:latest-change";
+    const cached = await cacheGet<object>(cacheKey);
+    if (cached) {
+      res.set("Cache-Control", "public, max-age=3600");
+      return res.json(cached);
+    }
+
+    try {
+      const rows = await db
+        .select({
+          changeType:    sponsorChanges.changeType,
+          previousValue: sponsorChanges.previousValue,
+          newValue:      sponsorChanges.newValue,
+          detectedAt:    sponsorChanges.detectedAt,
+          companyName:   sponsorCanonical.currentName,
+          companyId:     sponsorCanonical.id,
+        })
+        .from(sponsorChanges)
+        .innerJoin(sponsorCanonical, eq(sponsorCanonical.fingerprint, sponsorChanges.fingerprint))
+        .where(inArray(sponsorChanges.changeType, ["REMOVED_REVOKED", "DOWNGRADED", "UPGRADED"]))
+        .orderBy(desc(sponsorChanges.detectedAt))
+        .limit(1);
+
+      const payload = rows[0] ?? null;
+      await cacheSet(cacheKey, payload, 3600);
+      res.set("Cache-Control", "public, max-age=3600");
+      res.json(payload);
+    } catch (err) {
+      console.error("Latest change error:", err);
+      res.status(500).json({ message: "Latest change unavailable." });
     }
   });
 
