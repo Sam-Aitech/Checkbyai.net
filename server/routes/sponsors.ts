@@ -258,9 +258,20 @@ export function registerSponsorRoutes(app: Express): void {
       const townFilter   = town   ? sql`AND town_city ILIKE ${"%" + town + "%"}`         : sql``;
       const routeFilter  = route  ? sql`AND route ILIKE ${"%" + route + "%"}`            : sql``;
 
+      type DirectoryStats = { active: number; newlyGranted: number; removedThisWeek: number; gracePeriod: number };
+      type DirectoryResponse = { results: unknown[]; total: number; page: number; totalPages: number; limit: number; stats: DirectoryStats };
+
+      // Full response cache: rows + count + stats for this exact filter+page combo.
+      // TTL 5 min — always flushed after each nightly rebuild via cacheFlushPattern("sponsors:*").
+      const dirCacheKey = `sponsors:dir:${Buffer.from(JSON.stringify({ name, status, town, route, page, limit })).toString("base64")}`;
+      const dirCached = await cacheGet<DirectoryResponse>(dirCacheKey);
+      if (dirCached) {
+        res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+        return res.json(dirCached);
+      }
+
       // Stats are an expensive full-table aggregation that only change once per nightly run.
       // Cache them for 10 minutes; flushed by sponsorMonitorJob after each successful run.
-      type DirectoryStats = { active: number; newlyGranted: number; removedThisWeek: number; gracePeriod: number };
       let stats = await cacheGet<DirectoryStats>("sponsors:stats");
 
       const [rows, countRows] = await Promise.all([
@@ -325,15 +336,17 @@ export function registerSponsorRoutes(app: Express): void {
       const total      = (countRows.rows[0] as any)?.total ?? 0;
       const totalPages = Math.max(1, Math.ceil(total / limit));
 
-      res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
-      res.json({
-        results: rows.rows,
+      const dirResponse: DirectoryResponse = {
+        results: rows.rows as unknown[],
         total,
         page,
         totalPages,
         limit,
-        stats,
-      });
+        stats: stats ?? { active: 0, newlyGranted: 0, removedThisWeek: 0, gracePeriod: 0 },
+      };
+      await cacheSet(dirCacheKey, dirResponse, 300);
+      res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+      res.json(dirResponse);
     } catch (error: unknown) {
       console.error("Error in sponsor directory:", error);
       res.status(500).json({ message: "Failed to load sponsor directory." });
@@ -705,6 +718,11 @@ export function registerSponsorRoutes(app: Express): void {
   // Public sponsor changes endpoint (last 7 days, grouped by date)
   app.get('/api/sponsor-changes', async (req, res) => {
     try {
+      // 7-day feed is static between nightly runs — cache for 10 min.
+      // sponsors:changes is flushed by sponsorMonitorJob via cacheFlushPattern("sponsors:*").
+      const changesCached = await cacheGet<{ changes: unknown[]; grouped: unknown; totalCount: number }>("sponsors:changes");
+      if (changesCached) return res.json(changesCached);
+
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
       const changes = await db
         .select({
@@ -728,7 +746,9 @@ export function registerSponsorRoutes(app: Express): void {
         grouped[dateKey].push(change);
       }
 
-      res.json({ changes, grouped, totalCount: changes.length });
+      const changesResponse = { changes, grouped, totalCount: changes.length };
+      await cacheSet("sponsors:changes", changesResponse, 600);
+      res.json(changesResponse);
     } catch (error) {
       console.error("Error fetching public sponsor changes:", error);
       res.status(500).json({ message: "Failed to fetch sponsor changes." });

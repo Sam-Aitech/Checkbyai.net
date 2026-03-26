@@ -9,6 +9,7 @@ import { logger } from "./utils/logger";
 // Import the job queue setup
 import { initJobQueue, setupWorkers } from "./services/jobQueue";
 import { initRedisCache } from "./utils/redisClient";
+import { rebuildSponsorIndex } from "./utils/sponsorSearch";
 
 // Startup validation — fail fast if truly critical env vars are missing
 // ADMIN_EMAIL is intentionally excluded: the app handles its absence gracefully (admin emails disabled)
@@ -411,6 +412,13 @@ async function applyPendingMigrations() {
   await initJobQueue();
   await initRedisCache();
   setupWorkers();
+
+  // Eagerly warm the Fuse.js sponsor index so the first request after a restart
+  // hits a warm index rather than triggering an on-demand full-table scan.
+  // Fire-and-forget: a failed warm-up degrades to the normal lazy-build path.
+  rebuildSponsorIndex().catch((err: unknown) =>
+    console.warn("[Startup] Sponsor index warm-up failed (non-fatal):", err instanceof Error ? err.message : String(err))
+  );
 
   // ALWAYS serve the app on port 5000
   // this serves both the API and the client.
