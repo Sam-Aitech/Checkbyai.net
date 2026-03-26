@@ -124,7 +124,7 @@ function RecentlyRevokedSection() {
                     )}
                   </div>
                   <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
-                    {s.removedAt ? new Date(s.removedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "Recent"}
+                    {s.removedAt ? new Date(s.removedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "Recent"}
                   </span>
                 </Link>
               ))}
@@ -231,7 +231,7 @@ interface LatestChange {
 
 function changeLabel(c: LatestChange): string {
   const name = c.companyName;
-  const date = new Date(c.detectedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  const date = new Date(c.detectedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
   switch (c.changeType) {
     case "REMOVED_REVOKED":
       return `'${name}' had its licence revoked — detected ${date}.`;
