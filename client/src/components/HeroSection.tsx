@@ -825,6 +825,36 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
               <AccordionTrigger className="text-sm font-semibold text-foreground hover:no-underline py-4">Can I just check myself for free?</AccordionTrigger>
               <AccordionContent className="text-sm text-muted-foreground pb-4">Yes, but you must remember to check every single night. Most people check once, forget, and find out too late. Our service is insurance against forgetfulness.</AccordionContent>
             </AccordionItem>
+            <AccordionItem value="q4" className="border rounded-xl px-4 bg-white dark:bg-slate-900">
+              <AccordionTrigger className="text-sm font-semibold text-foreground hover:no-underline py-4">What is the difference between Starter and Pro?</AccordionTrigger>
+              <AccordionContent className="text-sm text-muted-foreground pb-4">
+                Starter (£24.99/mo) monitors 2 companies and sends Email + WhatsApp alerts by 6 PM on the day a change is detected. Pro (£49.99/mo) monitors 5 companies, adds SMS, delivers alerts within 30 minutes of the nightly register check, and includes 5 Certificate of Sponsorship checks per month. Both plans can be cancelled anytime.
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="q5" className="border rounded-xl px-4 bg-white dark:bg-slate-900">
+              <AccordionTrigger className="text-sm font-semibold text-foreground hover:no-underline py-4">How exactly does monitoring work?</AccordionTrigger>
+              <AccordionContent className="text-sm text-muted-foreground pb-4">
+                Every night we download the full UK Home Office licensed sponsor register and compare it against the previous version. Any addition, removal, downgrade, or route change is recorded. Subscribed users with a matching company are alerted by their chosen channels within the delivery window for their plan.
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="q6" className="border rounded-xl px-4 bg-white dark:bg-slate-900">
+              <AccordionTrigger className="text-sm font-semibold text-foreground hover:no-underline py-4">What happens if the register does not update one night?</AccordionTrigger>
+              <AccordionContent className="text-sm text-muted-foreground pb-4">
+                The Home Office occasionally skips a nightly publish (bank holidays, weekends). Our system detects this, skips the comparison for that night, and resumes automatically when the register is updated. You will not receive false alerts and will not miss any genuine changes.
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="q7" className="border rounded-xl px-4 bg-white dark:bg-slate-900">
+              <AccordionTrigger className="text-sm font-semibold text-foreground hover:no-underline py-4">Is there a refund policy?</AccordionTrigger>
+              <AccordionContent className="text-sm text-muted-foreground pb-4">
+                Yes. We offer a 30-day money-back guarantee on all plans — no questions asked. If you are not satisfied within the first 30 days, contact us and we will issue a full refund. After 30 days you can cancel anytime; your plan stays active until the end of the billing period.
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="q8" className="border rounded-xl px-4 bg-white dark:bg-slate-900">
+              <AccordionTrigger className="text-sm font-semibold text-foreground hover:no-underline py-4">Can I monitor a company I do not yet work for?</AccordionTrigger>
+              <AccordionContent className="text-sm text-muted-foreground pb-4">
+                Yes. Many users monitor a prospective employer before accepting a job offer, or track a previous employer to follow up on a pending visa application. You can add any licensed UK sponsor to your watchlist.
+              </AccordionContent>
+            </AccordionItem>
           </Accordion>
         </div>
       </section>
