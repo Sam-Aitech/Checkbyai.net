@@ -10,6 +10,7 @@ import {
   uniqueIndex,
   date,
   uuid,
+  numeric,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -512,11 +513,75 @@ export const sponsorEnrichment = pgTable(
     scrapedAt: timestamp("scraped_at").defaultNow(),
     scrapeStatus: varchar("scrape_status", { length: 20 }).notNull().default("pending"),
     lastAttempted: timestamp("last_attempted"),
+    // ── Companies House enrichment fields ─────────────────────────────────────
+    companyStatus: varchar("company_status", { length: 50 }),             // 'active' | 'dissolved' | 'administration' | 'liquidation'
+    companyType: varchar("company_type", { length: 100 }),                // 'private-limited-company' | 'llp' | etc.
+    incorporationDate: date("incorporation_date"),
+    sicCodes: jsonb("sic_codes").$type<string[]>().default([]),            // e.g. ["62012", "82990"]
+    lastFiledAccountsDate: date("last_filed_accounts_date"),
+    nextConfStmtDueDate: date("next_conf_stmt_due_date"),
+    dissolvedAt: date("dissolved_at"),
+    companiesHouseSource: boolean("companies_house_source").default(false), // true = official API hit
+    fuzzyMatchScore: numeric("fuzzy_match_score", { precision: 4, scale: 3 }), // 0.000–1.000
+    historicalNamesRaw: jsonb("historical_names_raw").$type<string[]>().default([]),
   },
   (table) => [
     index("idx_enrichment_fingerprint").on(table.fingerprint),
     index("idx_enrichment_scraped_at").on(table.scrapedAt),
     index("idx_enrichment_status").on(table.scrapeStatus),
+  ],
+);
+
+// ─── Phase D: Pro Enrichment — Historical Timeline ───────────────────────────
+
+// 1-to-many: each row is a point-in-time snapshot of a sponsor's licence status,
+// sourced either from the daily Home Office CSV diff or from the lsuk scraper.
+export const sponsorLicenceTimeline = pgTable(
+  "sponsor_licence_timeline",
+  {
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+    fingerprint: varchar("fingerprint", { length: 500 }).notNull(),
+    recordedDate: date("recorded_date").notNull(),
+    licenceStatus: varchar("licence_status", { length: 100 }).notNull(),  // 'Active' | 'Revoked' | 'Suspended' | 'Surrendered'
+    route: varchar("route", { length: 200 }),
+    typeRating: varchar("type_rating", { length: 50 }),
+    organisationName: varchar("organisation_name", { length: 500 }),       // name as it appeared on that date
+    source: varchar("source", { length: 50 }).notNull(),                   // 'home-office-csv' | 'lsuk-scrape'
+    scrapedAt: timestamp("scraped_at", { withTimezone: true }).defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    index("idx_licence_timeline_fingerprint").on(table.fingerprint),
+    index("idx_licence_timeline_date").on(table.recordedDate),
+    uniqueIndex("idx_licence_timeline_unique").on(table.fingerprint, table.recordedDate, table.source),
+  ],
+);
+
+// Async enrichment worker state ledger — survives Redis restarts.
+// Workers claim rows optimistically; exponential backoff is encoded in nextAttemptAt.
+export const enrichmentQueue = pgTable(
+  "enrichment_queue",
+  {
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+    fingerprint: varchar("fingerprint", { length: 500 }).notNull(),
+    jobType: varchar("job_type", { length: 50 }).notNull(),  // 'companies_house' | 'licence_history'
+    // 'pending' | 'in_progress' | 'completed' | 'failed' | 'rate_limited' | 'captcha_blocked' | 'no_match'
+    status: varchar("status", { length: 30 }).notNull().default("pending"),
+    priority: integer("priority").notNull().default(0),       // higher = processed first; Pro watchlist = 10
+    attemptCount: integer("attempt_count").notNull().default(0),
+    lastAttemptedAt: timestamp("last_attempted_at", { withTimezone: true }),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).defaultNow(),
+    lockedAt: timestamp("locked_at", { withTimezone: true }),
+    lockedBy: varchar("locked_by", { length: 255 }),          // worker instance ID
+    errorMessage: text("error_message"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    index("idx_enrichment_queue_poll").on(table.status, table.nextAttemptAt),
+    index("idx_enrichment_queue_fingerprint").on(table.fingerprint),
+    uniqueIndex("idx_enrichment_queue_unique").on(table.fingerprint, table.jobType),
   ],
 );
 
@@ -647,6 +712,11 @@ export type NotifLogEntry = typeof notifLog.$inferSelect;
 export type CsvArchiveEntry = typeof csvArchive.$inferSelect;
 export type DiffResultEntry = typeof diffResults.$inferSelect;
 export type SubscriptionAuditLogEntry = typeof subscriptionAuditLog.$inferSelect;
+export type SponsorLicenceTimelineEntry = typeof sponsorLicenceTimeline.$inferSelect;
+export type SponsorLicenceTimelineInsert = typeof sponsorLicenceTimeline.$inferInsert;
+export type EnrichmentQueueEntry = typeof enrichmentQueue.$inferSelect;
+export type EnrichmentQueueInsert = typeof enrichmentQueue.$inferInsert;
+export type SponsorEnrichmentEntry = typeof sponsorEnrichment.$inferSelect;
 
 // Zod schemas
 export const insertUserSchema = createInsertSchema(users);

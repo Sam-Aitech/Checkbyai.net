@@ -26,3 +26,15 @@ export const verifyLimiter = rateLimit({
   message: { message: "Too many verification requests. Please try again in an hour." },
   skipSuccessfulRequests: false,
 });
+
+// Per-user + per-fingerprint: max 1 enrich request every 5 minutes for the same sponsor.
+// Prevents a single Pro user from hammering the queue with duplicate priority-10 upserts.
+export const enrichLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 1,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Enrichment already queued for this sponsor. Please wait 5 minutes before requesting again." },
+  keyGenerator: (req: any) => `enrich:${req.user?.id ?? req.ip}:${req.params?.fingerprint ?? ""}`,
+  skipSuccessfulRequests: false,
+});

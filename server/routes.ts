@@ -11,12 +11,15 @@ import { registerNotificationRoutes } from "./routes/notifications";
 import { registerStatsRoutes } from "./routes/stats";
 import { registerAdminRoutes } from "./routes/admin";
 import { registerSupportRoutes } from "./routes/support";
+import { registerEnrichmentRoutes } from "./routes/enrichment";
 import { rebuildSponsorIndex } from "./utils/sponsorSearch";
 import { startSponsorMonitorCron, checkAndTriggerIfNeeded } from "./utils/sponsorMonitorJob";
 import { startJobAlertScheduler } from "./utils/jobAlertJob";
+import { startEnrichmentCron } from "./utils/enrichmentWorker";
 
 // Start background schedulers
 startJobAlertScheduler();
+startEnrichmentCron();
 
 export async function registerRoutes(app: Express): Promise<Server> {
   await setupAuth(app);
@@ -41,6 +44,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerStatsRoutes(app);
   registerAdminRoutes(app);
   registerSupportRoutes(app);
+  registerEnrichmentRoutes(app);
 
   rebuildSponsorIndex().catch((err) => {
     console.error("[SponsorSearch] Failed to build initial index:", err);

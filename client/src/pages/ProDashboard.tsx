@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import FileUploadSimple from "@/components/FileUploadSimple";
+import { CompanyIntelligenceDialog } from "@/components/CompanyIntelligencePanel";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import logoImg from "@assets/logo_material.png";
@@ -337,8 +338,10 @@ function MonitorTab({ user }: { user: any }) {
   const [query, setQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [expanded, setExpanded] = useState<number|null>(null);
+  const [intelligenceTarget, setIntelligenceTarget] = useState<{ fingerprint: string; name: string } | null>(null);
   const dq = useDebounce(query, 350);
   const isPro = ["starter","pro","unlimited","enterprise"].includes(user?.subscriptionStatus||"");
+  const hasIntelligence = ["pro","unlimited","enterprise"].includes(user?.subscriptionStatus||"");
 
   const { data: watches, isLoading } = useQuery<WatchEntry[]>({ queryKey:["/api/watches"], retry:false });
 
@@ -499,10 +502,24 @@ function MonitorTab({ user }: { user: any }) {
                         ) : <p style={{ fontSize:13, color:T.muted }}>No changes detected yet.</p>}
                         <div style={{ borderTop:`1px solid ${T.border}`, marginTop:12, paddingTop:12, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                           <span style={{ fontSize:12, color:T.muted }}>Watching since {fmtDate(w.createdAt)}</span>
-                          <button onClick={() => delM.mutate(w.id)} disabled={delM.isPending}
-                            style={{ display:"flex", alignItems:"center", gap:5, fontSize:12, color:T.red, background:"none", border:"none", cursor:"pointer" }}>
-                            <Trash2 style={{width:12,height:12}}/> Remove
-                          </button>
+                          <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                            {hasIntelligence && w.fingerprint ? (
+                              <button
+                                onClick={() => setIntelligenceTarget({ fingerprint: w.fingerprint!, name: w.organisationName })}
+                                style={{ display:"flex", alignItems:"center", gap:5, fontSize:12, color:"var(--primary)", background:"none", border:"none", cursor:"pointer", fontWeight:600 }}
+                              >
+                                <BarChart3 style={{width:12,height:12}}/> Company Intel
+                              </button>
+                            ) : !hasIntelligence && w.fingerprint && (
+                              <a href="/pricing" style={{ display:"flex", alignItems:"center", gap:5, fontSize:12, color:T.muted, textDecoration:"none" }}>
+                                <BarChart3 style={{width:12,height:12}}/> Company Intel <span style={{ fontSize:10, background:"color-mix(in srgb, var(--primary) 10%, transparent)", color:"var(--primary)", borderRadius:99, padding:"1px 6px", fontWeight:700 }}>Pro</span>
+                              </a>
+                            )}
+                            <button onClick={() => delM.mutate(w.id)} disabled={delM.isPending}
+                              style={{ display:"flex", alignItems:"center", gap:5, fontSize:12, color:T.red, background:"none", border:"none", cursor:"pointer" }}>
+                              <Trash2 style={{width:12,height:12}}/> Remove
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </motion.div>
@@ -513,6 +530,13 @@ function MonitorTab({ user }: { user: any }) {
           </div>
         </div>
       )}
+
+      {/* Company Intelligence dialog — rendered outside the list to avoid z-index issues */}
+      <CompanyIntelligenceDialog
+        fingerprint={intelligenceTarget?.fingerprint ?? null}
+        companyName={intelligenceTarget?.name ?? ""}
+        onClose={() => setIntelligenceTarget(null)}
+      />
     </div>
   );
 }

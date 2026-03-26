@@ -2290,4 +2290,64 @@ Format your response in clear, professional markdown.`;
       res.status(500).json({ message: 'Failed to fetch notification log' });
     }
   });
+
+  // ── GET /api/admin/enrichment-queue ──────────────────────────────────────────
+  // Returns queue health stats: status counts, job-type breakdown, recent failures,
+  // and stalled in-progress items (locked > 30 min).
+  app.get('/api/admin/enrichment-queue', isAdmin, async (_req, res) => {
+    try {
+      const [statusRows, typeRows, recentFailures, stalled, totals] = await Promise.all([
+        // Status counts
+        db.execute(sql`
+          SELECT status, COUNT(*)::int AS count
+          FROM enrichment_queue
+          GROUP BY status
+          ORDER BY count DESC
+        `),
+        // Breakdown by job_type × status
+        db.execute(sql`
+          SELECT job_type, status, COUNT(*)::int AS count
+          FROM enrichment_queue
+          GROUP BY job_type, status
+          ORDER BY job_type, count DESC
+        `),
+        // Last 15 failed / captcha-blocked items
+        db.execute(sql`
+          SELECT fingerprint, job_type, status, attempt_count, error_message, last_attempted_at, updated_at
+          FROM enrichment_queue
+          WHERE status IN ('failed', 'captcha_blocked', 'no_match')
+          ORDER BY updated_at DESC
+          LIMIT 15
+        `),
+        // In-progress items locked > 30 minutes (stalled workers)
+        db.execute(sql`
+          SELECT fingerprint, job_type, locked_by, locked_at
+          FROM enrichment_queue
+          WHERE status = 'in_progress'
+            AND locked_at < NOW() - INTERVAL '30 minutes'
+          ORDER BY locked_at ASC
+          LIMIT 10
+        `),
+        // Total and completed counts for progress %
+        db.execute(sql`
+          SELECT
+            COUNT(*)::int AS total,
+            COUNT(*) FILTER (WHERE status = 'completed')::int AS completed
+          FROM enrichment_queue
+        `),
+      ]);
+
+      res.json({
+        statusCounts:   statusRows.rows,
+        jobTypeCounts:  typeRows.rows,
+        recentFailures: recentFailures.rows,
+        stalled:        stalled.rows,
+        total:          (totals.rows[0] as any)?.total    ?? 0,
+        completed:      (totals.rows[0] as any)?.completed ?? 0,
+      });
+    } catch (error) {
+      console.error('[Admin] enrichment-queue error:', error);
+      res.status(500).json({ message: 'Failed to fetch enrichment queue stats' });
+    }
+  });
 }

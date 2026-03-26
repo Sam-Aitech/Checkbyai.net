@@ -128,6 +128,225 @@ interface UploadPreview {
   metadata: any;
 }
 
+// ─── Enrichment Queue Tab ─────────────────────────────────────────────────────
+interface EnrichmentQueueStats {
+  statusCounts:   Array<{ status: string; count: number }>;
+  jobTypeCounts:  Array<{ job_type: string; status: string; count: number }>;
+  recentFailures: Array<{ fingerprint: string; job_type: string; status: string; attempt_count: number; error_message: string | null; last_attempted_at: string | null; updated_at: string }>;
+  stalled:        Array<{ fingerprint: string; job_type: string; locked_by: string | null; locked_at: string }>;
+  total:          number;
+  completed:      number;
+}
+
+const STATUS_COLORS: Record<string, string> = {
+  pending:         'bg-blue-500/20 text-blue-400 border-blue-500/30',
+  in_progress:     'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
+  completed:       'bg-green-500/20 text-green-400 border-green-500/30',
+  failed:          'bg-red-500/20 text-red-400 border-red-500/30',
+  rate_limited:    'bg-amber-500/20 text-amber-400 border-amber-500/30',
+  captcha_blocked: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+  no_match:        'bg-slate-500/20 text-slate-400 border-slate-500/30',
+};
+
+function EnrichmentQueueTab() {
+  const [data, setData] = useState<EnrichmentQueueStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const r = await fetch('/api/admin/enrichment-queue', { credentials: 'include' });
+      if (!r.ok) throw new Error('Failed to fetch');
+      setData(await r.json());
+    } catch {
+      setError('Failed to load enrichment queue stats.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const progressPct = data && data.total > 0
+    ? Math.round((data.completed / data.total) * 100)
+    : 0;
+
+  // Aggregate pending + rate_limited as "awaiting"
+  const awaiting = (data?.statusCounts ?? [])
+    .filter(r => ['pending', 'rate_limited'].includes(r.status))
+    .reduce((s, r) => s + r.count, 0);
+  const inProgress = data?.statusCounts.find(r => r.status === 'in_progress')?.count ?? 0;
+  const failed     = data?.statusCounts.find(r => r.status === 'failed')?.count ?? 0;
+  const blocked    = data?.statusCounts.find(r => r.status === 'captcha_blocked')?.count ?? 0;
+
+  return (
+    <div className="space-y-6">
+      <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div>
+              <CardTitle className="text-gray-900 dark:text-white flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-violet-400" />
+                Enrichment Queue
+              </CardTitle>
+              <CardDescription className="text-gray-500 dark:text-slate-400">
+                Companies House &amp; Licence History async pipeline
+              </CardDescription>
+            </div>
+            <Button size="sm" variant="outline" onClick={load} disabled={loading}
+              className="border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700">
+              <RefreshCw className={`w-4 h-4 sm:mr-1 ${loading ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Refresh</span>
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loading && !data ? (
+            <div className="flex items-center gap-2 text-gray-500 dark:text-slate-400 py-4">
+              <div className="w-5 h-5 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
+              Loading queue stats…
+            </div>
+          ) : error ? (
+            <p className="text-red-400 text-sm py-4">{error}</p>
+          ) : data && (
+            <div className="space-y-6">
+              {/* Progress bar */}
+              <div>
+                <div className="flex justify-between text-xs text-gray-500 dark:text-slate-400 mb-1">
+                  <span>Overall enrichment progress</span>
+                  <span>{data.completed.toLocaleString()} / {data.total.toLocaleString()} ({progressPct}%)</span>
+                </div>
+                <div className="h-2 bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                  <div className="h-full bg-violet-500 rounded-full transition-all" style={{ width: `${progressPct}%` }} />
+                </div>
+              </div>
+
+              {/* Status stat cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  { label: 'Awaiting',   value: awaiting,    color: 'text-blue-400'   },
+                  { label: 'In Progress',value: inProgress,  color: 'text-cyan-400'   },
+                  { label: 'Failed',     value: failed,      color: 'text-red-400'    },
+                  { label: 'CF Blocked', value: blocked,     color: 'text-orange-400' },
+                ].map(({ label, value, color }) => (
+                  <div key={label} className="bg-gray-100 dark:bg-slate-700/50 rounded-lg p-3">
+                    <p className="text-xs text-gray-500 dark:text-slate-400 mb-1">{label}</p>
+                    <p className={`text-2xl font-bold ${color}`}>{value.toLocaleString()}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Full status breakdown */}
+              <div>
+                <p className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-2">All statuses</p>
+                <div className="flex flex-wrap gap-2">
+                  {data.statusCounts.map(({ status, count }) => (
+                    <Badge key={status} variant="outline" className={STATUS_COLORS[status] ?? 'bg-slate-500/20 text-slate-400 border-slate-500/30'}>
+                      {status}: {count.toLocaleString()}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              {/* Job type breakdown */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {['companies_house', 'licence_history'].map(jobType => {
+                  const rows = data.jobTypeCounts.filter(r => r.job_type === jobType);
+                  const total = rows.reduce((s, r) => s + r.count, 0);
+                  return (
+                    <div key={jobType} className="bg-gray-100 dark:bg-slate-700/50 rounded-lg p-3">
+                      <p className="text-xs font-semibold text-gray-700 dark:text-slate-300 mb-2">
+                        {jobType === 'companies_house' ? 'Companies House' : 'Licence History'} ({total.toLocaleString()})
+                      </p>
+                      <div className="flex flex-col gap-1">
+                        {rows.map(({ status, count }) => (
+                          <div key={status} className="flex justify-between items-center text-xs">
+                            <Badge variant="outline" className={`${STATUS_COLORS[status] ?? ''} text-[10px] py-0`}>{status}</Badge>
+                            <span className="text-gray-500 dark:text-slate-400">{count.toLocaleString()}</span>
+                          </div>
+                        ))}
+                        {rows.length === 0 && <p className="text-xs text-gray-400 dark:text-slate-500">No items</p>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Stalled items */}
+              {data.stalled.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-amber-500 uppercase tracking-wider mb-2 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3" /> Stalled (in_progress &gt; 30 min)
+                  </p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-gray-200 dark:border-slate-700 text-gray-500 dark:text-slate-400">
+                          <th className="text-left py-2 px-3">Fingerprint</th>
+                          <th className="text-left py-2 px-3">Job Type</th>
+                          <th className="text-left py-2 px-3">Locked At</th>
+                          <th className="text-left py-2 px-3">Locked By</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.stalled.map((row, i) => (
+                          <tr key={i} className="border-b border-gray-100 dark:border-slate-700/50">
+                            <td className="py-2 px-3 font-mono text-[10px] max-w-[160px] truncate text-gray-700 dark:text-slate-300">{row.fingerprint}</td>
+                            <td className="py-2 px-3 text-gray-600 dark:text-slate-400">{row.job_type}</td>
+                            <td className="py-2 px-3 text-amber-500">{new Date(row.locked_at).toLocaleString()}</td>
+                            <td className="py-2 px-3 text-gray-400 dark:text-slate-500 truncate max-w-[120px]">{row.locked_by ?? '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Recent failures */}
+              {data.recentFailures.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-2">Recent Failures</p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-gray-200 dark:border-slate-700 text-gray-500 dark:text-slate-400">
+                          <th className="text-left py-2 px-3">Fingerprint</th>
+                          <th className="text-left py-2 px-3">Type</th>
+                          <th className="text-left py-2 px-3">Status</th>
+                          <th className="text-left py-2 px-3">Attempts</th>
+                          <th className="text-left py-2 px-3">Last Error</th>
+                          <th className="text-left py-2 px-3">Updated</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.recentFailures.map((row, i) => (
+                          <tr key={i} className="border-b border-gray-100 dark:border-slate-700/50 hover:bg-gray-50 dark:hover:bg-slate-700/20">
+                            <td className="py-2 px-3 font-mono text-[10px] max-w-[140px] truncate text-gray-700 dark:text-slate-300">{row.fingerprint}</td>
+                            <td className="py-2 px-3 text-gray-600 dark:text-slate-400">{row.job_type}</td>
+                            <td className="py-2 px-3">
+                              <Badge variant="outline" className={`${STATUS_COLORS[row.status] ?? ''} text-[10px] py-0`}>{row.status}</Badge>
+                            </td>
+                            <td className="py-2 px-3 text-gray-500 dark:text-slate-400">{row.attempt_count}</td>
+                            <td className="py-2 px-3 text-red-400 max-w-[200px] truncate" title={row.error_message ?? ''}>{row.error_message ?? '—'}</td>
+                            <td className="py-2 px-3 text-gray-400 dark:text-slate-500 whitespace-nowrap">{new Date(row.updated_at).toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function SimpleAdmin() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -1709,6 +1928,10 @@ export default function SimpleAdmin() {
                     <Radio className="w-4 h-4 shrink-0" />
                     <span className="text-xs sm:text-sm">Sponsor Monitor</span>
                   </TabsTrigger>
+                  <TabsTrigger value="enrichment" className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap data-[state=active]:bg-violet-50 data-[state=active]:text-violet-700 dark:data-[state=active]:bg-violet-900/30 dark:data-[state=active]:text-violet-400">
+                    <TrendingUp className="w-4 h-4 shrink-0" />
+                    <span className="text-xs sm:text-sm">Enrichment Queue</span>
+                  </TabsTrigger>
                 </>
               ) : (
                 <>
@@ -3024,6 +3247,11 @@ export default function SimpleAdmin() {
               </Card>
 
             </div>
+          </TabsContent>
+
+          {/* Enrichment Queue Tab */}
+          <TabsContent value="enrichment">
+            <EnrichmentQueueTab />
           </TabsContent>
 
           {/* Licence Check Tab */}

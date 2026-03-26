@@ -7,7 +7,7 @@ import {
   AlertTriangle, Eye, Trash2, Clock, ArrowDown, ArrowUp, XCircle, PlusCircle, CalendarDays,
   Bell, Mail, MessageSquare, Phone, CheckCircle2, Send, Save, History, CheckCheck, XOctagon, Clock3,
   ExternalLink, Linkedin, CheckCircle, FileText, Lock, X, Zap, ShieldCheck, Smartphone,
-  ChevronDown, ChevronRight, Activity, Timer, FileSearch, Wifi, ArrowRight, Briefcase,
+  ChevronDown, ChevronRight, Activity, Timer, FileSearch, Wifi, ArrowRight, Briefcase, BarChart3,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ import LandingDigest from "@/components/LandingDigest";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { CompanyIntelligenceDialog } from "@/components/CompanyIntelligencePanel";
 
 interface SponsorSearchResult {
   fingerprint: string;
@@ -757,6 +758,7 @@ export default function SponsorMonitor() {
   const [addedCompanies, setAddedCompanies] = useState<Set<string>>(new Set());
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyTarget, setHistoryTarget] = useState<{ fingerprint: string; name: string } | null>(null);
+  const [intelligenceTarget, setIntelligenceTarget] = useState<{ fingerprint: string; name: string } | null>(null);
   const searchRef = useRef<HTMLDivElement>(null);
 
   const userPlan = user?.subscriptionStatus || "free";
@@ -1229,6 +1231,11 @@ export default function SponsorMonitor() {
                             </div>
                             <div className="flex items-center gap-3 mt-2 flex-wrap">
                               {watch.fingerprint && <button onClick={() => openHistory(watch.fingerprint!, watch.organisationName)} className="inline-flex items-center gap-1 text-xs text-primary hover:underline"><History className="w-3 h-3" /> View History</button>}
+                              {isProUser && watch.fingerprint && (
+                                <button onClick={() => setIntelligenceTarget({ fingerprint: watch.fingerprint!, name: watch.organisationName })} className="inline-flex items-center gap-1 text-xs font-medium text-violet-600 dark:text-violet-400 hover:underline">
+                                  <BarChart3 className="w-3 h-3" /> Company Intel
+                                </button>
+                              )}
                               <a href="https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary hover:underline"><ExternalLink className="w-3 h-3" /> Gov.uk</a>
                               <a href={`https://www.linkedin.com/search/results/companies/?keywords=${encodeURIComponent(watch.organisationName)}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary hover:underline"><Linkedin className="w-3 h-3" /> LinkedIn</a>
                             </div>
@@ -1342,6 +1349,12 @@ export default function SponsorMonitor() {
           onOpenChange={(open) => { setHistoryOpen(open); if (!open) setHistoryTarget(null); }}
         />
       )}
+
+      <CompanyIntelligenceDialog
+        fingerprint={intelligenceTarget?.fingerprint ?? null}
+        companyName={intelligenceTarget?.name ?? ""}
+        onClose={() => setIntelligenceTarget(null)}
+      />
     </PageLayout>
   );
 }
