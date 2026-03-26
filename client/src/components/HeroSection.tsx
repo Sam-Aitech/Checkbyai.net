@@ -615,7 +615,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                     <Play className="mr-1.5 w-3.5 h-3.5" />
                     Verify a Document
                   </Button>
-                  <Link href="/pricing">
+                  <Link href="/pricing?plan=starter">
                     <Button size="sm" className="bg-emerald-500 hover:bg-emerald-600 text-white px-5 rounded-full font-bold shadow-lg shadow-emerald-500/20 transition-all duration-200 w-full sm:w-auto text-xs">
                       <Bell className="mr-1.5 w-3.5 h-3.5" />
                       Get Licence Alerts
@@ -785,7 +785,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />30-day history</li>
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />Same-day alerts (6 PM)</li>
                 </ul>
-                <Link href="/pricing"><Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-5 text-base shadow-md"><Zap className="w-4 h-4 mr-2" />Get Same-Day Alerts</Button></Link>
+                <Link href="/pricing?plan=starter"><Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-5 text-base shadow-md"><Zap className="w-4 h-4 mr-2" />Get Same-Day Alerts</Button></Link>
               </CardContent>
             </Card>
 
@@ -800,7 +800,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />90-day history</li>
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />Immediate alerts</li>
                 </ul>
-                <Link href="/pricing"><Button variant="outline" className="w-full font-bold py-5 text-base">Get Pro Protection</Button></Link>
+                <Link href="/pricing?plan=pro"><Button variant="outline" className="w-full font-bold py-5 text-base">Get Pro Protection</Button></Link>
               </CardContent>
             </Card>
           </div>

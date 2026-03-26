@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation, useSearch } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { Check, X, Shield, Zap, Clock, LogIn, Bell, Eye, MessageSquare, ArrowRight } from 'lucide-react';
@@ -70,12 +70,13 @@ const notificationPlans: NotificationPlan[] = [
   },
 ];
 
-function NotificationPlanCard({ plan, index, isLoggedIn, loading, onSelect }: {
+function NotificationPlanCard({ plan, index, isLoggedIn, loading, onSelect, highlighted }: {
   plan: NotificationPlan;
   index: number;
   isLoggedIn: boolean;
   loading: string | null;
   onSelect: (plan: NotificationPlan) => void;
+  highlighted?: boolean;
 }) {
   const [ref, inView] = useInView({ triggerOnce: true, threshold: 0.15 });
 
@@ -87,6 +88,7 @@ function NotificationPlanCard({ plan, index, isLoggedIn, loading, onSelect }: {
       transition={{ ...spring, delay: index * 0.1 }}
       whileHover={{ y: -4, transition: { type: "spring", stiffness: 300, damping: 20 } }}
       className={`relative overflow-hidden flex flex-col theme-card bg-card ${
+        highlighted ? 'ring-2 ring-emerald-500 border-emerald-500 shadow-lg shadow-emerald-500/20' :
         plan.popular ? 'border-primary lg:scale-105 z-10' : ''
       }`}
     >
@@ -169,9 +171,21 @@ function NotificationPlanCard({ plan, index, isLoggedIn, loading, onSelect }: {
 export default function Pricing() {
   const [, setLocation] = useLocation();
   const search = useSearch();
-  const companyParam = new URLSearchParams(search).get('company') || '';
+  const params = new URLSearchParams(search);
+  const companyParam = params.get('company') || '';
+  const planParam = params.get('plan') || '';   // 'starter' | 'pro'
   const { toast } = useToast();
   const [loading, setLoading] = useState<string | null>(null);
+  const planCardsRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to the plan cards when arriving from the landing page with ?plan=
+  useEffect(() => {
+    if (!planParam) return;
+    const timer = setTimeout(() => {
+      planCardsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [planParam]);
 
   const { data: user, isLoading: isLoadingUser } = useQuery<User | null>({
     queryKey: ['/api/auth/user'],
@@ -349,7 +363,7 @@ export default function Pricing() {
           </motion.div>
 
           <div className="max-w-3xl mx-auto mb-16">
-            <div className="grid md:grid-cols-2 gap-6">
+            <div ref={planCardsRef} className="grid md:grid-cols-2 gap-6">
               {notificationPlans.map((plan, index) => (
                 <NotificationPlanCard
                   key={plan.packageType}
@@ -358,6 +372,7 @@ export default function Pricing() {
                   isLoggedIn={isLoggedIn}
                   loading={loading}
                   onSelect={handleSelectNotification}
+                  highlighted={!!planParam && plan.packageType === `notification_${planParam}`}
                 />
               ))}
             </div>
