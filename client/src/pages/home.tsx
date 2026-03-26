@@ -58,7 +58,7 @@ export default function Home() {
               "name": "Free Sponsor Search",
               "price": "0",
               "priceCurrency": "GBP",
-              "description": "Search the UK sponsor register once per day for free"
+              "description": "Unlimited free searches of the UK sponsor register, no login required"
             },
             {
               "@type": "Offer",
@@ -108,7 +108,7 @@ export default function Home() {
               "name": "How do I check if my employer has a valid UK sponsor licence?",
               "acceptedAnswer": {
                 "@type": "Answer",
-                "text": "You can search the UK Home Office Register of Licensed Sponsors for free on CheckByAI. Simply visit our Sponsor Monitor page and enter your employer's name. We offer one free search per day, or unlimited searches with a subscription."
+                "text": "You can search the UK Home Office Register of Licensed Sponsors for free on CheckByAI. Simply enter your employer's name in the search box on our homepage or Sponsor Monitor page. Searches are free and unlimited with no login required."
               }
             },
             {
@@ -132,7 +132,7 @@ export default function Home() {
               "name": "Is the sponsor licence search really free?",
               "acceptedAnswer": {
                 "@type": "Answer",
-                "text": "Yes, anyone can search the UK sponsor register once every 24 hours without creating an account or providing any personal information. For unlimited searches and real-time alerts, subscription plans start from £24.99 per month."
+                "text": "Yes, anyone can search the UK sponsor register unlimited times without creating an account or providing any personal information. For real-time alerts when a sponsor's status changes, subscription plans start from £24.99 per month."
               }
             }
           ]

@@ -9,35 +9,18 @@ import { normalizeName, generateFingerprint } from "../utils/sponsorListFetcher"
 import { ensureIndexReady, isIndexReady, searchSponsors, searchSponsorsFallback, type PagedSearchResult } from "../utils/sponsorSearch";
 import { generateHeadline, signDigest } from "../services/aiDigest";
 import { storage } from "../storage";
-import { getRedis, cacheGet, cacheSet } from "../utils/redisClient";
+import { cacheGet, cacheSet } from "../utils/redisClient";
 import rateLimit from "express-rate-limit";
 
 // ── Free-search rate limiter ─────────────────────────────────────────────────
-// Redis primary (cross-instance, survives restarts) with in-process Map fallback.
-const localFreeSearchTracker = new Map<string, number>();
-setInterval(() => {
-  const now = Date.now();
-  for (const [ip, ts] of Array.from(localFreeSearchTracker.entries())) {
-    if (now - ts > 24 * 60 * 60 * 1000) localFreeSearchTracker.delete(ip);
-  }
-}, 60 * 60 * 1000);
-
-async function hasFreeSearchUsed(ip: string): Promise<boolean> {
-  const redis = getRedis();
-  if (redis) {
-    try { return (await redis.exists(`sponsors:freesearch:${ip}`)) > 0; } catch { /* fall through */ }
-  }
-  const ts = localFreeSearchTracker.get(ip);
-  return ts !== undefined && Date.now() - ts < 24 * 60 * 60 * 1000;
-}
-
-async function markFreeSearchUsed(ip: string): Promise<void> {
-  const redis = getRedis();
-  if (redis) {
-    try { await redis.set(`sponsors:freesearch:${ip}`, "1", "EX", 86400); return; } catch { /* fall through */ }
-  }
-  localFreeSearchTracker.set(ip, Date.now());
-}
+// 30 requests/min per IP — prevents abuse while allowing unlimited real usage.
+const freeSearchRateLimit = rateLimit({
+  windowMs: 60 * 1_000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many searches. Please wait a moment before searching again." },
+});
 
 function getWatchLimit(subscriptionStatus: string | null): number {
   return getWatchLimitFromTier(subscriptionStatus);
@@ -65,29 +48,20 @@ const changesRateLimit = rateLimit({
 });
 
 export function registerSponsorRoutes(app: Express): void {
-  app.get('/api/sponsors/free-search', async (req: any, res) => {
+  app.get('/api/sponsors/free-search', freeSearchRateLimit, async (req: any, res) => {
     try {
       const q = (req.query.q as string || "").trim().slice(0, 200);
       if (q.length < 3) {
         return res.status(400).json({ message: "Search query must be at least 3 characters long." });
       }
 
-      const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || req.connection?.remoteAddress || 'unknown';
-      if (await hasFreeSearchUsed(ip)) {
-        return res.status(429).json({
-          message: "You've used your free search for today. Subscribe to the Notification Engine for unlimited searches and real-time alerts.",
-          limitReached: true,
-        });
-      }
-
       await ensureIndexReady();
-      const opts = { limit: 10 };
+      const opts = { limit: 50 };
       const paged = isIndexReady()
         ? searchSponsors(q, opts)
         : await searchSponsorsFallback(q, opts);
 
-      await markFreeSearchUsed(ip);
-      res.json({ results: paged?.results ?? [], freeSearchUsed: true });
+      res.json({ results: paged?.results ?? [] });
     } catch (error) {
       console.error("Error in free sponsor search:", error);
       res.status(500).json({ message: "Failed to search sponsors." });

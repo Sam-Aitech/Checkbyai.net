@@ -63,6 +63,8 @@ interface FreeSearchResult {
   route: string | null;
   status: string;
   matchScore: number;
+  grantedAt: string | null;
+  isNew: boolean;
 }
 
 export default function HeroSection({ onStartVerification }: HeroSectionProps) {
@@ -72,7 +74,6 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [searchResults, setSearchResults] = useState<FreeSearchResult[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
-  const [searchLimitReached, setSearchLimitReached] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
   const [searchUnavailable, setSearchUnavailable] = useState(false)
 
@@ -84,15 +85,12 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
     if (searchQuery.trim().length < 3) return;
     setSearchLoading(true);
     setSearchResults([]);
-    setSearchLimitReached(false);
     setSearchUnavailable(false);
     setHasSearched(true);
     try {
       const res = await fetch(`/api/sponsors/free-search?q=${encodeURIComponent(searchQuery.trim())}`);
       const data = await res.json();
-      if (res.status === 429 && data.limitReached) {
-        setSearchLimitReached(true);
-      } else if (res.ok) {
+      if (res.ok) {
         setSearchResults(data.results || []);
       } else {
         setSearchUnavailable(true);
@@ -182,19 +180,89 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                   The Home Office updates the register at midnight. They do not email you. We check every night and alert you within 30 minutes by WhatsApp, Email, and SMS.
                 </motion.p>
 
-                <motion.div initial={{ opacity: 0, y: 20 }} animate={isLoaded ? { opacity: 1, y: 0 } : {}} transition={{ ...spring, delay: 0.45 }} className="flex flex-col sm:flex-row gap-3">
-                  <Link href="/pricing">
-                    <Button size="lg" className="bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-3 rounded-full font-bold shadow-xl shadow-emerald-500/20 transition-all duration-200 w-full sm:w-auto">
-                      <ShieldCheck className="mr-2 w-5 h-5" />
-                      Protect My Visa
-                      <span className="ml-2 text-sm font-normal text-emerald-200">from £24.99/mo</span>
-                    </Button>
-                  </Link>
-                  <Button variant="outline" size="lg" className="border-white/30 text-white hover:bg-white/10 rounded-full px-6 py-3 font-semibold transition-all duration-200 bg-transparent" onClick={onStartVerification}>
-                    <Play className="mr-2 w-4 h-4" />
+                {/* ── Hero search box ───────────────────────────────────── */}
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={isLoaded ? { opacity: 1, y: 0 } : {}} transition={{ ...spring, delay: 0.45 }} className="space-y-3">
+                  <div className="relative">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40 pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Search any employer — e.g. NHS, Tata, Deloitte…"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleSearchSubmit()}
+                      className="w-full pl-11 pr-28 h-14 bg-white/10 border border-white/20 rounded-xl text-white placeholder:text-white/40 text-sm focus:outline-none focus:border-emerald-400 focus:bg-white/15 transition-all"
+                    />
+                    <button
+                      onClick={handleSearchSubmit}
+                      disabled={searchQuery.trim().length < 3 || searchLoading}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-white rounded-lg px-4 h-10 text-sm font-semibold transition-colors flex items-center gap-1.5"
+                    >
+                      {searchLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Search className="w-3.5 h-3.5" />Search</>}
+                    </button>
+                  </div>
+                  <p className="text-xs text-white/50">Free, unlimited searches. No login required. 124,000+ licensed sponsors.</p>
+
+                  {/* Hero search results */}
+                  {searchLoading && (
+                    <div className="flex items-center gap-2 text-white/60 text-sm py-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />Searching…
+                    </div>
+                  )}
+                  {searchUnavailable && (
+                    <p className="text-amber-300 text-xs py-1">Search temporarily unavailable — please try again.</p>
+                  )}
+                  {!searchLoading && !searchUnavailable && hasSearched && searchResults.length === 0 && (
+                    <p className="text-white/60 text-xs py-1">No sponsors found. Try a different name.</p>
+                  )}
+                  {!searchLoading && searchResults.length > 0 && (
+                    <div className="space-y-1.5 max-h-64 overflow-y-auto pr-0.5">
+                      {searchResults.map((r) => {
+                        const isActive = r.status === "ACTIVE";
+                        const isNew = r.status === "NEWLY_GRANTED";
+                        const isGrace = r.status === "GRACE_PERIOD";
+                        const isRemoved = !isActive && !isNew && !isGrace;
+                        const isBRated = (r.typeRating || "").toLowerCase().includes("b");
+                        const grantedYear = r.grantedAt ? new Date(r.grantedAt).getFullYear() : null;
+                        return (
+                          <div key={r.fingerprint} className="bg-white/10 border border-white/15 rounded-lg px-3.5 py-2.5 flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="font-semibold text-white text-sm truncate">{r.organisationName}</p>
+                              <p className="text-xs text-white/55 mt-0.5 truncate">
+                                {[r.townCity, r.route, grantedYear ? `since ${grantedYear}` : null].filter(Boolean).join(" · ")}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {isNew && <span className="bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">New</span>}
+                              {isActive && !isNew && <span className="bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">Active</span>}
+                              {isGrace && <span className="bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">Review</span>}
+                              {isRemoved && <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">Revoked</span>}
+                              {isBRated && <span className="bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">B</span>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <div className="pt-1 text-center">
+                        <Link href="/pricing" className="text-xs text-emerald-300 hover:text-emerald-200 font-semibold">
+                          Get alerts when any sponsor changes →
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                </motion.div>
+
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button variant="outline" size="sm" className="border-white/30 text-white hover:bg-white/10 rounded-full px-5 font-semibold transition-all duration-200 bg-transparent text-xs" onClick={onStartVerification}>
+                    <Play className="mr-1.5 w-3.5 h-3.5" />
                     Verify a Document
                   </Button>
-                </motion.div>
+                  <Link href="/pricing">
+                    <Button size="sm" className="bg-emerald-500 hover:bg-emerald-600 text-white px-5 rounded-full font-bold shadow-lg shadow-emerald-500/20 transition-all duration-200 w-full sm:w-auto text-xs">
+                      <Bell className="mr-1.5 w-3.5 h-3.5" />
+                      Get Licence Alerts
+                      <span className="ml-1.5 font-normal text-emerald-200">from £24.99/mo</span>
+                    </Button>
+                  </Link>
+                </div>
 
                 <CreditCounter />
 
@@ -258,7 +326,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
             Check Your Sponsor Right Now
           </h2>
           <p className="text-base text-muted-foreground mb-8 max-w-xl mx-auto">
-            Search the official UK Home Office Register of Licensed Sponsors. Free, instant, no login required to search.
+            Search 124,000+ licensed sponsors from the official UK Home Office Register. Free, unlimited, no login required.
           </p>
           <div className="relative max-w-lg mx-auto mb-4">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
@@ -281,34 +349,22 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
             </div>
           )}
 
-          {searchLimitReached && (
-            <div className="max-w-lg mx-auto mt-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl p-5 text-center">
-              <Lock className="w-8 h-8 text-amber-500 mx-auto mb-3" />
-              <h3 className="font-bold text-foreground mb-1">Free search limit reached</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                You've used your free search for today. Subscribe to the Notification Engine for unlimited searches and real-time alerts when your sponsor's licence changes.
-              </p>
-              <Link href="/pricing">
-                <Button className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-full px-6 font-bold">
-                  <Bell className="w-4 h-4 mr-2" />View Plans from £24.99/mo
-                </Button>
-              </Link>
-            </div>
-          )}
-
           {!searchLoading && searchUnavailable && (
             <p className="text-sm text-amber-400 mt-4">Search temporarily unavailable — please try again in a moment.</p>
           )}
-          {!searchLoading && !searchLimitReached && !searchUnavailable && hasSearched && searchResults.length === 0 && (
+          {!searchLoading && !searchUnavailable && hasSearched && searchResults.length === 0 && (
             <p className="text-sm text-muted-foreground mt-4">No sponsors found matching your search. Try a different name.</p>
           )}
 
           {!searchLoading && searchResults.length > 0 && (
             <div className="max-w-lg mx-auto mt-4 text-left space-y-2">
               {searchResults.map((r) => {
-                const isActive = r.status !== "NOT_LISTED";
-                const rating = (r.typeRating || "").toLowerCase();
-                const isBRated = rating.includes("b rating") || rating.includes("b-rating") || rating === "b";
+                const isActive = r.status === "ACTIVE";
+                const isNew = r.status === "NEWLY_GRANTED";
+                const isGrace = r.status === "GRACE_PERIOD";
+                const isRemoved = !isActive && !isNew && !isGrace;
+                const isBRated = (r.typeRating || "").toLowerCase().includes("b");
+                const grantedYear = r.grantedAt ? new Date(r.grantedAt).getFullYear() : null;
                 return (
                   <div key={r.fingerprint} className="bg-card border border-border rounded-xl p-4 flex items-center justify-between gap-3">
                     <div className="min-w-0">
@@ -316,32 +372,24 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                       <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                         {r.townCity && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{r.townCity}</span>}
                         {r.route && <span>{r.route}</span>}
+                        {grantedYear && <span>since {grantedYear}</span>}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {isActive ? (
-                        <Badge className="bg-emerald-600 text-white border-emerald-700 rounded-full text-[11px] font-bold px-2.5">
-                          <CheckCircle className="w-3 h-3 mr-1" />Active
-                        </Badge>
-                      ) : (
-                        <Badge className="bg-red-600 text-white border-red-700 rounded-full text-[11px] font-bold px-2.5">
-                          <XCircle className="w-3 h-3 mr-1" />Revoked
-                        </Badge>
-                      )}
-                      {isBRated && (
-                        <Badge className="bg-amber-500 text-white border-amber-600 rounded-full text-[11px] font-bold px-2.5">
-                          <AlertTriangle className="w-3 h-3 mr-1" />B-Rated
-                        </Badge>
-                      )}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {isNew && <Badge className="bg-blue-600 text-white border-blue-700 rounded-full text-[11px] font-bold px-2.5"><CheckCircle className="w-3 h-3 mr-1" />New</Badge>}
+                      {isActive && <Badge className="bg-emerald-600 text-white border-emerald-700 rounded-full text-[11px] font-bold px-2.5"><CheckCircle className="w-3 h-3 mr-1" />Active</Badge>}
+                      {isGrace && <Badge className="bg-amber-500 text-white border-amber-600 rounded-full text-[11px] font-bold px-2.5"><AlertTriangle className="w-3 h-3 mr-1" />Under Review</Badge>}
+                      {isRemoved && <Badge className="bg-red-600 text-white border-red-700 rounded-full text-[11px] font-bold px-2.5"><XCircle className="w-3 h-3 mr-1" />Revoked</Badge>}
+                      {isBRated && <Badge className="bg-orange-500 text-white border-orange-600 rounded-full text-[11px] font-bold px-2.5"><AlertTriangle className="w-3 h-3 mr-1" />B-Rated</Badge>}
                     </div>
                   </div>
                 );
               })}
               <div className="text-center pt-3">
-                <p className="text-xs text-muted-foreground mb-2">Want to get alerts when this sponsor's status changes?</p>
+                <p className="text-xs text-muted-foreground mb-2">Get instant alerts when this sponsor's status changes.</p>
                 <Link href="/pricing">
                   <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-full px-5 font-bold text-xs">
-                    <Bell className="w-3.5 h-3.5 mr-1.5" />Get Instant Alerts
+                    <Bell className="w-3.5 h-3.5 mr-1.5" />Set Up Alerts — from £24.99/mo
                   </Button>
                 </Link>
               </div>
@@ -350,8 +398,8 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
 
           {!hasSearched && (
             <p className="text-xs text-muted-foreground">
-              One free search per day. No login required.{" "}
-              <Link href="/pricing" className="text-primary font-semibold hover:underline">Subscribe for unlimited searches and alerts</Link>
+              Free, unlimited searches. No login required.{" "}
+              <Link href="/pricing" className="text-primary font-semibold hover:underline">Subscribe for real-time alerts</Link>
             </p>
           )}
         </div>
