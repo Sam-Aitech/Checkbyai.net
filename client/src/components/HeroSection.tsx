@@ -156,6 +156,70 @@ function RecentlyRevokedSection() {
   );
 }
 
+// ── Nightly stats bar ─────────────────────────────────────────────────────
+
+interface NightlyStats {
+  totalActive:  number;
+  lastRunDate:  string | null;
+  addedCount:   number;
+  removedCount: number;
+  changesCount: number;
+}
+
+function formatRunDate(dateStr: string | null): string {
+  if (!dateStr) return "Pending";
+  const d = new Date(dateStr);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const isoDate = (dt: Date) => dt.toISOString().slice(0, 10);
+  if (dateStr === isoDate(today))     return "Today";
+  if (dateStr === isoDate(yesterday)) return "Yesterday";
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function NightlyStatsBar() {
+  const { data, isLoading } = useQuery<NightlyStats>({
+    queryKey: ["/api/sponsors/nightly-stats"],
+    staleTime: 60 * 60 * 1_000,
+  });
+
+  const totalLabel  = isLoading ? "—" : (data?.totalActive  ?? 0).toLocaleString("en-GB");
+  const changesLabel = isLoading ? "—" : (() => {
+    if (!data) return "No data";
+    const parts: string[] = [];
+    if (data.addedCount)   parts.push(`+${data.addedCount} new`);
+    if (data.removedCount) parts.push(`${data.removedCount} revoked`);
+    if (data.changesCount) parts.push(`${data.changesCount} updated`);
+    return parts.length > 0 ? parts.join(" · ") : "No changes";
+  })();
+  const dateLabel   = isLoading ? "—" : formatRunDate(data?.lastRunDate ?? null);
+  const hasRemovals = !isLoading && (data?.removedCount ?? 0) > 0;
+
+  return (
+    <div className="bg-slate-900 border-y border-slate-700 -mt-16 relative z-10">
+      <div className="max-w-5xl mx-auto px-4 py-5">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-0 sm:divide-x sm:divide-slate-700 text-center">
+          <div className="px-4">
+            <p className={cn("text-2xl font-bold text-white", isLoading && "animate-pulse")}>{totalLabel}</p>
+            <p className="text-xs text-slate-400 mt-0.5">Active licensed sponsors</p>
+          </div>
+          <div className="px-4">
+            <p className={cn("text-2xl font-bold", isLoading ? "text-white animate-pulse" : hasRemovals ? "text-red-400" : "text-emerald-400")}>
+              {changesLabel}
+            </p>
+            <p className="text-xs text-slate-400 mt-0.5">In last nightly run</p>
+          </div>
+          <div className="px-4">
+            <p className={cn("text-2xl font-bold text-emerald-400", isLoading && "animate-pulse")}>{dateLabel}</p>
+            <p className="text-xs text-slate-400 mt-0.5">Register last checked</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface HeroSectionProps {
   onStartVerification?: () => void;
 }
@@ -478,24 +542,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
           </div>
         </div>
 
-        <div className="bg-slate-900 border-y border-slate-700 -mt-16 relative z-10">
-          <div className="max-w-5xl mx-auto px-4 py-5">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-0 sm:divide-x sm:divide-slate-700 text-center">
-              <div className="px-4">
-                <p className="text-2xl font-bold text-white">47,823</p>
-                <p className="text-xs text-slate-400 mt-0.5">Companies checked last night</p>
-              </div>
-              <div className="px-4">
-                <p className="text-2xl font-bold text-red-400">3 downgraded, 1 revoked</p>
-                <p className="text-xs text-slate-400 mt-0.5">Changes detected</p>
-              </div>
-              <div className="px-4">
-                <p className="text-2xl font-bold text-emerald-400">04:32 AM GMT</p>
-                <p className="text-xs text-slate-400 mt-0.5">Alerts sent to 847 subscribers</p>
-              </div>
-            </div>
-          </div>
-        </div>
+        <NightlyStatsBar />
       </div>
 
       <LandingDigest />

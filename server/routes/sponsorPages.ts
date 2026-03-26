@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { db } from "../db";
 import { sql, eq, inArray, desc } from "drizzle-orm";
-import { sponsorCanonical, sponsorChanges, sponsorEnrichment } from "@shared/schema";
+import { sponsorCanonical, sponsorChanges, sponsorEnrichment, dailyDigest } from "@shared/schema";
 import { cacheGet, cacheSet } from "../utils/redisClient";
 import { getAppUrl } from "../utils/appUrl";
 import { ensureIndexReady, getIndexData, type SearchIndexEntry } from "../utils/sponsorSearch";
@@ -246,6 +246,57 @@ export function registerSponsorPageRoutes(app: Express): void {
     } catch (err) {
       console.error("Recently revoked error:", err);
       res.status(500).json({ message: "Failed to load recently revoked sponsors." });
+    }
+  });
+
+  // ── Nightly run stats ─────────────────────────────────────────────────────
+  // Powers the live stats bar on the homepage. Returns total active sponsors,
+  // last run date, and change counts from the most recent daily_digest row.
+  // Falls back gracefully when no digest row exists yet.
+  // Cached 1hr — same cadence as the nightly job.
+  app.get("/api/sponsors/nightly-stats", async (_req: any, res) => {
+    const cacheKey = "sponsors:nightly-stats";
+    const cached = await cacheGet<object>(cacheKey);
+    if (cached) {
+      res.set("Cache-Control", "public, max-age=3600");
+      return res.json(cached);
+    }
+
+    try {
+      const [countResult, digestRows] = await Promise.all([
+        db
+          .select({ total: sql<number>`count(*)::int` })
+          .from(sponsorCanonical)
+          .where(inArray(sponsorCanonical.status, ["ACTIVE", "NEWLY_GRANTED"])),
+        db
+          .select({
+            snapshotDate:  dailyDigest.snapshotDate,
+            addedCount:    dailyDigest.addedCount,
+            removedCount:  dailyDigest.removedCount,
+            updatedCount:  dailyDigest.updatedCount,
+          })
+          .from(dailyDigest)
+          .orderBy(desc(dailyDigest.snapshotDate))
+          .limit(1),
+      ]);
+
+      const totalActive  = countResult[0]?.total ?? 0;
+      const latest       = digestRows[0] ?? null;
+
+      const payload = {
+        totalActive,
+        lastRunDate:  latest?.snapshotDate  ?? null,
+        addedCount:   latest?.addedCount    ?? 0,
+        removedCount: latest?.removedCount  ?? 0,
+        changesCount: latest?.updatedCount  ?? 0,
+      };
+
+      await cacheSet(cacheKey, payload, 3600);
+      res.set("Cache-Control", "public, max-age=3600");
+      res.json(payload);
+    } catch (err) {
+      console.error("Nightly stats error:", err);
+      res.status(500).json({ message: "Stats unavailable." });
     }
   });
 
