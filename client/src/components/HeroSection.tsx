@@ -483,7 +483,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                 </motion.h1>
 
                 <motion.p initial={{ opacity: 0, y: 20 }} animate={isLoaded ? { opacity: 1, y: 0 } : {}} transition={{ ...springGentle, delay: 0.35 }} className="text-base text-white/70 max-w-lg leading-relaxed">
-                  The Home Office updates the register at midnight. They do not email you. We check every night and alert you within 30 minutes by WhatsApp, Email, and SMS.
+                  The Home Office updates the register at midnight. They do not email you. We check every night — Pro subscribers are alerted within 30 minutes. Starter subscribers by 6 PM, same day, before any letter arrives.
                 </motion.p>
 
                 {/* ── Hero search box ───────────────────────────────────── */}
@@ -578,7 +578,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
 
                 <motion.div initial={{ opacity: 0 }} animate={isLoaded ? { opacity: 1 } : {}} transition={{ ...springGentle, delay: 0.6 }} className="flex items-center gap-4 sm:gap-6 pt-1 flex-wrap">
                   {[
-                    { icon: <HeroAlertIcon className="w-5 h-5 flex-shrink-0" size={20} />, label: "Alerts in 30 min", colorClass: "text-red-200", borderClass: "border-red-500/20 bg-red-500/10 shadow-[0_0_15px_rgba(239,68,68,0.1)]" },
+                    { icon: <HeroAlertIcon className="w-5 h-5 flex-shrink-0" size={20} />, label: "Pro: alerts in 30 min", colorClass: "text-red-200", borderClass: "border-red-500/20 bg-red-500/10 shadow-[0_0_15px_rgba(239,68,68,0.1)]" },
                     { icon: <HeroTrackedIcon className="w-5 h-5 flex-shrink-0" size={20} />, label: "47,823 sponsors tracked", colorClass: "text-indigo-200", borderClass: "border-indigo-500/20 bg-indigo-500/10 shadow-[0_0_15px_rgba(99,102,241,0.1)]" },
                     { icon: <HeroGDPRLockIcon className="w-5 h-5 flex-shrink-0" size={20} />, label: "UK GDPR", colorClass: "text-blue-200", borderClass: "border-blue-500/20 bg-blue-500/10 shadow-[0_0_15px_rgba(59,130,246,0.1)]" },
                   ].map((item, i) => (
@@ -721,7 +721,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                   <TimelineClockIcon size={30} />
                 </div>
                 <h3 className="text-lg font-bold text-foreground mb-3">The 12-Hour Advantage</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">The register updates at midnight. Letters are posted at 9 AM. Our WhatsApp alert hits your phone at 00:30. You have half a day to pivot before your employer even knows.</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">The register updates at midnight. Letters are posted at 9 AM. Pro subscribers receive a WhatsApp alert at 00:30 — half a day before their employer even knows. Starter subscribers are alerted by 6 PM, still the same day.</p>
               </CardContent>
             </Card>
             <Card className="border-slate-200 dark:border-slate-800 glow-amber transition-all duration-300">
@@ -806,7 +806,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />30-day history</li>
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />Same-day alerts (6 PM)</li>
                 </ul>
-                <Link href="/pricing"><Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-5 text-base shadow-md"><Zap className="w-4 h-4 mr-2" />Get Instant Alerts</Button></Link>
+                <Link href="/pricing"><Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-5 text-base shadow-md"><Zap className="w-4 h-4 mr-2" />Get Same-Day Alerts</Button></Link>
               </CardContent>
             </Card>
 
