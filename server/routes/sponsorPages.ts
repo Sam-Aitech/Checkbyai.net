@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { db } from "../db";
 import { sql, eq, inArray, desc } from "drizzle-orm";
-import { sponsorCanonical, sponsorChanges } from "@shared/schema";
+import { sponsorCanonical, sponsorChanges, sponsorEnrichment } from "@shared/schema";
 import { cacheGet, cacheSet } from "../utils/redisClient";
 import { getAppUrl } from "../utils/appUrl";
 import rateLimit from "express-rate-limit";
@@ -63,20 +63,38 @@ export function registerSponsorPageRoutes(app: Express): void {
 
       if (!sponsor) return res.status(404).json({ message: "Sponsor not found." });
 
-      const recentChanges = await db
-        .select({
-          changeType:    sponsorChanges.changeType,
-          snapshotDate:  sponsorChanges.snapshotDate,
-          previousValue: sponsorChanges.previousValue,
-          newValue:      sponsorChanges.newValue,
-          detectedAt:    sponsorChanges.detectedAt,
-        })
-        .from(sponsorChanges)
-        .where(eq(sponsorChanges.fingerprint, sponsor.fingerprint))
-        .orderBy(desc(sponsorChanges.detectedAt))
-        .limit(5);
+      const [recentChanges, countResult, enrichmentRows] = await Promise.all([
+        // Free preview: 3 most recent changes
+        db
+          .select({
+            changeType:    sponsorChanges.changeType,
+            snapshotDate:  sponsorChanges.snapshotDate,
+            previousValue: sponsorChanges.previousValue,
+            newValue:      sponsorChanges.newValue,
+            detectedAt:    sponsorChanges.detectedAt,
+          })
+          .from(sponsorChanges)
+          .where(eq(sponsorChanges.fingerprint, sponsor.fingerprint))
+          .orderBy(desc(sponsorChanges.detectedAt))
+          .limit(3),
+        // Total changes count — drives the "X more" lock indicator in the UI
+        db
+          .select({ total: sql<number>`count(*)::int` })
+          .from(sponsorChanges)
+          .where(eq(sponsorChanges.fingerprint, sponsor.fingerprint)),
+        // Companies House enrichment — included only when scrape completed
+        db
+          .select()
+          .from(sponsorEnrichment)
+          .where(eq(sponsorEnrichment.fingerprint, sponsor.fingerprint))
+          .limit(1),
+      ]);
 
-      const payload = { ...sponsor, recentChanges };
+      const totalChanges = countResult[0]?.total ?? 0;
+      const rawEnrichment = enrichmentRows[0];
+      const enrichment = (rawEnrichment?.scrapeStatus === "done") ? rawEnrichment : null;
+
+      const payload = { ...sponsor, recentChanges, totalChanges, enrichment };
       await cacheSet(cacheKey, payload, 3600);
       res.json(payload);
     } catch (err) {
@@ -168,6 +186,37 @@ export function registerSponsorPageRoutes(app: Express): void {
     } catch (err) {
       console.error(`Sitemap sponsors page ${page} error:`, err);
       res.status(500).send("Sitemap page unavailable");
+    }
+  });
+
+  // ── Recently revoked ─────────────────────────────────────────────────────
+  // Public feed of the 7 most recently revoked sponsors. Used by the homepage
+  // "Recently Revoked" widget. Cached 1 hr — flushed by nightly monitor job.
+  app.get("/api/sponsors/recently-revoked", async (_req: any, res) => {
+    const cacheKey = "sponsors:recently-revoked";
+    const cached = await cacheGet<object[]>(cacheKey);
+    if (cached) return res.json(cached);
+
+    try {
+      const sponsors = await db
+        .select({
+          id:          sponsorCanonical.id,
+          currentName: sponsorCanonical.currentName,
+          townCity:    sponsorCanonical.townCity,
+          route:       sponsorCanonical.route,
+          removedAt:   sponsorCanonical.removedAt,
+        })
+        .from(sponsorCanonical)
+        .where(eq(sponsorCanonical.status, "REMOVED_REVOKED"))
+        .orderBy(desc(sponsorCanonical.removedAt))
+        .limit(7);
+
+      await cacheSet(cacheKey, sponsors, 3600);
+      res.set("Cache-Control", "public, max-age=3600");
+      res.json(sponsors);
+    } catch (err) {
+      console.error("Recently revoked error:", err);
+      res.status(500).json({ message: "Failed to load recently revoked sponsors." });
     }
   });
 

@@ -4,7 +4,7 @@ import {
   Building2, MapPin, Shield, Star, Calendar, Clock,
   CheckCircle, XCircle, AlertTriangle, ArrowLeft,
   Bell, ChevronRight, ArrowUpCircle, ArrowDownCircle,
-  RefreshCw, FileText, Tag,
+  RefreshCw, FileText, Tag, Lock, ExternalLink, Briefcase,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,16 @@ interface SponsorChange {
   detectedAt:    string;
 }
 
+interface SponsorEnrichment {
+  companyNumber:        string | null;
+  companyStatus:        string | null;
+  companyType:          string | null;
+  incorporationDate:    string | null;
+  natureOfBusiness:     string | null;
+  lastFiledAccountsDate: string | null;
+  companiesHouseSource: boolean | null;
+}
+
 interface SponsorDetailData {
   id:              number;
   fingerprint:     string;
@@ -36,6 +46,8 @@ interface SponsorDetailData {
   removedAt:       string | null;
   historicalNames: string[];
   recentChanges:   SponsorChange[];
+  totalChanges:    number;
+  enrichment:      SponsorEnrichment | null;
 }
 
 // ── Change type display helpers ───────────────────────────────────────────────
@@ -223,6 +235,11 @@ export default function SponsorDetail() {
               {isBRated && (
                 <Badge className="bg-amber-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">B-Rated</Badge>
               )}
+              <Link href={`/sponsor-monitor?company=${encodeURIComponent(data.currentName)}`}>
+                <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-full px-3 h-7 text-xs gap-1">
+                  <Bell className="w-3 h-3" />Set Alert
+                </Button>
+              </Link>
             </div>
           </div>
 
@@ -263,11 +280,16 @@ export default function SponsorDetail() {
           </div>
         </div>
 
-        {/* Recent changes */}
+        {/* Change history */}
         {data.recentChanges.length > 0 && (
           <div className="bg-card border border-border rounded-xl p-6">
-            <h2 className="text-base font-semibold text-foreground mb-4">Recent Changes</h2>
-            <div className="space-y-3">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-semibold text-foreground">Licence Change History</h2>
+              {data.totalChanges > 0 && (
+                <span className="text-xs text-muted-foreground">{data.totalChanges} event{data.totalChanges !== 1 ? "s" : ""} on record</span>
+              )}
+            </div>
+            <div className="space-y-0">
               {data.recentChanges.map((c, i) => {
                 const meta = CHANGE_META[c.changeType] || {
                   label: c.changeType.replace(/_/g, " "),
@@ -275,7 +297,7 @@ export default function SponsorDetail() {
                   color: "text-muted-foreground",
                 };
                 return (
-                  <div key={i} className="flex items-start gap-3 py-2 border-b border-border last:border-0 last:pb-0">
+                  <div key={i} className="flex items-start gap-3 py-2.5 border-b border-border last:border-0">
                     <span className={`mt-0.5 shrink-0 ${meta.color}`}>{meta.icon}</span>
                     <div className="flex-1 min-w-0">
                       <p className={`text-sm font-medium ${meta.color}`}>{meta.label}</p>
@@ -294,10 +316,87 @@ export default function SponsorDetail() {
                 );
               })}
             </div>
-            <p className="text-xs text-muted-foreground mt-4">
-              Full change history (90 days) available to subscribers.{" "}
-              <Link href="/pricing" className="text-primary font-semibold hover:underline">View plans</Link>
-            </p>
+
+            {/* Lock indicator — shown when there are more changes than the 3-event free preview */}
+            {data.totalChanges > 3 && (
+              <div className="mt-3 rounded-lg border border-dashed border-border bg-muted/40 px-4 py-3 flex items-center gap-3">
+                <Lock className="w-4 h-4 text-muted-foreground shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground">
+                    {data.totalChanges - 3} more event{data.totalChanges - 3 !== 1 ? "s" : ""} in full history
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">90-day history, upgrades, downgrades, route changes — subscribe to unlock.</p>
+                </div>
+                <Link href="/pricing">
+                  <Button size="sm" variant="outline" className="shrink-0 text-xs rounded-full">
+                    Unlock <ChevronRight className="w-3 h-3 ml-0.5" />
+                  </Button>
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Companies House enrichment card */}
+        {data.enrichment && (
+          <div className="bg-card border border-border rounded-xl p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Briefcase className="w-4 h-4 text-muted-foreground" />
+              <h2 className="text-base font-semibold text-foreground">Companies House</h2>
+              {data.enrichment.companiesHouseSource && (
+                <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 text-[10px] font-semibold px-2 py-0.5 rounded-full">Verified</Badge>
+              )}
+            </div>
+            <div className="grid sm:grid-cols-2 gap-3">
+              {data.enrichment.companyNumber && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Shield className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground">Company No.</span>
+                  <a
+                    href={`https://find-and-update.company-information.service.gov.uk/company/${data.enrichment.companyNumber}`}
+                    target="_blank" rel="noopener noreferrer"
+                    className="text-primary hover:underline flex items-center gap-0.5"
+                  >
+                    {data.enrichment.companyNumber} <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+              )}
+              {data.enrichment.companyStatus && (
+                <div className="flex items-center gap-2 text-sm">
+                  <CheckCircle className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground">Status</span>
+                  <span className="text-foreground capitalize">{data.enrichment.companyStatus.replace(/-/g, " ")}</span>
+                </div>
+              )}
+              {data.enrichment.companyType && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Briefcase className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground">Type</span>
+                  <span className="text-foreground capitalize">{data.enrichment.companyType.replace(/-/g, " ")}</span>
+                </div>
+              )}
+              {data.enrichment.incorporationDate && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground">Incorporated</span>
+                  <span className="text-foreground">{formatDate(data.enrichment.incorporationDate)}</span>
+                </div>
+              )}
+              {data.enrichment.lastFiledAccountsDate && (
+                <div className="flex items-center gap-2 text-sm">
+                  <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground">Last Accounts</span>
+                  <span className="text-foreground">{formatDate(data.enrichment.lastFiledAccountsDate)}</span>
+                </div>
+              )}
+              {data.enrichment.natureOfBusiness && (
+                <div className="flex items-start gap-2 text-sm sm:col-span-2">
+                  <Tag className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+                  <span className="text-muted-foreground shrink-0">Business</span>
+                  <span className="text-foreground">{data.enrichment.natureOfBusiness}</span>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

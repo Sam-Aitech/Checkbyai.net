@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils'
 import { useState, useEffect, Suspense, lazy } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { useInView } from 'react-intersection-observer'
 import { Zap, Lock, ArrowRight, Play, Bell, Activity, CheckCircle, XCircle, AlertTriangle, ShieldCheck, Eye, Search, MapPin, Loader2 } from 'lucide-react'
@@ -49,6 +50,110 @@ function LoadingFallback() {
       </div>
     </div>
   )
+}
+
+// ── Recently Revoked widget ───────────────────────────────────────────────────
+
+interface RevokedEntry {
+  id:          number;
+  currentName: string;
+  townCity:    string | null;
+  route:       string | null;
+  removedAt:   string | null;
+}
+
+function toDetailSlug(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim().replace(/\s+/g, "-").slice(0, 80);
+}
+
+function RecentlyRevokedSection() {
+  const [ref, inView] = useInView({ triggerOnce: true, threshold: 0.1 });
+  const { data, isLoading } = useQuery<RevokedEntry[]>({
+    queryKey: ["/api/sponsors/recently-revoked"],
+    staleTime: 60 * 60 * 1_000,
+  });
+
+  return (
+    <section ref={ref} className="bg-white dark:bg-background py-16 border-t border-border">
+      <div className="max-w-4xl mx-auto px-6">
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={inView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+        >
+          <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <XCircle className="w-5 h-5 text-red-500" />
+                <h2 className="text-xl font-bold text-foreground">Recently Revoked Licences</h2>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Latest removals from the Home Office register — updated nightly.
+              </p>
+            </div>
+            <Link href="/sponsor-changes">
+              <Button variant="outline" size="sm" className="rounded-full text-xs">
+                View All Changes <ArrowRight className="w-3 h-3 ml-1" />
+              </Button>
+            </Link>
+          </div>
+
+          {isLoading && (
+            <div className="space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="h-14 rounded-xl bg-muted animate-pulse" />
+              ))}
+            </div>
+          )}
+
+          {!isLoading && data && data.length > 0 && (
+            <div className="rounded-xl border border-red-100 dark:border-red-900/40 overflow-hidden divide-y divide-red-50 dark:divide-red-900/20">
+              {data.map((s) => (
+                <Link
+                  key={s.id}
+                  href={`/sponsor/${s.id}/${toDetailSlug(s.currentName)}`}
+                  className="flex items-center gap-4 px-5 py-3.5 bg-red-50/40 dark:bg-red-950/10 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors group"
+                >
+                  <XCircle className="w-4 h-4 text-red-500 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors">
+                      {s.currentName}
+                    </p>
+                    {(s.townCity || s.route) && (
+                      <p className="text-xs text-muted-foreground truncate">
+                        {[s.townCity, s.route].filter(Boolean).join(" · ")}
+                      </p>
+                    )}
+                  </div>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+                    {s.removedAt ? new Date(s.removedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "Recent"}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          )}
+
+          {!isLoading && (!data || data.length === 0) && (
+            <div className="rounded-xl border border-border py-10 text-center text-muted-foreground text-sm">
+              No revocations detected in recent data.
+            </div>
+          )}
+
+          <div className="mt-5 bg-slate-50 dark:bg-slate-900/50 border border-border rounded-xl px-5 py-3 flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-sm text-muted-foreground">
+              <Bell className="w-3.5 h-3.5 inline mr-1 text-emerald-500" />
+              Get instant WhatsApp or email alerts when any sponsor revokes.
+            </p>
+            <Link href="/pricing">
+              <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-full text-xs font-bold">
+                Set Up Alerts
+              </Button>
+            </Link>
+          </div>
+        </motion.div>
+      </div>
+    </section>
+  );
 }
 
 interface HeroSectionProps {
@@ -584,6 +689,8 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
           </div>
         </div>
       </section>
+
+      <RecentlyRevokedSection />
 
       <section className="bg-slate-950 text-white py-16">
         <div className="max-w-2xl mx-auto px-6 text-center">
