@@ -17,7 +17,6 @@ import { Badge } from '@/components/ui/badge'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Link, useLocation } from 'wouter'
 import logoImg from "@assets/logo_material.png";
-import CreditCounter from '@/components/CreditCounter'
 import Footer from '@/components/Footer'
 import LandingDigest from '@/components/LandingDigest'
 
@@ -572,8 +571,6 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                     </Button>
                   </Link>
                 </div>
-
-                <CreditCounter />
 
                 <motion.div initial={{ opacity: 0 }} animate={isLoaded ? { opacity: 1 } : {}} transition={{ ...springGentle, delay: 0.6 }} className="flex items-center gap-4 sm:gap-6 pt-1 flex-wrap">
                   {[
