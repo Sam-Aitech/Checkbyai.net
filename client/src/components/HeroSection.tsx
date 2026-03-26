@@ -494,11 +494,11 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
               </Link>
               <div className="hidden md:flex items-center gap-1">
                 {[
+                  { href: "/sponsors", label: "Sponsor Register" },
+                  { href: "/sponsor-monitor", label: "Sponsor Monitor" },
                   { href: "/dashboard", label: "Verify CoS" },
                   { href: "/pricing", label: "Pricing" },
-                  { href: "/sponsor-monitor", label: "Sponsor Monitor" },
                   { href: "/cos-guide", label: "CoS Guide" },
-                  { href: "/technology", label: "Technology" },
                   { href: "/api-docs", label: "API" },
                 ].map((link) => (
                   <Link key={link.href} href={link.href} className="px-4 py-2 text-sm text-white/70 hover:text-white font-medium rounded-full hover:bg-white/10 transition-all duration-200">{link.label}</Link>
