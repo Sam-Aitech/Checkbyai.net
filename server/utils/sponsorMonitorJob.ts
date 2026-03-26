@@ -1,6 +1,6 @@
 import cron from "node-cron";
 import { db } from "../db";
-import { dailyDigest, monitorJobRuns, diffResults, sponsorCanonical } from "@shared/schema";
+import { dailyDigest, monitorJobRuns, diffResults, sponsorCanonical, csvArchive } from "@shared/schema";
 import { eq, sql, and } from "drizzle-orm";
 import { discoverCsvUrl, generateFingerprint, type SponsorChange } from "./sponsorListFetcher";
 import { ensureTodaysArchive, getArchiveForDate, parseCsvFile } from "./csvArchiver";
@@ -192,17 +192,28 @@ async function buildFirstRunDiff(rawFilePath: string): Promise<CsvDiffResult> {
 }
 
 /**
- * Persists diff metadata (row counts + duration) to the diff_results table.
+ * Persists diff metadata (row counts + duration + bounded payload) to diff_results.
  * Non-fatal: a failure here only loses audit data, not state machine correctness.
+ *
+ * diffJson stores up to 1 000 fingerprints per bucket so any server in a
+ * horizontal cluster can read the payload from the DB rather than a local file.
+ * Typical daily deltas are 20–200 entries (a few KB). The full record-level
+ * changes are already persisted in sponsor_changes; this is for audit/replay.
  */
 async function saveDiffResult(runDate: string, diff: CsvDiffResult): Promise<void> {
   try {
+    const diffPayload = {
+      added:    diff.Additions.map((r) => r["fingerprint"] as string).filter(Boolean).slice(0, 1000),
+      removed:  diff.Deletions.map((r)  => r["fingerprint"] as string).filter(Boolean).slice(0, 1000),
+      modified: diff.Modifications.map((r) => r["fingerprint"] as string).filter(Boolean).slice(0, 1000),
+    };
     await db.insert(diffResults).values({
       runDate,
       addedCount:           diff.Additions.length,
       removedCount:         diff.Deletions.length,
       attributeChangeCount: diff.Modifications.length,
       diffDurationMs:       diff.durationMs,
+      diffJson:             diffPayload,
     }).onConflictDoNothing();
   } catch (err: unknown) {
     console.warn("[SponsorMonitorJob] Failed to save diff result (non-fatal):", err instanceof Error ? err.message : String(err));
@@ -322,6 +333,24 @@ export async function runSponsorMonitorJob(source: string = "cron", notifyOnFail
 
     console.log(`[SponsorMonitorJob] === Daily sponsor monitor check starting (triggered by: ${source}) ===`);
 
+    // ── ETL integrity check (migration 0014) ───────────────────────────────────
+    // Detect archives that were downloaded in a prior run but whose state machine
+    // never completed (PENDING_SYNC). This happens when the server crashed between
+    // the CSV download and the state machine write. Operators should re-trigger
+    // the job manually to re-process these dates.
+    const staleArchives = await db
+      .select({ snapshotDate: csvArchive.snapshotDate })
+      .from(csvArchive)
+      .where(eq(csvArchive.syncStatus, "PENDING_SYNC"));
+    if (staleArchives.length > 0) {
+      const staleDates = staleArchives.map((r) => r.snapshotDate).join(", ");
+      log.warn(
+        { staleDates },
+        `[SponsorMonitorJob] INTEGRITY WARNING: ${staleArchives.length} archive(s) stuck at PENDING_SYNC — state machine may not have run for: ${staleDates}. ` +
+        `Trigger a manual re-run via POST /api/admin/sponsor-monitor/run to reprocess.`,
+      );
+    }
+
     // ── Idempotency check ──────────────────────────────────────────────────────
     const existingRun = await db
       .select({ id: monitorJobRuns.id, status: monitorJobRuns.status })
@@ -380,8 +409,31 @@ export async function runSponsorMonitorJob(source: string = "cron", notifyOnFail
 
     // ── Phase 3: State machine ─────────────────────────────────────────────────
     // applyStateMachine handles all DB writes (canonical + sponsorChanges) internally.
+    // syncStatus is updated to SYNCED on success or FAILED on error so that the
+    // ETL integrity check on the next run can detect incomplete state machine runs.
     console.log("[SponsorMonitorJob] Applying state machine…");
-    const smResult = await applyStateMachine(diff, today, todayArchive.fingerprintedFilePath);
+    let smResult: Awaited<ReturnType<typeof applyStateMachine>>;
+    try {
+      smResult = await applyStateMachine(diff, today, todayArchive.fingerprintedFilePath);
+      // Mark this archive as fully processed — visible to all server instances.
+      await db
+        .update(csvArchive)
+        .set({ syncStatus: "SYNCED" })
+        .where(eq(csvArchive.snapshotDate, today))
+        .catch((err: unknown) =>
+          console.warn("[SponsorMonitorJob] Failed to mark archive SYNCED (non-fatal):", err instanceof Error ? err.message : String(err))
+        );
+    } catch (smErr: unknown) {
+      // Mark the archive as FAILED so the integrity check surfaces it clearly.
+      await db
+        .update(csvArchive)
+        .set({ syncStatus: "FAILED" })
+        .where(eq(csvArchive.snapshotDate, today))
+        .catch((err: unknown) =>
+          console.warn("[SponsorMonitorJob] Failed to mark archive FAILED (non-fatal):", err instanceof Error ? err.message : String(err))
+        );
+      throw smErr; // re-throw so the outer catch logs + sends admin alert
+    }
 
     await rebuildSponsorIndex();
 

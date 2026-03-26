@@ -297,6 +297,11 @@ export const sponsorCanonical = pgTable(
     index("idx_sponsor_canonical_status").on(table.status),
     index("idx_sponsor_canonical_current_name").on(table.currentName),
     index("idx_sponsor_canonical_granted_at").on(table.grantedAt),
+    // Compound indexes for sub-10ms filtered search queries (migration 0014).
+    // Replace two single-column scans with one seek + filter per query shape.
+    index("idx_sc_status_name").on(table.status, table.currentName),
+    index("idx_sc_status_town").on(table.status, table.townCity),
+    index("idx_sc_status_type").on(table.status, table.typeRating),
   ]
 );
 
@@ -367,6 +372,9 @@ export const sponsorChanges = pgTable(
     index("idx_sponsor_changes_fingerprint").on(table.fingerprint),
     index("idx_sponsor_changes_snapshot_date").on(table.snapshotDate),
     index("idx_sponsor_changes_change_type").on(table.changeType),
+    // Compound indexes for history and change-feed endpoints (migration 0014).
+    index("idx_changes_date_type").on(table.snapshotDate, table.changeType),
+    index("idx_changes_fp_detected").on(table.fingerprint, table.detectedAt),
   ]
 );
 
@@ -644,6 +652,11 @@ export const csvArchive = pgTable(
     sourceUrl:      text("source_url"),
     isValid:        boolean("is_valid").notNull().default(true),
     downloadedAt:   timestamp("downloaded_at", { withTimezone: true }).defaultNow().notNull(),
+    // ETL integrity flag (migration 0014).
+    // PENDING_SYNC = archive downloaded, state machine not yet run
+    // SYNCED       = state machine completed successfully for this archive
+    // FAILED       = state machine ran but aborted with an error
+    syncStatus:     text("sync_status").notNull().default("SYNCED"),
   },
   (table) => [
     uniqueIndex("idx_csv_archive_date").on(table.snapshotDate),
@@ -660,7 +673,8 @@ export const diffResults = pgTable(
     removedCount:         integer("removed_count").notNull().default(0),
     attributeChangeCount: integer("attribute_change_count").notNull().default(0),
     diffDurationMs:       integer("diff_duration_ms"),
-    diffJsonPath:         text("diff_json_path"),          // path to raw diff.json for audit/replay
+    diffJsonPath:         text("diff_json_path"),          // kept for backward-compat; superseded by diffJson
+    diffJson:             jsonb("diff_json"),              // bounded payload { added, removed, modified } — DB-native, scale-safe
     createdAt:            timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [

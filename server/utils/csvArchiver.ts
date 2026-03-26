@@ -380,6 +380,10 @@ export async function ensureTodaysArchive(
   }
 
   // ── Register valid archive in DB ────────────────────────────────────────────
+  // syncStatus is set to PENDING_SYNC here and updated to SYNCED (or FAILED)
+  // by sponsorMonitorJob.ts after applyStateMachine() completes. This lets the
+  // ETL integrity check on the next job run detect archives that were downloaded
+  // but whose state machine never ran (e.g. mid-run server crash).
   await db
     .insert(csvArchive)
     .values({
@@ -389,6 +393,7 @@ export async function ensureTodaysArchive(
       checksumSha256,
       sourceUrl:      csvUrl,
       isValid:        true,
+      syncStatus:     "PENDING_SYNC",
       downloadedAt:   new Date(),
     })
     .onConflictDoNothing(); // idempotent on re-run
