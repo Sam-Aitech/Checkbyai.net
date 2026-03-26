@@ -193,6 +193,12 @@ export async function searchSponsorsFallback(
   const { status, town, page = 1, limit = 20 } = options;
   const offset = (Math.max(1, page) - 1) * limit;
 
+  // Clamp query length: a trigram index generates ~(N-2) trigrams for a query of
+  // length N. Beyond 200 chars there is no accuracy gain, only extra CPU work.
+  // All values below are passed as Drizzle sql`${}` parameters — fully
+  // parameterized, no string interpolation into the SQL text.
+  const safeQuery = query.slice(0, 200);
+
   // Build dynamic WHERE clauses
   const statusFilter = status
     ? sql`AND status = ${status}`
@@ -215,9 +221,9 @@ export async function searchSponsorsFallback(
           granted_at          AS "grantedAt",
           historical_names    AS "historicalNames",
           GREATEST(
-            similarity(current_name, ${query}),
+            similarity(current_name, ${safeQuery}),
             COALESCE(
-              (SELECT MAX(similarity(hn, ${query}))
+              (SELECT MAX(similarity(hn, ${safeQuery}))
                  FROM UNNEST(historical_names) AS hn),
               0
             )
@@ -225,10 +231,10 @@ export async function searchSponsorsFallback(
         FROM sponsor_canonical
         WHERE
           (
-            current_name % ${query}
+            current_name % ${safeQuery}
             OR EXISTS (
               SELECT 1 FROM UNNEST(historical_names) AS hn
-              WHERE hn % ${query}
+              WHERE hn % ${safeQuery}
             )
           )
           ${statusFilter}
@@ -241,10 +247,10 @@ export async function searchSponsorsFallback(
         FROM sponsor_canonical
         WHERE
           (
-            current_name % ${query}
+            current_name % ${safeQuery}
             OR EXISTS (
               SELECT 1 FROM UNNEST(historical_names) AS hn
-              WHERE hn % ${query}
+              WHERE hn % ${safeQuery}
             )
           )
           ${statusFilter}

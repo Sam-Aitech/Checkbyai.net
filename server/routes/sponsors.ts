@@ -10,6 +10,7 @@ import { ensureIndexReady, isIndexReady, searchSponsors, searchSponsorsFallback,
 import { generateHeadline, signDigest } from "../services/aiDigest";
 import { storage } from "../storage";
 import { getRedis, cacheGet, cacheSet } from "../utils/redisClient";
+import rateLimit from "express-rate-limit";
 
 // ── Free-search rate limiter ─────────────────────────────────────────────────
 // Redis primary (cross-instance, survives restarts) with in-process Map fallback.
@@ -42,10 +43,37 @@ function getWatchLimit(subscriptionStatus: string | null): number {
   return getWatchLimitFromTier(subscriptionStatus);
 }
 
+// ── API Rate Limiters ─────────────────────────────────────────────────────────
+// In-process store per instance. For multi-server deployments consider adding a
+// Redis store (e.g. rate-limit-redis) so counters are shared across pods.
+const directoryRateLimit = rateLimit({
+  windowMs: 60 * 1_000,  // 1 minute
+  max: 60,
+  standardHeaders: true,  // RateLimit-* headers (RFC 6585)
+  legacyHeaders: false,
+  keyGenerator: (req) =>
+    (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
+    req.ip ||
+    "unknown",
+  message: { message: "Too many requests. Please wait before browsing the directory again." },
+});
+
+const changesRateLimit = rateLimit({
+  windowMs: 60 * 1_000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) =>
+    (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
+    req.ip ||
+    "unknown",
+  message: { message: "Too many requests. Please wait before fetching sponsor changes again." },
+});
+
 export function registerSponsorRoutes(app: Express): void {
   app.get('/api/sponsors/free-search', async (req: any, res) => {
     try {
-      const q = (req.query.q as string || "").trim();
+      const q = (req.query.q as string || "").trim().slice(0, 200);
       if (q.length < 3) {
         return res.status(400).json({ message: "Search query must be at least 3 characters long." });
       }
@@ -208,7 +236,7 @@ export function registerSponsorRoutes(app: Express): void {
 
   app.get('/api/sponsors/search', isAuthenticated, async (req: any, res) => {
     try {
-      const q = (req.query.q as string || "").trim();
+      const q = (req.query.q as string || "").trim().slice(0, 200);
       if (q.length < 3) {
         return res.status(400).json({ message: "Search query must be at least 3 characters long." });
       }
@@ -241,16 +269,30 @@ export function registerSponsorRoutes(app: Express): void {
     }
   });
 
-  app.get('/api/sponsors/directory', async (req: any, res) => {
+  app.get('/api/sponsors/directory', directoryRateLimit, async (req: any, res) => {
     try {
-      const VALID_STATUSES = ["ACTIVE", "NEWLY_GRANTED", "REMOVED_REVOKED", "GRACE_PERIOD"];
-      const name   = (req.query.name   as string || "").trim() || null;
-      const statusParam = (req.query.status as string || "").toUpperCase();
-      const status = VALID_STATUSES.includes(statusParam) ? statusParam : null;
-      const town   = (req.query.town   as string || "").trim() || null;
-      const route  = (req.query.route  as string || "").trim() || null;
-      const page   = Math.max(1, parseInt(req.query.page  as string) || 1);
-      const limit  = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
+      // Validate and sanitize all query params at the boundary.
+      // Returns 400 on invalid input (e.g. unknown status, non-integer page).
+      const dirParsed = z.object({
+        name:   z.string().trim().max(200).optional().default(""),
+        status: z.preprocess(
+          (v) => typeof v === "string" && v.trim() ? v.trim().toUpperCase() : undefined,
+          z.enum(["ACTIVE", "NEWLY_GRANTED", "REMOVED_REVOKED", "GRACE_PERIOD"]).optional(),
+        ),
+        town:   z.string().trim().max(200).optional().default(""),
+        route:  z.string().trim().max(200).optional().default(""),
+        page:   z.coerce.number().int().min(1).max(10_000).default(1),
+        limit:  z.coerce.number().int().min(1).max(100).default(50),
+      }).safeParse(req.query);
+      if (!dirParsed.success) {
+        return res.status(400).json({ message: "Invalid query parameters.", errors: dirParsed.error.flatten().fieldErrors });
+      }
+      const name   = dirParsed.data.name   || null;
+      const status = dirParsed.data.status ?? null;
+      const town   = dirParsed.data.town   || null;
+      const route  = dirParsed.data.route  || null;
+      const page   = dirParsed.data.page;
+      const limit  = dirParsed.data.limit;
       const offset = (page - 1) * limit;
 
       const nameFilter   = name   ? sql`AND current_name ILIKE ${"%" + name + "%"}`     : sql``;
@@ -716,7 +758,7 @@ export function registerSponsorRoutes(app: Express): void {
   });
 
   // Public sponsor changes endpoint (last 7 days, grouped by date)
-  app.get('/api/sponsor-changes', async (req, res) => {
+  app.get('/api/sponsor-changes', changesRateLimit, async (req, res) => {
     try {
       // 7-day feed is static between nightly runs — cache for 10 min.
       // sponsors:changes is flushed by sponsorMonitorJob via cacheFlushPattern("sponsors:*").
