@@ -4,6 +4,7 @@ import { sql, eq, inArray, desc } from "drizzle-orm";
 import { sponsorCanonical, sponsorChanges, sponsorEnrichment } from "@shared/schema";
 import { cacheGet, cacheSet } from "../utils/redisClient";
 import { getAppUrl } from "../utils/appUrl";
+import { ensureIndexReady, getIndexData, type SearchIndexEntry } from "../utils/sponsorSearch";
 import rateLimit from "express-rate-limit";
 
 /** Wrap a CSV field value in quotes if it contains commas, quotes, or newlines. */
@@ -96,6 +97,7 @@ export function registerSponsorPageRoutes(app: Express): void {
 
       const payload = { ...sponsor, recentChanges, totalChanges, enrichment };
       await cacheSet(cacheKey, payload, 3600);
+      res.set("Cache-Control", "public, max-age=3600, stale-while-revalidate=7200");
       res.json(payload);
     } catch (err) {
       console.error("Sponsor detail error:", err);
@@ -186,6 +188,33 @@ export function registerSponsorPageRoutes(app: Express): void {
     } catch (err) {
       console.error(`Sitemap sponsors page ${page} error:`, err);
       res.status(500).send("Sitemap page unavailable");
+    }
+  });
+
+  // ── Client-side instant search index ────────────────────────────────────
+  // Returns a compact JSON array used by the browser for zero-latency search.
+  // Backed by the same in-memory Fuse.js dataset — no extra DB query when warm.
+  // The gzip compression middleware (level 6) reduces ~10MB → ~1.5MB in transit.
+  // Cached 12hr in Redis + HTTP (CDN-friendly). Invalidated on nightly index rebuild.
+  app.get("/api/sponsors/search-index.json", async (_req: any, res) => {
+    const cacheKey = "sponsors:search-index-json";
+    const cached = await cacheGet<SearchIndexEntry[]>(cacheKey);
+    if (cached) {
+      res.set("Content-Type", "application/json");
+      res.set("Cache-Control", "public, max-age=43200, stale-while-revalidate=86400");
+      return res.json(cached);
+    }
+
+    try {
+      await ensureIndexReady();
+      const data = getIndexData();
+      await cacheSet(cacheKey, data, 43200);  // 12hr — matches nightly rebuild cadence
+      res.set("Content-Type", "application/json");
+      res.set("Cache-Control", "public, max-age=43200, stale-while-revalidate=86400");
+      res.json(data);
+    } catch (err) {
+      console.error("Search index export error:", err);
+      res.status(500).json({ message: "Search index unavailable." });
     }
   });
 

@@ -161,15 +161,66 @@ interface HeroSectionProps {
 }
 
 interface FreeSearchResult {
-  fingerprint: string;
+  id?:             number;
+  fingerprint:     string;
   organisationName: string;
-  townCity: string | null;
-  typeRating: string | null;
-  route: string | null;
-  status: string;
-  matchScore: number;
-  grantedAt: string | null;
-  isNew: boolean;
+  townCity:        string | null;
+  typeRating:      string | null;
+  route:           string | null;
+  status:          string;
+  matchScore:      number;
+  grantedAt:       string | null;
+  isNew:           boolean;
+}
+
+// ── Client-side instant search index ─────────────────────────────────────────
+// Cached at module level — survives re-renders and only fetches once per session.
+
+interface IndexEntry { id: number; n: string; c: string | null; r: string | null; t: string | null; s: string }
+
+let _clientIndex: IndexEntry[] | null = null;
+let _indexFetching = false;
+
+function preloadSearchIndex(): void {
+  if (_clientIndex !== null || _indexFetching) return;
+  _indexFetching = true;
+  fetch("/api/sponsors/search-index.json")
+    .then((res) => res.json())
+    .then((data) => { _clientIndex = data; })
+    .catch(() => {})
+    .finally(() => { _indexFetching = false; });
+}
+
+function clientSearch(q: string, limit = 20): FreeSearchResult[] {
+  if (!_clientIndex) return [];
+  const query = q.toLowerCase();
+  type Scored = { e: IndexEntry; score: number };
+  const hits: Scored[] = [];
+  for (const e of _clientIndex) {
+    const name = e.n.toLowerCase();
+    if (name.includes(query)) {
+      hits.push({ e, score: name.startsWith(query) ? 2 : 1 });
+    }
+  }
+  return hits
+    .sort((a, b) => b.score - a.score || a.e.n.localeCompare(b.e.n))
+    .slice(0, limit)
+    .map(({ e }) => ({
+      id:               e.id,
+      fingerprint:      String(e.id),
+      organisationName: e.n,
+      townCity:         e.c,
+      typeRating:       e.t,
+      route:            e.r,
+      status:           e.s,
+      matchScore:       100,
+      grantedAt:        null,
+      isNew:            e.s === "NEWLY_GRANTED",
+    }));
+}
+
+function toHeroSlug(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim().replace(/\s+/g, "-").slice(0, 80);
 }
 
 export default function HeroSection({ onStartVerification }: HeroSectionProps) {
@@ -186,14 +237,37 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
     setIsLoaded(true)
   }, [])
 
+  // Pre-load the client-side search index on mount so it's ready by the time
+  // the user types. (Fire-and-forget; failures are silently ignored.)
+  useEffect(() => { preloadSearchIndex(); }, [])
+
+  // Reactive instant search: runs on every keystroke once the index is loaded.
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (q.length < 3) return;
+    if (_clientIndex !== null) {
+      setSearchResults(clientSearch(q));
+      setHasSearched(true);
+      setSearchLoading(false);
+    }
+  }, [searchQuery])
+
   const handleSearchSubmit = async () => {
-    if (searchQuery.trim().length < 3) return;
+    const q = searchQuery.trim();
+    if (q.length < 3) return;
+    // If the client index is already loaded, the useEffect already populated results
+    if (_clientIndex !== null) {
+      setSearchResults(clientSearch(q));
+      setHasSearched(true);
+      return;
+    }
+    // Fallback: server-side search when index hasn't loaded yet
     setSearchLoading(true);
     setSearchResults([]);
     setSearchUnavailable(false);
     setHasSearched(true);
     try {
-      const res = await fetch(`/api/sponsors/free-search?q=${encodeURIComponent(searchQuery.trim())}`);
+      const res = await fetch(`/api/sponsors/free-search?q=${encodeURIComponent(q)}`);
       const data = await res.json();
       if (res.ok) {
         setSearchResults(data.results || []);
@@ -328,8 +402,9 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                         const isRemoved = !isActive && !isNew && !isGrace;
                         const isBRated = (r.typeRating || "").toLowerCase().includes("b");
                         const grantedYear = r.grantedAt ? new Date(r.grantedAt).getFullYear() : null;
-                        return (
-                          <div key={r.fingerprint} className="bg-white/10 border border-white/15 rounded-lg px-3.5 py-2.5 flex items-center justify-between gap-2">
+                        const detailHref = r.id ? `/sponsor/${r.id}/${toHeroSlug(r.organisationName)}` : null;
+                        const inner = (
+                          <div className="bg-white/10 border border-white/15 rounded-lg px-3.5 py-2.5 flex items-center justify-between gap-2 hover:bg-white/15 transition-colors">
                             <div className="min-w-0">
                               <p className="font-semibold text-white text-sm truncate">{r.organisationName}</p>
                               <p className="text-xs text-white/55 mt-0.5 truncate">
@@ -345,6 +420,9 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                             </div>
                           </div>
                         );
+                        return detailHref
+                          ? <Link key={r.fingerprint} href={detailHref}>{inner}</Link>
+                          : <div key={r.fingerprint}>{inner}</div>;
                       })}
                       <div className="pt-1 text-center">
                         <Link href="/pricing" className="text-xs text-emerald-300 hover:text-emerald-200 font-semibold">

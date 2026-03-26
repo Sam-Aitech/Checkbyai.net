@@ -4,38 +4,66 @@ import { sponsorCanonical } from "@shared/schema";
 import { inArray, sql } from "drizzle-orm";
 
 interface SponsorSearchRecord {
-  fingerprint: string;
+  id:              number;
+  fingerprint:     string;
   organisationName: string;
-  townCity: string | null;
-  typeRating: string | null;
-  route: string | null;
-  status: string;
-  grantedAt: string | null;
+  townCity:        string | null;
+  typeRating:      string | null;
+  route:           string | null;
+  status:          string;
+  grantedAt:       string | null;
   historicalNames: string[];
 }
 
 export interface SponsorSearchResult {
-  fingerprint: string;
+  id:              number;
+  fingerprint:     string;
   organisationName: string;
-  townCity: string | null;
-  typeRating: string | null;
-  route: string | null;
-  status: string;
-  matchScore: number;
-  grantedAt: string | null;
-  isNew: boolean;          // true when status === 'NEWLY_GRANTED'
+  townCity:        string | null;
+  typeRating:      string | null;
+  route:           string | null;
+  status:          string;
+  matchScore:      number;
+  grantedAt:       string | null;
+  isNew:           boolean;          // true when status === 'NEWLY_GRANTED'
   historicalNames: string[];
-  source: "index" | "db"; // "index" = Fuse.js, "db" = pg_trgm fallback
+  source:          "index" | "db";  // "index" = Fuse.js, "db" = pg_trgm fallback
+}
+
+/** Minimal record shape served to the client as the instant-search JSON index. */
+export interface SearchIndexEntry {
+  id:   number;
+  n:    string;        // organisationName
+  c:    string | null; // townCity
+  r:    string | null; // route
+  t:    string | null; // typeRating
+  s:    string;        // status (abbreviated key saves ~20% payload size)
 }
 
 // ── Index state ───────────────────────────────────────────────────────────────
 let fuseIndex: Fuse<SponsorSearchRecord> | null = null;
+let rawRecords: SponsorSearchRecord[] = []; // kept for the JSON search-index export
 let indexRecordCount = 0;  // guards against empty-index false-positives
 let indexBuiltAt: number = 0;
 
 // Single rebuild promise — deduplicates all concurrent callers onto one DB fetch.
 // Without this, N concurrent requests at cold-start each trigger a full table scan.
 let rebuildPromise: Promise<void> | null = null;
+
+/**
+ * Returns the minimal flat array used to power client-side instant search.
+ * Caller must call ensureIndexReady() first to guarantee the data is populated.
+ */
+export function getIndexData(): SearchIndexEntry[] {
+  return rawRecords.map((r) => ({
+    id: r.id,
+    n:  r.organisationName,
+    c:  r.townCity,
+    r:  r.route,
+    t:  r.typeRating,
+    s:  r.status,
+  }));
+}
 
 const FUSE_OPTIONS: IFuseOptions<SponsorSearchRecord> = {
   keys: [
@@ -60,6 +88,7 @@ export async function rebuildSponsorIndex(): Promise<void> {
   const buildStart = Date.now();
   const records = await db
     .select({
+      id:               sponsorCanonical.id,
       fingerprint:      sponsorCanonical.fingerprint,
       organisationName: sponsorCanonical.currentName,
       townCity:         sponsorCanonical.townCity,
@@ -73,6 +102,7 @@ export async function rebuildSponsorIndex(): Promise<void> {
     .where(inArray(sponsorCanonical.status, ["ACTIVE", "NEWLY_GRANTED"]));
 
   const searchRecords: SponsorSearchRecord[] = records.map((r) => ({
+    id:               r.id,
     fingerprint:      r.fingerprint,
     organisationName: r.organisationName,
     townCity:         r.townCity,
@@ -84,6 +114,7 @@ export async function rebuildSponsorIndex(): Promise<void> {
   }));
 
   fuseIndex = new Fuse(searchRecords, FUSE_OPTIONS);
+  rawRecords = searchRecords;  // store for getIndexData()
   indexRecordCount = searchRecords.length;
   indexBuiltAt = Date.now();
   console.log(
@@ -160,6 +191,7 @@ export function searchSponsors(
 
   return {
     results: pageHits.map((r) => ({
+      id:               r.item.id,
       fingerprint:      r.item.fingerprint,
       organisationName: r.item.organisationName,
       townCity:         r.item.townCity,
@@ -212,6 +244,7 @@ export async function searchSponsorsFallback(
     const [dataRows, countRows] = await Promise.all([
       db.execute(sql`
         SELECT
+          id,
           fingerprint,
           current_name        AS "organisationName",
           town_city           AS "townCity",
@@ -263,6 +296,7 @@ export async function searchSponsorsFallback(
 
     return {
       results: (dataRows.rows as any[]).map((r) => ({
+        id:               r.id,
         fingerprint:      r.fingerprint,
         organisationName: r.organisationName,
         townCity:         r.townCity ?? null,

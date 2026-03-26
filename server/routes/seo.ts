@@ -11,6 +11,30 @@ function escapeAttr(str: string): string {
   return str.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+// In-memory HTML template cache — eliminates repeated disk reads per bot request.
+// Key = resolved file path; value = file contents (string).
+// Cleared in tests by setting htmlCache = new Map() if needed.
+const htmlCache = new Map<string, string>();
+
+function readHtmlTemplate(filePath: string): string | null {
+  const cached = htmlCache.get(filePath);
+  if (cached) return cached;
+  try {
+    if (!fs.existsSync(filePath)) return null;
+    const content = fs.readFileSync(filePath, "utf-8");
+    htmlCache.set(filePath, content);
+    return content;
+  } catch {
+    return null;
+  }
+}
+
+// Candidate HTML template paths — production build first, dev source fallback.
+const HTML_PATHS = [
+  path.resolve("dist/public/index.html"),
+  path.resolve("client/index.html"),
+];
+
 const CORE_URLS: Array<{ path: string; priority: string; changefreq: string }> = [
   { path: '/', priority: '1.0', changefreq: 'weekly' },
   { path: '/sponsor-monitor', priority: '0.9', changefreq: 'daily' },
@@ -251,14 +275,11 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
         } : {}),
       });
 
-      // Try built path first (production), fall back to source (dev)
-      const indexPaths = [
-        path.resolve('dist/public/index.html'),
-        path.resolve('client/index.html'),
-      ];
+      // Try built path first (production), fall back to source (dev) — both cached in memory
       let html: string | null = null;
-      for (const p of indexPaths) {
-        if (fs.existsSync(p)) { html = fs.readFileSync(p, 'utf-8'); break; }
+      for (const p of HTML_PATHS) {
+        html = readHtmlTemplate(p);
+        if (html) break;
       }
       if (!html) return next();
 
@@ -278,6 +299,8 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
       html = html.replace('</head>', `<script type="application/ld+json">${schema}</script>\n</head>`);
 
       res.set('Content-Type', 'text/html');
+      // CDN-friendly: sponsor pages are static between nightly runs
+      res.set('Cache-Control', 'public, max-age=3600, stale-while-revalidate=7200');
       res.send(html);
     } catch (err) {
       console.error('Sponsor page meta injection error:', err);
@@ -355,8 +378,12 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
     if (!accept.includes('text/html')) return next();
 
     try {
-      const indexPath = path.resolve('client/index.html');
-      let html = fs.readFileSync(indexPath, 'utf-8');
+      let html: string | null = null;
+      for (const p of HTML_PATHS) {
+        html = readHtmlTemplate(p);
+        if (html) break;
+      }
+      if (!html) return next();
       const { title, description } = routeMeta;
       const canonical = `${getAppUrl()}${req.path === '/' ? '/' : req.path}`;
 
