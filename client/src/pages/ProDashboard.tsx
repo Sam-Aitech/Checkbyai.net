@@ -347,11 +347,12 @@ function MonitorTab({ user }: { user: any }) {
 
   const { data: results, isFetching: searching } = useQuery<SponsorSearchResult[]>({
     queryKey:["/api/sponsors/search", dq],
-    enabled: dq.trim().length >= 2,
+    enabled: dq.trim().length >= 3,
     queryFn: async () => {
       const r = await fetch(`/api/sponsors/search?q=${encodeURIComponent(dq.trim())}`, { credentials:"include" });
       if(!r.ok) throw new Error();
-      return r.json();
+      const data = await r.json();
+      return data.results ?? data;
     },
     retry:false,
   });
