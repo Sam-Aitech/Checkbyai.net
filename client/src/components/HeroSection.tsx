@@ -3,7 +3,7 @@ import { useState, useEffect, Suspense, lazy } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { useInView } from 'react-intersection-observer'
-import { Zap, Lock, ArrowRight, Play, Bell, Activity, CheckCircle, XCircle, AlertTriangle, ShieldCheck, Eye, Search, MapPin, Loader2 } from 'lucide-react'
+import { Zap, Lock, ArrowRight, Play, Bell, Activity, CheckCircle, XCircle, AlertTriangle, ShieldCheck, Eye, Search, Loader2 } from 'lucide-react'
 import { ShieldMonitorIcon, AlertBellIcon, DocumentVerifyIcon, TimelineClockIcon, EarlyWarningIcon, CreditCoinIcon,
   HeroAlertIcon,
   HeroTrackedIcon,
@@ -14,7 +14,6 @@ import { ShieldMonitorIcon, AlertBellIcon, DocumentVerifyIcon, TimelineClockIcon
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Link, useLocation } from 'wouter'
 import logoImg from "@assets/logo_material.png";
@@ -619,86 +618,23 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
             Check Your Sponsor Right Now
           </h2>
           <p className="text-base text-muted-foreground mb-8 max-w-xl mx-auto">
-            Search 124,000+ licensed sponsors from the official UK Home Office Register. Free, unlimited, no login required.
+            124,000+ licensed sponsors from the official UK Home Office Register. Free, unlimited, no login required.
           </p>
-          <div className="relative max-w-lg mx-auto mb-4">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
-            <Input
-              type="text"
-              placeholder="Type your employer name..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearchSubmit()}
-              className="pl-11 h-14 text-base border-2 border-slate-200 dark:border-slate-700 focus-visible:ring-emerald-500 focus-visible:border-emerald-500 rounded-xl"
-            />
-            <Button onClick={handleSearchSubmit} disabled={searchQuery.trim().length < 3 || searchLoading} className="absolute right-2 top-1/2 -translate-y-1/2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 rounded-lg px-4 h-10">
-              {searchLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Search"}
-            </Button>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Link href="/sponsors">
+              <Button size="lg" className="bg-slate-900 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 text-white rounded-full px-8 font-bold shadow-md">
+                <Search className="w-4 h-4 mr-2" />Browse Full Register
+              </Button>
+            </Link>
+            <Link href="/sponsor-monitor">
+              <Button size="lg" variant="outline" className="rounded-full px-8 font-bold border-emerald-500 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30">
+                <Bell className="w-4 h-4 mr-2" />Set Up Monitoring
+              </Button>
+            </Link>
           </div>
-
-          {searchLoading && (
-            <div className="flex justify-center py-6">
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-            </div>
-          )}
-
-          {!searchLoading && searchUnavailable && (
-            <p className="text-sm text-amber-400 mt-4">Search temporarily unavailable — please try again in a moment.</p>
-          )}
-          {!searchLoading && !searchUnavailable && hasSearched && searchResults.length === 0 && (
-            <p className="text-sm text-muted-foreground mt-4">No sponsors found matching your search. Try a different name.</p>
-          )}
-
-          {!searchLoading && searchResults.length > 0 && (
-            <div className="max-w-lg mx-auto mt-4 text-left space-y-2">
-              {searchResults.map((r) => {
-                const isActive = r.status === "ACTIVE";
-                const isNew = r.status === "NEWLY_GRANTED";
-                const isGrace = r.status === "GRACE_PERIOD";
-                const isRemoved = !isActive && !isNew && !isGrace;
-                const isBRated = (r.typeRating || "").toLowerCase().includes("b");
-                const grantedYear = r.grantedAt ? new Date(r.grantedAt).getFullYear() : null;
-                const detailHref = r.id ? `/sponsor/${r.id}/${toHeroSlug(r.organisationName)}` : null;
-                const card = (
-                  <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between gap-3 hover:border-emerald-500 hover:shadow-sm transition-all">
-                    <div className="min-w-0">
-                      <p className="font-semibold text-foreground text-sm truncate">{r.organisationName}</p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                        {r.townCity && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{r.townCity}</span>}
-                        {r.route && <span>{r.route}</span>}
-                        {grantedYear && <span>since {grantedYear}</span>}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {isNew && <Badge className="bg-blue-600 text-white border-blue-700 rounded-full text-[11px] font-bold px-2.5"><CheckCircle className="w-3 h-3 mr-1" />New</Badge>}
-                      {isActive && <Badge className="bg-emerald-600 text-white border-emerald-700 rounded-full text-[11px] font-bold px-2.5"><CheckCircle className="w-3 h-3 mr-1" />Active</Badge>}
-                      {isGrace && <Badge className="bg-amber-500 text-white border-amber-600 rounded-full text-[11px] font-bold px-2.5"><AlertTriangle className="w-3 h-3 mr-1" />Under Review</Badge>}
-                      {isRemoved && <Badge className="bg-red-600 text-white border-red-700 rounded-full text-[11px] font-bold px-2.5"><XCircle className="w-3 h-3 mr-1" />Revoked</Badge>}
-                      {isBRated && <Badge className="bg-orange-500 text-white border-orange-600 rounded-full text-[11px] font-bold px-2.5"><AlertTriangle className="w-3 h-3 mr-1" />B-Rated</Badge>}
-                    </div>
-                  </div>
-                );
-                return detailHref
-                  ? <Link key={r.fingerprint} href={detailHref}>{card}</Link>
-                  : <div key={r.fingerprint}>{card}</div>;
-              })}
-              <div className="text-center pt-3">
-                <p className="text-xs text-muted-foreground mb-2">Get instant alerts when this sponsor's status changes.</p>
-                <Link href="/pricing">
-                  <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-full px-5 font-bold text-xs">
-                    <Bell className="w-3.5 h-3.5 mr-1.5" />Set Up Alerts — from £24.99/mo
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          )}
-
-          {!hasSearched && (
-            <p className="text-xs text-muted-foreground">
-              Free, unlimited searches. No login required.{" "}
-              <Link href="/pricing" className="text-primary font-semibold hover:underline">Subscribe for real-time alerts</Link>
-            </p>
-          )}
+          <p className="text-xs text-muted-foreground mt-4">
+            Already searched above? <Link href="/pricing" className="text-primary font-semibold hover:underline">Subscribe for real-time alerts →</Link>
+          </p>
         </div>
       </section>
 
