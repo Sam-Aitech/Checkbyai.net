@@ -8,6 +8,7 @@ import { logger } from "./utils/logger";
 
 // Import the job queue setup
 import { initJobQueue, setupWorkers } from "./services/jobQueue";
+import { initRedisCache } from "./utils/redisClient";
 
 // Startup validation — fail fast if truly critical env vars are missing
 // ADMIN_EMAIL is intentionally excluded: the app handles its absence gracefully (admin emails disabled)
@@ -406,8 +407,9 @@ async function applyPendingMigrations() {
     serveStatic(app);
   }
 
-  // Probe Redis and initialise BullMQ queues (no-op if Redis is unavailable)
+  // Probe Redis: initialise BullMQ queues + shared cache client (no-op if Redis is unavailable)
   await initJobQueue();
+  await initRedisCache();
   setupWorkers();
 
   // ALWAYS serve the app on port 5000

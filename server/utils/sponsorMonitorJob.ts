@@ -7,6 +7,7 @@ import { ensureTodaysArchive, getArchiveForDate, parseCsvFile } from "./csvArchi
 import { runCsvDiff, type CsvDiffResult } from "./binaryRunner";
 import { applyStateMachine } from "./sponsorStateMachine";
 import { rebuildSponsorIndex } from "./sponsorSearch";
+import { cacheFlushPattern } from "./redisClient";
 import { processDelayedNotifications } from "./notificationDispatcher";
 import { notifyUsersOfEvent, processQueuedEngineEvents } from "../services/notificationEngine";
 import { generateHeadline, type RawDigestData } from "../services/aiDigest";
@@ -436,6 +437,13 @@ export async function runSponsorMonitorJob(source: string = "cron", notifyOnFail
     }
 
     await rebuildSponsorIndex();
+
+    // Flush stale Redis cache so the next request picks up the fresh index data.
+    // Non-fatal: if Redis is down, cacheFlushPattern returns 0 silently.
+    const flushed = await cacheFlushPattern("sponsors:*");
+    if (flushed > 0) {
+      console.log(`[SponsorMonitorJob] Flushed ${flushed} Redis cache keys after nightly rebuild.`);
+    }
 
     const changeCounts: Record<string, number> = {};
     for (const change of smResult.changes) {

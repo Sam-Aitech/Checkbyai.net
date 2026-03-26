@@ -6,18 +6,37 @@ import { z } from "zod";
 import { isAuthenticated, isAdmin } from "../auth";
 import { getWatchLimit as getWatchLimitFromTier, getTierConfig } from "../utils/tierConfig";
 import { normalizeName, generateFingerprint } from "../utils/sponsorListFetcher";
-import { ensureIndexReady, isIndexReady, searchSponsors, searchSponsorsFallback } from "../utils/sponsorSearch";
+import { ensureIndexReady, isIndexReady, searchSponsors, searchSponsorsFallback, type PagedSearchResult } from "../utils/sponsorSearch";
 import { generateHeadline, signDigest } from "../services/aiDigest";
 import { storage } from "../storage";
+import { getRedis, cacheGet, cacheSet } from "../utils/redisClient";
 
-const freeSearchTracker = new Map<string, number>();
+// ── Free-search rate limiter ─────────────────────────────────────────────────
+// Redis primary (cross-instance, survives restarts) with in-process Map fallback.
+const localFreeSearchTracker = new Map<string, number>();
 setInterval(() => {
   const now = Date.now();
-  const entries = Array.from(freeSearchTracker.entries());
-  for (const [ip, ts] of entries) {
-    if (now - ts > 24 * 60 * 60 * 1000) freeSearchTracker.delete(ip);
+  for (const [ip, ts] of Array.from(localFreeSearchTracker.entries())) {
+    if (now - ts > 24 * 60 * 60 * 1000) localFreeSearchTracker.delete(ip);
   }
 }, 60 * 60 * 1000);
+
+async function hasFreeSearchUsed(ip: string): Promise<boolean> {
+  const redis = getRedis();
+  if (redis) {
+    try { return (await redis.exists(`sponsors:freesearch:${ip}`)) > 0; } catch { /* fall through */ }
+  }
+  const ts = localFreeSearchTracker.get(ip);
+  return ts !== undefined && Date.now() - ts < 24 * 60 * 60 * 1000;
+}
+
+async function markFreeSearchUsed(ip: string): Promise<void> {
+  const redis = getRedis();
+  if (redis) {
+    try { await redis.set(`sponsors:freesearch:${ip}`, "1", "EX", 86400); return; } catch { /* fall through */ }
+  }
+  localFreeSearchTracker.set(ip, Date.now());
+}
 
 function getWatchLimit(subscriptionStatus: string | null): number {
   return getWatchLimitFromTier(subscriptionStatus);
@@ -32,8 +51,7 @@ export function registerSponsorRoutes(app: Express): void {
       }
 
       const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || req.connection?.remoteAddress || 'unknown';
-      const lastSearch = freeSearchTracker.get(ip);
-      if (lastSearch && Date.now() - lastSearch < 24 * 60 * 60 * 1000) {
+      if (await hasFreeSearchUsed(ip)) {
         return res.status(429).json({
           message: "You've used your free search for today. Subscribe to the Notification Engine for unlimited searches and real-time alerts.",
           limitReached: true,
@@ -46,7 +64,7 @@ export function registerSponsorRoutes(app: Express): void {
         ? searchSponsors(q, opts)
         : await searchSponsorsFallback(q, opts);
 
-      freeSearchTracker.set(ip, Date.now());
+      await markFreeSearchUsed(ip);
       res.json({ results: paged?.results ?? [], freeSearchUsed: true });
     } catch (error) {
       console.error("Error in free sponsor search:", error);
@@ -204,12 +222,19 @@ export function registerSponsorRoutes(app: Express): void {
 
       const opts = { status, town, page, limit };
 
+      // L1 Redis cache: TTL 5 min — avoids redundant Fuse/pg_trgm work for repeated queries.
+      const cacheKey = `sponsors:search:${Buffer.from(JSON.stringify({ q, status, town, page, limit })).toString("base64")}`;
+      const cached = await cacheGet<PagedSearchResult>(cacheKey);
+      if (cached) return res.json(cached);
+
       await ensureIndexReady();
       const paged = isIndexReady()
         ? searchSponsors(q, opts)
         : await searchSponsorsFallback(q, opts);
 
-      res.json(paged ?? { results: [], total: 0, page: 1, totalPages: 1 });
+      const searchResult = paged ?? { results: [], total: 0, page: 1, totalPages: 1 };
+      await cacheSet(cacheKey, searchResult, 300);
+      res.json(searchResult);
     } catch (error) {
       console.error("Error searching sponsors:", error);
       res.status(500).json({ message: "Failed to search sponsors." });
@@ -233,7 +258,12 @@ export function registerSponsorRoutes(app: Express): void {
       const townFilter   = town   ? sql`AND town_city ILIKE ${"%" + town + "%"}`         : sql``;
       const routeFilter  = route  ? sql`AND route ILIKE ${"%" + route + "%"}`            : sql``;
 
-      const [rows, countRows, statsRows] = await Promise.all([
+      // Stats are an expensive full-table aggregation that only change once per nightly run.
+      // Cache them for 10 minutes; flushed by sponsorMonitorJob after each successful run.
+      type DirectoryStats = { active: number; newlyGranted: number; removedThisWeek: number; gracePeriod: number };
+      let stats = await cacheGet<DirectoryStats>("sponsors:stats");
+
+      const [rows, countRows] = await Promise.all([
         db.execute(sql`
           SELECT
             fingerprint,
@@ -271,32 +301,38 @@ export function registerSponsorRoutes(app: Express): void {
             ${townFilter}
             ${routeFilter}
         `),
-        db.execute(sql`
+      ]);
+
+      if (!stats) {
+        const statsRows = await db.execute(sql`
           SELECT
             COUNT(*) FILTER (WHERE status = 'ACTIVE')                                                        AS active,
             COUNT(*) FILTER (WHERE status = 'NEWLY_GRANTED')                                                 AS "newlyGranted",
             COUNT(*) FILTER (WHERE status = 'REMOVED_REVOKED' AND removed_at >= NOW() - INTERVAL '7 days')  AS "removedThisWeek",
             COUNT(*) FILTER (WHERE status = 'GRACE_PERIOD')                                                  AS "gracePeriod"
           FROM sponsor_canonical
-        `),
-      ]);
+        `);
+        const raw = statsRows.rows[0] as any;
+        stats = {
+          active:          Number(raw?.active ?? 0),
+          newlyGranted:    Number(raw?.newlyGranted ?? 0),
+          removedThisWeek: Number(raw?.removedThisWeek ?? 0),
+          gracePeriod:     Number(raw?.gracePeriod ?? 0),
+        };
+        await cacheSet("sponsors:stats", stats, 600);
+      }
 
       const total      = (countRows.rows[0] as any)?.total ?? 0;
       const totalPages = Math.max(1, Math.ceil(total / limit));
-      const stats      = statsRows.rows[0] as any;
 
+      res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
       res.json({
         results: rows.rows,
         total,
         page,
         totalPages,
         limit,
-        stats: {
-          active:          Number(stats?.active ?? 0),
-          newlyGranted:    Number(stats?.newlyGranted ?? 0),
-          removedThisWeek: Number(stats?.removedThisWeek ?? 0),
-          gracePeriod:     Number(stats?.gracePeriod ?? 0),
-        },
+        stats,
       });
     } catch (error: unknown) {
       console.error("Error in sponsor directory:", error);
