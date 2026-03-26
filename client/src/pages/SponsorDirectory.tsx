@@ -4,7 +4,7 @@ import { Link } from "wouter";
 import {
   Search, Building2, MapPin, Route, Star, CheckCircle, Zap, XCircle,
   Clock, AlertTriangle, ChevronLeft, ChevronRight, ExternalLink, Shield,
-  Loader2, RefreshCw,
+  Loader2, RefreshCw, Download,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -185,11 +185,14 @@ function Pagination({
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
+const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+
 export default function SponsorDirectory() {
   const [nameInput, setNameInput]   = useState("");
   const [statusFilter, setStatus]   = useState("");
   const [townInput, setTownInput]   = useState("");
   const [routeInput, setRouteInput] = useState("");
+  const [letterFilter, setLetter]   = useState("");
   const [page, setPage]             = useState(1);
 
   const name  = useDebounce(nameInput,  400);
@@ -204,13 +207,14 @@ export default function SponsorDirectory() {
     if (statusFilter) p.set("status", statusFilter);
     if (town)         p.set("town",   town);
     if (route)        p.set("route",  route);
+    if (letterFilter) p.set("letter", letterFilter);
     p.set("page",  String(page));
     p.set("limit", "50");
     return p.toString();
   };
 
   const { data, isLoading, isFetching, isError } = useQuery<DirectoryResponse>({
-    queryKey: ["/api/sponsors/directory", name, statusFilter, town, route, page],
+    queryKey: ["/api/sponsors/directory", name, statusFilter, town, route, letterFilter, page],
     queryFn: async () => {
       const res = await fetch(`/api/sponsors/directory?${buildQuery()}`);
       if (!res.ok) throw new Error("Failed to load directory");
@@ -221,9 +225,14 @@ export default function SponsorDirectory() {
   });
 
   const handleStatusChange = (value: string) => { setStatus(value);     resetPage(); };
-  const handleNameChange  = (v: string)      => { setNameInput(v);     resetPage(); };
+  const handleNameChange  = (v: string)      => { setNameInput(v);     setLetter(""); resetPage(); };
   const handleTownChange  = (v: string)      => { setTownInput(v);     resetPage(); };
   const handleRouteChange = (v: string)      => { setRouteInput(v);    resetPage(); };
+  const handleLetterClick = (l: string)      => {
+    setLetter(l === letterFilter ? "" : l);
+    setNameInput("");
+    resetPage();
+  };
 
   const stats = data?.stats;
 
@@ -255,12 +264,20 @@ export default function SponsorDirectory() {
               </a>
             </p>
           </div>
-          <Link href="/sponsor-monitor">
-            <Button variant="default" size="sm" className="shrink-0">
-              <Zap className="w-4 h-4 mr-1.5" />
-              Monitor a Sponsor
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2 flex-wrap">
+            <a href="/api/sponsors/export.csv" download>
+              <Button variant="outline" size="sm" className="shrink-0">
+                <Download className="w-4 h-4 mr-1.5" />
+                Download CSV
+              </Button>
+            </a>
+            <Link href="/sponsor-monitor">
+              <Button variant="default" size="sm" className="shrink-0">
+                <Zap className="w-4 h-4 mr-1.5" />
+                Monitor a Sponsor
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* ── Stats bar ── */}
@@ -338,6 +355,34 @@ export default function SponsorDirectory() {
                 {tab.label}
               </button>
             ))}
+          </div>
+
+          {/* A–Z quick filter */}
+          <div className="border-t pt-3">
+            <div className="flex items-center gap-1 flex-wrap">
+              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mr-1">A–Z</span>
+              {ALPHABET.map((l) => (
+                <button
+                  key={l}
+                  onClick={() => handleLetterClick(l)}
+                  className={`w-7 h-7 rounded text-xs font-semibold border transition-colors ${
+                    letterFilter === l
+                      ? "bg-primary text-white border-primary"
+                      : "bg-transparent text-muted-foreground border-slate-200 dark:border-slate-700 hover:border-primary hover:text-primary"
+                  }`}
+                >
+                  {l}
+                </button>
+              ))}
+              {letterFilter && (
+                <button
+                  onClick={() => handleLetterClick("")}
+                  className="ml-1 px-2 h-7 rounded text-xs font-medium text-muted-foreground border border-slate-200 dark:border-slate-700 hover:border-destructive hover:text-destructive transition-colors"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
           </div>
         </div>
 

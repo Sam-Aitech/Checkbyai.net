@@ -249,6 +249,7 @@ export function registerSponsorRoutes(app: Express): void {
         ),
         town:   z.string().trim().max(200).optional().default(""),
         route:  z.string().trim().max(200).optional().default(""),
+        letter: z.string().trim().max(1).regex(/^[A-Za-z]$/).optional(),
         page:   z.coerce.number().int().min(1).max(10_000).default(1),
         limit:  z.coerce.number().int().min(1).max(100).default(50),
       }).safeParse(req.query);
@@ -259,6 +260,7 @@ export function registerSponsorRoutes(app: Express): void {
       const status = dirParsed.data.status ?? null;
       const town   = dirParsed.data.town   || null;
       const route  = dirParsed.data.route  || null;
+      const letter = dirParsed.data.letter ?? null;
       const page   = dirParsed.data.page;
       const limit  = dirParsed.data.limit;
       const offset = (page - 1) * limit;
@@ -267,13 +269,15 @@ export function registerSponsorRoutes(app: Express): void {
       const statusFilter = status ? sql`AND status = ${status}`                          : sql``;
       const townFilter   = town   ? sql`AND town_city ILIKE ${"%" + town + "%"}`         : sql``;
       const routeFilter  = route  ? sql`AND route ILIKE ${"%" + route + "%"}`            : sql``;
+      // Letter filter: starts-with, case-insensitive. Mutually exclusive with nameFilter (frontend enforces this).
+      const letterFilter = letter ? sql`AND current_name ILIKE ${letter.toUpperCase() + "%"}` : sql``;
 
       type DirectoryStats = { active: number; newlyGranted: number; removedThisWeek: number; gracePeriod: number };
       type DirectoryResponse = { results: unknown[]; total: number; page: number; totalPages: number; limit: number; stats: DirectoryStats };
 
       // Full response cache: rows + count + stats for this exact filter+page combo.
       // TTL 5 min — always flushed after each nightly rebuild via cacheFlushPattern("sponsors:*").
-      const dirCacheKey = `sponsors:dir:${Buffer.from(JSON.stringify({ name, status, town, route, page, limit })).toString("base64")}`;
+      const dirCacheKey = `sponsors:dir:${Buffer.from(JSON.stringify({ name, status, town, route, letter, page, limit })).toString("base64")}`;
       const dirCached = await cacheGet<DirectoryResponse>(dirCacheKey);
       if (dirCached) {
         res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
@@ -304,6 +308,7 @@ export function registerSponsorRoutes(app: Express): void {
             ${statusFilter}
             ${townFilter}
             ${routeFilter}
+            ${letterFilter}
           ORDER BY
             CASE status
               WHEN 'NEWLY_GRANTED'   THEN 0
@@ -322,6 +327,7 @@ export function registerSponsorRoutes(app: Express): void {
             ${statusFilter}
             ${townFilter}
             ${routeFilter}
+            ${letterFilter}
         `),
       ]);
 

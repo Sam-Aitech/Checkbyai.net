@@ -4,6 +4,25 @@ import { sql, eq, inArray, desc } from "drizzle-orm";
 import { sponsorCanonical, sponsorChanges } from "@shared/schema";
 import { cacheGet, cacheSet } from "../utils/redisClient";
 import { getAppUrl } from "../utils/appUrl";
+import rateLimit from "express-rate-limit";
+
+/** Wrap a CSV field value in quotes if it contains commas, quotes, or newlines. */
+function csvEscape(val: string): string {
+  if (!val) return "";
+  if (val.includes(",") || val.includes('"') || val.includes("\n") || val.includes("\r")) {
+    return `"${val.replace(/"/g, '""')}"`;
+  }
+  return val;
+}
+
+// 5 CSV downloads per hour per IP — it's a heavy full-table scan.
+const csvRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1_000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: "Too many CSV downloads. Please wait before downloading again.",
+});
 
 /** URL-safe slug from a display string — used to build readable /sponsor/{id}/{slug} URLs. */
 export function toSlug(str: string): string {
@@ -149,6 +168,46 @@ export function registerSponsorPageRoutes(app: Express): void {
     } catch (err) {
       console.error(`Sitemap sponsors page ${page} error:`, err);
       res.status(500).send("Sitemap page unavailable");
+    }
+  });
+
+  // ── Public CSV export ─────────────────────────────────────────────────────
+  // Full current register (ACTIVE + NEWLY_GRANTED) as a downloadable CSV.
+  // UTF-8 BOM prepended so Excel opens it correctly without manual encoding steps.
+  // 5 downloads/hour per IP; 12hr HTTP cache for CDN.
+  app.get("/api/sponsors/export.csv", csvRateLimit, async (_req: any, res) => {
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      const rows = await db.execute(sql`
+        SELECT
+          current_name   AS name,
+          town_city      AS town,
+          type_rating    AS type_rating,
+          route,
+          status,
+          granted_at
+        FROM sponsor_canonical
+        WHERE status IN ('ACTIVE', 'NEWLY_GRANTED')
+        ORDER BY current_name ASC
+      `);
+
+      const header = "Organisation Name,Town/City,Type & Rating,Route,Status,Licence Granted\r\n";
+      const body = (rows.rows as any[]).map((r) => [
+        csvEscape(r.name      || ""),
+        csvEscape(r.town      || ""),
+        csvEscape(r.type_rating || ""),
+        csvEscape(r.route     || ""),
+        csvEscape(r.status    || ""),
+        r.granted_at ? String(r.granted_at).slice(0, 10) : "",
+      ].join(",")).join("\r\n");
+
+      res.set("Content-Type", "text/csv; charset=utf-8");
+      res.set("Content-Disposition", `attachment; filename="uk-licensed-sponsors-${today}.csv"`);
+      res.set("Cache-Control", "public, max-age=43200");  // 12 hr
+      res.send("\uFEFF" + header + body);  // BOM for Excel UTF-8 compat
+    } catch (err) {
+      console.error("CSV export error:", err);
+      res.status(500).send("Export unavailable");
     }
   });
 }

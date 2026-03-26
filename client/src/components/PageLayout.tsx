@@ -14,14 +14,15 @@ interface PageLayoutProps {
 }
 
 const navLinks = [
-  { href: "/dashboard", label: "Verify CoS" },
-  { href: "/pricing", label: "Pricing" },
-  { href: "/ai-guide", label: "AI Guide" },
-  { href: "/cos-guide", label: "CoS Guide" },
-  { href: "/technology", label: "Technology" },
   { href: "/sponsors",        label: "Sponsor Register" },
   { href: "/sponsor-monitor", label: "Sponsor Monitor" },
-  { href: "/api-docs", label: "API" },
+  { href: "/sponsor-changes", label: "Licence Changes" },
+  { href: "/dashboard",       label: "Verify CoS" },
+  { href: "/pricing",         label: "Pricing" },
+  { href: "/ai-guide",        label: "AI Guide" },
+  { href: "/cos-guide",       label: "CoS Guide" },
+  { href: "/technology",      label: "Technology" },
+  { href: "/api-docs",        label: "API" },
 ];
 
 export default function PageLayout({ children, hideNav = false, hideFooter = false }: PageLayoutProps) {
