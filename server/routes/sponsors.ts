@@ -287,6 +287,7 @@ export function registerSponsorRoutes(app: Express): void {
       const [rows, countRows] = await Promise.all([
         db.execute(sql`
           SELECT
+            id,
             fingerprint,
             current_name   AS "organisationName",
             town_city      AS "townCity",

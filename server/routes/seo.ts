@@ -2,45 +2,73 @@ import type { Express } from "express";
 import * as fs from "fs";
 import * as path from "path";
 import { getAppUrl } from "../utils/appUrl";
+import { db } from "../db";
+import { eq } from "drizzle-orm";
+import { sponsorCanonical } from "@shared/schema";
+import { toSlug } from "./sponsorPages";
+
+function escapeAttr(str: string): string {
+  return str.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+const CORE_URLS: Array<{ path: string; priority: string; changefreq: string }> = [
+  { path: '/', priority: '1.0', changefreq: 'weekly' },
+  { path: '/sponsor-monitor', priority: '0.9', changefreq: 'daily' },
+  { path: '/sponsors', priority: '0.9', changefreq: 'daily' },
+  { path: '/pricing', priority: '0.9', changefreq: 'weekly' },
+  { path: '/cos-pricing', priority: '0.8', changefreq: 'weekly' },
+  { path: '/dashboard', priority: '0.8', changefreq: 'weekly' },
+  { path: '/sponsor-changes', priority: '0.8', changefreq: 'daily' },
+  { path: '/ai-guide', priority: '0.7', changefreq: 'monthly' },
+  { path: '/cos-guide', priority: '0.7', changefreq: 'monthly' },
+  { path: '/technology', priority: '0.7', changefreq: 'monthly' },
+  { path: '/login', priority: '0.5', changefreq: 'monthly' },
+  { path: '/about', priority: '0.6', changefreq: 'monthly' },
+  { path: '/privacy', priority: '0.4', changefreq: 'yearly' },
+  { path: '/data-security', priority: '0.4', changefreq: 'yearly' },
+  { path: '/check-fake-cos', priority: '0.8', changefreq: 'monthly' },
+  { path: '/what-to-do-fake-cos', priority: '0.8', changefreq: 'monthly' },
+  { path: '/guides/how-to-check-cos-genuine', priority: '0.6', changefreq: 'monthly' },
+  { path: '/guides/cos-scams-red-flags', priority: '0.6', changefreq: 'monthly' },
+  { path: '/guides/employers-guide-fake-cos', priority: '0.5', changefreq: 'monthly' },
+  { path: '/guides/what-to-do-fake-cos', priority: '0.5', changefreq: 'monthly' },
+];
 
 export function registerSeoRoutes(app: Express): void {
+
+  // Sitemap INDEX — points to core pages + 124k sponsor detail pages
   app.get('/sitemap.xml', (req, res) => {
     const today = new Date().toISOString().split('T')[0];
     const baseUrl = getAppUrl();
-    const urls: Array<{ path: string; priority: string; changefreq: string }> = [
-      { path: '/', priority: '1.0', changefreq: 'weekly' },
-      { path: '/sponsor-monitor', priority: '0.9', changefreq: 'daily' },
-      { path: '/pricing', priority: '0.9', changefreq: 'weekly' },
-      { path: '/cos-pricing', priority: '0.8', changefreq: 'weekly' },
-      { path: '/dashboard', priority: '0.8', changefreq: 'weekly' },
-      { path: '/sponsor-changes', priority: '0.8', changefreq: 'daily' },
-      { path: '/ai-guide', priority: '0.7', changefreq: 'monthly' },
-      { path: '/cos-guide', priority: '0.7', changefreq: 'monthly' },
-      { path: '/technology', priority: '0.7', changefreq: 'monthly' },
-      { path: '/login', priority: '0.5', changefreq: 'monthly' },
-      { path: '/about', priority: '0.6', changefreq: 'monthly' },
-      { path: '/privacy', priority: '0.4', changefreq: 'yearly' },
-      { path: '/data-security', priority: '0.4', changefreq: 'yearly' },
-      { path: '/check-fake-cos', priority: '0.8', changefreq: 'monthly' },
-      { path: '/what-to-do-fake-cos', priority: '0.8', changefreq: 'monthly' },
-      { path: '/guides/how-to-check-cos-genuine', priority: '0.6', changefreq: 'monthly' },
-      { path: '/guides/cos-scams-red-flags', priority: '0.6', changefreq: 'monthly' },
-      { path: '/guides/employers-guide-fake-cos', priority: '0.5', changefreq: 'monthly' },
-      { path: '/guides/what-to-do-fake-cos', priority: '0.5', changefreq: 'monthly' },
-    ];
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <sitemap>
+    <loc>${baseUrl}/sitemap-core.xml</loc>
+    <lastmod>${today}</lastmod>
+  </sitemap>
+  <sitemap>
+    <loc>${baseUrl}/sitemap-sponsors.xml</loc>
+    <lastmod>${today}</lastmod>
+  </sitemap>
+</sitemapindex>`;
+    res.set('Content-Type', 'application/xml');
+    res.send(xml);
+  });
 
-    const urlEntries = urls.map(u => `  <url>
+  // Core pages sitemap (static routes)
+  app.get('/sitemap-core.xml', (req, res) => {
+    const today = new Date().toISOString().split('T')[0];
+    const baseUrl = getAppUrl();
+    const urlEntries = CORE_URLS.map(u => `  <url>
     <loc>${baseUrl}${u.path}</loc>
     <lastmod>${today}</lastmod>
     <changefreq>${u.changefreq}</changefreq>
     <priority>${u.priority}</priority>
   </url>`).join('\n');
-
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${urlEntries}
 </urlset>`;
-
     res.set('Content-Type', 'application/xml');
     res.send(xml);
   });
@@ -50,6 +78,7 @@ ${urlEntries}
 Allow: /
 
 Sitemap: ${getAppUrl()}/sitemap.xml
+Sitemap: ${getAppUrl()}/sitemap-sponsors.xml
 
 User-agent: GPTBot
 Allow: /
@@ -164,6 +193,96 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
   app.get('/llms-full.txt', (req, res) => {
     res.set('Content-Type', 'text/plain');
     res.send(llmsBaseContent + llmsFullExtra);
+  });
+
+  // ── Dynamic meta injection for /sponsor/:id/:slug bot requests ──────────────
+  // For real browsers the React page handles the title; for bots (and social
+  // link previews) we read the DB and return fully-populated HTML.
+  app.get('/sponsor/:id/:slug?', async (req: any, res, next) => {
+    const accept = req.headers['accept'] || '';
+    if (!accept.includes('text/html')) return next();
+
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id) || id <= 0) return next();
+
+    try {
+      const [sponsor] = await db
+        .select()
+        .from(sponsorCanonical)
+        .where(eq(sponsorCanonical.id, id))
+        .limit(1);
+
+      if (!sponsor) return next();
+
+      const base = getAppUrl();
+      const slug = toSlug(sponsor.currentName);
+      const canonical = `${base}/sponsor/${id}/${slug}`;
+
+      const statusLabel =
+        sponsor.status === 'ACTIVE'         ? 'Active' :
+        sponsor.status === 'NEWLY_GRANTED'  ? 'Newly Granted' :
+        sponsor.status === 'GRACE_PERIOD'   ? 'Under Review' : 'Revoked';
+
+      const location  = sponsor.townCity ? ` in ${sponsor.townCity}` : '';
+      const routePart = sponsor.route     ? ` (${sponsor.route})`    : '';
+      const grantedYr = sponsor.grantedAt ? new Date(sponsor.grantedAt).getFullYear() : null;
+
+      const title =
+        `${sponsor.currentName} — ${statusLabel} UK Sponsor Licence | CheckByAI`;
+
+      const description = sponsor.status === 'REMOVED_REVOKED'
+        ? `${sponsor.currentName}${location} had their UK sponsor licence revoked. ` +
+          `Workers must find a new employer. See full licence history on CheckByAI.`
+        : `${sponsor.currentName}${location} holds a ${statusLabel} UK sponsor licence${routePart}` +
+          `${grantedYr ? `, active since ${grantedYr}` : ''}. ` +
+          `Get instant alerts if their status changes — free on CheckByAI.`;
+
+      const schema = JSON.stringify({
+        "@context": "https://schema.org",
+        "@type":    "Organization",
+        "name":     sponsor.currentName,
+        "url":      canonical,
+        ...(sponsor.townCity ? {
+          "address": {
+            "@type":           "PostalAddress",
+            "addressLocality": sponsor.townCity,
+            "addressCountry":  "GB",
+          },
+        } : {}),
+      });
+
+      // Try built path first (production), fall back to source (dev)
+      const indexPaths = [
+        path.resolve('dist/public/index.html'),
+        path.resolve('client/index.html'),
+      ];
+      let html: string | null = null;
+      for (const p of indexPaths) {
+        if (fs.existsSync(p)) { html = fs.readFileSync(p, 'utf-8'); break; }
+      }
+      if (!html) return next();
+
+      const t = escapeAttr(title);
+      const d = escapeAttr(description);
+
+      html = html.replace(/<title>[^<]*<\/title>/, `<title>${t}</title>`);
+      html = html.replace(/<meta name="title" content="[^"]*"/, `<meta name="title" content="${t}"`);
+      html = html.replace(/<meta name="description" content="[^"]*"/, `<meta name="description" content="${d}"`);
+      html = html.replace(/<meta property="og:title" content="[^"]*"/, `<meta property="og:title" content="${t}"`);
+      html = html.replace(/<meta property="og:description" content="[^"]*"/, `<meta property="og:description" content="${d}"`);
+      html = html.replace(/<meta property="og:url" content="[^"]*"/, `<meta property="og:url" content="${canonical}"`);
+      html = html.replace(/<meta property="twitter:title" content="[^"]*"/, `<meta property="twitter:title" content="${t}"`);
+      html = html.replace(/<meta property="twitter:description" content="[^"]*"/, `<meta property="twitter:description" content="${d}"`);
+      html = html.replace(/<meta property="twitter:url" content="[^"]*"/, `<meta property="twitter:url" content="${canonical}"`);
+      html = html.replace(/<link rel="canonical" href="[^"]*"/, `<link rel="canonical" href="${canonical}"`);
+      html = html.replace('</head>', `<script type="application/ld+json">${schema}</script>\n</head>`);
+
+      res.set('Content-Type', 'text/html');
+      res.send(html);
+    } catch (err) {
+      console.error('Sponsor page meta injection error:', err);
+      next();
+    }
   });
 
   const seoMetaMap: Record<string, { title: string; description: string }> = {

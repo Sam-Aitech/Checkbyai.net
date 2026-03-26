@@ -17,6 +17,7 @@ import { useDebounce } from "@/hooks/useDebounce";
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface DirectoryResult {
+  id: number;
   fingerprint: string;
   organisationName: string;
   townCity: string | null;
@@ -408,7 +409,10 @@ export default function SponsorDirectory() {
           {/* Data rows */}
           {!isLoading && data && data.results.length > 0 && (
             <div className="divide-y">
-              {data.results.map((r) => (
+              {data.results.map((r) => {
+                const slug = r.organisationName.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim().replace(/\s+/g, "-").slice(0, 80);
+                const detailHref = r.id ? `/sponsor/${r.id}/${slug}` : null;
+                return (
                 <div
                   key={r.fingerprint}
                   className={`px-4 py-3 ${rowClass(r.status)} transition-colors hover:bg-muted/20`}
@@ -417,9 +421,15 @@ export default function SponsorDirectory() {
                   <div className="hidden md:grid grid-cols-[2fr_1fr_1fr_1fr_auto_auto] gap-4 items-center">
                     <div className="flex items-center gap-2 min-w-0">
                       <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
-                      <span className="font-medium text-foreground text-sm truncate" title={r.organisationName}>
-                        {r.organisationName}
-                      </span>
+                      {detailHref ? (
+                        <Link href={detailHref} className="font-medium text-foreground text-sm truncate hover:text-primary hover:underline" title={r.organisationName}>
+                          {r.organisationName}
+                        </Link>
+                      ) : (
+                        <span className="font-medium text-foreground text-sm truncate" title={r.organisationName}>
+                          {r.organisationName}
+                        </span>
+                      )}
                     </div>
                     <span className="text-sm text-muted-foreground truncate">
                       {r.townCity ?? "—"}
@@ -468,7 +478,8 @@ export default function SponsorDirectory() {
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
