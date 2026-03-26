@@ -658,8 +658,9 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                 const isRemoved = !isActive && !isNew && !isGrace;
                 const isBRated = (r.typeRating || "").toLowerCase().includes("b");
                 const grantedYear = r.grantedAt ? new Date(r.grantedAt).getFullYear() : null;
-                return (
-                  <div key={r.fingerprint} className="bg-card border border-border rounded-xl p-4 flex items-center justify-between gap-3">
+                const detailHref = r.id ? `/sponsor/${r.id}/${toHeroSlug(r.organisationName)}` : null;
+                const card = (
+                  <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between gap-3 hover:border-emerald-500 hover:shadow-sm transition-all">
                     <div className="min-w-0">
                       <p className="font-semibold text-foreground text-sm truncate">{r.organisationName}</p>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
@@ -677,6 +678,9 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                     </div>
                   </div>
                 );
+                return detailHref
+                  ? <Link key={r.fingerprint} href={detailHref}>{card}</Link>
+                  : <div key={r.fingerprint}>{card}</div>;
               })}
               <div className="text-center pt-3">
                 <p className="text-xs text-muted-foreground mb-2">Get instant alerts when this sponsor's status changes.</p>
