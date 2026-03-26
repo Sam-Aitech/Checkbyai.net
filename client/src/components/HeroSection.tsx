@@ -220,6 +220,76 @@ function NightlyStatsBar() {
   );
 }
 
+// ── Urgency banner ────────────────────────────────────────────────────────
+
+function UrgencyBanner() {
+  const { data, isLoading } = useQuery<NightlyStats>({
+    queryKey: ["/api/sponsors/nightly-stats"],
+    staleTime: 60 * 60 * 1_000,
+  });
+
+  // Don't render until data arrives — avoids showing stale hardcoded text
+  if (isLoading || !data || !data.lastRunDate) return null;
+
+  const { removedCount, changesCount, addedCount, lastRunDate } = data;
+
+  if (removedCount > 0) {
+    return (
+      <div className="bg-red-700 text-white">
+        <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2.5 text-center">
+          <span className="urgency-dot shrink-0" aria-hidden="true" />
+          <p className="text-xs sm:text-sm font-medium">
+            <span className="font-bold">URGENT:</span>{" "}
+            {removedCount} sponsor licence{removedCount !== 1 ? "s" : ""} revoked in the last nightly run.{" "}
+            <Link href="/sponsor-monitor" className="underline underline-offset-2 font-bold">Are you monitoring your employer?</Link>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (changesCount > 0) {
+    return (
+      <div className="bg-amber-600 text-white">
+        <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2.5 text-center">
+          <Activity className="w-3.5 h-3.5 shrink-0 animate-pulse" aria-hidden="true" />
+          <p className="text-xs sm:text-sm font-medium">
+            <span className="font-bold">{changesCount} licence change{changesCount !== 1 ? "s" : ""}</span>{" "}
+            detected in the last nightly run.{" "}
+            <Link href="/sponsor-monitor" className="underline underline-offset-2 font-bold">Set up monitoring →</Link>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (addedCount > 0) {
+    return (
+      <div className="bg-emerald-700 text-white">
+        <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2.5 text-center">
+          <CheckCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+          <p className="text-xs sm:text-sm font-medium">
+            <span className="font-bold">{addedCount} new sponsor{addedCount !== 1 ? "s" : ""}</span>{" "}
+            added in the last nightly run — register updated {formatRunDate(lastRunDate)}.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // No changes at all — show a calm confirmation strip
+  return (
+    <div className="bg-slate-800 text-slate-200">
+      <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2 text-center">
+        <CheckCircle className="w-3.5 h-3.5 shrink-0 text-emerald-400" aria-hidden="true" />
+        <p className="text-xs sm:text-sm font-medium">
+          Register checked {formatRunDate(lastRunDate)} — no changes detected.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 interface HeroSectionProps {
   onStartVerification?: () => void;
 }
@@ -358,14 +428,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
       )}
 
     <div className="min-h-screen bg-background">
-      <div className="bg-red-700 text-white">
-        <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2.5 text-center">
-          <span className="urgency-dot shrink-0" aria-hidden="true" />
-          <p className="text-xs sm:text-sm font-medium">
-            <span className="font-bold">URGENT:</span> 3 sponsor licences revoked in the last 48 hours. Are you monitoring your employer?
-          </p>
-        </div>
-      </div>
+      <UrgencyBanner />
 
       <div className="relative overflow-hidden">
         <div className="theme-gradient pb-32 pt-6">
