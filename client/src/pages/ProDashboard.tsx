@@ -22,6 +22,7 @@ import {
   Clock, FileText, BarChart3, Copy, Menu, X, Plus, Search,
   Mail, Smartphone, Loader2, Trash2, ChevronDown, ChevronRight, Zap,
   HelpCircle, SendHorizonal, MessageSquare, CheckCheck,
+  type LucideIcon,
 } from "lucide-react";
 
 // ─── Design tokens — maps to site CSS variables ───────────────────────────────
@@ -91,7 +92,7 @@ interface SponsorSearchResult {
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const NAV: Array<{ id: Tab; label: string; Icon: React.FC<{className?:string}> }> = [
+const NAV: Array<{ id: Tab; label: string; Icon: LucideIcon }> = [
   { id: "overview",      label: "Overview",        Icon: LayoutDashboard },
   { id: "monitor",       label: "Sponsor Monitor", Icon: Building2 },
   { id: "verify",        label: "Verify CoS",      Icon: Shield },
@@ -110,7 +111,7 @@ const EVENT_ROWS: Array<{ key: NotifEventType; label: string; sub: string }> = [
   { key: "weekly_digest",      label: "Weekly Digest",      sub: "Weekly summary email" },
 ];
 
-const CHANGE_META: Record<string, { label: string; Icon: React.FC<{className?:string}>; color: string }> = {
+const CHANGE_META: Record<string, { label: string; Icon: LucideIcon; color: string }> = {
   NEW_LICENCE:     { label: "Licence Granted",  Icon: CheckCircle2, color: T.emerald },
   RE_ACTIVATED:    { label: "Reactivated",       Icon: RotateCcw,   color: T.cyan },
   REMOVED_REVOKED: { label: "Licence Revoked",   Icon: XCircle,     color: T.red },
@@ -157,7 +158,7 @@ function PlanPill({ plan }: { plan: string }) {
   );
 }
 
-interface StatCardProps { label: string; value: React.ReactNode; sub?: string; gradient: string; Icon: React.FC<{className?:string}>; loading?: boolean }
+interface StatCardProps { label: string; value: React.ReactNode; sub?: string; gradient: string; Icon: LucideIcon; loading?: boolean }
 function StatCard({ label, value, sub, gradient, Icon, loading }: StatCardProps) {
   return (
     <motion.div
@@ -205,7 +206,7 @@ function OverviewTab({ user, setTab }: { user: any; setTab: (t: Tab) => void }) 
     ...(verifs?.slice(0,5)||[]).map(v => ({ key:`v${v.id}`, ts: +new Date(v.verifiedAt), kind:"verify" as const, data:v })),
   ].sort((a,b) => b.ts - a.ts).slice(0, 8);
 
-  const QUICK: Array<{ tab: Tab; label: string; sub: string; Icon: React.FC<{className?:string}>; gradient: string }> = [
+  const QUICK: Array<{ tab: Tab; label: string; sub: string; Icon: LucideIcon; gradient: string }> = [
     { tab:"monitor",       label:"Add Sponsor to Watch",   sub:"Monitor licence status",   Icon:Building2, gradient:`linear-gradient(135deg,#3B82F6,#06B6D4)` },
     { tab:"verify",        label:"Verify a CoS Document",  sub:"Instant AI verification",  Icon:Shield,    gradient:`linear-gradient(135deg,${T.violet},${T.indigo})` },
     { tab:"notifications", label:"Configure Alerts",       sub:"Email · SMS · In-app",     Icon:Bell,      gradient:`linear-gradient(135deg,${T.amber},#F97316)` },
@@ -696,7 +697,7 @@ function NotificationsTab() {
     patchM.mutate(patch);
   };
 
-  const CH: Array<{ key:"email"|"inApp"|"sms"; label:string; Icon:React.FC<{className?:string}> }> = [
+  const CH: Array<{ key:"email"|"inApp"|"sms"; label:string; Icon:LucideIcon }> = [
     { key:"email", label:"Email", Icon:Mail },
     { key:"inApp", label:"In-App", Icon:Bell },
     { key:"sms",   label:"SMS",   Icon:Smartphone },

@@ -44,6 +44,21 @@ export default function AdminPortal() {
   // Audit log panel state — tracks which user's audit log is visible
   const [auditLogUserId, setAuditLogUserId] = useState<string | null>(null);
 
+  // Sponsor Monitor plan change confirmation state
+  const [pendingPlanChange, setPendingPlanChange] = useState<{
+    userId: string;
+    userName: string;
+    currentPlan: string;
+    newPlan: 'free' | 'starter' | 'pro';
+    hasStripeSubscription: boolean;
+    activeWatchCount: number;
+    newWatchLimit: number;
+  } | null>(null);
+
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { isAuthenticated, isAdmin, isLoading, user } = useAuth();
+
   interface SubAuditEntry {
     id: number;
     userId: string;
@@ -61,21 +76,6 @@ export default function AdminPortal() {
     queryFn: () => fetch(`/api/admin/users/${auditLogUserId}/subscription-audit`, { credentials: 'include' }).then(r => r.json()),
     enabled: !!auditLogUserId && isAuthenticated && isAdmin && activeTab === 'users',
   });
-
-  // Sponsor Monitor plan change confirmation state
-  const [pendingPlanChange, setPendingPlanChange] = useState<{
-    userId: string;
-    userName: string;
-    currentPlan: string;
-    newPlan: 'free' | 'starter' | 'pro';
-    hasStripeSubscription: boolean;
-    activeWatchCount: number;
-    newWatchLimit: number;
-  } | null>(null);
-
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const { isAuthenticated, isAdmin, isLoading, user } = useAuth();
 
   // All hooks must be called before any conditional logic
   const { data: stats } = useQuery<StatsResponse>({

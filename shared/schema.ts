@@ -869,6 +869,6 @@ export const supportTickets = pgTable(
 
 export type SupportTicket = typeof supportTickets.$inferSelect;
 export const insertSupportTicketSchema = createInsertSchema(supportTickets).omit({
-  id: true, status: true, adminReply: true, repliedAt: true, createdAt: true, userId: true,
+  status: true, adminReply: true, repliedAt: true, createdAt: true, userId: true,
 });
 export type InsertSupportTicket = z.infer<typeof insertSupportTicketSchema>;

@@ -134,8 +134,8 @@ export async function seedEnrichmentQueue(): Promise<{ inserted: number }> {
         .where(eq(sponsorCanonical.status, "ACTIVE")),
     ]);
 
-    const watchedSet = new Set(watched.map((r) => r.fingerprint));
-    const newlyGrantedSet = new Set(newlyGranted.map((r) => r.fingerprint));
+    const watchedSet = new Set(watched.map((r) => r.fingerprint).filter((f): f is string => f !== null));
+    const newlyGrantedSet = new Set(newlyGranted.map((r) => r.fingerprint).filter((f): f is string => f !== null));
     const jobTypes = ["companies_house", "licence_history"] as const;
     type Row = typeof enrichmentQueue.$inferInsert;
     const rows: Row[] = [];

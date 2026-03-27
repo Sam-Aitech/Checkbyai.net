@@ -430,7 +430,7 @@ function LicenceTimelinePanel({ fingerprint }: { fingerprint: string }) {
               alignItems: "center",
               gap: 12,
               // Highlight rows where the status changed
-              ...(isStatusChange ? { boxShadow: `0 0 0 1px ${statusStyle.border?.replace("1px solid ", "")}` } : {}),
+              ...(isStatusChange ? { boxShadow: `0 0 0 1px ${String(statusStyle.border ?? "").replace("1px solid ", "")}` } : {}),
             }}
           >
             {/* Status pill */}

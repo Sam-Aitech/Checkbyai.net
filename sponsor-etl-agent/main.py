@@ -26,6 +26,28 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
+# Health check function for deployment validation
+# ---------------------------------------------------------------------------
+def health_check():
+    """Function to validate the application can start correctly."""
+    try:
+        # Basic validation of required dependencies
+        import bs4
+        import fastapi
+        import httpx
+        
+        # Verify we can create the app instance
+        test_app = FastAPI(title="Test App")
+        
+        return True
+    except ImportError as e:
+        log.error(f"Missing dependency: {e}")
+        return False
+    except Exception as e:
+        log.error(f"Health check failed: {e}")
+        return False
+
+# ---------------------------------------------------------------------------
 # App
 # ---------------------------------------------------------------------------
 app = FastAPI(

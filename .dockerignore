@@ -1,0 +1,51 @@
+# Dependencies — reinstalled in builder stage
+node_modules
+
+# Build output — generated during docker build
+dist
+
+# Development files
+.env
+.env.*
+!.env.example
+
+# Git
+.git
+.gitignore
+.github
+
+# Dev tools
+.claude
+.replit
+replit.md
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test artifacts
+coverage
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Binaries (installed at runtime)
+bin/
+
+# Large data files
+data/
+backend/etl_sponsors.db
+
+# Test files
+*.test.ts
+*.test.js
+FEEDBACK_TESTING.md
+MANUAL_TEST_GUIDE.md
+TEST_RESULTS.md
+test.pdf
+test_response.pdf
+
+# Docs (not needed at runtime)
+docs/
+attached_assets/

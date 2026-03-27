@@ -1,0 +1,85 @@
+version: '3.9'
+
+# ─────────────────────────────────────────────────────────────
+# CheckByAI — Local Development Stack
+# Usage: docker compose up
+# ─────────────────────────────────────────────────────────────
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    ports:
+      - "5000:5000"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://checkbyai:checkbyai@postgres:5432/checkbyai?sslmode=disable
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # Copy remaining secrets from your .env file
+      SESSION_SECRET: ${SESSION_SECRET}
+      PHONE_ENCRYPTION_KEY: ${PHONE_ENCRYPTION_KEY}
+      IP_HASH_SALT: ${IP_HASH_SALT}
+      CHECKOUT_HMAC_SECRET: ${CHECKOUT_HMAC_SECRET}
+      DIGEST_SIGNING_KEY: ${DIGEST_SIGNING_KEY}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}
+      AI_INTEGRATIONS_OPENAI_API_KEY: ${AI_INTEGRATIONS_OPENAI_API_KEY:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      APP_URL: ${APP_URL:-http://localhost:5000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      # Persist binaries across restarts
+      - app-bin:/app/bin
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: checkbyai
+      POSTGRES_USER: checkbyai
+      POSTGRES_PASSWORD: checkbyai
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U checkbyai -d checkbyai"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:
+  app-bin:

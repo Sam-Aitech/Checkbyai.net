@@ -1,0 +1,23 @@
+# CODEOWNERS
+# Each line is a file pattern followed by one or more owners.
+# These owners will be auto-requested for review when a PR modifies matching files.
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default: all files require review from the core team
+* @Sam-Aitech
+
+# Security-critical files require security review
+SECURITY.md @Sam-Aitech
+server/auth.ts @Sam-Aitech
+server/utils/phoneCrypto.ts @Sam-Aitech
+shared/schema.ts @Sam-Aitech
+
+# Payment code requires financial review
+server/routes/stripe* @Sam-Aitech
+
+# CI/CD changes require admin review
+.github/ @Sam-Aitech
+
+# Dependencies require security review
+package.json @Sam-Aitech
+package-lock.json @Sam-Aitech

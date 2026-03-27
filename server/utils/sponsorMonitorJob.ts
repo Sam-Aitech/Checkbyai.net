@@ -206,7 +206,7 @@ async function saveDiffResult(runDate: string, diff: CsvDiffResult): Promise<voi
     const diffPayload = {
       added:    diff.Additions.map((r) => r["fingerprint"] as string).filter(Boolean).slice(0, 1000),
       removed:  diff.Deletions.map((r)  => r["fingerprint"] as string).filter(Boolean).slice(0, 1000),
-      modified: diff.Modifications.map((r) => r["fingerprint"] as string).filter(Boolean).slice(0, 1000),
+      modified: diff.Modifications.map((r) => r.curr["fingerprint"] as string).filter(Boolean).slice(0, 1000),
     };
     await db.insert(diffResults).values({
       runDate,
