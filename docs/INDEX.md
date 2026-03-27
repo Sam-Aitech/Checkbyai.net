@@ -13,6 +13,7 @@
 | [API_REFERENCE.md](API_REFERENCE.md) | Engineering / Frontend / Integration | All API endpoints, request/response shapes, auth requirements |
 | [SECURITY.md](SECURITY.md) | Engineering / Compliance | Threat model, authentication design, data protection, outstanding issues |
 | [ARCHITECTURE_DECISIONS.md](ARCHITECTURE_DECISIONS.md) | Engineering | Why architectural choices were made (ADRs) |
+| [ENTERPRISE_EXECUTION_PLAN.md](ENTERPRISE_EXECUTION_PLAN.md) | Leadership / Engineering / Ops | CTO-approved hardening roadmap for enterprise readiness, delivery order, and exit criteria |
 
 ---
 

@@ -219,6 +219,45 @@ Add PostgreSQL RLS policies as a future hardening milestone when the connection 
 
 ## ADR-010: qsv Validation Gate (Hard Floor on Record Count)
 
+## ADR-011: Operational Hardening Before Platform Decomposition
+
+**Status:** Accepted
+
+**Context:**
+The product now has the core ingredients of a sellable platform: production billing, sponsor-monitor automation, admin workflows, security controls, and baseline CI. However, the current system still operates as a single-process monolith with binary role-based access, limited observability, and no explicit enterprise delivery model for staging, DR, or compliance evidence.
+
+Requests for "enterprise" features can easily pull the system in the wrong direction: premature microservice work, broad infrastructure churn, or customer-specific one-offs before the platform has the operational controls to support them safely.
+
+**Decision:**
+For the next execution phase, engineering prioritises operational hardening over architectural decomposition.
+
+Delivery order:
+1. **Enterprise control plane**
+	RBAC expansion, auditability, tenancy boundaries, environment promotion, admin safety rails
+2. **Observability and reliability**
+	Structured telemetry, alerting, SLOs, backup/restore drills, deployment safety
+3. **Compliance and data governance**
+	Retention schedules, access reviews, evidence collection, DSR/incident procedures
+4. **Scale-out architecture changes only after hard metrics justify them**
+	Separate workers, queue-backed pipelines, multi-instance topology, or service decomposition
+
+**Rationale:**
+- Enterprise buyers care more about control, evidence, and reliability than about internal service count
+- Current bottlenecks are operational, not yet architectural
+- The team remains small, so platform complexity must be purchased only when justified by measurable load, customer requirements, or reliability targets
+- Hardening the operating model now reduces future migration risk if the system later moves to distributed workers or multi-tenant isolation
+
+**Trade-offs accepted:**
+- Some enterprise deals that require SAML, fine-grained RBAC, or formal compliance evidence may need phased delivery rather than immediate support
+- In-process jobs remain acceptable in the short term, but only with explicit monitoring, runbooks, and failure containment
+- The monolith remains a single deployment unit until capacity, recovery, or release-risk data proves otherwise
+
+**Triggers to revisit this decision:**
+- Sustained queue or cron workload that measurably degrades request latency
+- Requirement for active-active or multi-region processing
+- Enterprise customer commitments that require isolated workers, stronger tenancy boundaries, or dedicated integration surfaces
+- Repeated release failures caused by the current single-unit deployment model
+
 **Status:** Accepted | **Introduced:** 2026-03-20
 
 **Context:**
