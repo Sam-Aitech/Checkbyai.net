@@ -193,6 +193,135 @@ async function buildFirstRunDiff(rawFilePath: string): Promise<CsvDiffResult> {
 }
 
 /**
+ * Builds a gap-day CsvDiffResult by comparing canonical DB records against
+ * today's CSV. Used when yesterday's archive is missing from disk (container
+ * restart, ephemeral storage) but canonical is already populated.
+ *
+ * Unlike buildFirstRunDiff (which blindly treats everything as new), this
+ * correctly computes:
+ *   Additions  — fingerprints in today's CSV not in canonical (NEW_LICENCE)
+ *                or present as REMOVED_REVOKED (RE_ACTIVATED)
+ *   Deletions  — fingerprints in canonical (ACTIVE/NEWLY_GRANTED/GRACE_PERIOD)
+ *                absent from today's CSV (→ Phase D GRACE_PERIOD / REMOVED_REVOKED)
+ *   Modifications — same fingerprint, different typeRating (UPGRADED/DOWNGRADED)
+ *
+ * Note: county is not stored in sponsor_canonical, so county-only changes are
+ * not detectable here. Route changes always produce a new fingerprint (deletion
+ * + addition) and are handled by Phase E rename detection, not Phase B.
+ */
+async function buildGapDayDiff(rawFilePath: string): Promise<CsvDiffResult> {
+  const start = Date.now();
+  log.info("Building gap-day diff from canonical DB vs today's CSV…");
+
+  // 1. Load today's CSV and index by fingerprint
+  const todayRecords = await parseCsvFile(rawFilePath);
+  const todayByFp = new Map<string, typeof todayRecords[0]>();
+  for (const r of todayRecords) {
+    const fp = generateFingerprint(r.organisationName, r.townCity, r.route);
+    todayByFp.set(fp, r);
+  }
+
+  // 2. Load all canonical records (all statuses so we can detect re-activations)
+  const canonicalRows = await db
+    .select({
+      fingerprint: sponsorCanonical.fingerprint,
+      currentName: sponsorCanonical.currentName,
+      townCity:    sponsorCanonical.townCity,
+      typeRating:  sponsorCanonical.typeRating,
+      route:       sponsorCanonical.route,
+      status:      sponsorCanonical.status,
+    })
+    .from(sponsorCanonical);
+
+  const canonicalByFp = new Map(canonicalRows.map((r) => [r.fingerprint, r]));
+
+  // 3. Compute diff buckets
+  const additions:     Record<string, string>[]        = [];
+  const deletions:     Record<string, string>[]        = [];
+  const modifications: CsvDiffResult["Modifications"] = [];
+
+  // Scan today's CSV: detect new companies and attribute changes
+  for (const [fp, r] of todayByFp) {
+    const canonical = canonicalByFp.get(fp);
+
+    if (!canonical) {
+      // New company — never in canonical
+      additions.push({
+        fingerprint:         fp,
+        "Organisation Name": r.organisationName,
+        "Town/City":         r.townCity,
+        "County":            r.county,
+        "Type & Rating":     r.typeRating,
+        "Route":             r.route,
+      });
+    } else if (canonical.status === "REMOVED_REVOKED") {
+      // Re-appearing after removal — Phase C will RE_ACTIVATE
+      additions.push({
+        fingerprint:         fp,
+        "Organisation Name": r.organisationName,
+        "Town/City":         r.townCity,
+        "County":            r.county,
+        "Type & Rating":     r.typeRating,
+        "Route":             r.route,
+      });
+    } else {
+      // Company exists and is active — check for typeRating change (only attribute
+      // detectable from canonical; county is not stored there)
+      const prevRating = canonical.typeRating ?? "";
+      if (prevRating !== r.typeRating) {
+        modifications.push({
+          prev: {
+            fingerprint:         fp,
+            "Organisation Name": canonical.currentName,
+            "Town/City":         canonical.townCity ?? "",
+            "County":            "",            // not stored in canonical
+            "Type & Rating":     prevRating,
+            "Route":             canonical.route ?? "",
+          },
+          curr: {
+            fingerprint:         fp,
+            "Organisation Name": r.organisationName,
+            "Town/City":         r.townCity,
+            "County":            r.county,
+            "Type & Rating":     r.typeRating,
+            "Route":             r.route,
+          },
+        });
+      }
+    }
+  }
+
+  // Scan canonical: detect companies that left the register
+  for (const [fp, canonical] of canonicalByFp) {
+    if (canonical.status === "REMOVED_REVOKED") continue; // already removed — skip
+    if (!todayByFp.has(fp)) {
+      // Missing from today's CSV — Phase D will move to GRACE_PERIOD
+      deletions.push({
+        fingerprint:         fp,
+        "Organisation Name": canonical.currentName,
+        "Town/City":         canonical.townCity ?? "",
+        "County":            "",                // not stored in canonical
+        "Type & Rating":     canonical.typeRating ?? "",
+        "Route":             canonical.route ?? "",
+      });
+    }
+  }
+
+  const elapsed = Date.now() - start;
+  log.info(
+    `Gap-day diff complete in ${elapsed}ms: ` +
+    `+${additions.length} added, -${deletions.length} removed, ~${modifications.length} modified`,
+  );
+
+  return {
+    Additions:     additions,
+    Deletions:     deletions,
+    Modifications: modifications,
+    durationMs:    elapsed,
+  };
+}
+
+/**
  * Persists diff metadata (row counts + duration + bounded payload) to diff_results.
  * Non-fatal: a failure here only loses audit data, not state machine correctness.
  *
@@ -380,13 +509,27 @@ export async function runSponsorMonitorJob(source: string = "cron", notifyOnFail
     let diff: CsvDiffResult;
 
     if (!yesterdayArchive) {
-      // First run or gap day: no previous archive to diff against.
-      // Treat all today's records as additions so the state machine seeds the DB.
-      console.log(
-        `[SponsorMonitorJob] No archive for ${yesterday} — first run detected. ` +
-        `Treating all ${todayArchive.recordCount.toLocaleString()} records as NEW_LICENCE.`,
-      );
-      diff = await buildFirstRunDiff(todayArchive.filePath);
+      // No previous archive on disk. Distinguish true first run (canonical empty)
+      // from gap day (archive lost, canonical already populated).
+      const seedCheck = await db.select({ id: sponsorCanonical.id }).from(sponsorCanonical).limit(1);
+      const isSeeded = seedCheck.length > 0;
+
+      if (isSeeded) {
+        // Gap day — archive file is missing (container restart / ephemeral disk)
+        // but canonical has data. Diff canonical DB vs today's CSV to detect real changes.
+        log.warn(
+          `[SponsorMonitorJob] No archive for ${yesterday} but canonical is populated — ` +
+          `running gap-day diff against DB. (Container restart or ephemeral disk issue.)`,
+        );
+        diff = await buildGapDayDiff(todayArchive.filePath);
+      } else {
+        // True first run — canonical is empty. Seed it with all today's records.
+        console.log(
+          `[SponsorMonitorJob] No archive for ${yesterday} and canonical is empty — ` +
+          `first run detected. Treating all ${todayArchive.recordCount.toLocaleString()} records as NEW_LICENCE.`,
+        );
+        diff = await buildFirstRunDiff(todayArchive.filePath);
+      }
     } else {
       // Standard night: diff yesterday vs today using the Go csvdiff binary.
       console.log(

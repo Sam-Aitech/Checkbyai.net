@@ -963,25 +963,19 @@ export default function SimpleAdmin() {
     setMigratingCanonical(true);
     setMigrateResult(null);
     try {
-      const res = await fetch('/api/admin/migrate-canonical', { method: 'POST', credentials: 'include' });
+      const res = await fetch('/api/admin/sponsor-monitor/rebuild-index', { method: 'POST', credentials: 'include' });
       const data = await res.json();
       if (res.ok) {
-        setMigrateResult({ inserted: data.inserted, message: `${data.inserted?.toLocaleString()} records indexed from snapshot ${data.snapshotDate}.` });
-        toast({ title: "Search Index Built", description: `${data.inserted?.toLocaleString()} sponsors now searchable.` });
+        setMigrateResult({ inserted: data.count, message: data.message });
+        toast({ title: "Search Index Rebuilt", description: data.message });
         loadSponsorMonitorData();
-      } else if (res.status === 409) {
-        setMigrateResult({ message: data.message, inserted: data.existingCount });
-        toast({ title: "Already Indexed", description: data.message });
-      } else if (res.status === 410) {
-        setMigrateResult({ message: data.message, deprecated: true });
-        toast({ title: "No Action Needed", description: data.message });
       } else {
-        setMigrateResult({ message: data.message || 'Migration failed', error: true });
+        setMigrateResult({ message: data.message || 'Failed to rebuild index', error: true });
         toast({ title: "Error", description: data.message, variant: "destructive" });
       }
     } catch {
       setMigrateResult({ message: 'Network error', error: true });
-      toast({ title: "Error", description: "Failed to build search index", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to rebuild search index", variant: "destructive" });
     } finally {
       setMigratingCanonical(false);
     }
@@ -3452,8 +3446,20 @@ export default function SimpleAdmin() {
                               <td className="py-1.5 pr-3 text-right text-gray-700 dark:text-slate-300 tabular-nums">
                                 {run.recordsProcessed != null ? run.recordsProcessed.toLocaleString() : '—'}
                               </td>
-                              <td className="py-1.5 pr-3 text-right text-gray-700 dark:text-slate-300 tabular-nums">
-                                {run.changesDetected ?? '—'}
+                              <td className="py-1.5 pr-3 text-right tabular-nums">
+                                {run.status === 'success' && run.changesDetected === 0 && run.recordsProcessed > 100000 ? (
+                                  <span
+                                    className="inline-flex items-center justify-end gap-1 text-amber-400"
+                                    title="0 changes on 100k+ records — likely a gap-day fallback run (archive missing from disk). Trigger 'Run Now' to pick up missed changes."
+                                  >
+                                    0
+                                    <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-700 dark:text-slate-300">
+                                    {run.changesDetected ?? '—'}
+                                  </span>
+                                )}
                               </td>
                               <td className="py-1.5 text-right text-gray-500 dark:text-slate-400 tabular-nums">
                                 {run.durationMs != null

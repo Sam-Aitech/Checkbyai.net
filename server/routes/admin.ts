@@ -27,6 +27,7 @@ import { sendEmailReliably } from "../utils/resilientEmail";
 import { getAppUrl } from "../utils/appUrl";
 import { checkBinaryHealth } from "../utils/binaryRunner";
 import { isJobRunning, getLastRunInfo, runSponsorMonitorJob } from "../utils/sponsorMonitorJob";
+import { rebuildSponsorIndex } from "../utils/sponsorSearch";
 import { isQueueAvailable, getSponsorRefreshQueue } from "../services/jobQueue";
 import { getWatchLimit } from "../utils/tierConfig";
 
@@ -786,6 +787,20 @@ Format your response in clear, professional markdown.`;
       message: "This migration route is no longer needed. The nightly monitor job (or the Initialize button) " +
                "automatically seeds sponsorCanonical on its first run via the state machine.",
     });
+  });
+
+  app.post('/api/admin/sponsor-monitor/rebuild-index', isAdmin, async (_req: any, res) => {
+    try {
+      await rebuildSponsorIndex();
+      const count = (await db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(sponsorCanonical)
+        .where(sql`${sponsorCanonical.status} IN ('ACTIVE', 'NEWLY_GRANTED')`))[0]?.n ?? 0;
+      res.json({ count, message: `Search index rebuilt with ${count.toLocaleString()} active sponsors.` });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ message: `Failed to rebuild index: ${msg}` });
+    }
   });
 
   app.post('/api/admin/sponsor-monitor/test', isAdmin, async (req: any, res) => {
