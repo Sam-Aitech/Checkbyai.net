@@ -65,6 +65,8 @@ export interface PDFMetadata {
   fonts?: string[];
   fontCount?: number;
   hasDigitalSignature?: boolean;
+  wordCount?: number;
+  characterCount?: number;
   forensic?: ForensicMetadata;
   xmp_tags?: {
     'dc:date'?: string;
@@ -191,6 +193,11 @@ export class PDFAnalyzer {
       metadata.fonts = this.extractFonts(pdfString);
       metadata.fontCount = metadata.fonts.length;
 
+      // ── Phase 3.5: Word and character count from text streams ──────────────
+      const textStats = this.extractTextStats(pdfString);
+      metadata.wordCount = textStats.wordCount;
+      metadata.characterCount = textStats.characterCount;
+
       // ── Phase 4: XMP extraction (yields before parsing) ───────────────────
       await yieldToEventLoop();
       const xmpData = this.extractXMPMetadata(pdfString);
@@ -272,6 +279,37 @@ export class PDFAnalyzer {
     return Array.from(fonts);
   }
   
+  private extractTextStats(pdfString: string): { wordCount: number; characterCount: number } {
+    try {
+      const btEtRegex = /BT\b[\s\S]*?\bET\b/g;
+      let textContent = '';
+      let match;
+      while ((match = btEtRegex.exec(pdfString)) !== null) {
+        const block = match[0];
+        const strRegex = /\(([^)\\]|\\.)*\)/g;
+        let strMatch;
+        while ((strMatch = strRegex.exec(block)) !== null) {
+          const raw = strMatch[0].slice(1, -1);
+          const cleaned = raw
+            .replace(/\\n/g, ' ').replace(/\\r/g, ' ').replace(/\\t/g, ' ')
+            .replace(/\\([0-7]{3})/g, (_, oct) => {
+              const code = parseInt(oct, 8);
+              return code >= 32 && code < 127 ? String.fromCharCode(code) : ' ';
+            })
+            .replace(/\\./g, ' ');
+          textContent += cleaned + ' ';
+        }
+      }
+      const cleanText = textContent.replace(/[^\x20-\x7E]/g, ' ').replace(/\s+/g, ' ').trim();
+      if (!cleanText) return { wordCount: 0, characterCount: 0 };
+      const words = cleanText.split(/\s+/).filter(w => w.length > 0);
+      const characterCount = cleanText.replace(/\s/g, '').length;
+      return { wordCount: words.length, characterCount };
+    } catch {
+      return { wordCount: 0, characterCount: 0 };
+    }
+  }
+
   private extractXMPHistory(xmpData: string): XMPHistoryEntry[] {
     const history: XMPHistoryEntry[] = [];
     

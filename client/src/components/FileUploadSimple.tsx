@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'wouter';
-import { Lock, Crown, CheckCircle } from 'lucide-react';
+import { Lock, Crown, CheckCircle, ShieldAlert } from 'lucide-react';
 
 interface VerificationResult {
   type: 'genuine' | 'suspicious' | 'fake';
@@ -14,6 +14,8 @@ interface VerificationResult {
   }>;
   receiptId?: string;
   documentHash?: string;
+  metadata?: Record<string, any>;
+  verificationId?: number;
 }
 
 interface FileUploadSimpleProps {
@@ -40,6 +42,7 @@ export default function FileUploadSimple({
   const [loading, setLoading] = useState(false);
   const [hasUsedFreeCheck, setHasUsedFreeCheck] = useState(false);
   const [verificationCount, setVerificationCount] = useState(0);
+  const [accessDenied, setAccessDenied] = useState(false);
 
   // Check usage on component mount
   useEffect(() => {
@@ -138,13 +141,23 @@ export default function FileUploadSimple({
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        
-        // Handle IP rate limit (429) with helpful message
+
+        // Access denied — show upgrade card instead of raw error
+        if (response.status === 403 && (errorData.code === 'cos_access_denied' || errorData.code === 'beta_login_required')) {
+          setAccessDenied(true);
+          return;
+        }
+
+        // Handle daily limit (429) with helpful message
         if (response.status === 429 && errorData.daysRemaining) {
           const message = `You can only verify one document every 7 days. Please try again in ${errorData.daysRemaining} day${errorData.daysRemaining > 1 ? 's' : ''} (${errorData.hoursRemaining} hours).`;
           throw new Error(message);
         }
-        
+
+        if (response.status === 429) {
+          throw new Error('Daily verification limit reached. Upgrade your plan for more checks.');
+        }
+
         throw new Error(`Verification failed: ${errorData.error || errorData.message || 'Unknown error'}`);
       }
       
@@ -159,11 +172,13 @@ export default function FileUploadSimple({
 
       const transformedResult: VerificationResult = {
         type: typeMapping[data.result] || 'fake',
-        confidence: data.confidence || 0,
+        confidence: (data.confidence || 0) / 100,
         mismatchedFields: data.mismatchedFields || [],
         checks: data.checks || [],
         receiptId: data.receiptId,
-        documentHash: data.documentHash
+        documentHash: data.documentHash,
+        metadata: data.metadata || {},
+        verificationId: data.id,
       };
 
       setResult(transformedResult);
@@ -190,6 +205,36 @@ export default function FileUploadSimple({
       onLoading?.(false);
     }
   };
+
+  // Show upgrade card when backend returns cos_access_denied
+  if (accessDenied) {
+    return (
+      <div className="w-full border border-amber-200 dark:border-amber-700/40 rounded-xl p-6 bg-amber-50 dark:bg-amber-900/10 text-center space-y-4">
+        <div className="flex justify-center">
+          <ShieldAlert className="w-10 h-10 text-amber-500" />
+        </div>
+        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">COS Check Access Required</h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          Your account doesn't yet have COS Check access. Upgrade your plan to unlock instant verification.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <Link
+            href="/cos-pricing"
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors"
+          >
+            <Crown className="w-4 h-4" />
+            View COS Check Plans
+          </Link>
+          <a
+            href="mailto:support@checkbyai.net?subject=COS%20Check%20Access%20Request"
+            className="inline-flex items-center justify-center px-5 py-2.5 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-sm font-semibold rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          >
+            Request Access
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   // Show restriction overlay if user has used their free check (skip for admin)
   if (restrictToOneCheck && hasUsedFreeCheck && !result && !isAdmin) {

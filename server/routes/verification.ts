@@ -188,11 +188,31 @@ export function registerVerificationRoutes(app: Express): void {
         result = analysisResult.result;
         analysis = analysisResult;
         metadata = {
-          producer: extractedMetadata.producer,
-          creator: extractedMetadata.creator,
-          created: extractedMetadata.creationDate,
-          modified: extractedMetadata.modificationDate,
-          fontCount: extractedMetadata.fontCount,
+          // File Format Info
+          format: 'Pdf',
+          mimeType: 'application/pdf',
+          pdfVersion: extractedMetadata.pdfVersion || null,
+          // PDF Properties
+          title: extractedMetadata.title || null,
+          author: extractedMetadata.author || null,
+          subject: extractedMetadata.subject || null,
+          creator: extractedMetadata.creator || null,
+          producer: extractedMetadata.producer || null,
+          creationDate: extractedMetadata.creationDate || null,
+          modificationDate: extractedMetadata.modificationDate || null,
+          // Document Statistics
+          pageCount: extractedMetadata.pages || null,
+          wordCount: extractedMetadata.wordCount || null,
+          characterCount: extractedMetadata.characterCount || null,
+          fontCount: extractedMetadata.fontCount || 0,
+          fileSize: extractedMetadata.fileSize || null,
+          // Security
+          isEncrypted: extractedMetadata.isEncrypted ?? false,
+          hasDigitalSignature: extractedMetadata.hasDigitalSignature ?? false,
+          // XMP Tags
+          xmp_tags: extractedMetadata.xmp_tags || {},
+          // Fonts
+          fonts: extractedMetadata.fonts || [],
         };
       }
       // ─────────────────────────────────────────────────────────────────────

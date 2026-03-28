@@ -22,6 +22,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import SponsorLicenceSearch from '@/components/admin/SponsorLicenceSearch';
+import MetadataGroupsPanel, { deriveAiAnnotations } from '@/components/MetadataGroupsPanel';
 
 interface AdminUser {
   id: string;
@@ -64,6 +65,8 @@ interface VerificationLog {
   analysisDetails: any;
   ipAddress?: string;
   verifiedAt: string;
+  adminStatus?: 'pending' | 'approved' | 'fake';
+  adminFeedback?: string | null;
 }
 
 interface Stats {
@@ -3882,15 +3885,10 @@ export default function SimpleAdmin() {
           {selectedLog && (
             <>
               <div className="mt-8 pt-6 border-t border-gray-200 dark:border-slate-700">
-                <h4 className="text-sm font-medium text-gray-500 dark:text-slate-400 mb-3 flex items-center gap-2">
-                  <Database className="w-4 h-4" />
-                  Raw Metadata
-                </h4>
-                <ScrollArea className="h-48 rounded bg-slate-900 p-3">
-                  <pre className="text-xs text-gray-500 dark:text-slate-400 whitespace-pre-wrap">
-                    {JSON.stringify(selectedLog.metadata, null, 2)}
-                  </pre>
-                </ScrollArea>
+                <MetadataGroupsPanel
+                  metadata={selectedLog.metadata || {}}
+                  aiAnnotations={deriveAiAnnotations(selectedLog.analysisDetails?.checks)}
+                />
               </div>
 
               {/* Teach AI Section */}
@@ -3937,7 +3935,7 @@ export default function SimpleAdmin() {
       </Sheet>
 
       {/* Detail Modal for Log */}
-      <Sheet open={selectedLog !== null && !aiPanelOpen} onOpenChange={(open) => !open && setSelectedLog(null)}>
+      <Sheet open={selectedLog !== null && !aiPanelOpen} onOpenChange={(open) => { if (!open) { setSelectedLog(null); setFeedbackReasoning(''); } }}>
         <SheetContent className="w-full sm:max-w-lg bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white overflow-y-auto">
           <SheetHeader>
             <SheetTitle className="text-gray-900 dark:text-white">Verification Details</SheetTitle>
@@ -4017,16 +4015,76 @@ export default function SimpleAdmin() {
                 </div>
               </div>
 
-              <div>
-                <h4 className="text-sm font-medium text-gray-500 dark:text-slate-400 mb-2 flex items-center gap-2">
-                  <Database className="w-4 h-4" />
-                  Raw Metadata
+              {/* ── Admin Verdict ─────────────────────────────────────── */}
+              <div className="border border-gray-200 dark:border-slate-700 rounded-xl p-4 bg-gray-50 dark:bg-slate-900/50">
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-blue-400" />
+                  Admin Verdict
                 </h4>
-                <ScrollArea className="h-48 rounded bg-slate-900 p-3">
-                  <pre className="text-xs text-gray-500 dark:text-slate-400 whitespace-pre-wrap">
-                    {JSON.stringify(selectedLog.metadata, null, 2)}
-                  </pre>
-                </ScrollArea>
+                <p className="text-xs text-gray-500 dark:text-slate-400 mb-4">
+                  Override the AI result with your human review. This is stored permanently and fed back to the AI.
+                </p>
+
+                {/* Current status */}
+                {selectedLog.adminStatus && selectedLog.adminStatus !== 'pending' && (
+                  <div className={`flex items-center gap-2 mb-4 px-3 py-2 rounded-lg text-sm font-medium ${
+                    selectedLog.adminStatus === 'approved'
+                      ? 'bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/30'
+                      : 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/30'
+                  }`}>
+                    {selectedLog.adminStatus === 'approved'
+                      ? <CheckCircle className="w-4 h-4" />
+                      : <XCircle className="w-4 h-4" />}
+                    {selectedLog.adminStatus === 'approved'
+                      ? 'You marked this as Genuine'
+                      : `You marked this as Fake/Edited${selectedLog.adminFeedback ? ': ' + selectedLog.adminFeedback : ''}`}
+                  </div>
+                )}
+
+                {/* Note textarea */}
+                <textarea
+                  value={feedbackReasoning}
+                  onChange={(e) => setFeedbackReasoning(e.target.value)}
+                  placeholder="Add a review note (required when marking as Fake/Edited)…"
+                  rows={3}
+                  className="w-full p-3 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 resize-none mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                />
+
+                {/* Verdict buttons */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { handleApproveLog(selectedLog); setSelectedLog(null); }}
+                    disabled={feedbackLoading}
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors"
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    ✓ Genuine
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (!feedbackReasoning.trim()) {
+                        toast({ title: 'Note required', description: 'Please add a review note before marking as fake.', variant: 'destructive' });
+                        return;
+                      }
+                      setFeedbackLog(selectedLog);
+                      handleSubmitFakeFeedback();
+                      setSelectedLog(null);
+                    }}
+                    disabled={feedbackLoading}
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors"
+                  >
+                    <XCircle className="w-4 h-4" />
+                    ✗ Fake / Edited
+                  </button>
+                </div>
+              </div>
+
+              {/* ── Metadata panel ────────────────────────────────────── */}
+              <div>
+                <MetadataGroupsPanel
+                  metadata={selectedLog.metadata || {}}
+                  aiAnnotations={deriveAiAnnotations(selectedLog.analysisDetails?.checks)}
+                />
               </div>
             </div>
           )}

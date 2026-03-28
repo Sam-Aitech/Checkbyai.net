@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Link } from 'wouter';
 import FileUploadSimple from './FileUploadSimple';
 import Enhanced3DDemo from './Enhanced3DDemo';
+import VerificationResults from './VerificationResults';
+import MetadataGroupsPanel from './MetadataGroupsPanel';
 import { useAuth } from '@/hooks/useAuth';
 import { Skeleton } from '@/components/ui/skeleton';
 import { queryClient } from '@/lib/queryClient';
@@ -18,6 +20,8 @@ interface VerificationResult {
   }>;
   receiptId?: string;
   documentHash?: string;
+  metadata?: Record<string, any>;
+  verificationId?: number;
 }
 
 export default function COSDashboard() {
@@ -158,8 +162,8 @@ export default function COSDashboard() {
     );
   }
 
-  // Beta gate — logged in but not yet approved (admins always bypass)
-  if (!authLoading && isAuthenticated && !user?.cosCheckApproved && user?.role !== 'admin') {
+  // Beta gate — logged in but not yet approved for COS Check
+  if (!authLoading && isAuthenticated && !hasElevatedAccess) {
     return (
       <div className="bg-gray-50 dark:bg-gray-900 min-h-screen flex items-center justify-center px-4">
         <div className="max-w-md w-full text-center">
@@ -207,6 +211,15 @@ export default function COSDashboard() {
           >
             Contact Support to Expedite
           </a>
+          <div className="mt-5 pt-5 border-t border-gray-200 dark:border-gray-700">
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Want instant access? Upgrade your plan:</p>
+            <Link
+              href="/cos-pricing"
+              className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all"
+            >
+              View COS Check Plans →
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -619,9 +632,9 @@ export default function COSDashboard() {
                             Detailed verification reports
                           </li>
                         </ul>
-                        <button className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
-                          Upgrade to Pro - $9.99/month
-                        </button>
+                        <Link href="/cos-pricing" className="w-full block text-center bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+                          View COS Check Plans →
+                        </Link>
                       </div>
                       
                       <p className="text-sm text-gray-500 dark:text-gray-400 dark:text-gray-500">Your free check will reset tomorrow. Come back then for another free verification!</p>
@@ -629,45 +642,30 @@ export default function COSDashboard() {
                   )}
                 </div>
               ) : (
-                <div className="text-center">
-                  <div className="mb-6">
-                    <div className="w-16 h-16 mx-auto mb-4 bg-green-100 rounded-full flex items-center justify-center">
-                      <svg className="w-8 h-8 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Verification Complete!</h3>
-                    <p className="text-gray-600 dark:text-gray-300">Your document has been analyzed</p>
-                  </div>
-
-                  <div className="mb-6">
-                    <div className={`inline-block px-6 py-3 rounded-full text-lg font-semibold transition-all duration-700 ease-in-out transform hover:scale-105 ${
-                      verificationResult.type === 'genuine' 
-                        ? 'bg-gradient-to-r from-green-400 to-emerald-500 text-white shadow-lg shadow-green-500/25 animate-pulse'
-                        : verificationResult.type === 'suspicious'
-                        ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white shadow-lg shadow-yellow-500/25 animate-bounce'
-                        : 'bg-gradient-to-r from-red-400 to-rose-500 text-white shadow-lg shadow-red-500/25 animate-pulse'
-                    }`}>
-                      {verificationResult.type.charAt(0).toUpperCase() + verificationResult.type.slice(1)}
-                    </div>
-                  </div>
-
-                  <div className="space-y-3 mb-6">
+                <div>
+                  {/* Header row */}
+                  <div className="flex items-center justify-between mb-5">
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">Analysis Complete</h3>
                     <button
                       onClick={() => {
                         setShowFreeCheck(false);
                         setVerificationResult(null);
                       }}
-                      className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                      className="text-sm text-muted-foreground hover:text-foreground transition-colors px-3 py-1 rounded-lg border border-border hover:bg-muted/50"
                     >
-                      Close
+                      ✕ Close
                     </button>
                   </div>
 
-                  <div className="text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg">
-                    <p className="font-medium mb-1">✨ Want more detailed analysis?</p>
-                    <p>Upgrade to our Pro service for advanced metadata analysis, batch verification, and detailed reporting.</p>
-                  </div>
+                  {/* Forensic verdict + checks */}
+                  <VerificationResults result={verificationResult} verificationId={verificationResult.verificationId} />
+
+                  {/* Structured metadata panel — admin only */}
+                  {isAdmin && verificationResult.metadata && Object.keys(verificationResult.metadata).length > 0 && (
+                    <div className="mt-6 border border-border rounded-xl p-5 bg-background">
+                      <MetadataGroupsPanel metadata={verificationResult.metadata} />
+                    </div>
+                  )}
                 </div>
               )}
             </div>

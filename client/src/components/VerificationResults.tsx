@@ -164,6 +164,19 @@ export default function VerificationResults({ result, verificationId }: Verifica
                   </Button>
                 </div>
               )}
+              {result.receiptId && (
+                <a
+                  href={`/receipt/${result.receiptId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline px-1 pt-1"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                  View shareable receipt page
+                </a>
+              )}
               {result.documentHash && (
                 <div className="flex items-center justify-between bg-muted/50 rounded-xl px-3 py-2">
                   <div>
