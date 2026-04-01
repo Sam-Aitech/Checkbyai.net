@@ -86,7 +86,7 @@ function esc(s: string): string {
 
 // ── Email builder ─────────────────────────────────────────────────────────────
 
-function buildEmail(
+export function buildEmail(
   changeType: string,
   organisationName: string,
   previousValue: string | null | undefined,
@@ -170,7 +170,7 @@ function buildEmail(
 
 const FROM_ADDRESS = "Sponsor Monitor <alerts@checkbyai.net>";
 
-async function sendViaResend(
+export async function sendViaResend(
   to: string,
   subject: string,
   html: string,

@@ -27,6 +27,7 @@ import type { CsvDiffResult } from "./binaryRunner";
 import type { SponsorChange } from "./sponsorListFetcher";
 import { loadFingerprintSet } from "./csvFingerprintBuilder";
 import { storage } from "../storage";
+import { buildEmail, sendViaResend } from "../services/notificationEngine";
 
 const RENAME_SIMILARITY_THRESHOLD = 0.85;
 const BATCH_SIZE = 500; // for bulk DB operations
@@ -101,46 +102,10 @@ async function batchedInsertChanges(changes: SponsorChange[], today: string): Pr
 
 async function sendReactivationEmail(toEmail: string, companyName: string): Promise<boolean> {
   try {
-    if (!process.env.RESEND_API_KEY) {
-      console.error("[ReactivationWatch] RESEND_API_KEY not configured");
-      return false;
-    }
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
-      },
-      body: JSON.stringify({
-        from: "Check By AI <noreply@checkbyai.net>",
-        to: [toEmail],
-        subject: `Sponsor licence alert: ${companyName} is back on the register`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="background: linear-gradient(135deg, #003366 0%, #0066cc 100%); padding: 30px; border-radius: 10px 10px 0 0;">
-              <h1 style="color: #ffffff; margin: 0; text-align: center;">Sponsor Licence Reactivated</h1>
-            </div>
-            <div style="background: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
-              <p style="color: #333; font-size: 16px;">
-                Good news — the company you were watching has reappeared on the GOV.UK sponsor register:
-              </p>
-              <div style="background: #f0f4ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #003366;">
-                <p style="margin: 0; font-size: 18px; font-weight: bold; color: #003366;">${companyName}</p>
-              </div>
-              <p style="color: #666; font-size: 14px;">
-                You can now search for this company on Check By AI to verify its current licence status.
-              </p>
-              <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
-              <p style="color: #999; font-size: 12px; text-align: center;">
-                This is an automated alert from Check By AI. You requested this notification when the company was not yet licensed.
-              </p>
-            </div>
-          </div>
-        `,
-      }),
-    });
-    if (!response.ok) {
-      console.error("[ReactivationWatch] Resend error:", await response.text());
+    const { subject, html } = buildEmail("RE_ACTIVATED", companyName, "REMOVED_REVOKED", "NEWLY_GRANTED");
+    const result = await sendViaResend(toEmail, subject, html);
+    if (!result.success) {
+      console.error("[ReactivationWatch] Resend error:", result.error);
       return false;
     }
     return true;

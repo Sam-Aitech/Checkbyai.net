@@ -432,6 +432,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
   const [historicalResults, setHistoricalResults] = useState<FreeSearchResult[]>([])
   const [historicalLoading, setHistoricalLoading] = useState(false)
   const historicalDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
 
   const triggerHistoricalSearch = async (q: string) => {
     setHistoricalLoading(true)
@@ -449,6 +450,20 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
 
   useEffect(() => {
     setIsLoaded(true)
+  }, [])
+
+  // Auto-focus the search input when the page is opened with ?search=1.
+  // Used by the "Find active sponsors" link on the revoked-company CTA.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('search') === '1') {
+      // Small delay so the element is visible after mount animations
+      const t = setTimeout(() => {
+        searchInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        searchInputRef.current?.focus()
+      }, 300)
+      return () => clearTimeout(t)
+    }
   }, [])
 
   // Pre-load the client-side search index on mount so it's ready by the time
@@ -590,6 +605,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40 pointer-events-none" />
                     <input
                       type="text"
+                      ref={searchInputRef}
                       placeholder="Search any employer — e.g. NHS, Tata, Deloitte…"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
