@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils'
-import { useState, useEffect, Suspense, lazy } from 'react'
+import { useState, useEffect, useRef, Suspense, lazy } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { useInView } from 'react-intersection-observer'
@@ -157,11 +157,12 @@ function RecentlyRevokedSection() {
 // ── Nightly stats bar ─────────────────────────────────────────────────────
 
 interface NightlyStats {
-  totalActive:  number;
-  lastRunDate:  string | null;
-  addedCount:   number;
-  removedCount: number;
-  changesCount: number;
+  totalActive:          number;
+  lastRunDate:          string | null;
+  addedCount:           number;
+  removedCount:         number;
+  changesCount:         number;
+  revokedLast12Months:  number;
 }
 
 function formatRunDate(dateStr: string | null): string {
@@ -182,7 +183,7 @@ function NightlyStatsBar() {
     staleTime: 60 * 60 * 1_000,
   });
 
-  const totalLabel  = isLoading ? "—" : (data?.totalActive  ?? 0).toLocaleString("en-GB");
+  const totalLabel   = isLoading ? "—" : (data?.totalActive  ?? 0).toLocaleString("en-GB");
   const changesLabel = isLoading ? "—" : (() => {
     if (!data) return "No data";
     const parts: string[] = [];
@@ -191,13 +192,14 @@ function NightlyStatsBar() {
     if (data.changesCount) parts.push(`${data.changesCount} updated`);
     return parts.length > 0 ? parts.join(" · ") : "No changes";
   })();
-  const dateLabel   = isLoading ? "—" : formatRunDate(data?.lastRunDate ?? null);
-  const hasRemovals = !isLoading && (data?.removedCount ?? 0) > 0;
+  const dateLabel    = isLoading ? "—" : formatRunDate(data?.lastRunDate ?? null);
+  const hasRemovals  = !isLoading && (data?.removedCount ?? 0) > 0;
+  const revoked12Label = isLoading ? "—" : (data?.revokedLast12Months ?? 0).toLocaleString("en-GB");
 
   return (
     <div className="bg-slate-900 border-y border-slate-700 -mt-16 relative z-10">
       <div className="max-w-5xl mx-auto px-4 py-5">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-0 sm:divide-x sm:divide-slate-700 text-center">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-0 sm:divide-x sm:divide-slate-700 text-center">
           <div className="px-4">
             <p className={cn("text-2xl font-bold text-white", isLoading && "animate-pulse")}>{totalLabel}</p>
             <p className="text-xs text-slate-400 mt-0.5">Active licensed sponsors</p>
@@ -207,6 +209,16 @@ function NightlyStatsBar() {
               {changesLabel}
             </p>
             <p className="text-xs text-slate-400 mt-0.5">In last nightly run</p>
+          </div>
+          <div className="px-4">
+            <Link href="/sponsor-changes" className="group">
+              <p className={cn("text-2xl font-bold text-red-400 group-hover:text-red-300 transition-colors", isLoading && "animate-pulse")}>
+                {revoked12Label}
+              </p>
+              <p className="text-xs text-slate-400 mt-0.5 group-hover:text-slate-300 transition-colors">
+                Licences revoked — 12 months <ArrowRight className="w-3 h-3 inline ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </p>
+            </Link>
           </div>
           <div className="px-4">
             <p className={cn("text-2xl font-bold text-emerald-400", isLoading && "animate-pulse")}>{dateLabel}</p>
@@ -354,6 +366,7 @@ interface FreeSearchResult {
   status:          string;
   matchScore:      number;
   grantedAt:       string | null;
+  removedAt?:      string | null;
   isNew:           boolean;
 }
 
@@ -416,6 +429,23 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
   const [searchLoading, setSearchLoading] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
   const [searchUnavailable, setSearchUnavailable] = useState(false)
+  const [historicalResults, setHistoricalResults] = useState<FreeSearchResult[]>([])
+  const [historicalLoading, setHistoricalLoading] = useState(false)
+  const historicalDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const triggerHistoricalSearch = async (q: string) => {
+    setHistoricalLoading(true)
+    setHistoricalResults([])
+    try {
+      const res = await fetch(`/api/sponsors/historical-search?q=${encodeURIComponent(q)}`)
+      const data = await res.json()
+      if (res.ok) setHistoricalResults(data.results || [])
+    } catch {
+      // silently swallow — historical search is a best-effort enhancement
+    } finally {
+      setHistoricalLoading(false)
+    }
+  }
 
   useEffect(() => {
     setIsLoaded(true)
@@ -428,11 +458,24 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
   // Reactive instant search: runs on every keystroke once the index is loaded.
   useEffect(() => {
     const q = searchQuery.trim();
-    if (q.length < 3) return;
+    if (q.length < 3) {
+      setHistoricalResults([]);
+      if (historicalDebounce.current) clearTimeout(historicalDebounce.current);
+      return;
+    }
     if (_clientIndex !== null) {
-      setSearchResults(clientSearch(q));
+      const results = clientSearch(q);
+      setSearchResults(results);
       setHasSearched(true);
       setSearchLoading(false);
+      if (results.length === 0) {
+        // Debounce the historical DB call so we don't fire on every keystroke.
+        if (historicalDebounce.current) clearTimeout(historicalDebounce.current);
+        historicalDebounce.current = setTimeout(() => triggerHistoricalSearch(q), 600);
+      } else {
+        setHistoricalResults([]);
+        if (historicalDebounce.current) clearTimeout(historicalDebounce.current);
+      }
     }
   }, [searchQuery])
 
@@ -441,20 +484,25 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
     if (q.length < 3) return;
     // If the client index is already loaded, the useEffect already populated results
     if (_clientIndex !== null) {
-      setSearchResults(clientSearch(q));
+      const results = clientSearch(q);
+      setSearchResults(results);
       setHasSearched(true);
+      if (results.length === 0) triggerHistoricalSearch(q);
       return;
     }
     // Fallback: server-side search when index hasn't loaded yet
     setSearchLoading(true);
     setSearchResults([]);
+    setHistoricalResults([]);
     setSearchUnavailable(false);
     setHasSearched(true);
     try {
       const res = await fetch(`/api/sponsors/free-search?q=${encodeURIComponent(q)}`);
       const data = await res.json();
       if (res.ok) {
-        setSearchResults(data.results || []);
+        const results = data.results || [];
+        setSearchResults(results);
+        if (results.length === 0) triggerHistoricalSearch(q);
       } else {
         setSearchUnavailable(true);
       }
@@ -567,7 +615,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                   {searchUnavailable && (
                     <p className="text-amber-300 text-xs py-1">Search temporarily unavailable — please try again.</p>
                   )}
-                  {!searchLoading && !searchUnavailable && hasSearched && searchResults.length === 0 && (
+                  {!searchLoading && !searchUnavailable && hasSearched && searchResults.length === 0 && !historicalLoading && historicalResults.length === 0 && (
                     <p className="text-white/60 text-xs py-1">No sponsors found. Try a different name.</p>
                   )}
                   {!searchLoading && searchResults.length > 0 && (
@@ -605,6 +653,55 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                         <Link href="/pricing" className="text-xs text-emerald-300 hover:text-emerald-200 font-semibold">
                           Get alerts when any sponsor changes →
                         </Link>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── Historical / revoked results tier ───────────────── */}
+                  {historicalLoading && (
+                    <div className="flex items-center gap-2 text-white/50 text-xs py-1.5">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />Checking historical register…
+                    </div>
+                  )}
+                  {!historicalLoading && historicalResults.length > 0 && (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-1.5 pt-0.5">
+                        <XCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                        <p className="text-xs text-red-300 font-semibold">Found in historical register — licence revoked</p>
+                      </div>
+                      <div className="space-y-1.5 max-h-48 overflow-y-auto pr-0.5">
+                        {historicalResults.map((r) => {
+                          const removedDate = r.removedAt
+                            ? new Date(r.removedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+                            : null;
+                          const detailHref = r.id ? `/sponsor/${r.id}/${toHeroSlug(r.organisationName)}` : null;
+                          const inner = (
+                            <div className="bg-red-950/40 border border-red-500/25 rounded-lg px-3.5 py-2.5 hover:bg-red-950/60 transition-colors">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-semibold text-white text-sm truncate">{r.organisationName}</p>
+                                  <p className="text-xs text-red-300/80 mt-0.5 truncate">
+                                    {removedDate ? `Licence revoked · ${removedDate}` : "Licence revoked"}{r.townCity ? ` · ${r.townCity}` : ""}
+                                  </p>
+                                </div>
+                                <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 mt-0.5">Revoked</span>
+                              </div>
+                              <div className="mt-2 flex items-center justify-between gap-2">
+                                <p className="text-[11px] text-white/50">Get notified if this licence is restored</p>
+                                <Link
+                                  href="/pricing?plan=starter"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="text-[11px] font-bold text-emerald-300 hover:text-emerald-200 whitespace-nowrap"
+                                >
+                                  Subscribe for alerts →
+                                </Link>
+                              </div>
+                            </div>
+                          );
+                          return detailHref
+                            ? <Link key={r.fingerprint} href={detailHref}>{inner}</Link>
+                            : <div key={r.fingerprint}>{inner}</div>;
+                        })}
                       </div>
                     </div>
                   )}

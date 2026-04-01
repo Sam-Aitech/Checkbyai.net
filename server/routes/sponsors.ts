@@ -1,12 +1,12 @@
 import type { Express } from "express";
 import { db } from "../db";
 import { sql, eq, and, desc, inArray, gte } from "drizzle-orm";
-import { sponsorCanonical, sponsorChanges, companyWatches, dailyDigest } from "@shared/schema";
+import { sponsorCanonical, sponsorChanges, companyWatches, sponsorWatches, dailyDigest } from "@shared/schema";
 import { z } from "zod";
 import { isAuthenticated, isAdmin } from "../auth";
 import { getWatchLimit as getWatchLimitFromTier, getTierConfig } from "../utils/tierConfig";
 import { normalizeName, generateFingerprint } from "../utils/sponsorListFetcher";
-import { ensureIndexReady, isIndexReady, searchSponsors, searchSponsorsFallback, type PagedSearchResult } from "../utils/sponsorSearch";
+import { ensureIndexReady, isIndexReady, searchSponsors, searchSponsorsFallback, searchRevokedSponsors, type PagedSearchResult } from "../utils/sponsorSearch";
 import { generateHeadline, signDigest } from "../services/aiDigest";
 import { storage } from "../storage";
 import { cacheGet, cacheSet } from "../utils/redisClient";
@@ -47,6 +47,32 @@ const changesRateLimit = rateLimit({
   message: { message: "Too many requests. Please wait before fetching sponsor changes again." },
 });
 
+/**
+ * Ensures a sponsor_watches row (pending_activation) exists for this user/company.
+ * Called when a paid user watches a REMOVED_REVOKED company so the nightly
+ * state-machine fires a RE_ACTIVATED email when the licence is restored.
+ * Safe to call multiple times — silently skips if a row already exists.
+ */
+async function ensureReactivationWatch(userId: string, companyName: string): Promise<void> {
+  try {
+    const existing = await db
+      .select({ id: sponsorWatches.id })
+      .from(sponsorWatches)
+      .where(and(
+        eq(sponsorWatches.userId, userId),
+        sql`LOWER(${sponsorWatches.companyName}) = LOWER(${companyName})`,
+        eq(sponsorWatches.status, "pending_activation"),
+      ))
+      .limit(1);
+    if (existing.length === 0) {
+      await db.insert(sponsorWatches).values({ userId, companyName });
+    }
+  } catch (err) {
+    // Non-fatal — log and continue
+    console.error("[ReactivationWatch] ensureReactivationWatch failed:", err instanceof Error ? err.message : err);
+  }
+}
+
 export function registerSponsorRoutes(app: Express): void {
   app.get('/api/sponsors/free-search', freeSearchRateLimit, async (req: any, res) => {
     try {
@@ -65,6 +91,25 @@ export function registerSponsorRoutes(app: Express): void {
     } catch (error) {
       console.error("Error in free sponsor search:", error);
       res.status(500).json({ message: "Failed to search sponsors." });
+    }
+  });
+
+  // ── Historical (revoked) sponsor search ─────────────────────────────────────
+  // Called by the frontend only when the primary active-sponsor search returns
+  // zero results. Shows revoked companies so users can discover their employer's
+  // historical record and subscribe for re-activation alerts.
+  app.get('/api/sponsors/historical-search', freeSearchRateLimit, async (req: any, res) => {
+    try {
+      const q = (req.query.q as string || "").trim().slice(0, 200);
+      if (q.length < 3) {
+        return res.status(400).json({ message: "Search query must be at least 3 characters long." });
+      }
+
+      const results = await searchRevokedSponsors(q, 10);
+      res.json({ results });
+    } catch (error) {
+      console.error("Error in historical sponsor search:", error);
+      res.status(500).json({ message: "Failed to search historical sponsors." });
     }
   });
 
@@ -449,17 +494,14 @@ export function registerSponsorRoutes(app: Express): void {
       const userId = req.user.id;
       const normalized = normalizeName(organisation_name.trim());
 
-      const watchableStatuses = ["ACTIVE", "NEWLY_GRANTED"];
-
+      // No status filter — REMOVED_REVOKED companies can also be watched so
+      // users receive a RE_ACTIVATED alert when the licence is restored.
       let canonicalMatch;
       if (fpParam) {
         const match = await db
           .select()
           .from(sponsorCanonical)
-          .where(and(
-            eq(sponsorCanonical.fingerprint, fpParam),
-            inArray(sponsorCanonical.status, watchableStatuses),
-          ))
+          .where(eq(sponsorCanonical.fingerprint, fpParam))
           .limit(1);
         canonicalMatch = match[0] || null;
       }
@@ -469,22 +511,20 @@ export function registerSponsorRoutes(app: Express): void {
         const fpMatch = await db
           .select()
           .from(sponsorCanonical)
-          .where(and(
-            eq(sponsorCanonical.fingerprint, fp),
-            inArray(sponsorCanonical.status, watchableStatuses),
-          ))
+          .where(eq(sponsorCanonical.fingerprint, fp))
           .limit(1);
         canonicalMatch = fpMatch[0] || null;
       }
 
       if (!canonicalMatch) {
         const normalizedCity = town_city ? normalizeName(town_city.trim()) : null;
-        const activeRecords = await db
+        // Scope full-table scan to active + revoked only (avoids loading every row)
+        const candidateRecords = await db
           .select()
           .from(sponsorCanonical)
-          .where(inArray(sponsorCanonical.status, watchableStatuses));
+          .where(inArray(sponsorCanonical.status, ["ACTIVE", "NEWLY_GRANTED", "REMOVED_REVOKED", "GRACE_PERIOD"]));
 
-        canonicalMatch = activeRecords.find(m => {
+        canonicalMatch = candidateRecords.find(m => {
           const mNorm = normalizeName(m.currentName);
           if (mNorm !== normalized) return false;
           if (normalizedCity && m.townCity) {
@@ -495,7 +535,7 @@ export function registerSponsorRoutes(app: Express): void {
       }
 
       if (!canonicalMatch) {
-        return res.status(404).json({ message: "Company not found in the current sponsor register. Please check the name and try again." });
+        return res.status(404).json({ message: "Company not found in the sponsor register. Please check the name and try again." });
       }
 
       const existingWatch = await db
@@ -535,6 +575,11 @@ export function registerSponsorRoutes(app: Express): void {
           .update(companyWatches)
           .set({ isActive: true, fingerprint: canonicalMatch.fingerprint })
           .where(eq(companyWatches.id, existingWatch[0].id));
+        // For revoked companies ensure a sponsor_watches row exists so the
+        // nightly RE_ACTIVATED notification fires when the licence is restored.
+        if (canonicalMatch.status === "REMOVED_REVOKED") {
+          await ensureReactivationWatch(userId, canonicalMatch.currentName);
+        }
         return res.json({ message: "Watch reactivated.", watch: { ...existingWatch[0], isActive: true } });
       }
 
@@ -549,6 +594,12 @@ export function registerSponsorRoutes(app: Express): void {
           isActive: true,
         })
         .returning();
+
+      // For revoked companies ensure a sponsor_watches row exists so the
+      // nightly RE_ACTIVATED notification fires when the licence is restored.
+      if (canonicalMatch.status === "REMOVED_REVOKED") {
+        await ensureReactivationWatch(userId, canonicalMatch.currentName);
+      }
 
       res.status(201).json({ message: "Watch created.", watch: newWatch });
     } catch (error) {
@@ -778,6 +829,15 @@ export function registerSponsorRoutes(app: Express): void {
   app.post('/api/sponsor-watch', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id as string;
+
+      const userSub = req.user.subscriptionStatus || "free";
+      if (userSub === "free" || !userSub) {
+        return res.status(403).json({
+          message: "Upgrade to Starter plan to set reactivation alerts.",
+          requiresUpgrade: true,
+        });
+      }
+
       const parsed = z.object({
         companyName: z.string().trim().min(1),
         companyNumber: z.string().trim().optional(),

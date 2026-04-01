@@ -214,7 +214,7 @@ Returns the authenticated user's verification history.
 ## 4. Sponsor Monitor — Search
 
 ### `GET /api/sponsors/free-search?q={query}`
-Free sponsor search. Rate limited to 1 search per IP per day.
+Free sponsor search. Unlimited for all users (30 req/min per IP). Returns only ACTIVE and NEWLY_GRANTED sponsors.
 
 **Query params:**
 | Param | Required | Description |
@@ -240,9 +240,42 @@ Free sponsor search. Rate limited to 1 search per IP per day.
 }
 ```
 
-**Response 429:** Daily free search limit reached
+**Response 429:** Rate limit exceeded
 
 **Response 503:** Search index not yet available (building post-startup)
+
+---
+
+### `GET /api/sponsors/historical-search?q={query}`
+Searches REMOVED_REVOKED sponsors using pg_trgm trigram similarity. Called client-side only when `free-search` returns 0 results — lets users find revoked companies and see conversion CTAs. Rate limited (same limiter as free-search, 30 req/min per IP).
+
+**Query params:**
+| Param | Required | Description |
+|---|---|---|
+| `q` | Yes | Search query (min 3 characters) |
+
+**Response 200:**
+```json
+{
+  "results": [
+    {
+      "id": 1234,
+      "fingerprint": "beesocialize|london|worker",
+      "organisationName": "Beesocialize Ltd",
+      "townCity": "London",
+      "typeRating": null,
+      "route": "Worker",
+      "status": "REMOVED_REVOKED",
+      "matchScore": 91,
+      "grantedAt": "2021-05-12",
+      "removedAt": "2024-11-03",
+      "isNew": false,
+      "historicalNames": [],
+      "source": "db"
+    }
+  ]
+}
+```
 
 ---
 
@@ -252,6 +285,71 @@ Authenticated sponsor search. Unlimited for paid users.
 **Auth required:** Yes
 
 **Response 200:** Same structure as free-search, without `searchesRemaining`.
+
+---
+
+### `GET /api/sponsors/search-index.json`
+Returns the full client-side instant-search index as a compact JSON array. Used by the browser for zero-latency search. Gzip-compressed (~1.5 MB). Cached 12hr in Redis + CDN. Contains only ACTIVE and NEWLY_GRANTED sponsors.
+
+**Auth required:** No
+
+**Response 200:** `[{ "id": 1, "n": "Acme Ltd", "c": "London", "r": "Worker", "t": "A-Rating", "s": "ACTIVE" }, ...]`
+
+---
+
+### `GET /api/sponsors/nightly-stats`
+Live stats for the homepage bar. Returns active sponsor count, last run date, and change counts from the most recent daily digest. Also returns `revokedLast12Months` — count of REMOVED_REVOKED sponsors whose licence was revoked in the past 12 months. Cached 1hr.
+
+**Auth required:** No
+
+**Response 200:**
+```json
+{
+  "totalActive": 124321,
+  "lastRunDate": "2026-04-01",
+  "addedCount": 12,
+  "removedCount": 3,
+  "changesCount": 8,
+  "revokedLast12Months": 1847
+}
+```
+
+---
+
+### `GET /api/sponsors/recently-revoked`
+Returns the 7 most recently revoked sponsors for the homepage widget. Cached 1hr.
+
+**Auth required:** No
+
+**Response 200:**
+```json
+[
+  { "id": 9001, "currentName": "Acme Ltd", "townCity": "Leeds", "route": "Worker", "removedAt": "2026-03-29" }
+]
+```
+
+---
+
+### `GET /api/sponsors/detail/:id`
+Returns full sponsor detail including enrichment data, recent changes preview (3 most recent), and total changes count. REMOVED_REVOKED sponsors are returned — no status filter. Cached 1hr in Redis.
+
+**Auth required:** No
+
+**Response 200:**
+```json
+{
+  "id": 1234,
+  "fingerprint": "acme|london|worker",
+  "currentName": "Acme Ltd",
+  "townCity": "London",
+  "status": "ACTIVE",
+  "grantedAt": "2020-06-15",
+  "removedAt": null,
+  "recentChanges": [...],
+  "totalChanges": 5,
+  "enrichment": { "companyNumber": "12345678", "companyStatus": "Active", ... }
+}
+```
 
 ---
 

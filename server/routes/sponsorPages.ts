@@ -263,7 +263,7 @@ export function registerSponsorPageRoutes(app: Express): void {
     }
 
     try {
-      const [countResult, digestRows] = await Promise.all([
+      const [countResult, digestRows, revokedResult] = await Promise.all([
         db
           .select({ total: sql<number>`count(*)::int` })
           .from(sponsorCanonical)
@@ -278,17 +278,27 @@ export function registerSponsorPageRoutes(app: Express): void {
           .from(dailyDigest)
           .orderBy(desc(dailyDigest.snapshotDate))
           .limit(1),
+        // Count revocations in the last 12 months — trust signal for the homepage.
+        db
+          .select({ total: sql<number>`count(*)::int` })
+          .from(sponsorCanonical)
+          .where(
+            sql`status = 'REMOVED_REVOKED'
+                AND removed_at >= (CURRENT_DATE - INTERVAL '12 months')`
+          ),
       ]);
 
-      const totalActive  = countResult[0]?.total ?? 0;
-      const latest       = digestRows[0] ?? null;
+      const totalActive          = countResult[0]?.total ?? 0;
+      const revokedLast12Months  = revokedResult[0]?.total ?? 0;
+      const latest               = digestRows[0] ?? null;
 
       const payload = {
         totalActive,
-        lastRunDate:  latest?.snapshotDate  ?? null,
-        addedCount:   latest?.addedCount    ?? 0,
-        removedCount: latest?.removedCount  ?? 0,
-        changesCount: latest?.updatedCount  ?? 0,
+        lastRunDate:          latest?.snapshotDate  ?? null,
+        addedCount:           latest?.addedCount    ?? 0,
+        removedCount:         latest?.removedCount  ?? 0,
+        changesCount:         latest?.updatedCount  ?? 0,
+        revokedLast12Months,
       };
 
       await cacheSet(cacheKey, payload, 3600);

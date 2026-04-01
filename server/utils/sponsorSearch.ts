@@ -12,6 +12,7 @@ interface SponsorSearchRecord {
   route:           string | null;
   status:          string;
   grantedAt:       string | null;
+  removedAt:       string | null;
   historicalNames: string[];
 }
 
@@ -25,6 +26,7 @@ export interface SponsorSearchResult {
   status:          string;
   matchScore:      number;
   grantedAt:       string | null;
+  removedAt:       string | null;
   isNew:           boolean;          // true when status === 'NEWLY_GRANTED'
   historicalNames: string[];
   source:          "index" | "db";  // "index" = Fuse.js, "db" = pg_trgm fallback
@@ -96,6 +98,7 @@ export async function rebuildSponsorIndex(): Promise<void> {
       route:            sponsorCanonical.route,
       status:           sponsorCanonical.status,
       grantedAt:        sponsorCanonical.grantedAt,
+      removedAt:        sponsorCanonical.removedAt,
       historicalNames:  sponsorCanonical.historicalNames,
     })
     .from(sponsorCanonical)
@@ -110,6 +113,7 @@ export async function rebuildSponsorIndex(): Promise<void> {
     route:            r.route,
     status:           r.status,
     grantedAt:        r.grantedAt,
+    removedAt:        r.removedAt ? String(r.removedAt) : null,
     historicalNames:  r.historicalNames || [],
   }));
 
@@ -200,6 +204,7 @@ export function searchSponsors(
       status:           r.item.status,
       matchScore:       Math.round((1 - (r.score ?? 1)) * 100),
       grantedAt:        r.item.grantedAt,
+      removedAt:        r.item.removedAt,
       isNew:            r.item.status === "NEWLY_GRANTED",
       historicalNames:  r.item.historicalNames,
       source:           "index",
@@ -252,6 +257,7 @@ export async function searchSponsorsFallback(
           route,
           status,
           granted_at          AS "grantedAt",
+          removed_at          AS "removedAt",
           historical_names    AS "historicalNames",
           GREATEST(
             similarity(current_name, ${safeQuery}),
@@ -305,6 +311,7 @@ export async function searchSponsorsFallback(
         status:           r.status,
         matchScore:       Math.round((parseFloat(r.match_score) || 0) * 100),
         grantedAt:        r.grantedAt ?? null,
+        removedAt:        r.removedAt ?? null,
         isNew:            r.status === "NEWLY_GRANTED",
         historicalNames:  r.historicalNames || [],
         source:           "db",
@@ -318,5 +325,74 @@ export async function searchSponsorsFallback(
     // rather than crashing the request handler.
     console.error("[SponsorSearch] pg_trgm fallback failed:", err instanceof Error ? err.message : err);
     return { results: [], total: 0, page: 1, totalPages: 1 };
+  }
+}
+
+/**
+ * Searches REMOVED_REVOKED sponsors using pg_trgm trigram similarity.
+ *
+ * Called only when the primary active-sponsor search returns zero results,
+ * so users searching for a revoked employer can still find the historical
+ * record and be shown a subscription CTA for re-activation alerts.
+ * Limited to 10 results — these are secondary, not the main search path.
+ */
+export async function searchRevokedSponsors(
+  query: string,
+  limit = 10,
+): Promise<SponsorSearchResult[]> {
+  const safeQuery = query.slice(0, 200);
+  try {
+    const rows = await db.execute(sql`
+      SELECT
+        id,
+        fingerprint,
+        current_name        AS "organisationName",
+        town_city           AS "townCity",
+        type_rating         AS "typeRating",
+        route,
+        status,
+        granted_at          AS "grantedAt",
+        removed_at          AS "removedAt",
+        historical_names    AS "historicalNames",
+        GREATEST(
+          similarity(current_name, ${safeQuery}),
+          COALESCE(
+            (SELECT MAX(similarity(hn, ${safeQuery}))
+               FROM UNNEST(historical_names) AS hn),
+            0
+          )
+        ) AS match_score
+      FROM sponsor_canonical
+      WHERE
+        status = 'REMOVED_REVOKED'
+        AND (
+          current_name % ${safeQuery}
+          OR EXISTS (
+            SELECT 1 FROM UNNEST(historical_names) AS hn
+            WHERE hn % ${safeQuery}
+          )
+        )
+      ORDER BY match_score DESC
+      LIMIT ${limit}
+    `);
+
+    return (rows.rows as any[]).map((r) => ({
+      id:               r.id,
+      fingerprint:      r.fingerprint,
+      organisationName: r.organisationName,
+      townCity:         r.townCity ?? null,
+      typeRating:       r.typeRating ?? null,
+      route:            r.route ?? null,
+      status:           r.status,
+      matchScore:       Math.round((parseFloat(r.match_score) || 0) * 100),
+      grantedAt:        r.grantedAt ?? null,
+      removedAt:        r.removedAt ?? null,
+      isNew:            false,
+      historicalNames:  r.historicalNames || [],
+      source:           "db" as const,
+    }));
+  } catch (err: unknown) {
+    console.error("[SponsorSearch] searchRevokedSponsors failed:", err instanceof Error ? err.message : err);
+    return [];
   }
 }

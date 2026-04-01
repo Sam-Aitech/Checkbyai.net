@@ -1229,6 +1229,12 @@ export default function SponsorMonitor() {
                               {watch.currentStatus.route && <span className="inline-flex items-center gap-1"><Route className="w-3.5 h-3.5" />{watch.currentStatus.route}</span>}
                               <span className="inline-flex items-center gap-1"><CalendarDays className="w-3.5 h-3.5" />Watching since {formatDate(watch.createdAt)}</span>
                             </div>
+                            {(watch.currentStatus.status === "REMOVED_REVOKED") && (
+                              <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 mt-1">
+                                <Bell className="w-3 h-3 shrink-0" />
+                                Licence revoked — you&apos;ll be alerted if they reapply
+                              </p>
+                            )}
                             <div className="flex items-center gap-3 mt-2 flex-wrap">
                               {watch.fingerprint && <button onClick={() => openHistory(watch.fingerprint!, watch.organisationName)} className="inline-flex items-center gap-1 text-xs text-primary hover:underline"><History className="w-3 h-3" /> View History</button>}
                               {isProUser && watch.fingerprint && (

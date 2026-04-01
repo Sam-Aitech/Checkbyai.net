@@ -1,16 +1,20 @@
 import { useParams, Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import {
   Building2, MapPin, Shield, Star, Calendar, Clock,
   CheckCircle, XCircle, AlertTriangle, ArrowLeft,
   Bell, ChevronRight, ArrowUpCircle, ArrowDownCircle,
   RefreshCw, FileText, Tag, Lock, ExternalLink, Briefcase,
+  Activity, Search,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import PageLayout from "@/components/PageLayout";
 import SEOHead from "@/components/SEOHead";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -40,9 +44,9 @@ interface SponsorDetailData {
   typeRating:      string | null;
   route:           string | null;
   status:          string;
-  firstSeen:       string;
-  lastSeen:        string;
-  grantedAt:       string;
+  firstSeen:       string | null;
+  lastSeen:        string | null;
+  grantedAt:       string | null;
   removedAt:       string | null;
   historicalNames: string[];
   recentChanges:   SponsorChange[];
@@ -108,6 +112,31 @@ function DetailSkeleton() {
 export default function SponsorDetail() {
   const params = useParams<{ id: string; slug?: string }>();
   const id = parseInt(params.id || "", 10);
+  const { isPro, isAuthenticated } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [watchAdded, setWatchAdded] = useState(false);
+
+  const watchMutation = useMutation({
+    mutationFn: async (payload: { organisation_name: string; fingerprint: string }) => {
+      const res = await fetch("/api/watches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.message || "Failed to add watch");
+      return body;
+    },
+    onSuccess: () => {
+      setWatchAdded(true);
+      queryClient.invalidateQueries({ queryKey: ["/api/watches"] });
+      toast({ title: "Watch added", description: "You'll be alerted when this company reapplies for a licence." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Could not add watch", description: err.message, variant: "destructive" });
+    },
+  });
 
   const { data, isLoading, isError } = useQuery<SponsorDetailData>({
     queryKey: ["/api/sponsors/detail", id],
@@ -280,6 +309,48 @@ export default function SponsorDetail() {
           </div>
         </div>
 
+        {/* ── Revoked: what this means for workers ─────────────────────── */}
+        {isRevoked && (
+          <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-xl p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+              <div>
+                <h2 className="text-base font-semibold text-red-900 dark:text-red-200 mb-3">
+                  What does this mean for sponsored workers?
+                </h2>
+                <div className="space-y-2 text-sm text-red-800 dark:text-red-300">
+                  <p>
+                    When the Home Office revokes a sponsor licence, any workers currently
+                    sponsored by that company are given a <strong>60-day window</strong> to find a
+                    new licensed employer, switch visa category, or leave the UK.
+                  </p>
+                  <p>
+                    The Home Office does not email individual workers — your only protection
+                    is actively monitoring the register or subscribing to alerts.
+                  </p>
+                  <p>
+                    If <strong>{data.currentName}</strong> reapplies and is re-granted a licence,
+                    it will appear on the register overnight. CheckByAI detects this within
+                    minutes and can notify you before anyone else.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="grid sm:grid-cols-3 gap-3 pt-2 border-t border-red-200 dark:border-red-800">
+              {[
+                { label: "60 days",        sub: "Grace period to find a new sponsor" },
+                { label: "Midnight check", sub: "Home Office updates the register nightly" },
+                { label: "30 min alert",   sub: "Pro subscribers notified within 30 minutes" },
+              ].map((item) => (
+                <div key={item.label} className="text-center">
+                  <p className="text-base font-bold text-red-900 dark:text-red-200">{item.label}</p>
+                  <p className="text-xs text-red-700 dark:text-red-400 mt-0.5">{item.sub}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Change history */}
         {data.recentChanges.length > 0 && (
           <div className="bg-card border border-border rounded-xl p-6">
@@ -400,38 +471,125 @@ export default function SponsorDetail() {
           </div>
         )}
 
-        {/* CTA */}
-        <div className="bg-slate-900 dark:bg-slate-800 rounded-xl p-6 text-white">
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center shrink-0">
-              <Bell className="w-5 h-5 text-emerald-400" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-semibold mb-1">
-                {isRevoked
-                  ? "Track reinstatements and new sponsors"
-                  : `Get instant alerts if ${data.currentName} changes`}
-              </h3>
-              <p className="text-sm text-white/70 mb-4">
-                {isRevoked
-                  ? "Monitor the register daily. Get notified the moment any sponsor is reinstated or a new licence is granted."
-                  : "The Home Office updates the register at midnight without warning. Our Notification Engine checks every night and alerts you within 30 minutes via WhatsApp, email, or SMS."}
+        {/* ── CTA: revoked company ─────────────────────────────────────── */}
+        {isRevoked ? (
+          <div className="rounded-xl overflow-hidden border border-red-900/60 bg-slate-900 text-white">
+            {/* Urgent header strip */}
+            <div className="bg-red-700 px-6 py-3 flex items-center gap-2.5">
+              <Activity className="w-4 h-4 text-red-200 animate-pulse shrink-0" />
+              <p className="text-sm font-bold text-white">
+                {data.currentName}&apos;s licence was revoked
+                {data.removedAt ? ` on ${formatDate(data.removedAt)}` : ""}.
+                You will not be notified unless you subscribe.
               </p>
-              <div className="flex gap-3 flex-wrap">
-                <Link href="/pricing">
-                  <Button className="bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-full px-6">
-                    Set Up Alerts — from £24.99/mo
-                  </Button>
-                </Link>
-                <Link href="/sponsors">
-                  <Button variant="outline" className="border-white/20 text-white hover:bg-white/10 rounded-full bg-transparent">
-                    <ArrowLeft className="w-4 h-4 mr-1.5" />Browse Register
+            </div>
+
+            <div className="p-6 space-y-5">
+              {/* Value proposition */}
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center shrink-0">
+                  <Bell className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg mb-1 leading-snug">
+                    Be the first to know if {data.currentName} reapplies
+                  </h3>
+                  <p className="text-sm text-white/70 leading-relaxed">
+                    The Home Office updates the register at midnight without notifying
+                    anyone. Our system checks every night and will alert you within
+                    30 minutes — via WhatsApp, email, or SMS — the moment this
+                    company reappears on the register.
+                  </p>
+                </div>
+              </div>
+
+              {/* Feature checklist */}
+              <div className="grid sm:grid-cols-2 gap-2 text-sm">
+                {[
+                  "Instant alert when licence is restored",
+                  "WhatsApp, email & SMS notifications",
+                  "Monitor multiple employers at once",
+                  "Access full licence change history",
+                  "Alerts for new matching sponsors",
+                  "Cancel anytime — no lock-in",
+                ].map((feat) => (
+                  <div key={feat} className="flex items-center gap-2 text-white/80">
+                    <CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span>{feat}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* CTA row — paid users get a direct watch button; free users go to pricing */}
+              <div className="flex flex-col sm:flex-row gap-3 pt-1 border-t border-white/10">
+                {isAuthenticated && isPro ? (
+                  watchAdded ? (
+                    <div className="flex-1 flex items-center gap-2 justify-center rounded-full bg-emerald-500/20 border border-emerald-500/40 px-6 py-3 text-emerald-300 font-semibold text-sm">
+                      <CheckCircle className="w-4 h-4" />
+                      Watching — you&apos;ll be alerted when their licence is restored
+                    </div>
+                  ) : (
+                    <Button
+                      className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-full px-6 py-5 text-base shadow-lg shadow-emerald-900/40"
+                      disabled={watchMutation.isPending}
+                      onClick={() => watchMutation.mutate({ organisation_name: data.currentName, fingerprint: data.fingerprint })}
+                    >
+                      <Bell className="w-4 h-4 mr-2" />
+                      {watchMutation.isPending ? "Adding watch…" : `Watch ${data.currentName} for reactivation`}
+                    </Button>
+                  )
+                ) : (
+                  <Link href={`/pricing?plan=starter&company=${encodeURIComponent(data.currentName)}`} className="flex-1">
+                    <Button className="w-full bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-full px-6 py-5 text-base shadow-lg shadow-emerald-900/40">
+                      <Bell className="w-4 h-4 mr-2" />
+                      Subscribe for alerts — from £24.99/mo
+                    </Button>
+                  </Link>
+                )}
+                <Link href="/?search=1">
+                  <Button variant="outline" className="border-white/20 text-white hover:bg-white/10 rounded-full bg-transparent px-5 py-5">
+                    <Search className="w-4 h-4 mr-1.5" />Find active sponsors
                   </Button>
                 </Link>
               </div>
+
+              <p className="text-xs text-white/35 text-center">
+                UK GDPR compliant · Encrypted · Cancel anytime
+              </p>
             </div>
           </div>
-        </div>
+        ) : (
+          /* ── CTA: active company ──────────────────────────────────────── */
+          <div className="bg-slate-900 dark:bg-slate-800 rounded-xl p-6 text-white">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center shrink-0">
+                <Bell className="w-5 h-5 text-emerald-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold mb-1">
+                  Get instant alerts if {data.currentName} changes
+                </h3>
+                <p className="text-sm text-white/70 mb-4">
+                  The Home Office updates the register at midnight without warning. Our
+                  Notification Engine checks every night and alerts you within 30 minutes
+                  via WhatsApp, email, or SMS.
+                </p>
+                <div className="flex gap-3 flex-wrap">
+                  <Link href="/pricing">
+                    <Button className="bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-full px-6">
+                      Set Up Alerts — from £24.99/mo
+                    </Button>
+                  </Link>
+                  <Link href="/sponsors">
+                    <Button variant="outline" className="border-white/20 text-white hover:bg-white/10 rounded-full bg-transparent">
+                      <ArrowLeft className="w-4 h-4 mr-1.5" />Browse Register
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Source attribution */}
         <p className="text-xs text-muted-foreground text-center pb-4">
