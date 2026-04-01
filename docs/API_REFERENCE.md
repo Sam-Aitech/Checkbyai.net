@@ -443,6 +443,58 @@ Removes a watch. The watch is soft-deleted (`isActive = false`).
 
 ---
 
+### `PATCH /api/watches/:id/reactivate`
+Re-enables a previously removed watch (sets `isActive = true`). Used when the user re-watches a company they had previously stopped monitoring.
+
+**Auth required:** Yes
+
+**Response 200:** `{ "message": "Watch reactivated." }`
+
+**Response 403/404:** Watch not found or belongs to another user
+
+---
+
+### `POST /api/sponsor-watch`
+Creates a **reactivation watch** (`pending_activation`) for a revoked company. The user will receive an email when that company's licence is restored. Requires a paid subscription (Starter or above).
+
+**Auth required:** Yes (paid plan)
+
+**Body:**
+```json
+{
+  "companyName": "Beesocialize Ltd",
+  "companyNumber": "12345678"
+}
+```
+
+**Response 201:** `{ "id": "uuid", "companyName": "Beesocialize Ltd", "status": "pending_activation", ... }`
+
+**Response 403:** Free user — upgrade required (`requiresUpgrade: true`)
+
+**Response 409:** Duplicate — watch already exists for this company
+
+---
+
+### `GET /api/sponsor-watch`
+Returns the current user's reactivation watches. Accepts an optional `?status=` query param (e.g. `pending_activation`, `notified`).
+
+**Auth required:** Yes
+
+**Response 200:** `{ "data": [...], "total": 2 }`
+
+---
+
+### `DELETE /api/sponsor-watch/:id`
+Cancels a reactivation watch.
+
+**Auth required:** Yes
+
+**Response 200:** `{ "message": "Watch cancelled" }`
+
+**Response 403/404:** Watch not found or belongs to another user
+
+---
+
 ## 6. Notification Preferences
 
 ### `GET /api/notification-preferences`
@@ -765,6 +817,68 @@ Manually triggers the sponsor monitor job.
 
 ### `POST /api/admin/daily-digest/refresh`
 Forces regeneration of the daily digest headline.
+
+---
+
+### `POST /api/admin/sponsor-monitor/initialize`
+Streams the full UK sponsor CSV (~124k rows), batch-inserts into `sponsor_canonical`, then rebuilds the Fuse.js index. Fires and forgets — returns a `jobId` immediately. Includes pre-flight zombie-lock check to terminate idle advisory-lock holders before starting. Guard: rejects if an `initialize` job is already in flight and returns the existing `jobId` for polling.
+
+**Response 200:** `{ "jobId": "uuid" }`
+
+**Response 409:** `{ "message": "An initialize job is already running", "jobId": "uuid" }`
+
+---
+
+### `GET /api/admin/sponsor-monitor/init-progress/:jobId`
+Polls progress of a running `initialize` job. Returns cumulative counters.
+
+**Response 200:**
+```json
+{
+  "jobId": "uuid",
+  "status": "running",
+  "progress": { "inserted": 45200, "updated": 0, "total": 124000, "percent": 37 }
+}
+```
+
+---
+
+### `POST /api/admin/sponsor-monitor/rebuild-index`
+Rebuilds the in-memory Fuse.js search index from the current `sponsor_canonical` table without re-fetching the CSV. Safe to call after a data-only migration.
+
+**Response 200:** `{ "message": "Index rebuilt", "count": 124000 }`
+
+---
+
+### `GET /api/admin/sponsor-monitor/status`
+Returns the current state of the nightly monitor job, last run info, and advisory-lock status.
+
+---
+
+### `GET /api/admin/sponsor-monitor/job-history`
+Returns the last N nightly job runs with timestamps, record counts, and change summaries.
+
+---
+
+### `POST /api/admin/sponsor-monitor/release-lock`
+Manually releases the PostgreSQL advisory lock if a job crashed and left it held. Safe to call when no job is running.
+
+**Response 200:** `{ "message": "Lock released", "released": true }`
+
+---
+
+### `GET /api/admin/sponsor-monitor/notification-stats`
+Returns per-event-type notification send counts for the last 30 days.
+
+---
+
+### `GET /api/admin/sponsor-monitor/top-watched`
+Returns the top 20 most-watched companies by watch count.
+
+---
+
+### `GET /api/admin/sponsor-monitor/binary-health`
+Checks that the nightly CSV binary (`pdftotext`-equivalent UK sponsor download) is reachable and returns the expected Content-Type.
 
 ---
 

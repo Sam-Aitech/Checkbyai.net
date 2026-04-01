@@ -125,34 +125,34 @@ function buildGroups(meta: DocumentMetadata): MetadataGroup[] {
     id: 'file-format',
     label: 'File Format Info',
     readonly: true,
-    fields: [
-      { key: 'Format',     label: 'Format',     value: 'Pdf',                              type: 'text' },
-      { key: 'MimeType',   label: 'MimeType',   value: meta.mimeType || 'application/pdf', type: 'text' },
-      { key: 'PdfVersion', label: 'PdfVersion', value: meta.pdfVersion || null,             type: 'text' },
-    ].filter(f => f.value !== null && f.value !== undefined),
+    fields: ([
+      { key: 'Format',     label: 'Format',     value: 'Pdf',                              type: 'text' as const },
+      { key: 'MimeType',   label: 'MimeType',   value: meta.mimeType || 'application/pdf', type: 'text' as const },
+      { key: 'PdfVersion', label: 'PdfVersion', value: meta.pdfVersion || null,             type: 'text' as const },
+    ] as MetadataField[]).filter(f => f.value !== null && f.value !== undefined),
   });
 
   // ── 2. PDF Properties ─────────────────────────────────────────────────────
-  const pdfProps: MetadataField[] = [
-    { key: 'creationdate',     label: 'creationdate',     value: meta.creationDate,     type: 'datetime' },
-    { key: 'creator',          label: 'creator',          value: meta.creator,          type: 'text'     },
-    { key: 'producer',         label: 'producer',         value: meta.producer,         type: 'text'     },
-    { key: 'title',            label: 'title',            value: meta.title,            type: 'text'     },
-    { key: 'author',           label: 'author',           value: meta.author,           type: 'text'     },
-    { key: 'subject',          label: 'subject',          value: meta.subject,          type: 'text'     },
-    { key: 'modificationdate', label: 'modificationdate', value: meta.modificationDate, type: 'datetime' },
-  ].filter(f => f.value !== null && f.value !== undefined && f.value !== '');
+  const pdfProps: MetadataField[] = ([
+    { key: 'creationdate',     label: 'creationdate',     value: meta.creationDate,     type: 'datetime' as const },
+    { key: 'creator',          label: 'creator',          value: meta.creator,          type: 'text'     as const },
+    { key: 'producer',         label: 'producer',         value: meta.producer,         type: 'text'     as const },
+    { key: 'title',            label: 'title',            value: meta.title,            type: 'text'     as const },
+    { key: 'author',           label: 'author',           value: meta.author,           type: 'text'     as const },
+    { key: 'subject',          label: 'subject',          value: meta.subject,          type: 'text'     as const },
+    { key: 'modificationdate', label: 'modificationdate', value: meta.modificationDate, type: 'datetime' as const },
+  ] as MetadataField[]).filter(f => f.value !== null && f.value !== undefined && f.value !== '');
 
   if (pdfProps.length > 0) {
     groups.push({ id: 'pdf-properties', label: 'PDF Properties', readonly: false, fields: pdfProps });
   }
 
   // ── 3. Document Statistics ────────────────────────────────────────────────
-  const statsFields: MetadataField[] = [
-    { key: 'Characters count', label: 'Characters count', value: meta.characterCount ?? null, type: 'number' },
-    { key: 'Pages count',      label: 'Pages count',      value: meta.pageCount ?? null,      type: 'number' },
-    { key: 'Words count',      label: 'Words count',      value: meta.wordCount ?? null,       type: 'number' },
-  ].filter(f => f.value !== null && f.value !== undefined);
+  const statsFields: MetadataField[] = ([
+    { key: 'Characters count', label: 'Characters count', value: meta.characterCount ?? null, type: 'number' as const },
+    { key: 'Pages count',      label: 'Pages count',      value: meta.pageCount ?? null,      type: 'number' as const },
+    { key: 'Words count',      label: 'Words count',      value: meta.wordCount ?? null,       type: 'number' as const },
+  ] as MetadataField[]).filter(f => f.value !== null && f.value !== undefined);
 
   if (statsFields.length > 0) {
     groups.push({ id: 'doc-statistics', label: 'Document Statistics', readonly: true, fields: statsFields });
@@ -160,16 +160,16 @@ function buildGroups(meta: DocumentMetadata): MetadataGroup[] {
 
   // ── 4. XMP Tags ───────────────────────────────────────────────────────────
   const xmp = meta.xmp_tags || {};
-  const xmpFields: MetadataField[] = [
-    { key: 'dc:date',          label: 'dc:date',          value: xmp['dc:date'],          type: 'datetime' },
-    { key: 'dc:format',        label: 'dc:format',        value: xmp['dc:format'],        type: 'text'     },
-    { key: 'dc:language',      label: 'dc:language',      value: xmp['dc:language'],      type: 'text'     },
-    { key: 'pdf:PDFVersion',   label: 'pdf:PDFVersion',   value: xmp['pdf:PDFVersion'],   type: 'text'     },
-    { key: 'pdf:Producer',     label: 'pdf:Producer',     value: xmp['pdf:Producer'],     type: 'text'     },
-    { key: 'xmp:CreateDate',   label: 'xmp:CreateDate',   value: xmp['xmp:CreateDate'],   type: 'datetime' },
-    { key: 'xmp:CreatorTool',  label: 'xmp:CreatorTool',  value: xmp['xmp:CreatorTool'],  type: 'text'     },
-    { key: 'xmp:MetadataDate', label: 'xmp:MetadataDate', value: xmp['xmp:MetadataDate'], type: 'datetime' },
-  ].filter(f => {
+  const xmpFields: MetadataField[] = ([
+    { key: 'dc:date',          label: 'dc:date',          value: xmp['dc:date'],          type: 'datetime' as const },
+    { key: 'dc:format',        label: 'dc:format',        value: xmp['dc:format'],        type: 'text'     as const },
+    { key: 'dc:language',      label: 'dc:language',      value: xmp['dc:language'],      type: 'text'     as const },
+    { key: 'pdf:PDFVersion',   label: 'pdf:PDFVersion',   value: xmp['pdf:PDFVersion'],   type: 'text'     as const },
+    { key: 'pdf:Producer',     label: 'pdf:Producer',     value: xmp['pdf:Producer'],     type: 'text'     as const },
+    { key: 'xmp:CreateDate',   label: 'xmp:CreateDate',   value: xmp['xmp:CreateDate'],   type: 'datetime' as const },
+    { key: 'xmp:CreatorTool',  label: 'xmp:CreatorTool',  value: xmp['xmp:CreatorTool'],  type: 'text'     as const },
+    { key: 'xmp:MetadataDate', label: 'xmp:MetadataDate', value: xmp['xmp:MetadataDate'], type: 'datetime' as const },
+  ] as MetadataField[]).filter(f => {
     const v = f.value;
     return v !== null && v !== undefined && v !== '' && v !== 'Not available';
   });
@@ -190,11 +190,11 @@ function buildGroups(meta: DocumentMetadata): MetadataGroup[] {
     id: 'security',
     label: 'Security & Signatures',
     readonly: true,
-    fields: [
-      { key: 'IsEncrypted',         label: 'IsEncrypted',         value: meta.isEncrypted ?? false,         type: 'boolean' },
-      { key: 'HasDigitalSignature', label: 'HasDigitalSignature', value: meta.hasDigitalSignature ?? false, type: 'boolean' },
-      { key: 'FileSize',            label: 'FileSize',            value: meta.fileSize ?? null,             type: 'bytes'   },
-    ].filter(f => f.value !== null && f.value !== undefined),
+    fields: ([
+      { key: 'IsEncrypted',         label: 'IsEncrypted',         value: meta.isEncrypted ?? false,         type: 'boolean' as const },
+      { key: 'HasDigitalSignature', label: 'HasDigitalSignature', value: meta.hasDigitalSignature ?? false, type: 'boolean' as const },
+      { key: 'FileSize',            label: 'FileSize',            value: meta.fileSize ?? null,             type: 'bytes'   as const },
+    ] as MetadataField[]).filter(f => f.value !== null && f.value !== undefined),
   });
 
   // ── 6. Embedded Fonts ─────────────────────────────────────────────────────

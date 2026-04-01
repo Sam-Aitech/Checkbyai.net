@@ -303,7 +303,7 @@ export default function SponsorDetail() {
               <span className="text-muted-foreground">
                 {isRevoked
                   ? `Revoked ${data.removedAt ? formatDate(data.removedAt) : "recently"}`
-                  : `Last confirmed ${formatDate(data.lastSeen)}`}
+                  : `Last confirmed ${data.lastSeen ? formatDate(data.lastSeen) : "unknown"}`}
               </span>
             </div>
           </div>
