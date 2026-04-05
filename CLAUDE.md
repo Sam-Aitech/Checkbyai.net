@@ -1,3 +1,18 @@
+# CONTEXT7 MCP SERVER
+
+Always use Context7 when I need library/API documentation, code generation, setup or configuration steps without me having to explicitly ask. 
+Context7 fetches up-to-date, version-specific documentation and code examples directly from the source.
+
+When working with:
+- Library/API questions
+- Code generation tasks
+- Setup or configuration steps
+- Framework-specific implementations
+
+Use Context7 tools (resolve-library-id, query-docs) to get current, accurate documentation before providing code.
+
+---
+
 <!-- code-review-graph MCP tools -->
 ## MCP Tools: code-review-graph
 
@@ -21,8 +36,8 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 
 | Tool | Use when |
 |------|----------|
-| `detect_changes` | Reviewing code changes — gives risk-scored analysis |
-| `get_review_context` | Need source snippets for review — token-efficient |
+| `detect_changes` | Reviewing code changes ï¿½ gives risk-scored analysis |
+| `get_review_context` | Need source snippets for review ï¿½ token-efficient |
 | `get_impact_radius` | Understanding blast radius of a change |
 | `get_affected_flows` | Finding which execution paths are impacted |
 | `query_graph` | Tracing callers, callees, imports, tests, dependencies |
