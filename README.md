@@ -38,7 +38,7 @@ Forensic analysis of Certificate of Sponsorship PDFs using AI and metadata foren
 | Feature | Free | Starter | Pro | Unlimited | Enterprise |
 |---------|------|---------|-----|-----------|------------|
 | **Sponsor Watches** | 1 | 2 | 5 | Unlimited | Unlimited |
-| **Notifications** | Daily digest | Email + WhatsApp (6pm) | All channels + Immediate | All channels + Immediate | All channels + Webhooks |
+| **Notifications** | Daily digest (next-morning email) | Email + WhatsApp (6pm) | All channels + Immediate | All channels + Immediate | All channels + Webhooks |
 | **Job Alerts** | — | — | ✅ | ✅ | ✅ |
 | **Companies House Data** | — | — | ✅ | ✅ | ✅ |
 | **COS Check Verifications** | Limited | Limited | Pay-per-check | Unlimited | Unlimited |

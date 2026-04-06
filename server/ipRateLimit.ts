@@ -4,7 +4,8 @@ import { storage } from "./storage";
 
 // Hash IP address for privacy (GDPR compliance)
 export function hashIpAddress(ip: string): string {
-  const salt = process.env.IP_HASH_SALT || "checkbyai-default-salt-change-in-production";
+  const salt = process.env.IP_HASH_SALT;
+  if (!salt) throw new Error("IP_HASH_SALT environment variable is required");
   return crypto.createHash("sha256").update(ip + salt).digest("hex");
 }
 

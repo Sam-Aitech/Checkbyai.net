@@ -41,12 +41,13 @@ class PerformanceMiddleware(BaseHTTPMiddleware):
 # Add performance middleware
 app.add_middleware(PerformanceMiddleware)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5000").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["POST", "GET"],
+    allow_headers=["Content-Type"],
 )
 
 # Register job scraper routes (POST /api/scrape-jobs)
@@ -153,25 +154,6 @@ async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "message": "COS Verification System is running"}
 
-@app.post("/api/auth/login")
-async def login(credentials: dict):
-    """Login endpoint for authentication"""
-    username = credentials.get("username")
-    password = credentials.get("password")
-    
-    # Simple authentication logic
-    if username and password:
-        role = "admin" if username.lower() == "admin" else "user"
-        return {
-            "token": f"auth_token_{username}",
-            "user": {
-                "username": username,
-                "role": role
-            }
-        }
-    else:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-
 @app.get("/api/stats")
 async def get_stats():
     """Get cached system statistics for optimal performance"""
@@ -213,7 +195,8 @@ async def upload_trusted(file: UploadFile = File(...)):
         pdf_data = await file.read()
         
         # Save uploaded file temporarily
-        temp_path = f"temp_{file.filename}"
+        safe_filename = os.path.basename(file.filename or "upload.pdf")
+        temp_path = os.path.join(os.getenv("TEMP_DIR", "/tmp"), f"temp_{safe_filename}")
         with open(temp_path, "wb") as f:
             f.write(pdf_data)
             
@@ -271,12 +254,10 @@ async def verify_cos(file: UploadFile = File(...)):
         pdf_data = await file.read()
         
         # Save uploaded file temporarily
-        temp_path = f"temp_{file.filename}"
+        safe_filename = os.path.basename(file.filename or "upload.pdf")
+        temp_path = os.path.join(os.getenv("TEMP_DIR", "/tmp"), f"temp_{safe_filename}")
         with open(temp_path, "wb") as f:
             f.write(pdf_data)
-            
-        # Extract metadata using AI engine
-        metadata = await ai_engine.extract_metadata(temp_path)
         
         
         # Remove temporary file
@@ -390,13 +371,6 @@ def compare_with_trusted(extracted_metadata: dict) -> dict:
     }
 
 # Add middleware for CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 if __name__ == "__main__":
     import uvicorn

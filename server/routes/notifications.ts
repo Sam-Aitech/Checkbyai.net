@@ -8,6 +8,7 @@ import { encryptPhone, decryptPhone } from "../utils/phoneCrypto";
 import { sendSMS, sendWhatsApp } from "../services/messaging";
 import { isChannelAllowed, getTierConfig } from "../utils/tierConfig";
 import { storage } from "../storage";
+import crypto from "crypto";
 
 const phoneOtpStore = new Map<string, { code: string; expiresAt: number; attempts: number }>();
 const otpRateLimit = new Map<string, { count: number; resetAt: number }>();
@@ -288,7 +289,7 @@ export function registerNotificationRoutes(app: Express): void {
         return res.status(429).json({ message: "Too many verification requests. Please wait 10 minutes before trying again." });
       }
 
-      const code = String(Math.floor(100000 + Math.random() * 900000));
+      const code = String(crypto.randomInt(100000, 999999));
       const key = `${req.user.id}:${channel}:${phone_number}`;
       phoneOtpStore.set(key, { code, expiresAt: Date.now() + 10 * 60 * 1000, attempts: 0 });
 

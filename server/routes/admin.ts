@@ -19,7 +19,7 @@ import {
   type NotifPrefs,
 } from "@shared/schema";
 import { z } from "zod";
-import { isAdmin } from "../auth";
+import { isAdmin, isAuthenticated } from "../auth";
 import { storage } from "../storage";
 import { PDFAnalyzer } from "../services/pdfAnalyzer";
 import { upload } from "./verification";
@@ -1444,7 +1444,7 @@ Format your response in clear, professional markdown.`;
     }
   });
 
-  app.post('/api/paid/create-checkout', async (req, res) => {
+  app.post('/api/paid/create-checkout', isAuthenticated, async (req, res) => {
     try {
       const { packageType } = req.body;
 
@@ -1503,7 +1503,7 @@ Format your response in clear, professional markdown.`;
     }
   });
 
-  app.get('/api/paid/submission/:sessionId', async (req, res) => {
+  app.get('/api/paid/submission/:sessionId', isAuthenticated, async (req, res) => {
     try {
       const { sessionId } = req.params;
       const submission = await storage.getPaidSubmissionBySessionId(sessionId);
@@ -1536,7 +1536,7 @@ Format your response in clear, professional markdown.`;
   app.post('/api/paid/submit/:submissionId', upload.fields([
     { name: 'cosDocument', maxCount: 1 },
     { name: 'supportingDocuments', maxCount: 5 },
-  ]), async (req: any, res) => {
+  ]), isAuthenticated, async (req: any, res) => {
     try {
       const submissionId = parseInt(req.params.submissionId);
       const submission = await storage.getPaidSubmission(submissionId);
@@ -1582,7 +1582,7 @@ Format your response in clear, professional markdown.`;
     }
   });
 
-  app.get('/api/paid/status/:submissionId', async (req, res) => {
+  app.get('/api/paid/status/:submissionId', isAuthenticated, async (req, res) => {
     try {
       const submissionId = parseInt(req.params.submissionId);
       const submission = await storage.getPaidSubmission(submissionId);

@@ -6,6 +6,20 @@ interface SendResult {
   error?: string;
 }
 
+let _twilioClient: ReturnType<typeof Twilio> | null = null;
+
+function getTwilioClient(): ReturnType<typeof Twilio> | null {
+  if (!_twilioClient) {
+    const accountSid = process.env.TWILIO_ACCOUNT_SID;
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    if (!accountSid || !authToken) {
+      return null;
+    }
+    _twilioClient = Twilio(accountSid, authToken);
+  }
+  return _twilioClient;
+}
+
 export async function sendSMS(phoneNumber: string, message: string): Promise<SendResult> {
   const apiKey = process.env.BREVO_API_KEY;
   if (!apiKey) {
@@ -45,21 +59,20 @@ export async function sendSMS(phoneNumber: string, message: string): Promise<Sen
 }
 
 export async function sendWhatsApp(phoneNumber: string, message: string): Promise<SendResult> {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
   const fromNumber = process.env.TWILIO_WHATSAPP_NUMBER;
 
-  if (!accountSid || !authToken) {
-    console.warn("[Messaging] TWILIO_ACCOUNT_SID or TWILIO_AUTH_TOKEN not configured, WhatsApp will not be sent");
-    return { success: false, error: "Twilio credentials not configured" };
-  }
   if (!fromNumber) {
     console.warn("[Messaging] TWILIO_WHATSAPP_NUMBER not configured, WhatsApp will not be sent");
     return { success: false, error: "TWILIO_WHATSAPP_NUMBER not configured" };
   }
 
+  const client = getTwilioClient();
+  if (!client) {
+    console.warn("[Messaging] TWILIO_ACCOUNT_SID or TWILIO_AUTH_TOKEN not configured, WhatsApp will not be sent");
+    return { success: false, error: "Twilio credentials not configured" };
+  }
+
   try {
-    const client = Twilio(accountSid, authToken);
     const result = await client.messages.create({
       from: `whatsapp:${fromNumber}`,
       to: `whatsapp:${phoneNumber}`,

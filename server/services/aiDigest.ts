@@ -180,7 +180,8 @@ async function logGeneration(
 }
 
 export function signDigest(data: Record<string, any>): string {
-  const key = process.env.DIGEST_SIGNING_KEY || "default-signing-key";
+  const key = process.env.DIGEST_SIGNING_KEY;
+  if (!key) throw new Error("DIGEST_SIGNING_KEY environment variable is required");
   return crypto
     .createHmac("sha256", key)
     .update(JSON.stringify(data))

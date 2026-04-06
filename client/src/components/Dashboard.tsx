@@ -1,36 +1,14 @@
-import { useState } from 'react';
 import { useQuery } from "@tanstack/react-query";
 import FileUploadSimple from './FileUploadSimple';
 import type { User } from '@shared/api-types';
 
-interface VerificationResult {
-  type: 'genuine' | 'suspicious' | 'fake';
-  confidence: number;
-  mismatchedFields?: string[];
-}
-
 export default function Dashboard() {
-  const [file, setFile] = useState<File | null>(null);
-  
-  // Check if user is admin
   const { data: user } = useQuery<User>({
     queryKey: ['/api/auth/user'],
     retry: false
   });
   
   const isAdmin = user?.role === 'admin';
-  const [result, setResult] = useState<VerificationResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  const handleFileUpload = (uploadedFile: File) => {
-    setFile(uploadedFile);
-    setResult(null);
-    setError('');
-    // analyzeDocument is now handled directly by FileUpload component
-  };
-
-  // analyzeDocument function removed - verification now handled by FileUpload component
 
   return (
     <div className="max-w-3xl mx-auto px-3 sm:px-6 lg:px-8">
@@ -44,18 +22,6 @@ export default function Dashboard() {
           restrictToOneCheck={!isAdmin} 
           isAdmin={isAdmin}
         />
-        
-        {loading && (
-          <div className="mt-6 flex justify-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-          </div>
-        )}
-        
-        {error && (
-          <div className="mt-4 p-3 bg-red-100 dark:bg-red-900/30 border-l-4 border-red-500 text-red-700 dark:text-red-400">
-            <p className="text-sm">{error}</p>
-          </div>
-        )}
       </div>
     </div>
   );

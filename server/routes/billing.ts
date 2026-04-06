@@ -9,15 +9,21 @@ import { sendEmailReliably } from "../utils/resilientEmail";
 import { getAppUrl } from "../utils/appUrl";
 import { isAuthenticated } from "../auth";
 import { storage } from "../storage";
+import { logger } from "../utils/logger";
 
-const CHECKOUT_HMAC_SECRET = process.env.CHECKOUT_HMAC_SECRET || process.env.SESSION_SECRET || process.env.STRIPE_SECRET_KEY!;
+const CHECKOUT_HMAC_SECRET = process.env.CHECKOUT_HMAC_SECRET;
+if (!CHECKOUT_HMAC_SECRET && process.env.NODE_ENV === "production") {
+  throw new Error("CHECKOUT_HMAC_SECRET is required in production");
+}
+// Fallback for development/testing only - use empty string as last resort
+const hmacSecret = CHECKOUT_HMAC_SECRET || process.env.SESSION_SECRET || process.env.STRIPE_SECRET_KEY || "";
 
 function signClientReferenceId(userId: string, packageType: string, companyName?: string): string {
   const encodedCompany = companyName ? encodeURIComponent(companyName) : '';
   const payload = encodedCompany
     ? `${userId}::${packageType}::${encodedCompany}`
     : `${userId}::${packageType}`;
-  const hmac = crypto.createHmac('sha256', CHECKOUT_HMAC_SECRET).update(payload).digest('hex').slice(0, 16);
+    const hmac = crypto.createHmac('sha256', hmacSecret).update(payload).digest('hex').slice(0, 16);
   return `${payload}::${hmac}`;
 }
 
@@ -38,7 +44,7 @@ function verifyClientReferenceId(clientRefId: string): { userId: string; package
 
     if (!userId || !packageType || !signature || signature.length !== 16) return null;
     const payload = encodedCompany ? `${userId}::${packageType}::${encodedCompany}` : `${userId}::${packageType}`;
-    const expected = crypto.createHmac('sha256', CHECKOUT_HMAC_SECRET).update(payload).digest('hex').slice(0, 16);
+    const expected = crypto.createHmac('sha256', hmacSecret).update(payload).digest('hex').slice(0, 16);
     const sigBuf = Buffer.from(signature, 'hex');
     const expBuf = Buffer.from(expected, 'hex');
     if (sigBuf.length !== expBuf.length) return null;
@@ -287,7 +293,7 @@ export function registerBillingRoutes(app: Express): void {
                   newStatus: subStatus,
                   reason: `Stripe subscription active (${event.type})`,
                   metadata: { stripeEventId: event.id, subscriptionId: subscription.id, packageType: subPkgType },
-                }).catch(() => {});
+                }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
               }
             } else if (subscription.status === 'canceled' || subscription.status === 'unpaid' || event.type === 'customer.subscription.deleted') {
               if (subPkgType === 'cos_check') {
@@ -305,7 +311,7 @@ export function registerBillingRoutes(app: Express): void {
                   newStatus: 'free',
                   reason: `Stripe subscription ${subscription.status} (${event.type})`,
                   metadata: { stripeEventId: event.id, subscriptionId: subscription.id, packageType: subPkgType },
-                }).catch(() => {});
+                }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
               }
             }
           }
@@ -342,7 +348,7 @@ export function registerBillingRoutes(app: Express): void {
                   newStatus: user.subscriptionStatus,
                   reason: 'Monthly notification_pro credit top-up (+5 credits)',
                   metadata: { stripeEventId: event.id, invoiceId: invoice.id, creditsAdded: 5 },
-                }).catch(() => {});
+                }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
                 console.log(`[Billing] Added 5 monthly credits to notification_pro user ${user.id}`);
               }
             }
@@ -368,7 +374,7 @@ export function registerBillingRoutes(app: Express): void {
               newStatus: 'past_due',
               reason: 'Stripe invoice payment failed',
               metadata: { stripeEventId: event.id, invoiceId: invoice.id },
-            }).catch(() => {});
+            }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
           }
         }
         break;
@@ -404,7 +410,7 @@ export function registerBillingRoutes(app: Express): void {
               }).where(eq(users.id, userId));
             }), 'webhook-checkout-starter');
             sendSubscriptionNotifications(userId, 'CoS Check Starter', 'starter', sessionEmail).catch((err) => console.error('[Subscription] Notification failed:', err));
-            storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'starter', reason: 'Checkout: CoS Check Starter', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch(() => {});
+            storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'starter', reason: 'Checkout: CoS Check Starter', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
           } else if (packageType === 'pro') {
             await withRetry(() => db.transaction(async (tx) => {
               await tx.update(users).set({
@@ -416,7 +422,7 @@ export function registerBillingRoutes(app: Express): void {
               }).where(eq(users.id, userId));
             }), 'webhook-checkout-pro');
             sendSubscriptionNotifications(userId, 'CoS Check Pro', 'pro', sessionEmail).catch((err) => console.error('[Subscription] Notification failed:', err));
-            storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'pro', reason: 'Checkout: CoS Check Pro', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch(() => {});
+            storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'pro', reason: 'Checkout: CoS Check Pro', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
           } else if (packageType === 'unlimited') {
             await withRetry(() => db.transaction(async (tx) => {
               await tx.update(users).set({
@@ -427,7 +433,7 @@ export function registerBillingRoutes(app: Express): void {
               }).where(eq(users.id, userId));
             }), 'webhook-checkout-unlimited');
             sendSubscriptionNotifications(userId, 'CoS Check Unlimited', 'unlimited', sessionEmail).catch((err) => console.error('[Subscription] Notification failed:', err));
-            storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'unlimited', reason: 'Checkout: CoS Check Unlimited', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch(() => {});
+            storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'unlimited', reason: 'Checkout: CoS Check Unlimited', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
           } else if (packageType === 'master') {
             await storage.createPaidSubmission({
               email: session.customer_details?.email || '',
@@ -448,7 +454,7 @@ export function registerBillingRoutes(app: Express): void {
               }).where(eq(users.id, userId));
             }), 'webhook-checkout-notification-starter');
             sendSubscriptionNotifications(userId, 'Notification Engine Starter', 'notification_starter', sessionEmail).catch((err) => console.error('[Subscription] Notification failed:', err));
-            storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'starter', reason: 'Checkout: Sponsor Monitor Starter', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch(() => {});
+            storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'starter', reason: 'Checkout: Sponsor Monitor Starter', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
           } else if (packageType === 'notification_pro') {
             await withRetry(() => db.transaction(async (tx) => {
               await tx.update(users).set({
@@ -461,7 +467,7 @@ export function registerBillingRoutes(app: Express): void {
               }).where(eq(users.id, userId));
             }), 'webhook-checkout-notification-pro');
             sendSubscriptionNotifications(userId, 'Notification Engine Pro', 'notification_pro', sessionEmail).catch((err) => console.error('[Subscription] Notification failed:', err));
-            storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'pro', reason: 'Checkout: Sponsor Monitor Pro', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch(() => {});
+            storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'pro', reason: 'Checkout: Sponsor Monitor Pro', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
           } else if (packageType === 'cos_check') {
             await withRetry(() => db.transaction(async (tx) => {
               await tx.update(users).set({

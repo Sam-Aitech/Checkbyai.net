@@ -147,7 +147,7 @@ export async function qsvDedup(
   // The correct flag for unsorted dedup is to omit --sorted (default behaviour
   // of qsv dedup handles unsorted data natively from v2+).
 
-  await execFileAsync(bin, ["dedup", inputPath, "--output", outputPath], {
+  await execFileAsync(bin, args, {
     timeout: 120_000,
   });
 }

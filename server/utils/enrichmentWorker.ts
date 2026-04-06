@@ -167,16 +167,16 @@ export async function seedEnrichmentQueue(): Promise<{ inserted: number }> {
     const CHUNK = 500;
     let inserted = 0;
     for (let i = 0; i < rows.length; i += CHUNK) {
-      await db
+      const result = await db
         .insert(enrichmentQueue)
         .values(rows.slice(i, i + CHUNK))
-        .onConflictDoNothing();
-      // onConflictDoNothing on (fingerprint, jobType) unique index — idempotent
-      inserted += Math.min(CHUNK, rows.length - i); // approximation; exact count not needed
+        .onConflictDoNothing()
+        .returning({ id: enrichmentQueue.id });
+      inserted += result.length;
     }
 
-    log.info({ total: rows.length }, "seedEnrichmentQueue: complete.");
-    return { inserted: rows.length };
+    log.info({ attempted: rows.length, inserted }, "seedEnrichmentQueue: complete.");
+    return { inserted };
   } finally {
     await releaseEnrichmentLock();
   }

@@ -136,7 +136,8 @@ export default function FileUploadSimple({
       
       const response = await fetch('/api/verify', {
         method: 'POST',
-        body: formData
+        body: formData,
+        credentials: 'include',
       });
       
       if (!response.ok) {

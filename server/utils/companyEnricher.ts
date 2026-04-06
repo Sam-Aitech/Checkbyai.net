@@ -104,7 +104,7 @@ async function scrapeCompaniesHouse(companyName: string): Promise<{
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15_000);
-    const res = await fetch(`${PYTHON_BACKEND_URL}/api/scrape-companies-house`, {
+    const res = await fetch(`${PYTHON_BACKEND_URL}/api/v1/enrich/companies-house`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ company_name: companyName }),

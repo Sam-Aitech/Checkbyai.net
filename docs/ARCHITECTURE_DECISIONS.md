@@ -359,3 +359,102 @@ Single cron at 00:30 UTC Mon-Fri. No backup cron. No startup catch-up. The DB id
 **Trade-offs accepted:**
 - If the main cron fails AND no API requests come in before midnight, the day's job is missed
 - Acceptable because gov.uk typically publishes at 09:00 UK time — the 00:30 UTC cron runs before the new register is available; the request-triggered path handles the actual download during business hours
+
+---
+
+## ADR-014: Security Hardening (April 2026)
+
+**Status:** Accepted | **Introduced:** 2026-04-06
+
+**Context:**
+Code review identified several critical security vulnerabilities:
+1. OTP generated with `Math.random()` — not cryptographically secure
+2. Paid submission endpoints without authentication
+3. HMAC secrets with fallback chains to weaker keys
+4. Python backend path traversal vulnerability
+5. CORS misconfiguration with wildcard origins + credentials
+6. Fake authentication endpoint in Python backend
+7. Default fallback values for security-critical secrets
+
+**Decision:**
+Systematic security hardening across all layers:
+
+### Server (Node.js)
+- OTP now uses `crypto.randomInt(100000, 999999)`
+- All `/api/paid/*` endpoints require `isAuthenticated` middleware
+- `CHECKOUT_HMAC_SECRET` required in production (hard-fail)
+- `DIGEST_SIGNING_KEY` required (no default fallback)
+- `IP_HASH_SALT` required (no default fallback)
+- Billing error handlers now log instead of silently swallowing
+
+### Client (React)
+- FormData uploads no longer force `Content-Type: application/json`
+- File upload includes `credentials: 'include'`
+- Toast listener dependency array fixed (was causing memory leak)
+- Confidence normalization unified across components
+
+### Backend (Python)
+- Path traversal fixed: `temp_{filename}` → sanitized path
+- CORS now uses configurable `ALLOWED_ORIGINS` from environment
+- Duplicate CORS middleware removed
+- Fake auth endpoint removed
+- Added `rapidfuzz` and `httpx` to dependencies
+- Fixed wrong endpoint: `/api/scrape-companies-house` → `/api/v1/enrich/companies-house`
+
+**Rationale:**
+- Cryptographic security is non-negotiable for OTP generation
+- Paid endpoints handle financial data and must require authentication
+- Fallback chains weaken security by allowing degraded key usage
+- Silent error swallowing prevents incident response
+
+**Trade-offs accepted:**
+- `CHECKOUT_HMAC_SECRET` is now required in production — requires deployment pipeline update
+- `IP_HASH_SALT` is now required — existing deployments need env var update
+
+---
+
+## ADR-015: Bug Fixes and Performance Improvements (April 2026)
+
+**Status:** Accepted | **Introduced:** 2026-04-06
+
+**Context:**
+Code review identified multiple bugs affecting functionality and performance:
+
+### High Priority
+1. `qsvDedup` built args array but ignored it — always used hardcoded array
+2. Toast memory leak — listener re-added on every state change
+3. Enrichment insert count overestimated due to `onConflictDoNothing`
+4. DB retry used linear backoff (thundering herd risk)
+
+### Medium Priority
+1. `pdfAnalyzer` fake async — `Promise.resolve()` doesn't yield to event loop
+2. Unused `customInstructions` parameter in `verifyWithRules`
+3. Twilio client recreated on every WhatsApp message
+
+**Decision:**
+Applied fixes:
+
+### Server
+- `qsvDedup` now uses the built `args` array
+- DB retry now uses exponential backoff with ±25% jitter
+- `enrichmentWorker` uses `.returning()` to get actual inserted count
+- Twilio client cached as module singleton
+- `pdfAnalyzer` uses `setImmediate` for true async yield
+- Removed unused `customInstructions` parameter
+- Removed dead Python files (main_old.py, main_optimized.py, database.py, database_old.py, pdf_analyzer.py)
+
+### Client
+- Toast dependency array `[]` instead of `[state]`
+- Toast delay fixed from 1000000ms (16min) to 10000ms (10sec)
+- Dashboard cleaned up (removed unused state)
+- FileUpload confidence normalized to 0-1 scale
+
+### Dead Code Removed
+- 5 Python files (28% of backend)
+- Unused Dashboard state
+
+**Rationale:**
+- Exponential backoff with jitter prevents thundering herd
+- Returning actual inserted count enables accurate metrics
+- Memory leaks degrade performance over time
+- Dead code increases cognitive load and maintenance burden

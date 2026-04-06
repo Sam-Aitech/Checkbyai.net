@@ -438,146 +438,28 @@ export async function notifyAffectedUsers(change: SponsorChange): Promise<{ sent
           }
           console.log(`[NotificationDispatcher] Queued notifications for ${userPlan} user ${watch.userId} (deliver after ${deliverAfter.toISOString()})`);
           continue;
-        }
-
-        // Dispatch all channels in parallel — email/SMS/WhatsApp are independent I/O
-        const channelPromises: Promise<void>[] = [];
-        for (const channel of tierConfig.channels) {
-          if (channel === "email" && emailEnabled) {
-            channelPromises.push(sendNotificationViaChannel("email", watch.userId, changeId, recipientEmail, null, null, subject, html, plainText, stats));
-          } else if (channel === "whatsapp" && prefs?.whatsappEnabled && prefs?.whatsappVerified && prefs?.whatsappNumber) {
-            channelPromises.push(sendNotificationViaChannel("whatsapp", watch.userId, changeId, null, null, prefs.whatsappNumber, subject, html, plainText, stats));
-          } else if (channel === "sms" && prefs?.smsEnabled && prefs?.smsVerified && prefs?.smsNumber) {
-            channelPromises.push(sendNotificationViaChannel("sms", watch.userId, changeId, null, prefs.smsNumber, null, subject, html, plainText, stats));
+        } else {
+          // Dispatch all channels in parallel — email/SMS/WhatsApp are independent I/O
+          const channelPromises: Promise<void>[] = [];
+          for (const channel of tierConfig.channels) {
+            if (channel === "email" && emailEnabled) {
+              channelPromises.push(sendNotificationViaChannel("email", watch.userId, changeId, recipientEmail, null, null, subject, html, plainText, stats));
+            } else if (channel === "whatsapp" && prefs?.whatsappEnabled && prefs?.whatsappVerified && prefs?.whatsappNumber) {
+              channelPromises.push(sendNotificationViaChannel("whatsapp", watch.userId, changeId, null, null, prefs.whatsappNumber, subject, html, plainText, stats));
+            } else if (channel === "sms" && prefs?.smsEnabled && prefs?.smsVerified && prefs?.smsNumber) {
+              channelPromises.push(sendNotificationViaChannel("sms", watch.userId, changeId, null, prefs.smsNumber, null, subject, html, plainText, stats));
+            }
           }
+          await Promise.all(channelPromises);
         }
-        await Promise.all(channelPromises);
-      } catch (err: unknown) {
+      } catch (err) {
         console.error(`[NotificationDispatcher] Error processing user ${watch.userId}:`, err);
-        await logNotification(watch.userId, changeId, "email", "failed", undefined, (err instanceof Error ? err.message : String(err)) || "Internal error");
         stats.failed++;
       }
     }
-
-    console.log(`[NotificationDispatcher] Dispatch complete for "${change.organisationName}": ${stats.sent} sent, ${stats.queued} queued, ${stats.skipped} skipped, ${stats.failed} failed`);
   } catch (err) {
-    console.error("[NotificationDispatcher] Fatal error in notifyAffectedUsers:", err);
+    console.error(`[NotificationDispatcher] Error dispatching notifications for "${change.organisationName}" (${change.changeType}):`, err);
   }
 
   return stats;
-}
-
-export async function processDelayedNotifications(): Promise<{ delivered: number; failed: number }> {
-  const result = { delivered: 0, failed: 0 };
-  const now = new Date();
-
-  try {
-    const queuedNotifications = await db
-      .select({
-        logId: notificationLog.id,
-        userId: notificationLog.userId,
-        changeId: notificationLog.changeId,
-        channel: notificationLog.channel,
-      })
-      .from(notificationLog)
-      .where(
-        and(
-          eq(notificationLog.status, "queued"),
-          lte(notificationLog.deliverAfter, now)
-        )
-      )
-      .limit(100);
-
-    if (queuedNotifications.length === 0) return result;
-
-    console.log(`[NotificationDispatcher] Processing ${queuedNotifications.length} delayed notification(s)...`);
-
-    // ── Batch all lookups upfront — replaces N+1 pattern (3 queries × N) ────
-    // BEFORE: for each notif → await change, await prefs, await user = 3N sequential queries
-    // AFTER: 3 parallel inArray() queries covering all notifs = 3 queries total
-    const uniqueChangeIds = [...new Set(queuedNotifications.map(n => n.changeId))];
-    const uniqueUserIds = [...new Set(queuedNotifications.map(n => n.userId))];
-
-    const [changeRecordsList, prefRecordsList, userRecordsList] = await Promise.all([
-      db.select().from(sponsorChanges).where(inArray(sponsorChanges.id, uniqueChangeIds)),
-      db.select().from(notificationPreferences).where(inArray(notificationPreferences.userId, uniqueUserIds)),
-      db.select({ id: users.id, email: users.email }).from(users).where(inArray(users.id, uniqueUserIds)),
-    ]);
-
-    const changeMap = new Map(changeRecordsList.map(c => [c.id, c]));
-    const prefsMap = new Map(prefRecordsList.map(p => [p.userId, p]));
-    const userMap = new Map(userRecordsList.map(u => [u.id, u]));
-
-    for (const notif of queuedNotifications) {
-      try {
-        const change = changeMap.get(notif.changeId);
-        if (!change) {
-          await db.update(notificationLog).set({ status: "failed", errorDetails: "Change record not found" }).where(eq(notificationLog.id, notif.logId));
-          result.failed++;
-          continue;
-        }
-
-        const { subject, html } = buildEmailHtml(change.changeType, change.organisationName, change.previousValue, change.newValue);
-        const plainText = buildPlainTextAlert(change.changeType, change.organisationName, change.previousValue, change.newValue);
-
-        const prefs = prefsMap.get(notif.userId) ?? null;
-        const userRecord = userMap.get(notif.userId);
-        const recipientEmail = prefs?.email ?? userRecord?.email;
-
-        let success = false;
-        let providerMessageId: string | undefined;
-        let errorDetails: string | undefined;
-
-        if (notif.channel === "email" && recipientEmail) {
-          const sendResult = await sendViaResend(recipientEmail, subject, html);
-          success = sendResult.success;
-          providerMessageId = sendResult.providerMessageId;
-          errorDetails = sendResult.error;
-        } else if (notif.channel === "sms" && prefs?.smsNumber) {
-          const phone = decryptPhone(prefs.smsNumber);
-          const sendResult = await sendSMS(phone, plainText);
-          success = sendResult.success;
-          providerMessageId = sendResult.providerMessageId;
-          errorDetails = sendResult.error;
-        } else if (notif.channel === "whatsapp" && prefs?.whatsappNumber) {
-          const phone = decryptPhone(prefs.whatsappNumber);
-          const sendResult = await sendWhatsApp(phone, plainText);
-          success = sendResult.success;
-          providerMessageId = sendResult.providerMessageId;
-          errorDetails = sendResult.error;
-        } else {
-          errorDetails = "No recipient details available";
-        }
-
-        if (success) {
-          await db.update(notificationLog).set({
-            status: "sent",
-            sentAt: new Date(),
-            providerMessageId: providerMessageId || null,
-          }).where(eq(notificationLog.id, notif.logId));
-          result.delivered++;
-        } else {
-          await db.update(notificationLog).set({
-            status: "failed",
-            errorDetails: errorDetails || "Delivery failed",
-          }).where(eq(notificationLog.id, notif.logId));
-          result.failed++;
-        }
-      } catch (err: unknown) {
-        const errMsg = err instanceof Error ? err.message : String(err);
-        console.error(`[NotificationDispatcher] Error delivering queued notification ${notif.logId}:`, errMsg);
-        await db.update(notificationLog).set({
-          status: "failed",
-          errorDetails: errMsg || "Internal delivery error",
-        }).where(eq(notificationLog.id, notif.logId));
-        result.failed++;
-      }
-    }
-
-    console.log(`[NotificationDispatcher] Delayed delivery complete: ${result.delivered} delivered, ${result.failed} failed`);
-  } catch (err) {
-    console.error("[NotificationDispatcher] Fatal error in processDelayedNotifications:", err);
-  }
-
-  return result;
 }

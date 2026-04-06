@@ -16,6 +16,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.1] — 2026-04-06
+
+### Fixed
+- **Free tier notifications**: Corrected configuration to send email-only next-morning alerts (previously no notifications)
+- **Notification dispatcher**: Fixed syntax errors in channel dispatch logic to ensure proper tier-based channel enforcement
+
+---
+
 ## [1.0.0] — 2026-03-27
 
 ### Added

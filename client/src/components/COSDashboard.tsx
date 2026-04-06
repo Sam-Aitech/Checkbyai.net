@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'wouter';
 import FileUploadSimple from './FileUploadSimple';
 import Enhanced3DDemo from './Enhanced3DDemo';
@@ -7,6 +7,50 @@ import MetadataGroupsPanel from './MetadataGroupsPanel';
 import { useAuth } from '@/hooks/useAuth';
 import { Skeleton } from '@/components/ui/skeleton';
 import { queryClient } from '@/lib/queryClient';
+
+function CursorTrail() {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const trailsRef = useRef<Set<HTMLDivElement>>(new Set());
+  const lastTimeRef = useRef(0);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    const now = Date.now();
+    if (now - lastTimeRef.current < 50) return;
+    lastTimeRef.current = now;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const trail = document.createElement('div');
+    trail.className = 'absolute w-3 h-3 bg-white/30 rounded-full pointer-events-none animate-ping';
+    trail.style.left = x + 'px';
+    trail.style.top = y + 'px';
+    trail.style.transform = 'translate(-50%, -50%)';
+    e.currentTarget.appendChild(trail);
+    trailsRef.current.add(trail);
+
+    setTimeout(() => {
+      trail.remove();
+      trailsRef.current.delete(trail);
+    }, 1000);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      trailsRef.current.forEach(t => t.remove());
+      trailsRef.current.clear();
+    };
+  }, []);
+
+  return (
+    <div
+      ref={containerRef}
+      className="absolute inset-0"
+      onMouseMove={handleMouseMove}
+    />
+  );
+}
 
 interface VerificationResult {
   type: 'genuine' | 'suspicious' | 'fake';
@@ -332,25 +376,8 @@ export default function COSDashboard() {
           ))}
         </div>
 
-        {/* Interactive Cursor Trail */}
-        <div 
-          className="absolute inset-0"
-          onMouseMove={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            
-            // Create trailing effect
-            const trail = document.createElement('div');
-            trail.className = 'absolute w-3 h-3 bg-white dark:bg-gray-800/30 rounded-full pointer-events-none animate-ping';
-            trail.style.left = x + 'px';
-            trail.style.top = y + 'px';
-            trail.style.transform = 'translate(-50%, -50%)';
-            e.currentTarget.appendChild(trail);
-            
-            setTimeout(() => trail.remove(), 1000);
-          }}
-        />
+        {/* Interactive Cursor Trail — throttled to 20fps max, cleaned up on unmount */}
+        <CursorTrail />
 
         {/* Geometric Background */}
         <div className="absolute inset-0 opacity-20">

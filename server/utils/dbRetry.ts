@@ -42,7 +42,9 @@ export async function withRetry<T>(
       lastError = err instanceof Error ? err : new Error(String(err));
       if (isRetryableError(err)) {
         if (attempt < maxRetries) {
-          const wait = delayMs * attempt;
+          const baseDelay = delayMs * Math.pow(2, attempt - 1);
+          const jitter = baseDelay * 0.25 * (Math.random() * 2 - 1);
+          const wait = baseDelay + jitter;
           console.warn(`[DBRetry] ${label} failed (attempt ${attempt}/${maxRetries}): ${lastError.message}. Warming connection and retrying in ${wait}ms...`);
           await new Promise(resolve => setTimeout(resolve, wait));
           await warmConnection();

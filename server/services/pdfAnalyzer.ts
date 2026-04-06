@@ -16,7 +16,7 @@ function yieldToEventLoop(): Promise<void> {
  * can be composed with Promise.all() for logical parallelism.
  */
 function matchAsync(str: string, pattern: RegExp): Promise<RegExpMatchArray | null> {
-  return Promise.resolve(str.match(pattern));
+  return new Promise(resolve => setImmediate(() => resolve(str.match(pattern))));
 }
 
 export interface ForensicMetadata {
@@ -571,8 +571,7 @@ export class PDFAnalyzer {
 
   verifyWithRules(
     documentMetadata: PDFMetadata,
-    trustedMetadata: PDFMetadata | null,
-    customInstructions?: string
+    trustedMetadata: PDFMetadata | null
   ): VerificationResult {
     const checks: VerificationCheck[] = [];
     let totalScore = 100;
