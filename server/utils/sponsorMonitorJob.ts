@@ -8,7 +8,6 @@ import { runCsvDiff, type CsvDiffResult } from "./binaryRunner";
 import { applyStateMachine } from "./sponsorStateMachine";
 import { rebuildSponsorIndex } from "./sponsorSearch";
 import { cacheFlushPattern } from "./redisClient";
-import { processDelayedNotifications } from "./notificationDispatcher";
 import { notifyUsersOfEvent, processQueuedEngineEvents } from "../services/notificationEngine";
 import { generateHeadline, type RawDigestData } from "../services/aiDigest";
 import { withRetry } from "./dbRetry";
@@ -844,10 +843,7 @@ export function startSponsorMonitorCron(): void {
   });
 
   cron.schedule("0 * * * *", () => {
-    processDelayedNotifications().catch((err) => {
-      console.error("[NotificationQueue] Error processing delayed notifications:", err);
-    });
-    processQueuedEngineEvents().catch((err) => {
+    processQueuedEngineEvents().catch((err: any) => {
       console.error("[NotificationEngine] Error processing queued engine events:", err);
     });
   }, {

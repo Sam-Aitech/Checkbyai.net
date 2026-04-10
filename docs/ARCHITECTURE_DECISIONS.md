@@ -458,3 +458,17 @@ Applied fixes:
 - Returning actual inserted count enables accurate metrics
 - Memory leaks degrade performance over time
 - Dead code increases cognitive load and maintenance burden
+
+## ADR-016: Fuzzy Reconciliation for Sponsor Notification Engine
+**Status:** Accepted
+**Date:** 2026-04-10
+**Context:** 
+The Sponsor Monitor relies on \csvdiff\ which checks strict string fingerprints (Name + City + Route). When a sponsor corrects a minor typo in their name (e.g., "Tech Corp LTD" to "Tech Corp Limited"), the fingerprint breaks. This creates a "Deletion" of the old fingerprint and an "Addition" of the new fingerprint. The state machine treated these as a Revoked licence and a New Licence, causing "flicker" and false alarms.
+**Decision:**
+Implemented a Phase A½ "Fuzzy Reconciliation" step immediately after \csvdiff\. It extracts orphaned Additions and Deletions and uses \string-similarity\ (Sorensen-Dice coefficient) to pair them.
+- Matches requiring >88% similarity are converted into a single \NAME_CHANGE\ modification.
+- Matched records bypass the standard Insertion/Revocation phases.
+**Consequences:**
+- Significant reduction in false positive "New Licence" and "Removed" notifications.
+- The notification engine is now much more resilient to administrative formatting corrections by the Home Office.
+- Minor performance cost due to string similarity calculations, offset by limiting it to only the subset of unresolved Additions and Deletions.

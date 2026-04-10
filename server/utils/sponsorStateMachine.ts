@@ -28,6 +28,12 @@ import type { SponsorChange } from "./sponsorListFetcher";
 import { loadFingerprintSet } from "./csvFingerprintBuilder";
 import { storage } from "../storage";
 import { buildEmail, sendViaResend } from "../services/notificationEngine";
+import { 
+  areCompaniesFuzzyMatch, 
+  reconcileAdditionsDeletions,
+  DEFAULT_FUZZY_CONFIG,
+  type CompanyRecord
+} from "./fuzzyMatcher";
 
 const RENAME_SIMILARITY_THRESHOLD = 0.85;
 const BATCH_SIZE = 500; // for bulk DB operations
@@ -186,14 +192,103 @@ export async function applyStateMachine(
 
   console.log(`[StateMachine] Loaded ${canonicalMap.size} affected canonical records.`);
 
+   // ── Phase A½: Fuzzy Reconciliation of Additions/Deletions ────────
+   const modUpdates: Array<{
+     fingerprint: string;
+     currentName: string;
+     typeRating: string | null;
+     route: string | null;
+     historicalNames?: string[];
+   }> = [];
+
+   // Convert raw CSV rows to company records for fuzzy matching
+   const additionRecords: CompanyRecord[] = diff.Additions.map(row => ({
+     organisationName: (row["Organisation Name"] ?? row["organisation name"] ?? "").trim(),
+     townCity: (row["Town/City"] ?? row["town/city"] ?? "").trim() || null,
+     route: (row["Route"] ?? row["route"] ?? "").trim() || null,
+     fingerprint: (row["fingerprint"] ?? "").trim(),
+     typeRating: (row["Type & Rating"] ?? row["type & rating"] ?? "").trim() || null
+   })).filter(r => r.organisationName && r.fingerprint);
+
+   const deletionRecords: CompanyRecord[] = diff.Deletions.map(row => ({
+     organisationName: (row["Organisation Name"] ?? row["organisation name"] ?? "").trim(),
+     townCity: (row["Town/City"] ?? row["town/city"] ?? "").trim() || null,
+     route: (row["Route"] ?? row["route"] ?? "").trim() || null,
+     fingerprint: (row["fingerprint"] ?? "").trim(),
+     typeRating: (row["Type & Rating"] ?? row["type & rating"] ?? "").trim() || null
+   })).filter(r => r.organisationName && r.fingerprint);
+
+   // Perform fuzzy reconciliation
+   const reconciliation = reconcileAdditionsDeletions(additionRecords, deletionRecords, {
+     ...DEFAULT_FUZZY_CONFIG,
+     nameThreshold: 0.88 // Slightly more aggressive for catching renames
+   });
+
+   // Log reconciliation results
+   if (reconciliation.matches.length > 0) {
+     console.log(`[StateMachine] Fuzzy reconciliation: ${reconciliation.matches.length} likely renames/relocations detected`);
+     for (const match of reconciliation.matches) {
+       console.log(`[StateMachine]   "${match.previous.organisationName}" → "${match.current.organisationName}" (similarity: ${match.similarity.toFixed(3)})`);
+     }
+   }
+
+   for (const match of reconciliation.matches) {
+     const { previous, current } = match;
+     const fp = current.fingerprint;
+     
+     // Use the 'current' (new) data as the canonical version
+     const existing = canonicalMap.get(fp);
+     if (!existing) {
+       // Should not happen, but guard against it
+       canonicalMap.set(fp, {
+         id: 0, // placeholder, will be updated from DB if needed
+         fingerprint: fp,
+         currentName: current.organisationName,
+         townCity: current.townCity ?? null,
+         typeRating: current.typeRating ?? null,
+         route: current.route ?? null,
+         status: "ACTIVE", // assume active for new matches
+         grantedAt: today,
+         consecutiveMisses: 0,
+         historicalNames: []
+       });
+     }
+
+     // Determine if this is actually a name change or other modification
+     const prevNameNormalized = normalizeName(previous.organisationName);
+     const currNameNormalized = normalizeName(current.organisationName);
+     
+     if (prevNameNormalized !== currNameNormalized) {
+       // Actual name change
+       const newHistorical = [...(existing?.historicalNames ?? []), previous.organisationName];
+       modUpdates.push({
+         fingerprint: fp,
+         currentName: current.organisationName,
+         typeRating: current.typeRating ?? (existing?.typeRating ?? null),
+         route: current.route ?? (existing?.route ?? null),
+         historicalNames: newHistorical
+       });
+       
+       changes.push({ 
+         organisationName: current.organisationName, 
+         changeType: "NAME_CHANGE", 
+         previousValue: previous.organisationName, 
+         newValue: current.organisationName, 
+         fingerprint: fp 
+       });
+     } else {
+       // Other changes (address, route, etc.) - treat as general modification
+       modUpdates.push({
+         fingerprint: fp,
+         currentName: current.organisationName,
+         typeRating: current.typeRating ?? (existing?.typeRating ?? null),
+         route: current.route ?? (existing?.route ?? null),
+         historicalNames: existing?.historicalNames ?? []
+       });
+     }
+   }
+
   // ── Phase B: Modifications (attribute changes) ────────────────────────────
-  const modUpdates: Array<{
-    fingerprint: string;
-    currentName: string;
-    typeRating: string;
-    route: string;
-    historicalNames?: string[];
-  }> = [];
 
   for (const { prev, curr } of diff.Modifications) {
     const fp = curr["fingerprint"] ?? "";
@@ -254,9 +349,9 @@ export async function applyStateMachine(
   const toRecoverFlicker: string[] = []; // fingerprints: GRACE_PERIOD → ACTIVE
   const reactivationCandidates: string[] = []; // company names to check for pending watches
 
-  for (const row of diff.Additions) {
-    const fp      = (row["fingerprint"] ?? "").trim();
-    const orgName = (row["Organisation Name"] ?? row["organisation name"] ?? "").trim();
+  for (const row of reconciliation.additions) {
+    const fp      = row.fingerprint;
+    const orgName = row.organisationName;
     if (!fp || !orgName) continue;
 
     const existing = canonicalMap.get(fp);
@@ -266,9 +361,9 @@ export async function applyStateMachine(
       toInsertNew.push({
         fingerprint:      fp,
         currentName:      orgName,
-        townCity:         (row["Town/City"] ?? row["town/city"] ?? "").trim() || null,
-        typeRating:       (row["Type & Rating"] ?? row["type & rating"] ?? "").trim() || null,
-        route:            (row["Route"] ?? row["route"] ?? "").trim() || null,
+        townCity:         row.townCity,
+        typeRating:       row.typeRating,
+        route:            row.route,
         status:           "NEWLY_GRANTED",
         firstSeen:        today,
         lastSeen:         today,
@@ -330,9 +425,9 @@ export async function applyStateMachine(
   const toRemove: string[] = [];
   const removedNames = new Map<string, string>(); // fp → orgName (for rename detection)
 
-  for (const row of diff.Deletions) {
-    const fp      = (row["fingerprint"] ?? "").trim();
-    const orgName = (row["Organisation Name"] ?? row["organisation name"] ?? "").trim();
+  for (const row of reconciliation.deletions) {
+    const fp      = row.fingerprint;
+    const orgName = row.organisationName;
     if (!fp) continue;
 
     const existing = canonicalMap.get(fp);
