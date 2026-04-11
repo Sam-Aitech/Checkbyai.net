@@ -6,20 +6,51 @@ import { z } from "zod";
 import { isAuthenticated, isAdmin } from "../auth";
 import { getWatchLimit as getWatchLimitFromTier, getTierConfig } from "../utils/tierConfig";
 import { normalizeName, generateFingerprint } from "../utils/sponsorListFetcher";
-import { ensureIndexReady, isIndexReady, searchSponsors, searchSponsorsFallback, searchRevokedSponsors, type PagedSearchResult } from "../utils/sponsorSearch";
+import { ensureIndexReady, isIndexReady, searchSponsors, searchSponsorsFallback, searchRevokedSponsors, getIndexHealth, type PagedSearchResult } from "../utils/sponsorSearch";
+import { recordSearchRequest } from "../services/monitoringService";
 import { generateHeadline, signDigest } from "../services/aiDigest";
 import { storage } from "../storage";
 import { cacheGet, cacheSet } from "../utils/redisClient";
 import rateLimit from "express-rate-limit";
 
-// ── Free-search rate limiter ─────────────────────────────────────────────────
-// 30 requests/min per IP — prevents abuse while allowing unlimited real usage.
-const freeSearchRateLimit = rateLimit({
+// ── Tiered Rate Limiters for Search ──────────────────────────────────────────
+// Authenticated users get higher limits, anonymous get reasonable limits
+const rateLimiterFactory = (maxPerMinute: number) => rateLimit({
   windowMs: 60 * 1_000,
-  max: 30,
+  max: maxPerMinute,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { message: "Too many searches. Please wait a moment before searching again." },
+  keyGenerator: (req) => {
+    // Use user ID if authenticated, otherwise IP
+    return (req as any).user?.id || req.ip;
+  },
+});
+
+// Anonymous search - 30 requests/minute (prevents abuse)
+const freeSearchRateLimit = rateLimiterFactory(30);
+
+// Authenticated search - 120 requests/minute (for power users)
+const authenticatedSearchRateLimit = rateLimiterFactory(120);
+
+// Custom key generator for personalized limits
+const personalizedRateLimiter = (baseLimit: number) => rateLimit({
+  windowMs: 60 * 1_000,
+  max: (req: any) => {
+    // Higher limits for premium/subscriber users
+    if (req.user?.subscriptionStatus?.includes('pro') || 
+        req.user?.subscriptionStatus?.includes('unlimited') ||
+        req.user?.subscriptionStatus?.includes('enterprise')) {
+      return baseLimit * 3; // 3x for premium users
+    }
+    if (req.user?.subscriptionStatus?.includes('starter') ||
+        req.user?.subscriptionStatus?.includes('notification')) {
+      return baseLimit * 2; // 2x for starter users
+    }
+    return baseLimit; // Default for free/trial users
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => (req.user?.id || req.ip),
 });
 
 function getWatchLimit(subscriptionStatus: string | null): number {
@@ -74,25 +105,113 @@ async function ensureReactivationWatch(userId: string, companyName: string): Pro
 }
 
 export function registerSponsorRoutes(app: Express): void {
+  // Health check endpoint for search system (Fix 2.1)
+  app.get('/api/sponsors/health', async (req: any, res) => {
+    try {
+      const health = getIndexHealth();
+      res.json({
+        status: 'ok',
+        search: health,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error("Search health check failed:", error);
+      res.status(503).json({ 
+        status: 'error', 
+        message: "Search service temporarily unavailable",
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
+   // Enhanced free search with optimized rate limiting (Fix 2.2 & 2.3)
   app.get('/api/sponsors/free-search', freeSearchRateLimit, async (req: any, res) => {
     try {
+      const startTime = Date.now();
       const q = (req.query.q as string || "").trim().slice(0, 200);
       if (q.length < 3) {
         return res.status(400).json({ message: "Search query must be at least 3 characters long." });
       }
 
-      await ensureIndexReady();
+      // Check search health before proceeding
+      const health = getIndexHealth();
+      
+      // Provide health info in response for debugging
       const opts = { limit: 50 };
+      let paged;
+      
+      if (isIndexReady()) {
+        paged = searchSponsors(q, opts);
+      } else {
+        // Fallback to database search if index not ready
+        console.log("[Search] Index not ready, using database fallback");
+        paged = await searchSponsorsFallback(q, opts);
+      }
+
+       const searchSuccess = !(paged === null || (paged?.results ?? []).length === 0 && health.ready);
+       recordSearchRequest(searchSuccess, Date.now() - startTime);
+       
+       res.json({ 
+         results: paged?.results ?? [],
+         health: health, // Include health info for debugging
+         searchType: isIndexReady() ? 'index' : 'database'
+       });
+    } catch (error) {
+      console.error("Error in free sponsor search:", error);
+      res.status(503).json({ 
+        message: "Search temporarily unavailable. Please try again in a few moments.",
+        retryAfter: 30,
+        code: "SEARCH_UNAVAILABLE"
+      });
+    }
+  });
+
+  // Authenticated search with personalized rate limits and Redis caching
+  app.get('/api/sponsors/search', isAuthenticated, personalizedRateLimiter(60), async (req: any, res) => {
+    try {
+      const startTime = Date.now();
+      const q = (req.query.q as string || "").trim().slice(0, 200);
+      if (q.length < 3) {
+        return res.json({ results: [], total: 0, page: 1, totalPages: 0 });
+      }
+
+      const VALID_STATUSES = ["ACTIVE", "NEWLY_GRANTED", "REMOVED_REVOKED", "GRACE_PERIOD"];
+      const statusParam = (req.query.status as string || "").toUpperCase();
+      const status = VALID_STATUSES.includes(statusParam) ? statusParam : undefined;
+      const town = (req.query.town as string || "").trim() || undefined;
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
+
+      const opts = { status, town, page, limit };
+
+      // L1 Redis cache: TTL 5 min — avoids redundant Fuse/pg_trgm work for repeated queries.
+      const cacheKey = `sponsors:search:${Buffer.from(JSON.stringify({ q, status, town, page, limit })).toString("base64")}`;
+      const cached = await cacheGet<PagedSearchResult>(cacheKey);
+      if (cached) return res.json(cached);
+
+      await ensureIndexReady();
       const paged = isIndexReady()
         ? searchSponsors(q, opts)
         : await searchSponsorsFallback(q, opts);
 
-      res.json({ results: paged?.results ?? [] });
+       const searchResult = paged ?? { results: [], total: 0, page: 1, totalPages: 1 };
+       await cacheSet(cacheKey, searchResult, 300);
+       const searchSuccess = !(searchResult.results.length === 0 && isIndexReady());
+       recordSearchRequest(searchSuccess, Date.now() - startTime);
+       res.json({ 
+         ...searchResult,
+         searchType: isIndexReady() ? 'index' : 'database'
+       });
     } catch (error) {
-      console.error("Error in free sponsor search:", error);
-      res.status(500).json({ message: "Failed to search sponsors." });
+      console.error("Error in authenticated sponsor search:", error);
+      res.status(503).json({ 
+        message: "Search temporarily unavailable",
+        retryAfter: 30
+      });
     }
   });
+
+
 
   // ── Historical (revoked) sponsor search ─────────────────────────────────────
   // Called by the frontend only when the primary active-sponsor search returns
@@ -244,41 +363,6 @@ export function registerSponsorRoutes(app: Express): void {
     } catch (error: unknown) {
       console.error("Error refreshing daily digest:", error);
       res.status(500).json({ message: "Failed to refresh digest.", error: error instanceof Error ? error.message : String(error) });
-    }
-  });
-
-  app.get('/api/sponsors/search', isAuthenticated, async (req: any, res) => {
-    try {
-      const q = (req.query.q as string || "").trim().slice(0, 200);
-      if (q.length < 3) {
-        return res.status(400).json({ message: "Search query must be at least 3 characters long." });
-      }
-
-      const VALID_STATUSES = ["ACTIVE", "NEWLY_GRANTED", "REMOVED_REVOKED", "GRACE_PERIOD"];
-      const statusParam = (req.query.status as string || "").toUpperCase();
-      const status = VALID_STATUSES.includes(statusParam) ? statusParam : undefined;
-      const town = (req.query.town as string || "").trim() || undefined;
-      const page = Math.max(1, parseInt(req.query.page as string) || 1);
-      const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
-
-      const opts = { status, town, page, limit };
-
-      // L1 Redis cache: TTL 5 min — avoids redundant Fuse/pg_trgm work for repeated queries.
-      const cacheKey = `sponsors:search:${Buffer.from(JSON.stringify({ q, status, town, page, limit })).toString("base64")}`;
-      const cached = await cacheGet<PagedSearchResult>(cacheKey);
-      if (cached) return res.json(cached);
-
-      await ensureIndexReady();
-      const paged = isIndexReady()
-        ? searchSponsors(q, opts)
-        : await searchSponsorsFallback(q, opts);
-
-      const searchResult = paged ?? { results: [], total: 0, page: 1, totalPages: 1 };
-      await cacheSet(cacheKey, searchResult, 300);
-      res.json(searchResult);
-    } catch (error) {
-      console.error("Error searching sponsors:", error);
-      res.status(500).json({ message: "Failed to search sponsors." });
     }
   });
 
