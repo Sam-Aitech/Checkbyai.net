@@ -127,6 +127,8 @@ export async function rebuildSponsorIndex(): Promise<void> {
   );
 }
 
+
+
 /**
  * Ensures the index is ready before serving a search request.
  *
@@ -145,6 +147,24 @@ export async function ensureIndexReady(): Promise<void> {
 
 export function isIndexReady(): boolean {
   return fuseIndex !== null && indexRecordCount > 0;
+}
+
+// Health monitoring for search system (Fix 2.1)
+export function getIndexHealth(): {
+  ready: boolean;
+  recordCount: number;
+  lastBuilt: string | null;
+  buildInProgress: boolean;
+  dbConnected: boolean;
+} {
+  const lastBuiltAt = indexBuiltAt > 0 ? new Date(indexBuiltAt).toISOString() : null;
+  return {
+    ready: isIndexReady(),
+    recordCount: indexRecordCount,
+    lastBuilt: lastBuiltAt,
+    buildInProgress: !!rebuildPromise,
+    dbConnected: !!db,
+  };
 }
 
 // ── Search ────────────────────────────────────────────────────────────────────
@@ -391,8 +411,20 @@ export async function searchRevokedSponsors(
       historicalNames:  r.historicalNames || [],
       source:           "db" as const,
     }));
-  } catch (err: unknown) {
+   } catch (err: unknown) {
     console.error("[SponsorSearch] searchRevokedSponsors failed:", err instanceof Error ? err.message : err);
     return [];
+  }
+}
+
+// Performance optimization: Index warmup strategy (Long-term)
+export async function warmupIndex(): Promise<void> {
+  try {
+    console.log('[SponsorSearch] Starting index warmup...');
+    await ensureIndexReady();
+    console.log('[SponsorSearch] Index warmup complete');
+  } catch (error) {
+    console.error('[SponsorSearch] Index warmup failed:', error);
+    // Don't throw - allow app to start even if warmup fails
   }
 }
