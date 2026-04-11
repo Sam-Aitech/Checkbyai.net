@@ -50,7 +50,7 @@ const personalizedRateLimiter = (baseLimit: number) => rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => (req.user?.id || req.ip),
+  keyGenerator: (req) => ((req as any).user?.id || req.ip),
 });
 
 function getWatchLimit(subscriptionStatus: string | null): number {
