@@ -3,7 +3,7 @@
 
 Owner: CTO / Tech Lead
 Status: Active Program Plan
-Last Updated: 2026-04-19
+Last Updated: 2026-04-18
 
 ---
 
@@ -13,7 +13,7 @@ Last Updated: 2026-04-19
 |---|---|---|---|---|---|
 | Phase 0 | Alignment and Scope Freeze | Completed | 2026-04-18 | None | Governance package created, approved, and frozen |
 | Phase 1 | Control Plane and Observability Foundation | **Completed** | 2026-04-19 | Phase 0 | RBAC baseline, audit trail, telemetry and health contracts |
-| Phase 2 | Secure Orchestration Contracts | Planned | 2026-05-06 | Phase 1 | Authenticated, idempotent orchestration boundaries |
+| Phase 2 | Secure Orchestration Contracts | In Progress | 2026-04-18 | Phase 1 | Authenticated, idempotent orchestration boundaries |
 | Phase 3 | Shadow Mode Validation | Planned | 2026-05-20 | Phase 2 | Side-by-side run parity with drift reports |
 | Phase 4 | Controlled Cutover | Planned | 2026-06-03 | Phase 3 | Job-by-job scheduler ownership migration |
 | Phase 5 | Incident Automation and Runbooks | Planned | 2026-06-17 | Phase 4 | Alert precision, ticket context automation, runbooks |
@@ -87,10 +87,18 @@ Quality gate:
 
 ### Phase 2: Secure Orchestration Contracts
 
-1. Define trigger endpoint contracts for orchestrated jobs.
-2. Enforce authn/authz and signed callbacks.
-3. Add idempotency tokens and replay protection.
-4. Add audit trail linkage between trigger and execution.
+Completed in commit `86d6bf1`:
+
+1. Defined trigger endpoint contracts for orchestrated jobs via `POST /api/ops/jobs/:jobName/trigger` and `GET /api/ops/jobs/:jobName/status/:triggerId`.
+2. Enforced authn/authz (`requireRole("admin")` for trigger and `requireRole("analyst")` for status) and callback signing (`X-Checkbyai-Signature`).
+3. Added replay protection via DB-backed idempotency uniqueness on `(job_name, idempotency_key)` and UUID-v4 idempotency key contract.
+4. Added audit trail linkage table `job_trigger_audit` (triggerId, correlationId, status, duration, failure reason).
+
+Remaining to close Phase 2:
+
+1. Add integration tests for the `/api/ops/jobs/*` contracts (authz paths, replay response semantics, callback behaviors).
+2. Add retry/backoff for failed callback delivery and persistent callback failure status.
+3. Finalize 24-hour replay-window semantics (current implementation enforces strict uniqueness by idempotency key).
 
 ### Phase 3: Shadow Mode Validation
 
