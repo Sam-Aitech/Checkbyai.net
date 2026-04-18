@@ -1,0 +1,59 @@
+name: Scope Exception Request
+description: Request a change to frozen scope after Phase 0 freeze
+title: "[Scope Exception]: "
+labels:
+  - scope-exception
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Process
+
+        1. Submit this exception request.
+        2. Required approvers review and approve or reject.
+        3. If approved, update docs/phase-0/SCOPE.md and add this issue reference.
+        4. Track resulting decision in docs/phase-0/DECISION-LOG.md.
+
+  - type: input
+    id: feature_change
+    attributes:
+      label: Feature or change requested
+      placeholder: Describe what needs to be added or changed
+    validations:
+      required: true
+
+  - type: textarea
+    id: business_justification
+    attributes:
+      label: Business justification
+      description: Why this cannot wait for the next planned phase
+    validations:
+      required: true
+
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Estimated impact
+      options:
+        - < 1 day effort, no schema change
+        - 1-3 days, no schema change
+        - Schema migration required
+        - Cross-cutting auth, billing, or infra impact
+    validations:
+      required: true
+
+  - type: textarea
+    id: tradeoff
+    attributes:
+      label: Tradeoff
+      description: Which in-scope item will be reduced, deferred, or removed
+    validations:
+      required: true
+
+  - type: input
+    id: required_approvers
+    attributes:
+      label: Required approvers
+      placeholder: Product Owner, Tech Lead
+    validations:
+      required: true

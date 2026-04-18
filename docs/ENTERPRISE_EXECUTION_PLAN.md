@@ -2,7 +2,7 @@
 # checkbyai.net
 **Owner:** CTO / Tech Lead
 **Status:** Approved
-**Last Updated:** 2026-03-27
+**Last Updated:** 2026-04-18
 
 ---
 
@@ -16,6 +16,33 @@ This means:
 - no enterprise customer commitments without control-plane, observability, and governance coverage
 
 The product is already functional. The immediate gap is not feature existence; it is enterprise operating confidence.
+
+---
+
+## Program Progress (Phase 0-8)
+
+Current execution status:
+
+1. Phase 0: Completed and frozen
+2. Phase 1-8: Planned, not started
+
+Source of truth for phase status and GitHub build backlog:
+
+- [EXECUTION_PHASES_0_8.md](EXECUTION_PHASES_0_8.md)
+
+Priority-to-phase mapping:
+
+| Priority | Covered By Phases |
+|---|---|
+| P0 Enterprise Control Plane | Phase 1 and Phase 5 |
+| P1 Observability and Reliability | Phase 1, Phase 2, Phase 5, Phase 7 |
+| P2 Compliance and Data Governance | Phase 5 and Phase 6 |
+| P3 Scale-Out Triggers | Phase 4, Phase 7, Phase 8 |
+
+Execution rule:
+
+1. If this document and phase document diverge, update both in the same PR.
+2. Delivery tracking uses `EXECUTION_PHASES_0_8.md`; strategy and rationale stay here.
 
 ---
 

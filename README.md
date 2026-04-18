@@ -200,7 +200,18 @@ CheckByAI is licensed under the [MIT License](LICENSE).
 
 ## 🗺️ Roadmap
 
-See [GitHub Issues](https://github.com/Sam-Aitech/Checkbyai.net/issues?q=is%3Aopen+label%3Aenhancement) for our public roadmap and upcoming features.
+Public feature roadmap:
+
+- [GitHub Issues](https://github.com/Sam-Aitech/Checkbyai.net/issues?q=is%3Aopen+label%3Aenhancement)
+
+Operational execution roadmap (enterprise hardening, Phase 0 to Phase 8):
+
+- [docs/EXECUTION_PHASES_0_8.md](docs/EXECUTION_PHASES_0_8.md)
+
+Usage:
+
+1. Feature roadmap explains what users will get.
+2. Operational roadmap explains how we make the platform enterprise-ready.
 
 ---
 

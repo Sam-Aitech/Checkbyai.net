@@ -1,5 +1,5 @@
 # checkbyai.net — Documentation Index
-**Last Updated:** 2026-03-20
+**Last Updated:** 2026-04-18
 
 ---
 
@@ -14,6 +14,7 @@
 | [SECURITY.md](SECURITY.md) | Engineering / Compliance | Threat model, authentication design, data protection, outstanding issues |
 | [ARCHITECTURE_DECISIONS.md](ARCHITECTURE_DECISIONS.md) | Engineering | Why architectural choices were made (ADRs) |
 | [ENTERPRISE_EXECUTION_PLAN.md](ENTERPRISE_EXECUTION_PLAN.md) | Leadership / Engineering / Ops | CTO-approved hardening roadmap for enterprise readiness, delivery order, and exit criteria |
+| [EXECUTION_PHASES_0_8.md](EXECUTION_PHASES_0_8.md) | Leadership / Engineering / PM | End-to-end program status from Phase 0 through Phase 8 (completed vs remaining, GitHub build plan) |
 
 ---
 
