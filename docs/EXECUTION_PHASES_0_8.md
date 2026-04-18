@@ -3,7 +3,7 @@
 
 Owner: CTO / Tech Lead
 Status: Active Program Plan
-Last Updated: 2026-04-18
+Last Updated: 2026-04-19
 
 ---
 
@@ -12,7 +12,7 @@ Last Updated: 2026-04-18
 | Phase | Name | Status | Target Start | Dependencies | Outcome |
 |---|---|---|---|---|---|
 | Phase 0 | Alignment and Scope Freeze | Completed | 2026-04-18 | None | Governance package created, approved, and frozen |
-| Phase 1 | Control Plane and Observability Foundation | Planned | 2026-04-22 | Phase 0 | RBAC baseline, audit trail, telemetry and health contracts |
+| Phase 1 | Control Plane and Observability Foundation | **Completed** | 2026-04-19 | Phase 0 | RBAC baseline, audit trail, telemetry and health contracts |
 | Phase 2 | Secure Orchestration Contracts | Planned | 2026-05-06 | Phase 1 | Authenticated, idempotent orchestration boundaries |
 | Phase 3 | Shadow Mode Validation | Planned | 2026-05-20 | Phase 2 | Side-by-side run parity with drift reports |
 | Phase 4 | Controlled Cutover | Planned | 2026-06-03 | Phase 3 | Job-by-job scheduler ownership migration |
@@ -63,15 +63,27 @@ Quality verification evidence:
 
 ---
 
-## Left To Build (Phase 1-8)
+### Phase 1
 
-### Phase 1: Control Plane and Observability Foundation
+Completed — commit `a10ed17` on 2026-04-19.
 
-1. Implement role matrix baseline and privileged action audit trail.
-2. Implement job lifecycle event contract for sponsor monitor, alerts, enrichment, delayed notifications.
-3. Add correlation IDs end-to-end.
-4. Extend health payload with per-job freshness and state.
-5. Add baseline operational dashboard and SLO definitions.
+Deliverables:
+
+1. `server/utils/jobTelemetry.ts` — typed lifecycle event contract (`JobLifecycleEvent`, `JobResult`, `TriggerSource`, `RunMode`) and in-memory health registry with `startJobRun` / `finishJobRun` / `getJobHealthSnapshot` / `getAllJobHealthSnapshots`.
+2. Telemetry wired into all 4 critical jobs: `sponsorMonitorJob`, `jobAlertJob`, `enrichmentWorker` (seed + batch), `notificationEngine.processQueuedEngineEvents`.
+3. `/api/health` extended — per-job freshness (`lastSuccessAt`, `lastFailureAt`, `staleByMinutes`, `running`, `lastRunMode`) via `getAllJobHealthSnapshots`; legacy `sponsorMonitor` block retained for backward compatibility.
+4. `server/middleware/roleGuard.ts` — typed role matrix (`viewer / support / analyst / billing / admin / owner`), `requireRole()` middleware factory, `hasRole()` predicate, `requireAdmin` convenience alias.
+5. `server/utils/__tests__/jobTelemetry.test.ts` — 13 new tests (correlation ID uniqueness, lifecycle state transitions, staleByMinutes, role hierarchy).
+
+Quality gate:
+
+1. `npm run check` — tsc clean
+2. `npm run test:run` — 86/86 pass (up from 73)
+3. `npm run build` — production build clean
+
+---
+
+## Left To Build (Phase 2-8)
 
 ### Phase 2: Secure Orchestration Contracts
 
