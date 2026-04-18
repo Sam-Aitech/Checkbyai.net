@@ -13,6 +13,7 @@ import { resolveTier } from "./tierConfig";
 import { getOrFetchEnrichment } from "./companyEnricher";
 import { scrapeJobsForCompany, type ScrapedJob } from "./jobScraper";
 import { sql } from "drizzle-orm";
+import { startJobRun, finishJobRun } from "./jobTelemetry";
 
 const ADVISORY_LOCK_KEY = 7483921; // Distinct from sponsor monitor (7483920)
 const PRO_BOARDS = ["company", "linkedin", "indeed", "cvlibrary", "google"];
@@ -122,6 +123,9 @@ export async function runJobAlertJob(): Promise<void> {
     return;
   }
 
+  const telemetry = startJobRun("jobAlertJob", "cron", "inline");
+  let outcome: "success" | "failed" = "success";
+  let failureReason: string | null = null;
   try {
     console.log("[JobAlertJob] Starting nightly job alert scan...");
     const today = new Date().toISOString().split("T")[0];
@@ -265,8 +269,11 @@ export async function runJobAlertJob(): Promise<void> {
     console.log(`[JobAlertJob] Complete. Emails sent: ${emailsSent}`);
   } catch (err) {
     console.error("[JobAlertJob] Fatal error:", err);
+    outcome = "failed";
+    failureReason = err instanceof Error ? err.message : String(err);
   } finally {
     await releaseJobLock();
+    finishJobRun({ ...telemetry, jobName: "jobAlertJob", triggerSource: "cron", runMode: "inline", result: outcome, failureReason });
   }
 }
 

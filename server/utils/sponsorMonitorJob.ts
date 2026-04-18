@@ -13,6 +13,7 @@ import { generateHeadline, type RawDigestData } from "../services/aiDigest";
 import { withRetry } from "./dbRetry";
 import { sendAdminAlert } from "./adminAlert";
 import { logger } from "./logger";
+import { startJobRun, finishJobRun, type TriggerSource } from "./jobTelemetry";
 
 const log = logger.child({ module: "SponsorMonitorJob" });
 
@@ -379,6 +380,8 @@ export async function runSponsorMonitorJob(source: string = "cron", notifyOnFail
     return { ...result, error: msg };
   }
 
+  const triggerSource: TriggerSource = source === "cron" ? "cron" : source === "queue" ? "queue" : "manual";
+  const telemetry = startJobRun("sponsorMonitorJob", triggerSource, "inline");
   const startTime = Date.now();
   const JOB_TIMEOUT_MS = 25 * 60 * 1000; // 25-minute hard ceiling
   let watchdogTimer: ReturnType<typeof setTimeout> | null = null;
@@ -439,10 +442,14 @@ export async function runSponsorMonitorJob(source: string = "cron", notifyOnFail
       ).catch((e) => console.error('[SponsorMonitorJob] Failed to send admin failure alert email:', e));
     }
     Object.assign(result, { error: errorMsg });
+    finishJobRun({ ...telemetry, jobName: "sponsorMonitorJob", triggerSource, runMode: "inline", result: "failed", failureReason: errorMsg });
     return result;
   } finally {
     if (watchdogTimer) clearTimeout(watchdogTimer);
     await releaseJobLock();
+    if (result.success) {
+      finishJobRun({ ...telemetry, jobName: "sponsorMonitorJob", triggerSource, runMode: "inline", result: "success" });
+    }
     lastRunInfo = {
       date: new Date().toISOString(),
       success: result.success,

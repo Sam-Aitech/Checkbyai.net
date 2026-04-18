@@ -28,6 +28,7 @@ import { normalizeName } from "../utils/sponsorListFetcher";
 import { getTierConfig } from "../utils/tierConfig";
 import { getAppUrl } from "../utils/appUrl";
 import { logger } from "../utils/logger";
+import { startJobRun, finishJobRun } from "../utils/jobTelemetry";
 
 const log = logger.child({ module: "NotificationEngine" });
 
@@ -366,6 +367,9 @@ export async function notifyUsersOfEvent(change: SponsorChange): Promise<void> {
  */
 export async function processQueuedEngineEvents(): Promise<void> {
   const now = new Date();
+  const telemetry = startJobRun("notificationDrain", "cron", "inline");
+  let outcome: "success" | "failed" = "success";
+  let failureReason: string | null = null;
 
   try {
     const queued = await db
@@ -466,5 +470,9 @@ export async function processQueuedEngineEvents(): Promise<void> {
     console.log("[NotificationEngine] Queued event processing complete.");
   } catch (err) {
     console.error("[NotificationEngine] Fatal error in processQueuedEngineEvents:", err);
+    outcome = "failed";
+    failureReason = err instanceof Error ? err.message : String(err);
+  } finally {
+    finishJobRun({ ...telemetry, jobName: "notificationDrain", triggerSource: "cron", runMode: "inline", result: outcome, failureReason });
   }
 }

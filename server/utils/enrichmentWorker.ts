@@ -27,6 +27,7 @@ import {
 } from "@shared/schema";
 import { eq, sql, and, inArray, lte } from "drizzle-orm";
 import { logger } from "./logger";
+import { startJobRun, finishJobRun } from "./jobTelemetry";
 
 const log = logger.child({ module: "EnrichmentWorker" });
 
@@ -463,23 +464,45 @@ async function setItemBackoff(
 // ── Cron scheduler ────────────────────────────────────────────────────────────
 
 export function startEnrichmentCron(): void {
-  // Nightly queue seed — 02:00 UTC (after midnight DB maintenance, before 00:30 sponsor monitor)
+  // Nightly queue seed — 02:00 UTC
   cron.schedule("0 2 * * *", async () => {
     try {
       log.info("Nightly enrichment queue seed starting...");
-      const { inserted } = await seedEnrichmentQueue();
-      log.info({ inserted }, "Nightly enrichment queue seed complete.");
+      const telemetry = startJobRun("enrichmentSeed", "cron", "inline");
+      let outcome: "success" | "failed" = "success";
+      let failureReason: string | null = null;
+      try {
+        const { inserted } = await seedEnrichmentQueue();
+        log.info({ inserted }, "Nightly enrichment queue seed complete.");
+      } catch (err) {
+        outcome = "failed";
+        failureReason = err instanceof Error ? err.message : String(err);
+        log.error({ err }, "Enrichment queue seed failed.");
+      } finally {
+        finishJobRun({ ...telemetry, jobName: "enrichmentSeed", triggerSource: "cron", runMode: "inline", result: outcome, failureReason });
+      }
     } catch (err) {
-      log.error({ err }, "Enrichment queue seed failed.");
+      log.error({ err }, "Enrichment cron outer error.");
     }
   });
 
-  // Hourly batch processor — runs at :15 past each hour to spread load
+  // Hourly batch processor — :15 past each hour
   cron.schedule("15 * * * *", async () => {
     try {
-      await runEnrichmentBatch();
+      const telemetry = startJobRun("enrichmentBatch", "cron", "inline");
+      let outcome: "success" | "failed" = "success";
+      let failureReason: string | null = null;
+      try {
+        await runEnrichmentBatch();
+      } catch (err) {
+        outcome = "failed";
+        failureReason = err instanceof Error ? err.message : String(err);
+        log.error({ err }, "Enrichment batch run failed.");
+      } finally {
+        finishJobRun({ ...telemetry, jobName: "enrichmentBatch", triggerSource: "cron", runMode: "inline", result: outcome, failureReason });
+      }
     } catch (err) {
-      log.error({ err }, "Enrichment batch run failed.");
+      log.error({ err }, "Enrichment cron outer error.");
     }
   });
 
