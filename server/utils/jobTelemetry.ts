@@ -6,7 +6,7 @@ const log = logger.child({ module: "JobTelemetry" });
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 export type JobResult = "success" | "failed" | "skipped" | "retried";
-export type TriggerSource = "cron" | "manual" | "webhook" | "queue";
+export type TriggerSource = "cron" | "manual" | "webhook" | "queue" | "incident";
 export type RunMode = "inline" | "queue" | "worker" | "shadow";
 
 /** Phase 1 job lifecycle event contract.  All fields required. */

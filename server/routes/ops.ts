@@ -1,8 +1,9 @@
 import crypto from "crypto";
 import type { Express } from "express";
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { CALLBACK_CONFIG, JOB_TIMEOUT_MS } from "../config/jobBudgets";
+import { and, desc, eq, gte, ne, sql } from "drizzle-orm";
 import { db } from "../db";
-import { jobTriggerAudit, shadowParityReports, shadowRunResults } from "@shared/schema";
+import { jobTriggerAudit, shadowParityReports, shadowRunResults, incidentTickets } from "@shared/schema";
 import { requireRole } from "../middleware/roleGuard";
 import { opsTriggerLimiter } from "../middleware/rateLimiter";
 import { isSafeCallbackUrl, signPayload } from "../utils/callbackSigner";
@@ -15,20 +16,17 @@ import { processQueuedEngineEvents } from "../services/notificationEngine";
 import { logger } from "../utils/logger";
 import { computeParityReport, getLatestProductionBaseline, runShadowSnapshot } from "../utils/shadowMode";
 import { getCutoverStatusSnapshot } from "../utils/scheduler";
+import { getAllJobHealthSnapshots } from "../utils/jobTelemetry";
+import {
+  evaluateSeverity,
+  createIncidentTicket,
+  tryAutoRemediate,
+  type IncidentSeverity,
+} from "../utils/incidentManager";
 
 const log = logger.child({ module: "OpsRoutes" });
 
-const CALLBACK_TIMEOUT_MS = 10_000;
-const CALLBACK_MAX_ATTEMPTS = 3;
-const CALLBACK_RETRY_BASE_MS = 500;
 const IDEMPOTENCY_WINDOW_MS = 24 * 60 * 60 * 1000;
-const JOB_TIMEOUT_MS: Record<JobName, number> = {
-  sponsorMonitorJob: 25 * 60 * 1000,
-  jobAlertJob: 15 * 60 * 1000,
-  enrichmentSeed: 10 * 60 * 1000,
-  enrichmentBatch: 30 * 60 * 1000,
-  notificationDrain: 10 * 60 * 1000,
-};
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -114,7 +112,7 @@ async function sendSignedCallback(callbackUrl: string, payload: Record<string, u
   const signature = signPayload(body, secret);
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), CALLBACK_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), CALLBACK_CONFIG.timeoutMs);
 
   try {
     const response = await fetch(callbackUrl, {
@@ -142,7 +140,7 @@ async function deliverCallbackWithRetry(params: {
 }): Promise<void> {
   let lastError: string | null = null;
 
-  for (let attempt = 1; attempt <= CALLBACK_MAX_ATTEMPTS; attempt += 1) {
+  for (let attempt = 1; attempt <= CALLBACK_CONFIG.maxAttempts; attempt += 1) {
     try {
       await sendSignedCallback(params.callbackUrl, params.payload);
       await db
@@ -167,8 +165,8 @@ async function deliverCallbackWithRetry(params: {
         })
         .where(eq(jobTriggerAudit.triggerId, params.triggerId));
 
-      if (attempt < CALLBACK_MAX_ATTEMPTS) {
-        const backoff = CALLBACK_RETRY_BASE_MS * Math.pow(2, attempt - 1);
+      if (attempt < CALLBACK_CONFIG.maxAttempts) {
+        const backoff = CALLBACK_CONFIG.retryBaseMs * Math.pow(2, attempt - 1);
         await sleep(backoff);
       }
     }
@@ -618,6 +616,147 @@ export function registerOpsRoutes(app: Express): void {
     } catch (err) {
       log.error({ err }, "Failed to read orchestration status");
       return res.status(500).json({ message: "Failed to read orchestration status" });
+    }
+  });
+
+  // ── Phase 5: Incident management ──────────────────────────────────────────
+
+  app.post("/api/ops/incidents/evaluate", requireRole("admin"), async (_req, res) => {
+    try {
+      const snapshots = getAllJobHealthSnapshots();
+      const created: Array<{ jobName: string; severity: IncidentSeverity; incidentId: number }> = [];
+
+      for (const snap of snapshots) {
+        const severity = evaluateSeverity(snap);
+        if (!severity) continue;
+
+        const incidentId = await createIncidentTicket(snap, severity);
+        created.push({ jobName: snap.jobName, severity, incidentId });
+
+        if (severity === "P0" || severity === "P1") {
+          void tryAutoRemediate({ incidentId, jobName: snap.jobName, severity }).catch((err) => {
+            log.error({ err, incidentId }, "Auto-remediation fire-and-forget failed");
+          });
+        }
+      }
+
+      return res.json({ evaluated: snapshots.length, created });
+    } catch (err) {
+      log.error({ err }, "Failed to evaluate incidents");
+      return res.status(500).json({ message: "Failed to evaluate incidents" });
+    }
+  });
+
+  app.get("/api/ops/incidents", requireRole("analyst"), async (req, res) => {
+    try {
+      const statusFilter = req.query.status ? String(req.query.status).trim() : null;
+      const limitRaw = Number(req.query.limit ?? 50);
+      const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(Math.floor(limitRaw), 1), 200) : 50;
+
+      const rows = await db
+        .select()
+        .from(incidentTickets)
+        .orderBy(desc(incidentTickets.createdAt))
+        .limit(limit);
+
+      const items = statusFilter ? rows.filter((r) => r.status === statusFilter) : rows;
+      return res.json({ count: items.length, items });
+    } catch (err) {
+      log.error({ err }, "Failed to list incidents");
+      return res.status(500).json({ message: "Failed to list incidents" });
+    }
+  });
+
+  app.get("/api/ops/incidents/:id", requireRole("analyst"), async (req, res) => {
+    try {
+      const id = Number(req.params.id ?? NaN);
+      if (!Number.isFinite(id) || id <= 0) {
+        return res.status(400).json({ message: "Invalid incident id" });
+      }
+
+      const rows = await db
+        .select()
+        .from(incidentTickets)
+        .where(eq(incidentTickets.id, id))
+        .limit(1);
+
+      if (rows.length === 0) return res.status(404).json({ message: "Incident not found" });
+      return res.json(rows[0]);
+    } catch (err) {
+      log.error({ err }, "Failed to read incident");
+      return res.status(500).json({ message: "Failed to read incident" });
+    }
+  });
+
+  app.post("/api/ops/incidents/:id/resolve", requireRole("admin"), async (req: any, res) => {
+    try {
+      const id = Number(req.params.id ?? NaN);
+      if (!Number.isFinite(id) || id <= 0) {
+        return res.status(400).json({ message: "Invalid incident id" });
+      }
+
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+      const updated = await db
+        .update(incidentTickets)
+        .set({ status: "resolved", resolvedBy: String(userId), resolvedAt: new Date() })
+        .where(eq(incidentTickets.id, id))
+        .returning();
+
+      if (updated.length === 0) return res.status(404).json({ message: "Incident not found" });
+      return res.json({ resolved: true, incident: updated[0] });
+    } catch (err) {
+      log.error({ err }, "Failed to resolve incident");
+      return res.status(500).json({ message: "Failed to resolve incident" });
+    }
+  });
+
+  // ── Phase 8: Hypercare rollout status ────────────────────────────────────
+  // GET /api/ops/rollout/status — analyst+
+  // Aggregates cutover state, job health, and open incident counts into a
+  // single view for hypercare monitoring. Drives the daily checkpoint.
+  app.get("/api/ops/rollout/status", requireRole("analyst"), async (_req, res) => {
+    try {
+      const cutover = getCutoverStatusSnapshot();
+      const healthSnapshots = getAllJobHealthSnapshots();
+
+      const openIncidents = await db
+        .select()
+        .from(incidentTickets)
+        .where(ne(incidentTickets.status, "resolved"))
+        .orderBy(desc(incidentTickets.createdAt))
+        .limit(200);
+
+      const p0Open = openIncidents.filter((i) => i.severity === "P0").length;
+      const p1Open = openIncidents.filter((i) => i.severity === "P1").length;
+      const staleCount = healthSnapshots.filter(
+        (s) => s.staleByMinutes !== null && s.staleByMinutes > 0,
+      ).length;
+
+      return res.json({
+        phase: "phase-8-hypercare",
+        generatedAt: new Date().toISOString(),
+        cutover: {
+          totalJobs: cutover.length,
+          cutoverCount: cutover.filter((j) => j.cutover).length,
+          remainingCount: cutover.filter((j) => !j.cutover).length,
+          jobs: cutover,
+        },
+        health: {
+          totalJobs: healthSnapshots.length,
+          staleCount,
+          snapshots: healthSnapshots,
+        },
+        incidents: {
+          openCount: openIncidents.length,
+          p0Open,
+          p1Open,
+        },
+      });
+    } catch (err) {
+      log.error({ err }, "Failed to read rollout status");
+      return res.status(500).json({ message: "Failed to read rollout status" });
     }
   });
 

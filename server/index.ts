@@ -415,6 +415,22 @@ async function applyPendingMigrations() {
       `ALTER TABLE "diff_results" ADD COLUMN IF NOT EXISTS "diff_json" JSONB`,
       `ALTER TABLE "csv_archive" ADD COLUMN IF NOT EXISTS "sync_status" TEXT NOT NULL DEFAULT 'SYNCED'`,
       `CREATE INDEX IF NOT EXISTS "idx_csv_archive_sync_status" ON "csv_archive"("sync_status", "snapshot_date" DESC) WHERE "sync_status" != 'SYNCED'`,
+      `CREATE TABLE IF NOT EXISTS "incident_tickets" (
+        "id" integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+        "job_name" varchar NOT NULL,
+        "severity" varchar(4) NOT NULL,
+        "status" varchar(20) NOT NULL DEFAULT 'open',
+        "title" text NOT NULL,
+        "context" jsonb NOT NULL,
+        "remediation_correlation_id" varchar,
+        "resolved_by" varchar,
+        "resolved_at" timestamp,
+        "created_at" timestamp NOT NULL DEFAULT now()
+      )`,
+      `CREATE INDEX IF NOT EXISTS "idx_incident_tickets_job" ON "incident_tickets"("job_name")`,
+      `CREATE INDEX IF NOT EXISTS "idx_incident_tickets_severity" ON "incident_tickets"("severity")`,
+      `CREATE INDEX IF NOT EXISTS "idx_incident_tickets_status" ON "incident_tickets"("status")`,
+      `CREATE INDEX IF NOT EXISTS "idx_incident_tickets_created" ON "incident_tickets"("created_at" DESC)`,
     ];
     for (const sql of migrations) {
       await client.query(sql);

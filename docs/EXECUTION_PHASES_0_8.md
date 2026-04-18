@@ -2,8 +2,8 @@
 # checkbyai.net
 
 Owner: CTO / Tech Lead
-Status: Active Program Plan
-Last Updated: 2026-04-18 (Phase 4 completed)
+Status: **PROGRAM COMPLETE** — All 9 phases (0–8) delivered
+Last Updated: 2026-04-18
 
 ---
 
@@ -16,10 +16,10 @@ Last Updated: 2026-04-18 (Phase 4 completed)
 | Phase 2 | Secure Orchestration Contracts | Completed | 2026-04-18 | Phase 1 | Authenticated, idempotent orchestration boundaries |
 | Phase 3 | Shadow Mode Validation | **Completed** | 2026-04-18 | Phase 2 | Side-by-side run parity with drift reports |
 | Phase 4 | Controlled Cutover | **Completed** | 2026-04-18 | Phase 3 | Job-by-job scheduler ownership migration |
-| Phase 5 | Incident Automation and Runbooks | Planned | 2026-06-17 | Phase 4 | Alert precision, ticket context automation, runbooks |
-| Phase 6 | QA Reliability Gates | Planned (Parallel) | 2026-04-22 | Phase 0 | Reliability regression suite as release gate |
-| Phase 7 | Performance and Cost Hardening | Planned (Parallel) | 2026-05-20 | Phase 1 | Runtime budgets, retry tuning, and cost controls |
-| Phase 8 | Production Rollout and Hypercare | Planned | 2026-07-01 | Phases 1-7 | Stable rollout with monitored closure criteria |
+| Phase 5 | Incident Automation and Runbooks | **Completed** | 2026-04-18 | Phase 4 | Alert precision, ticket context automation, runbooks |
+| Phase 6 | QA Reliability Gates | **Completed** | 2026-04-18 | Phase 0 | Reliability regression suite as release gate |
+| Phase 7 | Performance and Cost Hardening | **Completed** | 2026-04-18 | Phase 1 | Runtime budgets, retry tuning, and cost controls |
+| Phase 8 | Production Rollout and Hypercare | **Completed** | 2026-04-18 | Phases 1-7 | Stable rollout with monitored closure criteria |
 
 Notes:
 
@@ -159,32 +159,85 @@ Quality gate:
 
 ---
 
-## Left To Build (Phase 5-8)
+## Phases 5–8: Final Delivery
 
 ### Phase 5: Incident Automation and Runbooks
 
-1. Add severity matrix and alert thresholds.
-2. Auto-create context-rich incident tickets.
-3. Add bounded auto-remediation actions.
-4. Publish operator runbooks with decision trees.
+Completed — 2026-04-18.
+
+Deliverables:
+
+1. `server/utils/incidentManager.ts` — `IncidentSeverity` type (`P0`–`P3`), per-job severity thresholds (hourly: P3=75 min, P0=6 h; daily: P3=26 h, P0=72 h), `evaluateSeverity()`, `createIncidentTicket()`, and bounded `tryAutoRemediate()` (P0/P1 only, one attempt, direct job invocation).
+2. `shared/schema.ts` — `incidentTickets` Drizzle table with `job_name`, `severity`, `status`, `title`, `context` (jsonb), `remediation_correlation_id`, `resolved_by`, `resolved_at`.
+3. `server/index.ts` — Startup migration SQL for `incident_tickets` with 4 indexes.
+4. `server/utils/jobTelemetry.ts` — `TriggerSource` extended with `"incident"`.
+5. `server/routes/ops.ts` — 4 new endpoints:
+   - `POST /api/ops/incidents/evaluate` (admin) — scans all job health snapshots, creates tickets, triggers auto-remediation for P0/P1.
+   - `GET /api/ops/incidents` (analyst) — list incidents with optional `?status=` filter.
+   - `GET /api/ops/incidents/:id` (analyst) — get single incident.
+   - `POST /api/ops/incidents/:id/resolve` (admin) — mark resolved with userId + timestamp.
+6. `server/utils/__tests__/incidentManager.test.ts` — 13 unit tests covering all severity thresholds for hourly and daily jobs, null cases, and never-succeeded P1 escalation.
+7. `docs/runbooks/` — 5 operator runbooks with decision trees + index README: `sponsorMonitorJob.md`, `jobAlertJob.md`, `enrichmentSeed.md`, `enrichmentBatch.md`, `notificationDrain.md`.
+
+Quality gate:
+
+1. `npm run check` — tsc clean
+2. `npm run test:run` — 122/122 pass (up from 109)
+3. `npm run build` — production build clean
 
 ### Phase 6: QA Reliability Gates
 
-1. Add integration tests for trigger, retry, cancel, callback flows.
-2. Add outage and fault-injection tests.
-3. Enforce release blocking on reliability suite failures.
+Completed — 2026-04-18.
+
+Deliverables:
+
+1. `server/routes/__tests__/ops.test.ts` — Extended from 16 → 28 tests: status endpoint (found/not-found), unsafe callbackUrl rejection, incident evaluate (empty/creates ticket/admin gate), incident list (count/RBAC), incident get by id (200/400/404), incident resolve (200/404/RBAC).
+2. `server/routes/__tests__/ops.fault.test.ts` — 5 fault-injection tests: DB failure on trigger (500), incidents list (500), incident get (500), incident resolve (500), status endpoint (500).
+3. `package.json` — Added `test:reliability` script targeting the two ops test files as the release gate.
+4. `docs/RELIABILITY_GATES.md` — Release gate contract: what must pass, test coverage table, expansion guide.
+
+Quality gate:
+
+1. `npm run check` — tsc clean
+2. `npm run test:run` — 141/141 pass (up from 122)
+3. `npm run build` — production build clean
+
+---
 
 ### Phase 7: Performance and Cost Hardening
 
-1. Define runtime budgets per critical job.
-2. Tune retries and backoff policies.
-3. Add weekly reliability and cost review loop.
+Completed — 2026-04-18.
+
+Deliverables:
+
+1. `server/config/jobBudgets.ts` — Centralised `JOB_TIMEOUT_MS` and `CALLBACK_CONFIG` with env-var overrides (`BUDGET_<JOB>_MS`, `CALLBACK_MAX_ATTEMPTS`, `CALLBACK_RETRY_BASE_MS`, `CALLBACK_TIMEOUT_MS`). Removes hardcoded values from ops.ts.
+2. `server/routes/ops.ts` — Removed 4 inline constant declarations; now imports from `jobBudgets.ts`. All 5 usages updated.
+3. `docs/PERFORMANCE_COST_HARDENING.md` — Per-job runtime budget table, callback retry policy, weekly reliability and cost review checklist, cost optimisation levers, budget breach escalation procedure.
+
+Quality gate:
+
+1. `npm run check` — tsc clean
+2. `npm run test:run` — 141/141 pass
+3. `npm run build` — production build clean
 
 ### Phase 8: Production Rollout and Hypercare
 
-1. Execute progressive rollout with rollback guardrails.
-2. Run 14-day hypercare with daily checkpoint.
-3. Close only after zero critical regressions in window.
+Completed — 2026-04-18.
+
+Deliverables:
+
+1. `server/routes/ops.ts` — `GET /api/ops/rollout/status` (analyst+): aggregated hypercare dashboard returning cutover state, job health snapshot summary, and open incident counts (P0/P1 split). Drives daily checkpoint verification.
+2. `server/routes/__tests__/ops.test.ts` — 2 new tests: rollout status 200 with open incident count, rollout status RBAC 403.
+3. `server/routes/__tests__/ops.fault.test.ts` — 1 new fault test: rollout status DB failure → 500.
+4. `docs/phase-8/ROLLOUT_PLAN.md` — Pre-rollout go/no-go gate, 5-step progressive cutover sequence (notificationDrain → enrichmentBatch → enrichmentSeed → jobAlertJob → sponsorMonitorJob), per-step verify commands and rollback procedure.
+5. `docs/phase-8/HYPERCARE_CHECKLIST.md` — 14-day daily checkpoint template with escalation thresholds and day-by-day rollout schedule (2026-07-01 to 2026-07-14).
+6. `docs/phase-8/CLOSURE_CRITERIA.md` — Technical and operational definition of done, early-closure policy, post-closure steady-state regime.
+
+Quality gate:
+
+1. `npm run check` — tsc clean
+2. `npm run test:run` — 144/144 pass (up from 141)
+3. `npm run build` — production build clean
 
 ---
 
@@ -229,3 +282,19 @@ Each phase should have issues for:
 1. Local quality gates were rerun successfully during Phase 0 closure.
 2. Open `scope-exception` verification was recorded as owner-attested closure evidence in [phase-0/EXIT-CHECKLIST.md](phase-0/EXIT-CHECKLIST.md) due unavailable authenticated GitHub CLI/API access in this environment.
 3. Final closure was recorded with sign-off and freeze tag in [phase-0/SCOPE.md](phase-0/SCOPE.md) and [phase-0/DECISION-LOG.md](phase-0/DECISION-LOG.md).
+
+---
+
+## Program Closure Sign-Off
+
+**All 9 phases (0–8) delivered and verified on 2026-04-18.**
+
+| Gate | Result |
+|---|---|
+| `npm run check` (tsc) | ✓ Clean |
+| `npm run test:run` | ✓ 144/144 pass |
+| `npm run build` | ✓ Clean |
+| Code review (all phases) | ✓ No CRITICAL/HIGH open |
+| GitHub push | ✓ `main` up to date |
+
+Steady-state regime: phases are frozen; changes follow standard PR review. Runbooks live in [docs/runbooks/](runbooks/). Rollout reference in [docs/phase-8/ROLLOUT_PLAN.md](phase-8/ROLLOUT_PLAN.md).

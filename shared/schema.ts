@@ -948,6 +948,33 @@ export const supportTickets = pgTable(
 );
 
 export type SupportTicket = typeof supportTickets.$inferSelect;
+
+// ─── Incident Tickets (Phase 5) ───────────────────────────────────────────────
+export const incidentTickets = pgTable(
+  "incident_tickets",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    jobName: varchar("job_name").notNull(),
+    severity: varchar("severity", { enum: ["P0", "P1", "P2", "P3"] }).notNull(),
+    status: varchar("status", { enum: ["open", "auto-remediated", "resolved"] })
+      .notNull()
+      .default("open"),
+    title: text("title").notNull(),
+    context: jsonb("context").notNull(),
+    remediationCorrelationId: varchar("remediation_correlation_id"),
+    resolvedBy: varchar("resolved_by"),
+    resolvedAt: timestamp("resolved_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_incident_tickets_job").on(table.jobName),
+    index("idx_incident_tickets_severity").on(table.severity),
+    index("idx_incident_tickets_status").on(table.status),
+    index("idx_incident_tickets_created").on(table.createdAt),
+  ],
+);
+
+export type IncidentTicketEntry = typeof incidentTickets.$inferSelect;
 export const insertSupportTicketSchema = createInsertSchema(supportTickets).omit({
   status: true, adminReply: true, repliedAt: true, createdAt: true, userId: true,
 });

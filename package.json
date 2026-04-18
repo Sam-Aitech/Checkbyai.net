@@ -10,6 +10,7 @@
     "check": "tsc",
     "test": "vitest",
     "test:run": "vitest run",
+    "test:reliability": "vitest run server/routes/__tests__/ops.test.ts server/routes/__tests__/ops.fault.test.ts",
     "db:push": "drizzle-kit push",
     "db:migrate": "drizzle-kit migrate",
     "setup:binaries": "bash scripts/setup-binaries.sh",
