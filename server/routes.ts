@@ -12,6 +12,7 @@ import { registerStatsRoutes } from "./routes/stats";
 import { registerAdminRoutes } from "./routes/admin";
 import { registerSupportRoutes } from "./routes/support";
 import { registerEnrichmentRoutes } from "./routes/enrichment";
+import { registerOpsRoutes } from "./routes/ops";
 import { registerSponsorPageRoutes } from "./routes/sponsorPages";
 import { rebuildSponsorIndex } from "./utils/sponsorSearch";
 import { startSponsorMonitorCron, checkAndTriggerIfNeeded } from "./utils/sponsorMonitorJob";
@@ -45,6 +46,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerNotificationRoutes(app);
   registerStatsRoutes(app);
   registerAdminRoutes(app);
+  registerOpsRoutes(app);
   registerSupportRoutes(app);
   registerEnrichmentRoutes(app);
 

@@ -13,7 +13,7 @@ import { resolveTier } from "./tierConfig";
 import { getOrFetchEnrichment } from "./companyEnricher";
 import { scrapeJobsForCompany, type ScrapedJob } from "./jobScraper";
 import { sql } from "drizzle-orm";
-import { startJobRun, finishJobRun } from "./jobTelemetry";
+import { startJobRun, finishJobRun, type TriggerSource } from "./jobTelemetry";
 
 const ADVISORY_LOCK_KEY = 7483921; // Distinct from sponsor monitor (7483920)
 const PRO_BOARDS = ["company", "linkedin", "indeed", "cvlibrary", "google"];
@@ -116,14 +116,15 @@ async function sendJobDigestEmail(
 
 // ─── Core job ─────────────────────────────────────────────────────────────────
 
-export async function runJobAlertJob(): Promise<void> {
+export async function runJobAlertJob(orchestration?: { correlationId?: string; triggerSource?: TriggerSource }): Promise<void> {
   const lockAcquired = await tryAcquireJobLock();
   if (!lockAcquired) {
     console.log("[JobAlertJob] Another instance is running. Skipping.");
     return;
   }
 
-  const telemetry = startJobRun("jobAlertJob", "cron", "inline");
+  const triggerSource = orchestration?.triggerSource ?? "cron";
+  const telemetry = startJobRun("jobAlertJob", triggerSource, "inline", orchestration?.correlationId);
   let outcome: "success" | "failed" = "success";
   let failureReason: string | null = null;
   try {
@@ -273,7 +274,7 @@ export async function runJobAlertJob(): Promise<void> {
     failureReason = err instanceof Error ? err.message : String(err);
   } finally {
     await releaseJobLock();
-    finishJobRun({ ...telemetry, jobName: "jobAlertJob", triggerSource: "cron", runMode: "inline", result: outcome, failureReason });
+    finishJobRun({ ...telemetry, jobName: "jobAlertJob", triggerSource, runMode: "inline", result: outcome, failureReason });
   }
 }
 

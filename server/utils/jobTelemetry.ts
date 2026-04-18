@@ -84,8 +84,9 @@ export function startJobRun(
   jobName: string,
   triggerSource: TriggerSource,
   runMode: RunMode,
+  correlationIdOverride?: string,
 ): { correlationId: string; startedAt: string } {
-  const correlationId = generateCorrelationId();
+  const correlationId = correlationIdOverride ?? generateCorrelationId();
   const startedAt = new Date().toISOString();
   registry.set(jobName, { ...getState(jobName), running: true, lastRunMode: runMode });
   log.info({ correlationId, jobName, triggerSource, runMode, startedAt, event: "started" });

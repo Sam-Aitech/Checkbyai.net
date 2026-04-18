@@ -350,7 +350,11 @@ async function saveDiffResult(runDate: string, diff: CsvDiffResult): Promise<voi
   }
 }
 
-export async function runSponsorMonitorJob(source: string = "cron", notifyOnFailure = false): Promise<{
+export async function runSponsorMonitorJob(
+  source: string = "cron",
+  notifyOnFailure = false,
+  orchestration?: { correlationId?: string; triggerSource?: TriggerSource },
+): Promise<{
   success: boolean;
   recordsProcessed: number;
   changes: Record<string, number>;
@@ -380,8 +384,8 @@ export async function runSponsorMonitorJob(source: string = "cron", notifyOnFail
     return { ...result, error: msg };
   }
 
-  const triggerSource: TriggerSource = source === "cron" ? "cron" : source === "queue" ? "queue" : "manual";
-  const telemetry = startJobRun("sponsorMonitorJob", triggerSource, "inline");
+  const triggerSource: TriggerSource = orchestration?.triggerSource ?? (source === "cron" ? "cron" : source === "queue" ? "queue" : "manual");
+  const telemetry = startJobRun("sponsorMonitorJob", triggerSource, "inline", orchestration?.correlationId);
   const startTime = Date.now();
   const JOB_TIMEOUT_MS = 25 * 60 * 1000; // 25-minute hard ceiling
   let watchdogTimer: ReturnType<typeof setTimeout> | null = null;

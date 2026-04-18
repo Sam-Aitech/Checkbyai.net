@@ -38,3 +38,14 @@ export const enrichLimiter = rateLimit({
   keyGenerator: (req: any) => `enrich:${req.user?.id ?? req.ip}:${req.params?.fingerprint ?? ""}`,
   skipSuccessfulRequests: false,
 });
+
+// Sensitive control-plane trigger endpoint limiter.
+export const opsTriggerLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many orchestration trigger requests. Please try again later." },
+  keyGenerator: (req: any) => `ops-trigger:${req.user?.id ?? req.ip}`,
+  skipSuccessfulRequests: false,
+});

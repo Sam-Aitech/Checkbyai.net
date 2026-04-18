@@ -28,7 +28,7 @@ import { normalizeName } from "../utils/sponsorListFetcher";
 import { getTierConfig } from "../utils/tierConfig";
 import { getAppUrl } from "../utils/appUrl";
 import { logger } from "../utils/logger";
-import { startJobRun, finishJobRun } from "../utils/jobTelemetry";
+import { startJobRun, finishJobRun, type TriggerSource } from "../utils/jobTelemetry";
 
 const log = logger.child({ module: "NotificationEngine" });
 
@@ -365,9 +365,10 @@ export async function notifyUsersOfEvent(change: SponsorChange): Promise<void> {
  * New sends write to notif_log; this function is transitional and will be retired
  * once the notif_engine_log queue is empty. Called hourly by the cron scheduler.
  */
-export async function processQueuedEngineEvents(): Promise<void> {
+export async function processQueuedEngineEvents(orchestration?: { correlationId?: string; triggerSource?: TriggerSource }): Promise<void> {
   const now = new Date();
-  const telemetry = startJobRun("notificationDrain", "cron", "inline");
+  const triggerSource = orchestration?.triggerSource ?? "cron";
+  const telemetry = startJobRun("notificationDrain", triggerSource, "inline", orchestration?.correlationId);
   let outcome: "success" | "failed" = "success";
   let failureReason: string | null = null;
 
@@ -473,6 +474,6 @@ export async function processQueuedEngineEvents(): Promise<void> {
     outcome = "failed";
     failureReason = err instanceof Error ? err.message : String(err);
   } finally {
-    finishJobRun({ ...telemetry, jobName: "notificationDrain", triggerSource: "cron", runMode: "inline", result: outcome, failureReason });
+    finishJobRun({ ...telemetry, jobName: "notificationDrain", triggerSource, runMode: "inline", result: outcome, failureReason });
   }
 }

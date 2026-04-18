@@ -506,6 +506,34 @@ export const monitorJobRuns = pgTable("monitor_job_runs", {
   completedAt: timestamp("completed_at"),
 });
 
+// Phase 2: secure orchestration audit trail
+// Links a trigger request to an execution correlationId and completion state.
+export const jobTriggerAudit = pgTable(
+  "job_trigger_audit",
+  {
+    triggerId: uuid("trigger_id").primaryKey().defaultRandom(),
+    correlationId: varchar("correlation_id", { length: 64 }).notNull(),
+    jobName: varchar("job_name", { length: 100 }).notNull(),
+    idempotencyKey: varchar("idempotency_key", { length: 100 }).notNull(),
+    triggeredBy: varchar("triggered_by", { length: 255 }).notNull().references(() => users.id),
+    triggerSource: varchar("trigger_source", { length: 20 }).notNull().default("manual"),
+    callbackUrl: text("callback_url"),
+    reason: text("reason"),
+    status: varchar("status", { length: 20 }).notNull().default("accepted"),
+    failureReason: text("failure_reason"),
+    triggeredAt: timestamp("triggered_at").defaultNow().notNull(),
+    completedAt: timestamp("completed_at"),
+    durationMs: integer("duration_ms"),
+  },
+  (table) => [
+    uniqueIndex("idx_job_trigger_audit_unique_idempotency").on(table.jobName, table.idempotencyKey),
+    index("idx_job_trigger_audit_job_name").on(table.jobName, table.triggeredAt),
+    index("idx_job_trigger_audit_triggered_by").on(table.triggeredBy, table.triggeredAt),
+    index("idx_job_trigger_audit_idempotency").on(table.jobName, table.idempotencyKey),
+    index("idx_job_trigger_audit_status").on(table.status),
+  ]
+);
+
 // ─── Phase C: Company Enrichment & Job Alerts ────────────────────────────────
 
 // Caches Companies House data scraped for each watched sponsor (7 day TTL)
@@ -726,6 +754,7 @@ export type NotifLogEntry = typeof notifLog.$inferSelect;
 export type CsvArchiveEntry = typeof csvArchive.$inferSelect;
 export type DiffResultEntry = typeof diffResults.$inferSelect;
 export type SubscriptionAuditLogEntry = typeof subscriptionAuditLog.$inferSelect;
+export type JobTriggerAuditEntry = typeof jobTriggerAudit.$inferSelect;
 export type SponsorLicenceTimelineEntry = typeof sponsorLicenceTimeline.$inferSelect;
 export type SponsorLicenceTimelineInsert = typeof sponsorLicenceTimeline.$inferInsert;
 export type EnrichmentQueueEntry = typeof enrichmentQueue.$inferSelect;
