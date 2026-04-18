@@ -2,7 +2,7 @@ import crypto from "crypto";
 import type { Express } from "express";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { db } from "../db";
-import { jobTriggerAudit } from "@shared/schema";
+import { jobTriggerAudit, shadowParityReports, shadowRunResults } from "@shared/schema";
 import { requireRole } from "../middleware/roleGuard";
 import { opsTriggerLimiter } from "../middleware/rateLimiter";
 import { isSafeCallbackUrl, signPayload } from "../utils/callbackSigner";
@@ -13,6 +13,7 @@ import { runJobAlertJob } from "../utils/jobAlertJob";
 import { seedEnrichmentQueue, runEnrichmentBatch } from "../utils/enrichmentWorker";
 import { processQueuedEngineEvents } from "../services/notificationEngine";
 import { logger } from "../utils/logger";
+import { computeParityReport, getLatestProductionBaseline, runShadowSnapshot } from "../utils/shadowMode";
 
 const log = logger.child({ module: "OpsRoutes" });
 
@@ -393,6 +394,189 @@ export function registerOpsRoutes(app: Express): void {
     } catch (err) {
       log.error({ err }, "Failed to trigger orchestration job");
       return res.status(500).json({ message: "Failed to trigger orchestration job" });
+    }
+  });
+
+  app.post("/api/ops/jobs/:jobName/shadow", requireRole("admin"), opsTriggerLimiter, async (req: any, res) => {
+    const jobNameRaw = String(req.params.jobName ?? "").trim();
+    if (!isJobName(jobNameRaw)) {
+      return res.status(400).json({ message: "Unsupported jobName" });
+    }
+    const jobName: JobName = jobNameRaw;
+
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const correlationId = generateCorrelationId();
+    const telemetry = startJobRun(jobName, "manual", "shadow", correlationId);
+    const startedAt = Date.now();
+
+    try {
+      const shadowSnapshot = await runShadowSnapshot(jobName);
+      const production = await getLatestProductionBaseline(jobName);
+      const parity = computeParityReport({ shadow: shadowSnapshot, production });
+
+      const shadowInsert = await db
+        .insert(shadowRunResults)
+        .values({
+          correlationId,
+          jobName,
+          runMode: "shadow",
+          triggerSource: "manual",
+          triggeredBy: String(userId),
+          snapshotJson: {
+            ...shadowSnapshot,
+            productionCorrelationId: production?.correlationId ?? null,
+          },
+          result: shadowSnapshot.result,
+          durationMs: Date.now() - startedAt,
+          startedAt: new Date(telemetry.startedAt),
+          completedAt: new Date(),
+        })
+        .returning({ id: shadowRunResults.id });
+
+      const shadowRunId = shadowInsert[0]?.id;
+      if (!shadowRunId) {
+        throw new Error("Failed to persist shadow run result");
+      }
+
+      const parityInsert = await db
+        .insert(shadowParityReports)
+        .values({
+          shadowRunId,
+          productionCorrelationId: production?.correlationId ?? null,
+          jobName,
+          parityScore: parity.parityScore.toFixed(4),
+          outcomeMatch: parity.outcomeMatch,
+          durationDriftMs: parity.durationDriftMs,
+          recordsDrift: parity.recordsDrift,
+          changeDriftJson: parity.changeDriftJson,
+          driftSummary: parity.driftSummary,
+        })
+        .returning({ id: shadowParityReports.id });
+
+      finishJobRun({
+        ...telemetry,
+        jobName,
+        triggerSource: "manual",
+        runMode: "shadow",
+        result: "success",
+      });
+
+      return res.status(202).json({
+        status: "accepted",
+        correlationId,
+        jobName,
+        runMode: "shadow",
+        shadowRunId,
+        parityReportId: parityInsert[0]?.id ?? null,
+        parityScore: parity.parityScore,
+      });
+    } catch (err) {
+      const failureReason = err instanceof Error ? err.message : String(err);
+      finishJobRun({
+        ...telemetry,
+        jobName,
+        triggerSource: "manual",
+        runMode: "shadow",
+        result: "failed",
+        failureReason,
+      });
+      log.error({ err, correlationId, jobName }, "Failed to execute shadow run");
+      return res.status(500).json({ message: "Failed to execute shadow run" });
+    }
+  });
+
+  app.get("/api/ops/shadow-runs", requireRole("analyst"), async (req, res) => {
+    try {
+      const jobName = req.query.jobName ? String(req.query.jobName).trim() : null;
+      const requestedLimit = Number(req.query.limit ?? 20);
+      const limit = Number.isFinite(requestedLimit)
+        ? Math.min(Math.max(Math.floor(requestedLimit), 1), 200)
+        : 20;
+
+      const rows = jobName
+        ? await db
+            .select()
+            .from(shadowRunResults)
+            .where(eq(shadowRunResults.jobName, jobName))
+            .orderBy(desc(shadowRunResults.createdAt))
+            .limit(limit)
+        : await db
+            .select()
+            .from(shadowRunResults)
+            .orderBy(desc(shadowRunResults.createdAt))
+            .limit(limit);
+
+      return res.json({
+        count: rows.length,
+        items: rows,
+      });
+    } catch (err) {
+      log.error({ err }, "Failed to list shadow runs");
+      return res.status(500).json({ message: "Failed to list shadow runs" });
+    }
+  });
+
+  app.get("/api/ops/parity-reports", requireRole("analyst"), async (req, res) => {
+    try {
+      const jobName = req.query.jobName ? String(req.query.jobName).trim() : null;
+      const minScoreRaw = req.query.minScore != null ? Number(req.query.minScore) : null;
+      const limitRaw = Number(req.query.limit ?? 20);
+      const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(Math.floor(limitRaw), 1), 200) : 20;
+
+      const rows = await db
+        .select()
+        .from(shadowParityReports)
+        .orderBy(desc(shadowParityReports.createdAt))
+        .limit(limit);
+
+      const filtered = rows.filter((row) => {
+        if (jobName && row.jobName !== jobName) {
+          return false;
+        }
+
+        if (minScoreRaw == null || !Number.isFinite(minScoreRaw)) {
+          return true;
+        }
+
+        const parityScore = Number(row.parityScore);
+        return Number.isFinite(parityScore) ? parityScore >= minScoreRaw : false;
+      });
+
+      return res.json({
+        count: filtered.length,
+        items: filtered,
+      });
+    } catch (err) {
+      log.error({ err }, "Failed to list parity reports");
+      return res.status(500).json({ message: "Failed to list parity reports" });
+    }
+  });
+
+  app.get("/api/ops/parity-reports/:id", requireRole("analyst"), async (req, res) => {
+    try {
+      const id = Number(req.params.id ?? NaN);
+      if (!Number.isFinite(id) || id <= 0) {
+        return res.status(400).json({ message: "Invalid parity report id" });
+      }
+
+      const rows = await db
+        .select()
+        .from(shadowParityReports)
+        .where(eq(shadowParityReports.id, id))
+        .limit(1);
+
+      if (rows.length === 0) {
+        return res.status(404).json({ message: "Parity report not found" });
+      }
+
+      return res.json(rows[0]);
+    } catch (err) {
+      log.error({ err }, "Failed to read parity report");
+      return res.status(500).json({ message: "Failed to read parity report" });
     }
   });
 

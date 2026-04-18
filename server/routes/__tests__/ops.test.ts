@@ -20,8 +20,11 @@ vi.mock("../../db", () => {
 
   const insert = vi.fn(() => {
     const chain: any = {
-      values: async (payload: any) => {
+      values: (payload: any) => {
         dbState.inserted.push(payload);
+        return {
+          returning: async () => [{ id: dbState.inserted.length }],
+        };
       },
     };
     return chain;
@@ -100,6 +103,27 @@ vi.mock("../../utils/enrichmentWorker", () => ({
   runEnrichmentBatch: async () => ({ processed: 0, errors: 0 }),
 }));
 vi.mock("../../services/notificationEngine", () => ({ processQueuedEngineEvents: async () => undefined }));
+vi.mock("../../utils/shadowMode", () => ({
+  runShadowSnapshot: async (jobName: string) => ({
+    jobName,
+    result: "success",
+    metrics: { recordsProcessed: 10, durationMs: 1000 },
+    notes: ["test"],
+  }),
+  getLatestProductionBaseline: async () => ({
+    correlationId: "corr-prod-1",
+    result: "success",
+    durationMs: 1200,
+  }),
+  computeParityReport: () => ({
+    parityScore: 0.95,
+    outcomeMatch: true,
+    durationDriftMs: 200,
+    recordsDrift: 0,
+    changeDriftJson: { test: true },
+    driftSummary: "ok",
+  }),
+}));
 
 import { registerOpsRoutes } from "../ops";
 
@@ -208,6 +232,36 @@ describe("ops routes", () => {
     const { server, baseUrl } = await startTestServer();
     try {
       const response = await fetch(`${baseUrl}/api/ops/jobs/jobAlertJob/status/not-a-uuid`, {
+        headers: { "x-role": "analyst" },
+      });
+      expect(response.status).toBe(400);
+    } finally {
+      server.close();
+    }
+  });
+
+  it("accepts a shadow run trigger for admin users", async () => {
+    const { server, baseUrl } = await startTestServer();
+    try {
+      const response = await fetch(`${baseUrl}/api/ops/jobs/jobAlertJob/shadow`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-role": "admin", "x-user-id": "u-3" },
+      });
+
+      expect(response.status).toBe(202);
+      const json = await response.json();
+      expect(json.status).toBe("accepted");
+      expect(json.runMode).toBe("shadow");
+      expect(json.parityScore).toBe(0.95);
+    } finally {
+      server.close();
+    }
+  });
+
+  it("rejects invalid parity report id", async () => {
+    const { server, baseUrl } = await startTestServer();
+    try {
+      const response = await fetch(`${baseUrl}/api/ops/parity-reports/not-a-number`, {
         headers: { "x-role": "analyst" },
       });
       expect(response.status).toBe(400);

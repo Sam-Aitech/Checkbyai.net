@@ -537,6 +537,52 @@ export const jobTriggerAudit = pgTable(
   ]
 );
 
+// Phase 3: shadow-mode run capture (read-only execution snapshots)
+export const shadowRunResults = pgTable(
+  "shadow_run_results",
+  {
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+    correlationId: varchar("correlation_id", { length: 64 }).notNull(),
+    jobName: varchar("job_name", { length: 100 }).notNull(),
+    runMode: varchar("run_mode", { length: 20 }).notNull().default("shadow"),
+    triggerSource: varchar("trigger_source", { length: 20 }).notNull().default("manual"),
+    triggeredBy: varchar("triggered_by", { length: 255 }).notNull().references(() => users.id),
+    snapshotJson: jsonb("snapshot_json").$type<Record<string, unknown>>().notNull().default({}),
+    result: varchar("result", { length: 20 }).notNull(),
+    failureReason: text("failure_reason"),
+    durationMs: integer("duration_ms"),
+    startedAt: timestamp("started_at").notNull(),
+    completedAt: timestamp("completed_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_shadow_run_results_job_created").on(table.jobName, table.createdAt),
+    index("idx_shadow_run_results_correlation").on(table.correlationId),
+  ]
+);
+
+// Phase 3: parity reports comparing shadow snapshots to latest production runs
+export const shadowParityReports = pgTable(
+  "shadow_parity_reports",
+  {
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+    shadowRunId: integer("shadow_run_id").notNull().references(() => shadowRunResults.id),
+    productionCorrelationId: varchar("production_correlation_id", { length: 64 }),
+    jobName: varchar("job_name", { length: 100 }).notNull(),
+    parityScore: numeric("parity_score", { precision: 5, scale: 4 }).notNull(),
+    outcomeMatch: boolean("outcome_match").notNull(),
+    durationDriftMs: integer("duration_drift_ms"),
+    recordsDrift: integer("records_drift"),
+    changeDriftJson: jsonb("change_drift_json").$type<Record<string, unknown>>().default({}),
+    driftSummary: text("drift_summary"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_shadow_parity_reports_job_created").on(table.jobName, table.createdAt),
+    index("idx_shadow_parity_reports_shadow_run").on(table.shadowRunId),
+  ]
+);
+
 // ─── Phase C: Company Enrichment & Job Alerts ────────────────────────────────
 
 // Caches Companies House data scraped for each watched sponsor (7 day TTL)
@@ -758,6 +804,8 @@ export type CsvArchiveEntry = typeof csvArchive.$inferSelect;
 export type DiffResultEntry = typeof diffResults.$inferSelect;
 export type SubscriptionAuditLogEntry = typeof subscriptionAuditLog.$inferSelect;
 export type JobTriggerAuditEntry = typeof jobTriggerAudit.$inferSelect;
+export type ShadowRunResultEntry = typeof shadowRunResults.$inferSelect;
+export type ShadowParityReportEntry = typeof shadowParityReports.$inferSelect;
 export type SponsorLicenceTimelineEntry = typeof sponsorLicenceTimeline.$inferSelect;
 export type SponsorLicenceTimelineInsert = typeof sponsorLicenceTimeline.$inferInsert;
 export type EnrichmentQueueEntry = typeof enrichmentQueue.$inferSelect;

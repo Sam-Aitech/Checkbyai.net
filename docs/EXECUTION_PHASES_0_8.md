@@ -14,7 +14,7 @@ Last Updated: 2026-04-18
 | Phase 0 | Alignment and Scope Freeze | Completed | 2026-04-18 | None | Governance package created, approved, and frozen |
 | Phase 1 | Control Plane and Observability Foundation | **Completed** | 2026-04-19 | Phase 0 | RBAC baseline, audit trail, telemetry and health contracts |
 | Phase 2 | Secure Orchestration Contracts | Completed | 2026-04-18 | Phase 1 | Authenticated, idempotent orchestration boundaries |
-| Phase 3 | Shadow Mode Validation | Planned | 2026-05-20 | Phase 2 | Side-by-side run parity with drift reports |
+| Phase 3 | Shadow Mode Validation | **Completed** | 2026-04-18 | Phase 2 | Side-by-side run parity with drift reports |
 | Phase 4 | Controlled Cutover | Planned | 2026-06-03 | Phase 3 | Job-by-job scheduler ownership migration |
 | Phase 5 | Incident Automation and Runbooks | Planned | 2026-06-17 | Phase 4 | Alert precision, ticket context automation, runbooks |
 | Phase 6 | QA Reliability Gates | Planned (Parallel) | 2026-04-22 | Phase 0 | Reliability regression suite as release gate |
@@ -101,13 +101,34 @@ Closure evidence:
 
 ---
 
-## Left To Build (Phase 3-8)
-
 ### Phase 3: Shadow Mode Validation
 
-1. Run parallel orchestration checks without full cutover.
-2. Compare parity by run outcome, latency, and retries.
-3. Produce drift report and remediation list.
+Completed — quality gates all green.
+
+Deliverables:
+
+1. `shared/schema.ts` — Added `shadowRunResults` and `shadowParityReports` Drizzle tables with full index definitions and type exports (`ShadowRunResultEntry`, `ShadowParityReportEntry`).
+2. `server/index.ts` — Startup migration SQL for both shadow tables with `IF NOT EXISTS` guards for safe rolling deploy.
+3. `server/utils/jobTelemetry.ts` — Extended `RunMode` union to include `"shadow"`.
+4. `server/utils/shadowMode.ts` — Read-only shadow execution utility: per-job `runShadowSnapshot`, `getLatestProductionBaseline`, and `computeParityReport` with deterministic parity scoring.
+5. `server/routes/ops.ts` — Three new endpoints: `POST /api/ops/jobs/:jobName/shadow` (admin), `GET /api/ops/shadow-runs` (analyst), `GET /api/ops/parity-reports` (analyst), `GET /api/ops/parity-reports/:id` (analyst).
+6. `server/routes/__tests__/ops.test.ts` — 2 new tests (shadow trigger accepted, invalid parity ID rejected); extended DB insert mock with `returning` support.
+7. `server/utils/__tests__/shadowMode.test.ts` — 2 unit tests for `computeParityReport` (null baseline, outcome and drift rewarding).
+
+Quality gate:
+
+1. `npm run check` — tsc clean
+2. `npm run test:run` — 102/102 pass (up from 98)
+3. `npm run build` — production build clean
+
+Critical bugs caught by code reviewer and fixed:
+
+- SQL column `recorded_at` corrected to `detected_at` in sponsor changes query
+- SQL filter `notification_type` corrected to `event_type` in notif_log query
+
+---
+
+## Left To Build (Phase 4-8)
 
 ### Phase 4: Controlled Cutover
 

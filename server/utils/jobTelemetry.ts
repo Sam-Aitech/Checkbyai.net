@@ -7,7 +7,7 @@ const log = logger.child({ module: "JobTelemetry" });
 
 export type JobResult = "success" | "failed" | "skipped" | "retried";
 export type TriggerSource = "cron" | "manual" | "webhook" | "queue";
-export type RunMode = "inline" | "queue" | "worker";
+export type RunMode = "inline" | "queue" | "worker" | "shadow";
 
 /** Phase 1 job lifecycle event contract.  All fields required. */
 export interface JobLifecycleEvent {
