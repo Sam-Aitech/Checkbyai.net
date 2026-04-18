@@ -3,7 +3,7 @@
 
 Owner: CTO / Tech Lead
 Status: Active Program Plan
-Last Updated: 2026-04-18
+Last Updated: 2026-04-18 (Phase 4 completed)
 
 ---
 
@@ -15,7 +15,7 @@ Last Updated: 2026-04-18
 | Phase 1 | Control Plane and Observability Foundation | **Completed** | 2026-04-19 | Phase 0 | RBAC baseline, audit trail, telemetry and health contracts |
 | Phase 2 | Secure Orchestration Contracts | Completed | 2026-04-18 | Phase 1 | Authenticated, idempotent orchestration boundaries |
 | Phase 3 | Shadow Mode Validation | **Completed** | 2026-04-18 | Phase 2 | Side-by-side run parity with drift reports |
-| Phase 4 | Controlled Cutover | Planned | 2026-06-03 | Phase 3 | Job-by-job scheduler ownership migration |
+| Phase 4 | Controlled Cutover | **Completed** | 2026-04-18 | Phase 3 | Job-by-job scheduler ownership migration |
 | Phase 5 | Incident Automation and Runbooks | Planned | 2026-06-17 | Phase 4 | Alert precision, ticket context automation, runbooks |
 | Phase 6 | QA Reliability Gates | Planned (Parallel) | 2026-04-22 | Phase 0 | Reliability regression suite as release gate |
 | Phase 7 | Performance and Cost Hardening | Planned (Parallel) | 2026-05-20 | Phase 1 | Runtime budgets, retry tuning, and cost controls |
@@ -128,15 +128,38 @@ Critical bugs caught by code reviewer and fixed:
 
 ---
 
-## Left To Build (Phase 4-8)
-
 ### Phase 4: Controlled Cutover
 
-1. Cut over delayed notification drain.
-2. Cut over enrichment batch.
-3. Cut over job alerts.
-4. Cut over sponsor monitor last.
-5. Preserve one-command rollback path for each job.
+Completed — current HEAD on 2026-04-18.
+
+Deliverables:
+
+1. `server/utils/scheduler.ts` — Central scheduler with per-job `CUTOVER_*` env flags and `getCutoverStatusSnapshot()`. Registers crons for any job with its flag set to `true`. Rollback = set flag to `false`; inline cron resumes on next restart.
+2. `server/utils/enrichmentWorker.ts` — `startEnrichmentCron()` guarded by `CUTOVER_ENRICHMENT_SEED` and `CUTOVER_ENRICHMENT_BATCH`. Inline cron suppressed when flag is set.
+3. `server/utils/jobAlertJob.ts` — `startJobAlertScheduler()` guarded by `CUTOVER_JOB_ALERT`. Early-returns when flag is set.
+4. `server/utils/sponsorMonitorJob.ts` — `startSponsorMonitorCron()` guarded by `CUTOVER_SPONSOR_MONITOR` (daily run) and `CUTOVER_NOTIFICATION_DRAIN` (hourly drain). Each suppressed independently.
+5. `server/routes/ops.ts` — `GET /api/ops/scheduler/status` (analyst+) returns per-job cutover state, owner, and cron schedule.
+6. `server/routes.ts` — Boots `startCentralScheduler()` before inline starters so cutover flags are evaluated in the right order.
+7. `server/utils/__tests__/scheduler.test.ts` — 7 unit tests covering: default inline-cron ownership, `true`/`1` truthy flags, `false` non-cutover, all-jobs cutover, schedule correctness, partial cutover isolation.
+
+Cutover order (lowest → highest blast radius):
+- `CUTOVER_NOTIFICATION_DRAIN` (hourly)
+- `CUTOVER_ENRICHMENT_BATCH` (hourly :15)
+- `CUTOVER_ENRICHMENT_SEED` (daily 02:00 UTC)
+- `CUTOVER_JOB_ALERT` (daily 02:00 UTC Mon-Fri)
+- `CUTOVER_SPONSOR_MONITOR` (daily 00:30 UTC Mon-Fri — cut last)
+
+Rollback for any job: set its `CUTOVER_*` env var to `false` and redeploy.
+
+Quality gate:
+
+1. `npm run check` — tsc clean
+2. `npm run test:run` — 109/109 pass (up from 102)
+3. `npm run build` — production build clean
+
+---
+
+## Left To Build (Phase 5-8)
 
 ### Phase 5: Incident Automation and Runbooks
 

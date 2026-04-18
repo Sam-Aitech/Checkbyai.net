@@ -14,6 +14,7 @@ import { seedEnrichmentQueue, runEnrichmentBatch } from "../utils/enrichmentWork
 import { processQueuedEngineEvents } from "../services/notificationEngine";
 import { logger } from "../utils/logger";
 import { computeParityReport, getLatestProductionBaseline, runShadowSnapshot } from "../utils/shadowMode";
+import { getCutoverStatusSnapshot } from "../utils/scheduler";
 
 const log = logger.child({ module: "OpsRoutes" });
 
@@ -619,4 +620,29 @@ export function registerOpsRoutes(app: Express): void {
       return res.status(500).json({ message: "Failed to read orchestration status" });
     }
   });
+
+  // ── Phase 4: Scheduler cutover status ─────────────────────────────────────
+  // GET /api/ops/scheduler/status — analyst+
+  // Returns per-job cutover state: which jobs are owned by the central
+  // scheduler vs still running from their inline cron.
+  app.get(
+    "/api/ops/scheduler/status",
+    requireRole("analyst"),
+    (_req, res) => {
+      try {
+        const jobs = getCutoverStatusSnapshot();
+        const cutoverCount = jobs.filter((j) => j.cutover).length;
+        return res.json({
+          phase: "phase-4-controlled-cutover",
+          totalJobs: jobs.length,
+          cutoverCount,
+          remainingCount: jobs.length - cutoverCount,
+          jobs,
+        });
+      } catch (err) {
+        log.error({ err }, "Failed to read scheduler cutover status");
+        return res.status(500).json({ message: "Failed to read scheduler cutover status" });
+      }
+    },
+  );
 }

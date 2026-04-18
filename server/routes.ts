@@ -18,8 +18,12 @@ import { rebuildSponsorIndex } from "./utils/sponsorSearch";
 import { startSponsorMonitorCron, checkAndTriggerIfNeeded } from "./utils/sponsorMonitorJob";
 import { startJobAlertScheduler } from "./utils/jobAlertJob";
 import { startEnrichmentCron } from "./utils/enrichmentWorker";
+import { startCentralScheduler } from "./utils/scheduler";
 
-// Start background schedulers
+// Start background schedulers.
+// Central scheduler must run first so it can claim any cut-over jobs
+// before the inline cron starters check their CUTOVER_* flags.
+startCentralScheduler();
 startJobAlertScheduler();
 startEnrichmentCron();
 

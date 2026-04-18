@@ -464,47 +464,58 @@ async function setItemBackoff(
 // ── Cron scheduler ────────────────────────────────────────────────────────────
 
 export function startEnrichmentCron(): void {
-  // Nightly queue seed — 02:00 UTC
-  cron.schedule("0 2 * * *", async () => {
-    try {
-      log.info("Nightly enrichment queue seed starting...");
-      const telemetry = startJobRun("enrichmentSeed", "cron", "inline");
-      let outcome: "success" | "failed" = "success";
-      let failureReason: string | null = null;
-      try {
-        const { inserted } = await seedEnrichmentQueue();
-        log.info({ inserted }, "Nightly enrichment queue seed complete.");
-      } catch (err) {
-        outcome = "failed";
-        failureReason = err instanceof Error ? err.message : String(err);
-        log.error({ err }, "Enrichment queue seed failed.");
-      } finally {
-        finishJobRun({ ...telemetry, jobName: "enrichmentSeed", triggerSource: "cron", runMode: "inline", result: outcome, failureReason });
-      }
-    } catch (err) {
-      log.error({ err }, "Enrichment cron outer error.");
-    }
-  });
+  const seedCutover = (process.env.CUTOVER_ENRICHMENT_SEED ?? "false").trim().toLowerCase();
+  const batchCutover = (process.env.CUTOVER_ENRICHMENT_BATCH ?? "false").trim().toLowerCase();
 
-  // Hourly batch processor — :15 past each hour
-  cron.schedule("15 * * * *", async () => {
-    try {
-      const telemetry = startJobRun("enrichmentBatch", "cron", "inline");
-      let outcome: "success" | "failed" = "success";
-      let failureReason: string | null = null;
+  if (seedCutover !== "true" && seedCutover !== "1") {
+    // Nightly queue seed — 02:00 UTC
+    cron.schedule("0 2 * * *", async () => {
       try {
-        await runEnrichmentBatch();
+        log.info("Nightly enrichment queue seed starting...");
+        const telemetry = startJobRun("enrichmentSeed", "cron", "inline");
+        let outcome: "success" | "failed" = "success";
+        let failureReason: string | null = null;
+        try {
+          const { inserted } = await seedEnrichmentQueue();
+          log.info({ inserted }, "Nightly enrichment queue seed complete.");
+        } catch (err) {
+          outcome = "failed";
+          failureReason = err instanceof Error ? err.message : String(err);
+          log.error({ err }, "Enrichment queue seed failed.");
+        } finally {
+          finishJobRun({ ...telemetry, jobName: "enrichmentSeed", triggerSource: "cron", runMode: "inline", result: outcome, failureReason });
+        }
       } catch (err) {
-        outcome = "failed";
-        failureReason = err instanceof Error ? err.message : String(err);
-        log.error({ err }, "Enrichment batch run failed.");
-      } finally {
-        finishJobRun({ ...telemetry, jobName: "enrichmentBatch", triggerSource: "cron", runMode: "inline", result: outcome, failureReason });
+        log.error({ err }, "Enrichment cron outer error.");
       }
-    } catch (err) {
-      log.error({ err }, "Enrichment cron outer error.");
-    }
-  });
+    });
+    log.info("Enrichment seed inline cron registered (CUTOVER_ENRICHMENT_SEED not set).");
+  } else {
+    log.info("Enrichment seed inline cron suppressed — owned by central scheduler.");
+  }
 
-  log.info("Enrichment cron scheduled (seed: 02:00 UTC daily, batch: :15 every hour).");
+  if (batchCutover !== "true" && batchCutover !== "1") {
+    // Hourly batch processor — :15 past each hour
+    cron.schedule("15 * * * *", async () => {
+      try {
+        const telemetry = startJobRun("enrichmentBatch", "cron", "inline");
+        let outcome: "success" | "failed" = "success";
+        let failureReason: string | null = null;
+        try {
+          await runEnrichmentBatch();
+        } catch (err) {
+          outcome = "failed";
+          failureReason = err instanceof Error ? err.message : String(err);
+          log.error({ err }, "Enrichment batch run failed.");
+        } finally {
+          finishJobRun({ ...telemetry, jobName: "enrichmentBatch", triggerSource: "cron", runMode: "inline", result: outcome, failureReason });
+        }
+      } catch (err) {
+        log.error({ err }, "Enrichment cron outer error.");
+      }
+    });
+    log.info("Enrichment batch inline cron registered (CUTOVER_ENRICHMENT_BATCH not set).");
+  } else {
+    log.info("Enrichment batch inline cron suppressed — owned by central scheduler.");
+  }
 }

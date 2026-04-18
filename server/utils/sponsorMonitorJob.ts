@@ -844,24 +844,36 @@ export function startSponsorMonitorCron(): void {
     console.error("[SponsorMonitorJob] Error in initial digest seed:", err);
   });
 
-  cron.schedule("30 0 * * 1-5", () => {
-    console.log("[SponsorMonitorJob] Cron trigger fired at", new Date().toISOString());
-    runSponsorMonitorJob("cron").catch((err) => {
-      console.error("[SponsorMonitorJob] Unhandled error in cron execution:", err);
+  const sponsorCutover = (process.env.CUTOVER_SPONSOR_MONITOR ?? "false").trim().toLowerCase();
+  if (sponsorCutover !== "true" && sponsorCutover !== "1") {
+    cron.schedule("30 0 * * 1-5", () => {
+      console.log("[SponsorMonitorJob] Cron trigger fired at", new Date().toISOString());
+      runSponsorMonitorJob("cron").catch((err) => {
+        console.error("[SponsorMonitorJob] Unhandled error in cron execution:", err);
+      });
+    }, {
+      timezone: "UTC",
     });
-  }, {
-    timezone: "UTC",
-  });
+    console.log("[SponsorMonitorJob] Inline cron registered (CUTOVER_SPONSOR_MONITOR not set).");
+  } else {
+    console.log("[SponsorMonitorJob] Inline cron suppressed — owned by central scheduler.");
+  }
 
-  cron.schedule("0 * * * *", () => {
-    processQueuedEngineEvents().catch((err: any) => {
-      console.error("[NotificationEngine] Error processing queued engine events:", err);
+  const drainCutover = (process.env.CUTOVER_NOTIFICATION_DRAIN ?? "false").trim().toLowerCase();
+  if (drainCutover !== "true" && drainCutover !== "1") {
+    cron.schedule("0 * * * *", () => {
+      processQueuedEngineEvents().catch((err: any) => {
+        console.error("[NotificationEngine] Error processing queued engine events:", err);
+      });
+    }, {
+      timezone: "UTC",
     });
-  }, {
-    timezone: "UTC",
-  });
+    console.log("[SponsorMonitorJob] Notification drain inline cron registered (CUTOVER_NOTIFICATION_DRAIN not set).");
+  } else {
+    console.log("[SponsorMonitorJob] Notification drain inline cron suppressed — owned by central scheduler.");
+  }
 
-  console.log("[SponsorMonitorJob] Cron jobs scheduled: daily monitor at 00:30 UTC Mon-Fri, delayed notifications hourly");
+  console.log("[SponsorMonitorJob] Cron setup complete.");
 }
 
 export async function isJobRunning(): Promise<boolean> {

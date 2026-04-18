@@ -281,6 +281,12 @@ export async function runJobAlertJob(orchestration?: { correlationId?: string; t
 // ─── Scheduler ────────────────────────────────────────────────────────────────
 
 export function startJobAlertScheduler(): void {
+  const cutover = (process.env.CUTOVER_JOB_ALERT ?? "false").trim().toLowerCase();
+  if (cutover === "true" || cutover === "1") {
+    console.log("[JobAlertJob] Inline cron suppressed — owned by central scheduler.");
+    return;
+  }
+
   // Runs at 02:00 UTC Mon-Fri (after the main sponsor monitor job at 00:30)
   cron.schedule(
     "0 2 * * 1-5",
@@ -293,5 +299,5 @@ export function startJobAlertScheduler(): void {
     { timezone: "UTC" },
   );
 
-  console.log("[JobAlertJob] Scheduled: 02:00 UTC Mon-Fri");
+  console.log("[JobAlertJob] Inline cron registered (CUTOVER_JOB_ALERT not set).");
 }
