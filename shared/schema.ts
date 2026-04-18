@@ -518,6 +518,10 @@ export const jobTriggerAudit = pgTable(
     triggeredBy: varchar("triggered_by", { length: 255 }).notNull().references(() => users.id),
     triggerSource: varchar("trigger_source", { length: 20 }).notNull().default("manual"),
     callbackUrl: text("callback_url"),
+    callbackStatus: varchar("callback_status", { length: 20 }), // pending | sent | failed
+    callbackAttempts: integer("callback_attempts").notNull().default(0),
+    callbackLastError: text("callback_last_error"),
+    callbackLastAttemptAt: timestamp("callback_last_attempt_at"),
     reason: text("reason"),
     status: varchar("status", { length: 20 }).notNull().default("accepted"),
     failureReason: text("failure_reason"),
@@ -526,7 +530,6 @@ export const jobTriggerAudit = pgTable(
     durationMs: integer("duration_ms"),
   },
   (table) => [
-    uniqueIndex("idx_job_trigger_audit_unique_idempotency").on(table.jobName, table.idempotencyKey),
     index("idx_job_trigger_audit_job_name").on(table.jobName, table.triggeredAt),
     index("idx_job_trigger_audit_triggered_by").on(table.triggeredBy, table.triggeredAt),
     index("idx_job_trigger_audit_idempotency").on(table.jobName, table.idempotencyKey),

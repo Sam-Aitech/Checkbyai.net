@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import type { Express } from "express";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { db } from "../db";
 import { jobTriggerAudit } from "@shared/schema";
 import { requireRole } from "../middleware/roleGuard";
@@ -17,6 +17,9 @@ import { logger } from "../utils/logger";
 const log = logger.child({ module: "OpsRoutes" });
 
 const CALLBACK_TIMEOUT_MS = 10_000;
+const CALLBACK_MAX_ATTEMPTS = 3;
+const CALLBACK_RETRY_BASE_MS = 500;
+const IDEMPOTENCY_WINDOW_MS = 24 * 60 * 60 * 1000;
 const JOB_TIMEOUT_MS: Record<JobName, number> = {
   sponsorMonitorJob: 25 * 60 * 1000,
   jobAlertJob: 15 * 60 * 1000,
@@ -24,6 +27,10 @@ const JOB_TIMEOUT_MS: Record<JobName, number> = {
   enrichmentBatch: 30 * 60 * 1000,
   notificationDrain: 10 * 60 * 1000,
 };
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 const JOB_NAMES = [
   "sponsorMonitorJob",
@@ -97,7 +104,9 @@ async function markAuditCompleted(params: {
 
 async function sendSignedCallback(callbackUrl: string, payload: Record<string, unknown>): Promise<void> {
   const secret = process.env.CALLBACK_SIGNING_SECRET;
-  if (!secret) return;
+  if (!secret) {
+    throw new Error("CALLBACK_SIGNING_SECRET is not configured");
+  }
 
   const body = JSON.stringify(payload);
   const signature = signPayload(body, secret);
@@ -106,7 +115,7 @@ async function sendSignedCallback(callbackUrl: string, payload: Record<string, u
   const timer = setTimeout(() => controller.abort(), CALLBACK_TIMEOUT_MS);
 
   try {
-    await fetch(callbackUrl, {
+    const response = await fetch(callbackUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -115,9 +124,65 @@ async function sendSignedCallback(callbackUrl: string, payload: Record<string, u
       body,
       signal: controller.signal,
     });
+
+    if (!response.ok) {
+      throw new Error(`Callback endpoint returned ${response.status}`);
+    }
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function deliverCallbackWithRetry(params: {
+  triggerId: string;
+  callbackUrl: string;
+  payload: Record<string, unknown>;
+}): Promise<void> {
+  let lastError: string | null = null;
+
+  for (let attempt = 1; attempt <= CALLBACK_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      await sendSignedCallback(params.callbackUrl, params.payload);
+      await db
+        .update(jobTriggerAudit)
+        .set({
+          callbackStatus: "sent",
+          callbackAttempts: attempt,
+          callbackLastError: null,
+          callbackLastAttemptAt: new Date(),
+        })
+        .where(eq(jobTriggerAudit.triggerId, params.triggerId));
+      return;
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : String(err);
+      await db
+        .update(jobTriggerAudit)
+        .set({
+          callbackStatus: "failed",
+          callbackAttempts: attempt,
+          callbackLastError: lastError,
+          callbackLastAttemptAt: new Date(),
+        })
+        .where(eq(jobTriggerAudit.triggerId, params.triggerId));
+
+      if (attempt < CALLBACK_MAX_ATTEMPTS) {
+        const backoff = CALLBACK_RETRY_BASE_MS * Math.pow(2, attempt - 1);
+        await sleep(backoff);
+      }
+    }
+  }
+
+  throw new Error(lastError ?? "Callback delivery failed after retries");
+}
+
+function dispatchCallbackDelivery(params: {
+  triggerId: string;
+  callbackUrl: string;
+  payload: Record<string, unknown>;
+}): void {
+  void deliverCallbackWithRetry(params).catch((err) => {
+    log.warn({ err, triggerId: params.triggerId }, "Callback delivery exhausted retries");
+  });
 }
 
 async function runTriggeredJob(params: {
@@ -188,12 +253,16 @@ async function runTriggeredJob(params: {
 
     await markAuditCompleted({ triggerId: params.triggerId, status: "success", startedAt });
     if (params.callbackUrl) {
-      await sendSignedCallback(params.callbackUrl, {
+      dispatchCallbackDelivery({
+        triggerId: params.triggerId,
+        callbackUrl: params.callbackUrl,
+        payload: {
         triggerId: params.triggerId,
         correlationId: params.correlationId,
         jobName: params.jobName,
         status: "success",
         completedAt: new Date().toISOString(),
+        },
       });
     }
   } catch (err) {
@@ -201,18 +270,18 @@ async function runTriggeredJob(params: {
     await markAuditCompleted({ triggerId: params.triggerId, status: "failed", failureReason, startedAt });
 
     if (params.callbackUrl) {
-      try {
-        await sendSignedCallback(params.callbackUrl, {
+      dispatchCallbackDelivery({
+        triggerId: params.triggerId,
+        callbackUrl: params.callbackUrl,
+        payload: {
           triggerId: params.triggerId,
           correlationId: params.correlationId,
           jobName: params.jobName,
           status: "failed",
           failureReason,
           completedAt: new Date().toISOString(),
-        });
-      } catch (callbackErr) {
-        log.warn({ err: callbackErr, triggerId: params.triggerId }, "Failed to deliver callback after job failure");
-      }
+        },
+      });
     }
 
     log.error({ err, triggerId: params.triggerId, jobName: params.jobName }, "Triggered orchestration job failed");
@@ -248,40 +317,61 @@ export function registerOpsRoutes(app: Express): void {
 
       const triggerId = crypto.randomUUID();
       const correlationId = generateCorrelationId();
+      const idempotencyBucket = Math.floor(Date.now() / IDEMPOTENCY_WINDOW_MS);
+      const storedIdempotencyKey = `${idempotencyKey}:${idempotencyBucket}`;
+      const previousBucketKey = `${idempotencyKey}:${idempotencyBucket - 1}`;
 
-      try {
-        await db.insert(jobTriggerAudit).values({
+      let replayResponse: { triggerId: string; correlationId: string } | null = null;
+      await db.transaction(async (tx) => {
+        const lockKey = `${jobNameRaw}:${storedIdempotencyKey}`;
+        await tx.execute(sql`
+          SELECT pg_advisory_xact_lock(
+            (('x' || substr(md5(${lockKey}), 1, 16))::bit(64))::bigint
+          )
+        `);
+
+        const replayWindowStart = new Date(Date.now() - IDEMPOTENCY_WINDOW_MS);
+        const existing = await tx
+          .select({ triggerId: jobTriggerAudit.triggerId, correlationId: jobTriggerAudit.correlationId })
+          .from(jobTriggerAudit)
+          .where(
+            and(
+              eq(jobTriggerAudit.jobName, jobNameRaw),
+              sql`${jobTriggerAudit.idempotencyKey} IN (${storedIdempotencyKey}, ${previousBucketKey})`,
+              gte(jobTriggerAudit.triggeredAt, replayWindowStart),
+            ),
+          )
+          .orderBy(desc(jobTriggerAudit.triggeredAt))
+          .limit(1);
+
+        if (existing.length > 0) {
+          replayResponse = { triggerId: existing[0].triggerId, correlationId: existing[0].correlationId };
+          return;
+        }
+
+        await tx.insert(jobTriggerAudit).values({
           triggerId,
           correlationId,
           jobName: jobNameRaw,
-          idempotencyKey,
+          idempotencyKey: storedIdempotencyKey,
           triggeredBy: String(userId),
           triggerSource: "manual",
           callbackUrl,
+          callbackStatus: callbackUrl ? "pending" : null,
+          callbackAttempts: 0,
           reason,
           status: "accepted",
         });
-      } catch (err: any) {
-        // Unique index enforces race-safe idempotency for (jobName, idempotencyKey).
-        if (err?.code === "23505") {
-          const existing = await db
-            .select({ triggerId: jobTriggerAudit.triggerId, correlationId: jobTriggerAudit.correlationId })
-            .from(jobTriggerAudit)
-            .where(and(eq(jobTriggerAudit.jobName, jobNameRaw), eq(jobTriggerAudit.idempotencyKey, idempotencyKey)))
-            .orderBy(desc(jobTriggerAudit.triggeredAt))
-            .limit(1);
+      });
 
-          if (existing.length > 0) {
-            return res.status(409).json({
-              status: "already_accepted",
-              triggerId: existing[0].triggerId,
-              correlationId: existing[0].correlationId,
-              message: "Idempotent replay detected",
-            });
-          }
-        }
-
-        throw err;
+      const replay = replayResponse as { triggerId: string; correlationId: string } | null;
+      if (replay !== null) {
+        return res.status(409).json({
+          status: "already_accepted",
+          triggerId: replay.triggerId,
+          correlationId: replay.correlationId,
+          message: "Idempotent replay detected in 24h window",
+        });
       }
 
       void runTriggeredJob({

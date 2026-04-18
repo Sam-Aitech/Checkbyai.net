@@ -13,7 +13,7 @@ Last Updated: 2026-04-18
 |---|---|---|---|---|---|
 | Phase 0 | Alignment and Scope Freeze | Completed | 2026-04-18 | None | Governance package created, approved, and frozen |
 | Phase 1 | Control Plane and Observability Foundation | **Completed** | 2026-04-19 | Phase 0 | RBAC baseline, audit trail, telemetry and health contracts |
-| Phase 2 | Secure Orchestration Contracts | In Progress | 2026-04-18 | Phase 1 | Authenticated, idempotent orchestration boundaries |
+| Phase 2 | Secure Orchestration Contracts | Completed | 2026-04-18 | Phase 1 | Authenticated, idempotent orchestration boundaries |
 | Phase 3 | Shadow Mode Validation | Planned | 2026-05-20 | Phase 2 | Side-by-side run parity with drift reports |
 | Phase 4 | Controlled Cutover | Planned | 2026-06-03 | Phase 3 | Job-by-job scheduler ownership migration |
 | Phase 5 | Incident Automation and Runbooks | Planned | 2026-06-17 | Phase 4 | Alert precision, ticket context automation, runbooks |
@@ -83,22 +83,25 @@ Quality gate:
 
 ---
 
-## Left To Build (Phase 2-8)
-
 ### Phase 2: Secure Orchestration Contracts
 
-Completed in commit `86d6bf1`:
+Completed in commits `86d6bf1` and `b6d6d00`, with closure hardening and tests in current head:
 
 1. Defined trigger endpoint contracts for orchestrated jobs via `POST /api/ops/jobs/:jobName/trigger` and `GET /api/ops/jobs/:jobName/status/:triggerId`.
 2. Enforced authn/authz (`requireRole("admin")` for trigger and `requireRole("analyst")` for status) and callback signing (`X-Checkbyai-Signature`).
 3. Added replay protection via DB-backed idempotency uniqueness on `(job_name, idempotency_key)` and UUID-v4 idempotency key contract.
 4. Added audit trail linkage table `job_trigger_audit` (triggerId, correlationId, status, duration, failure reason).
 
-Remaining to close Phase 2:
+Closure evidence:
 
-1. Add integration tests for the `/api/ops/jobs/*` contracts (authz paths, replay response semantics, callback behaviors).
-2. Add retry/backoff for failed callback delivery and persistent callback failure status.
-3. Finalize 24-hour replay-window semantics (current implementation enforces strict uniqueness by idempotency key).
+1. Added ops route integration tests: `server/routes/__tests__/ops.test.ts`.
+2. Added callback retry/backoff with persistent audit status fields: `callback_status`, `callback_attempts`, `callback_last_error`, `callback_last_attempt_at`.
+3. Finalized replay-window semantics with race-safe advisory lock + 24-hour bucketed idempotency keys.
+4. Quality gates green after closure changes: `npm run check`, `npm run test:run` (98/98), `npm run build`.
+
+---
+
+## Left To Build (Phase 3-8)
 
 ### Phase 3: Shadow Mode Validation
 
