@@ -274,7 +274,23 @@ async function findCsvUrl(): Promise<string | ScraplingResponse> {
  * Throws if only the HTML fallback is available — the monitor job requires the full CSV.
  */
 export async function discoverCsvUrl(): Promise<string> {
-  const result = await findCsvUrl();
+  let result;
+  try {
+    result = await findCsvUrl();
+  } catch (err: any) {
+    console.warn("[SponsorListFetcher] Both Scrapers failed. Attempting Direct URL Fallback.");
+    // Try to construct today's URL or fallback
+    const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+    const fallbackUrl = `https://assets.publishing.service.gov.uk/media/register-of-licensed-sponsors-workers/${today}_Worker_and_Temporary_Worker.csv`;
+    sendAdminAlert(
+      "⚠️ CheckByAI: All scrapers failed, using URL fallback",
+      `<p>Cheerio and Scrapling both failed. Attempting to use guessed URL:</p>
+       <pre>${fallbackUrl}</pre>
+       <p>Error was: ${err.message}</p>`
+    ).catch(() => {});
+    return fallbackUrl;
+  }
+  
   const url = typeof result === "string" ? result : result.url;
   if (!url) {
     throw new Error(

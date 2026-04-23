@@ -848,15 +848,14 @@ export function startSponsorMonitorCron(): void {
   if (sponsorCutover !== "true" && sponsorCutover !== "1") {
     cron.schedule("30 0 * * 1-5", () => {
       console.log("[SponsorMonitorJob] Cron trigger fired at", new Date().toISOString());
-      runSponsorMonitorJob("cron").catch((err) => {
+      runSponsorMonitorJob("cron", true).catch((err) => {
         console.error("[SponsorMonitorJob] Unhandled error in cron execution:", err);
       });
     }, {
       timezone: "UTC",
     });
-    console.log("[SponsorMonitorJob] Inline cron registered (CUTOVER_SPONSOR_MONITOR not set).");
   } else {
-    console.log("[SponsorMonitorJob] Inline cron suppressed — owned by central scheduler.");
+    console.log("[SponsorMonitorJob] Skipping inline cron initialization; scheduler owns this job.");
   }
 
   const drainCutover = (process.env.CUTOVER_NOTIFICATION_DRAIN ?? "false").trim().toLowerCase();

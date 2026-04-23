@@ -213,7 +213,7 @@ export default function SponsorDirectory() {
     return p.toString();
   };
 
-  const { data, isLoading, isFetching, isError } = useQuery<DirectoryResponse>({
+  const { data, isLoading, isFetching, isError, refetch } = useQuery<DirectoryResponse>({
     queryKey: ["/api/sponsors/directory", name, statusFilter, town, route, letterFilter, page],
     queryFn: async () => {
       const res = await fetch(`/api/sponsors/directory?${buildQuery()}`);
@@ -435,10 +435,14 @@ export default function SponsorDirectory() {
 
           {/* Error state */}
           {isError && (
-            <div className="py-20 text-center text-muted-foreground">
-              <AlertTriangle className="w-8 h-8 mx-auto mb-3 text-destructive" />
-              <p className="font-medium">Could not load the register.</p>
-              <p className="text-sm mt-1">Please try refreshing the page.</p>
+            <div className="py-20 text-center text-muted-foreground flex flex-col items-center justify-center">
+              <AlertTriangle className="w-8 h-8 mb-3 text-destructive" />
+              <p className="font-medium text-foreground">Could not load the register.</p>
+              <p className="text-sm mt-1 mb-4">Please try refreshing the page or try again below.</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Retry
+              </Button>
             </div>
           )}
 
