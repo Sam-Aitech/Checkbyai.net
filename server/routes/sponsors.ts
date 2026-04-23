@@ -11,7 +11,7 @@ import { recordSearchRequest } from "../services/monitoringService";
 import { generateHeadline, signDigest } from "../services/aiDigest";
 import { storage } from "../storage";
 import { cacheGet, cacheSet } from "../utils/redisClient";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 
 // ── Tiered Rate Limiters for Search ──────────────────────────────────────────
 // Authenticated users get higher limits, anonymous get reasonable limits
@@ -22,7 +22,7 @@ const rateLimiterFactory = (maxPerMinute: number) => rateLimit({
   legacyHeaders: false,
   keyGenerator: (req) => {
     // Use user ID if authenticated, otherwise IP
-    return (req as any).user?.id || req.ip;
+    return (req as any).user?.id || ipKeyGenerator(req.ip ?? "");
   },
 });
 
@@ -50,7 +50,7 @@ const personalizedRateLimiter = (baseLimit: number) => rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => ((req as any).user?.id || req.ip),
+  keyGenerator: (req) => ((req as any).user?.id || ipKeyGenerator(req.ip ?? "")),
 });
 
 function getWatchLimit(subscriptionStatus: string | null): number {

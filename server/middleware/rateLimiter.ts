@@ -1,4 +1,4 @@
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -35,7 +35,7 @@ export const enrichLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: "Enrichment already queued for this sponsor. Please wait 5 minutes before requesting again." },
-  keyGenerator: (req: any) => `enrich:${req.user?.id ?? req.ip}:${req.params?.fingerprint ?? ""}`,
+  keyGenerator: (req: any) => `enrich:${req.user?.id ?? ipKeyGenerator(req.ip ?? "")}:${req.params?.fingerprint ?? ""}`,
   skipSuccessfulRequests: false,
 });
 
@@ -46,6 +46,6 @@ export const opsTriggerLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: "Too many orchestration trigger requests. Please try again later." },
-  keyGenerator: (req: any) => `ops-trigger:${req.user?.id ?? req.ip}`,
+  keyGenerator: (req: any) => `ops-trigger:${req.user?.id ?? ipKeyGenerator(req.ip ?? "")}`,
   skipSuccessfulRequests: false,
 });
