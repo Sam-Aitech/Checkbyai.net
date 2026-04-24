@@ -21,6 +21,25 @@ Phase 5 runbooks for each critical background job. Each runbook includes the sev
 | P2 | Warning — one missed run | Fix within 24 h |
 | P3 | Advisory — first missed window | Investigate during business hours |
 
+## Monitoring & Reliability (Phase 1e)
+
+### Dead-man's Switch (External Uptime Monitor)
+
+The application includes an `/api/health` endpoint that exposes internal job telemetry. It is critical to set up an external monitor (e.g., UptimeRobot, BetterStack, or Checkly) to ensure the system is alive and the ETL pipeline is moving.
+
+1. **Endpoint**: `https://checkbyai.net/api/health` (requires Bearer token if configured, or specific public health flags).
+2. **Frequency**: Every 5–60 minutes.
+3. **Alert Condition**: 
+   - HTTP status is not 200.
+   - Response body contains `status: "unhealthy"` or `stale: true`.
+   - Response time > 5s.
+
+### Ghost Lock Remediation
+
+If `sponsorMonitorJob` stays in a `running` state for > 2 hours, the system will send an admin alert. 
+- **Cause**: Application crashed without releasing the PostgreSQL advisory lock.
+- **Action**: Check Neon dashboard for zombie connections holding lock `7483920` and terminate them, or redeploy the application to force connection recycling.
+
 ## Common Diagnostic Commands
 
 ```bash

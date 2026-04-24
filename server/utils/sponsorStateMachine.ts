@@ -80,25 +80,36 @@ function classifyRatingChange(prev: string, curr: string): "UPGRADED" | "DOWNGRA
 // ── Batch helper ──────────────────────────────────────────────────────────────
 
 async function batchedInsertChanges(changes: SponsorChange[], today: string): Promise<void> {
+  if (!changes || changes.length === 0) return;
+
   for (let i = 0; i < changes.length; i += BATCH_SIZE) {
     const batch = changes.slice(i, i + BATCH_SIZE);
-    const inserted = await db.insert(sponsorChanges).values(
-      batch.map((c) => ({
+    
+    // Map for O(1) lookups instead of O(N^2) Array.find()
+    const batchMap = new Map<string, SponsorChange>();
+    const insertValues = batch.map((c) => {
+      // Create a unique key for the batch map
+      const key = `${c.fingerprint}_${c.changeType}`;
+      batchMap.set(key, c);
+      
+      return {
         organisationName: c.organisationName,
         fingerprint:      c.fingerprint ?? null,
         changeType:       c.changeType,
         previousValue:    c.previousValue ?? null,
         newValue:         c.newValue ?? null,
         snapshotDate:     today,
-      })),
-    ).returning({ id: sponsorChanges.id, fingerprint: sponsorChanges.fingerprint, changeType: sponsorChanges.changeType });
+      };
+    });
 
-    // Populate DB-assigned id back into the SponsorChange objects so
-    // notifyAffectedUsers() can use it as the notificationLog.changeId FK.
+    const inserted = await db.insert(sponsorChanges)
+      .values(insertValues)
+      .returning({ id: sponsorChanges.id, fingerprint: sponsorChanges.fingerprint, changeType: sponsorChanges.changeType });
+
+    // Populate DB-assigned id back into the SponsorChange objects efficiently
     for (const row of inserted) {
-      const match = batch.find(
-        (c) => c.fingerprint === row.fingerprint && c.changeType === row.changeType,
-      );
+      const key = `${row.fingerprint}_${row.changeType}`;
+      const match = batchMap.get(key);
       if (match) match.id = row.id;
     }
   }
@@ -124,6 +135,14 @@ async function sendReactivationEmail(toEmail: string, companyName: string): Prom
 async function notifyReactivationWatchers(companyNames: string[]): Promise<void> {
   if (companyNames.length === 0) return;
   try {
+    // Optimization for first run / massive diffs: if we have more than 10,000 candidates,
+    // this is likely the first ETL run (140k+ records). We can skip reactivation emails
+    // since no user could possibly have pending watches for 140k newly imported companies.
+    if (companyNames.length > 10000) {
+      console.log(`[ReactivationWatch] Skipping individual checks for ${companyNames.length} candidates (likely first-run).`);
+      return;
+    }
+
     for (const name of companyNames) {
       const watches = await storage.getPendingWatchesByCompanyName(name);
       for (const watch of watches) {
@@ -348,6 +367,9 @@ export async function applyStateMachine(
   const toReactivate: string[] = [];    // fingerprints: REMOVED_REVOKED → NEWLY_GRANTED
   const toRecoverFlicker: string[] = []; // fingerprints: GRACE_PERIOD → ACTIVE
   const reactivationCandidates: string[] = []; // company names to check for pending watches
+  
+  // Detect first-run/seed by the sheer volume of additions
+  const isFirstRun = reconciliation.additions.length > 100000;
 
   for (const row of reconciliation.additions) {
     const fp      = row.fingerprint;
@@ -371,19 +393,33 @@ export async function applyStateMachine(
         consecutiveMisses: 0,
         historicalNames:  [],
       });
-      changes.push({ organisationName: orgName, changeType: "NEW_LICENCE", previousValue: null, newValue: orgName, fingerprint: fp });
+      
+      // Only track NEW_LICENCE change events if this is NOT the initial 140k+ seed
+      if (!isFirstRun) {
+        changes.push({ organisationName: orgName, changeType: "NEW_LICENCE", previousValue: null, newValue: orgName, fingerprint: fp });
+      }
+      
       reactivationCandidates.push(orgName);
       addedCount++;
     } else if (existing.status === "REMOVED_REVOKED") {
       // Reactivation
       toReactivate.push(fp);
-      changes.push({ organisationName: orgName, changeType: "RE_ACTIVATED", previousValue: "REMOVED_REVOKED", newValue: "NEWLY_GRANTED", fingerprint: fp });
+      changes.push({ 
+        organisationName: orgName, 
+        changeType: "RE_ACTIVATED", 
+        previousValue: "REMOVED_REVOKED", 
+        newValue: "NEWLY_GRANTED", 
+        fingerprint: fp 
+      });
       reactivationCandidates.push(orgName);
       reactivatedCount++;
-    } else if (existing.status === "GRACE_PERIOD") {
-      // Flicker: company disappeared for one day and came back — suppress the removal
-      toRecoverFlicker.push(fp);
-      // No change event — flicker is noise, not a real change
+    } else if (existing.status === "GRACE_PERIOD" || existing.status === "REMOVED_REVOKED") {
+      // Logic for re-appearing records: 
+      // If it's in REMOVED_REVOKED, we already handled it above.
+      // If it's in GRACE_PERIOD, it's a flicker (was gone yesterday, back today).
+      if (existing.status === "GRACE_PERIOD") {
+        toRecoverFlicker.push(fp);
+      }
     }
     // ACTIVE / NEWLY_GRANTED already in today's CSV — handled by modification phase or unchanged
   }

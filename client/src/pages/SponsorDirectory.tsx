@@ -60,10 +60,20 @@ function StatusBadge({ status, typeRating }: { status: string; typeRating: strin
     );
   }
   if (status === "NEWLY_GRANTED") {
+    // If newly granted, check if it's a re-activation (not strictly in DB status yet, but logic-wise)
+    // For now, we use a single badge, but we can refine if the DB status differentiates.
     return (
       <Badge className="bg-orange-500 text-white border-orange-600 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
         <Zap className="w-3 h-3 mr-1" />
         Newly Granted
+      </Badge>
+    );
+  }
+  if (status === "REINSTATED") {
+     return (
+      <Badge className="bg-emerald-500 text-white border-emerald-600 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
+        <RefreshCw className="w-3 h-3 mr-1" />
+        Reinstated
       </Badge>
     );
   }

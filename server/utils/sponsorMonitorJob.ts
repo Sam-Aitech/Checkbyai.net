@@ -37,10 +37,45 @@ const REQUEST_CHECK_INTERVAL_MS = 60 * 60 * 1000;
  */
 async function tryAcquireJobLock(): Promise<boolean> {
   try {
+    // ── STUCK LOCK DETECTION (Phase 1b) ──
+    // pg_advisory_lock is session-level, so it survives app crashes until the
+    // DB connection is terminated by Neon. If we can't get the lock, check if
+    // the job has been "running" for more than 2 hours. If so, it's likely a
+    // ghost lock from a zombie connection.
     const result = await db.execute(
       sql`SELECT pg_try_advisory_lock(${SPONSOR_MONITOR_LOCK_KEY}) AS acquired`
     );
-    return (result.rows[0] as any)?.acquired === true;
+    const acquired = (result.rows[0] as any)?.acquired === true;
+
+    if (!acquired) {
+      const today = new Date().toISOString().split("T")[0];
+      const activeRun = await db
+        .select({ id: monitorJobRuns.id, startedAt: monitorJobRuns.startedAt })
+        .from(monitorJobRuns)
+        .where(and(eq(monitorJobRuns.runDate, today), eq(monitorJobRuns.status, "running")))
+        .limit(1);
+
+      if (activeRun.length > 0 && activeRun[0].startedAt) {
+        const runtimeMs = Date.now() - activeRun[0].startedAt.getTime();
+        const MAX_RUNTIME_MS = 2 * 60 * 60 * 1000; // 2 hours
+        if (runtimeMs > MAX_RUNTIME_MS) {
+          log.error(
+            { runtimeMs, runId: activeRun[0].id },
+            `[SponsorMonitorJob] LOCK CONTENTION: Job has been in 'running' state for ${Math.round(runtimeMs/60000)} mins. Possible ghost lock.`
+          );
+          // We don't force-release here (risky if job is slow but alive),
+          // but we alert so admin can manually kill the DB session.
+          await sendAdminAlert(
+            "ALERT: Sponsor Monitor Ghost Lock Detected",
+            `<p>Job for today has been 'running' for ${Math.round(runtimeMs/60000)} mins without completion.</p>
+             <p>The advisory lock (ID: ${SPONSOR_MONITOR_LOCK_KEY}) is likely held by a zombie session.</p>
+             <p>Check Neon dashboard and terminate stuck backend if necessary.</p>`
+          );
+        }
+      }
+    }
+
+    return acquired;
   } catch (err) {
     console.error('[SponsorMonitorJob] Failed to acquire advisory lock:', err);
     return false;
@@ -609,7 +644,13 @@ export async function runSponsorMonitorJob(
     // prefs (notif_prefs jsonb), applies rate limit (3/hr per user:company),
     // and sends immediately. Results logged to notif_log.
     const alertableChanges = smResult.changes.filter((c) => c.changeType !== "NAME_CHANGE");
-    if (alertableChanges.length > 0) {
+    
+    // First-run optimization: If there are over 10,000 changes, this is an initial 
+    // database seed or a massive structural change. We should not attempt to dispatch 
+    // notifications for every single one of them.
+    if (alertableChanges.length > 10000) {
+      console.log(`[SponsorMonitorJob] Skipping notifications for ${alertableChanges.length} alertable changes (first-run / mass update).`);
+    } else if (alertableChanges.length > 0) {
       console.log(`[SponsorMonitorJob] Dispatching notifications for ${alertableChanges.length} alertable changes…`);
       for (const change of alertableChanges) {
         notifyUsersOfEvent(change).catch((err: any) =>

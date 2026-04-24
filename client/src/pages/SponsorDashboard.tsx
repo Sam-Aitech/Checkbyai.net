@@ -87,6 +87,10 @@ function normalizeCompanyName(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
+function isRevokedStatus(status: string | undefined): boolean {
+  return status === "REMOVED_REVOKED";
+}
+
 function StatusBadge({ status }: { status: string | undefined }) {
   if (status === "ACTIVE")
     return (
@@ -322,14 +326,33 @@ function ActivityTimelineCard({
   isLoading: boolean;
   companyName: string;
 }) {
+  const revokedEvents = changes.filter((change) => change.changeType === "REMOVED_REVOKED").length;
+  const reinstatedEvents = changes.filter((change) => change.changeType === "RE_ACTIVATED").length;
+
   return (
     <Card className="border border-border rounded-xl">
       <CardContent className="p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <Activity className="w-4 h-4 text-primary" />
-          <h3 className="editorial-subheading text-foreground text-sm font-semibold">
-            Register Activity
-          </h3>
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div className="flex items-center gap-2">
+            <Activity className="w-4 h-4 text-primary" />
+            <h3 className="editorial-subheading text-foreground text-sm font-semibold">
+              Register Activity
+            </h3>
+          </div>
+          {!isLoading && (revokedEvents > 0 || reinstatedEvents > 0) && (
+            <div className="flex flex-wrap justify-end gap-2">
+              {revokedEvents > 0 && (
+                <Badge className="bg-red-500/10 text-red-600 border border-red-500/20 text-xs">
+                  {revokedEvents} revoked
+                </Badge>
+              )}
+              {reinstatedEvents > 0 && (
+                <Badge className="bg-blue-500/10 text-blue-600 border border-blue-500/20 text-xs">
+                  {reinstatedEvents} reinstated
+                </Badge>
+              )}
+            </div>
+          )}
         </div>
 
         {isLoading ? (
@@ -513,30 +536,36 @@ export default function SponsorDashboard() {
     },
   });
 
+  const watchedEntries = (watches ?? []).filter((watch) => watch.isActive);
+  const activeSponsorWatches = watchedEntries.filter(
+    (watch) => !isRevokedStatus(watch.currentStatus?.status),
+  );
+  const revokedSponsorWatches = watchedEntries.filter((watch) =>
+    isRevokedStatus(watch.currentStatus?.status),
+  );
+
   // Find the watch matching the URL param
   const focusedWatch = companyParam && watches
-    ? watches.find(
-        (w) =>
-          normalizeCompanyName(w.organisationName) === normalizeCompanyName(companyParam) &&
-          w.isActive,
+    ? watchedEntries.find(
+        (watch) =>
+          normalizeCompanyName(watch.organisationName) === normalizeCompanyName(companyParam),
       )
     : undefined;
 
   // Collect timeline changes
   const timelineChanges: SponsorChange[] = (() => {
     if (!watches) return [];
-    const activeWatches = watches.filter((w) => w.isActive);
 
     if (companyParam) {
       // Only show changes for the focused company
-      const target = focusedWatch ?? activeWatches.find(
+      const target = focusedWatch ?? watchedEntries.find(
         (w) => normalizeCompanyName(w.organisationName) === normalizeCompanyName(companyParam),
       );
       return target ? [...target.recentChanges].sort((a, b) => new Date(b.detectedAt).getTime() - new Date(a.detectedAt).getTime()) : [];
     }
 
     // All watches: merge and sort
-    return activeWatches
+    return watchedEntries
       .flatMap((w) => w.recentChanges)
       .sort((a, b) => new Date(b.detectedAt).getTime() - new Date(a.detectedAt).getTime())
       .slice(0, 15);
@@ -648,36 +677,128 @@ export default function SponsorDashboard() {
           {/* Section 4: Upsell (starter or pro only) */}
           {(plan === "starter" || plan === "pro") && <UpsellCard plan={plan} />}
 
-          {/* Watch list summary (if no focused company) */}
-          {!companyParam && watches && watches.filter((w) => w.isActive).length > 0 && (
-            <div className="pt-1">
-              <p className="text-xs text-muted-foreground mb-2 px-1">
-                Watching {watches.filter((w) => w.isActive).length} compan
-                {watches.filter((w) => w.isActive).length === 1 ? "y" : "ies"}
-              </p>
-              <div className="space-y-2">
-                {watches
-                  .filter((w) => w.isActive)
-                  .map((w) => (
-                    <button
-                      key={w.id}
-                      className="w-full flex items-center gap-3 p-3 rounded-xl border border-border bg-card hover:bg-muted/50 transition-colors text-left"
-                      onClick={() =>
-                        setLocation(
-                          `/dashboard/sponsor?company=${encodeURIComponent(w.organisationName)}`,
-                        )
-                      }
-                    >
-                      <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
-                      <span className="flex-1 text-sm text-foreground truncate">
-                        {w.organisationName}
-                      </span>
-                      <StatusBadge status={w.currentStatus?.status} />
-                      <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-                    </button>
-                  ))}
+          {!companyParam && watches && (
+            <>
+              <Card className="border border-border rounded-xl overflow-hidden">
+                <CardContent className="p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Watch Status</p>
+                      <h3 className="editorial-subheading text-foreground text-sm font-semibold">
+                        {watchedEntries.length === 0
+                          ? "No sponsors currently watched"
+                          : `Watching ${watchedEntries.length} sponsor${watchedEntries.length === 1 ? "" : "s"}`}
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {watchedEntries.length === 0
+                          ? "Add a sponsor to start tracking active, revoked, and reinstated changes."
+                          : revokedSponsorWatches.length > 0
+                            ? `${revokedSponsorWatches.length} sponsor${revokedSponsorWatches.length === 1 ? " is" : "s are"} currently revoked.`
+                            : "All watched sponsors are currently active or pending review."}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap justify-end gap-2 shrink-0">
+                      <Badge className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-xs">
+                        {activeSponsorWatches.length} active
+                      </Badge>
+                      <Badge className="bg-red-500/10 text-red-600 border border-red-500/20 text-xs">
+                        {revokedSponsorWatches.length} revoked
+                      </Badge>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="pt-1">
+                <p className="text-xs text-muted-foreground mb-2 px-1">
+                  Watching Active
+                </p>
+                {activeSponsorWatches.length === 0 ? (
+                  <Card className="border border-border rounded-xl">
+                    <CardContent className="p-5">
+                      <p className="text-sm text-foreground">No active sponsors in your watchlist.</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Revoked sponsors stay tracked below until they are reinstated.
+                      </p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="space-y-2">
+                    {activeSponsorWatches.map((watch) => {
+                      const latestChange = watch.recentChanges[0];
+                      return (
+                        <button
+                          key={watch.id}
+                          className="w-full flex items-center gap-3 p-3 rounded-xl border border-border bg-card hover:bg-muted/50 transition-colors text-left"
+                          onClick={() =>
+                            setLocation(
+                              `/dashboard/sponsor?company=${encodeURIComponent(watch.organisationName)}`,
+                            )
+                          }
+                        >
+                          <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-foreground truncate">{watch.organisationName}</p>
+                            <p className="text-xs text-muted-foreground truncate mt-0.5">
+                              {latestChange
+                                ? `${changeMeta(latestChange.changeType).label} · ${formatDate(latestChange.detectedAt)}`
+                                : watch.townCity || "Monitoring for status changes"}
+                            </p>
+                          </div>
+                          <StatusBadge status={watch.currentStatus?.status} />
+                          <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            </div>
+
+              <div className="pt-1">
+                <p className="text-xs text-muted-foreground mb-2 px-1">
+                  Watching Revoked
+                </p>
+                {revokedSponsorWatches.length === 0 ? (
+                  <Card className="border border-border rounded-xl">
+                    <CardContent className="p-5">
+                      <p className="text-sm text-foreground">No revoked sponsors in your watchlist.</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        If a watched sponsor is removed from the register, it will stay visible here until reinstated.
+                      </p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="space-y-2">
+                    {revokedSponsorWatches.map((watch) => {
+                      const latestChange = watch.recentChanges[0];
+                      return (
+                        <button
+                          key={watch.id}
+                          className="w-full flex items-center gap-3 p-3 rounded-xl border border-red-500/20 bg-red-50/40 dark:bg-red-950/10 hover:bg-red-50/60 dark:hover:bg-red-950/20 transition-colors text-left"
+                          onClick={() =>
+                            setLocation(
+                              `/dashboard/sponsor?company=${encodeURIComponent(watch.organisationName)}`,
+                            )
+                          }
+                        >
+                          <XCircle className="w-4 h-4 text-red-500 shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-foreground truncate">{watch.organisationName}</p>
+                            <p className="text-xs text-muted-foreground truncate mt-0.5">
+                              {latestChange
+                                ? `${changeMeta(latestChange.changeType).label} · ${formatDate(latestChange.detectedAt)}`
+                                : "Revoked sponsors remain monitored for reinstatement"}
+                            </p>
+                          </div>
+                          <StatusBadge status={watch.currentStatus?.status} />
+                          <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </>
           )}
         </motion.div>
       </div>

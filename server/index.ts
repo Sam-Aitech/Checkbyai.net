@@ -30,6 +30,27 @@ if (missingVars.length > 0) {
   }
 }
 
+// ── Python ETL Agent Health Check (Phase 1d) ──
+async function checkPythonBackend() {
+  const pythonUrl = process.env.PYTHON_BACKEND_URL || "http://localhost:8000";
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
+    const res = await fetch(`${pythonUrl}/health`, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (res.ok) {
+      logger.info({ url: pythonUrl }, "Python ETL agent is ONLINE");
+    } else {
+      logger.warn({ url: pythonUrl, status: res.status }, "Python ETL agent returned non-OK status");
+    }
+  } catch (err) {
+    logger.error(
+      { url: pythonUrl, error: err instanceof Error ? err.message : String(err) },
+      "Python ETL agent is OFFLINE. CSV discovery fallback to Scrapling will be unavailable."
+    );
+  }
+}
+
 // STRIPE_WEBHOOK_SECRET is not hard-required (app starts without it) but webhooks
 // will silently return 400 and plans will never activate if it is missing.
 if (!process.env.STRIPE_WEBHOOK_SECRET) {
@@ -461,6 +482,7 @@ async function applyPendingMigrations() {
 
 (async () => {
   await applyPendingMigrations();
+  await checkPythonBackend();
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

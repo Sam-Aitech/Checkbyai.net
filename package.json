@@ -154,6 +154,7 @@
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
     "@types/ws": "^8.18.1",
+    "dotenv": "^17.4.2",
     "vitest": "^4.1.1"
   },
   "optionalDependencies": {

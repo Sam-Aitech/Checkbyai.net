@@ -6,6 +6,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import logoImg from "@assets/logo_material.png";
 import { useAuth } from "@/hooks/useAuth";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 interface PageLayoutProps {
   children: React.ReactNode;
@@ -221,7 +222,7 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
             transition={shouldReduceMotion ? { duration: 0.15 } : { duration: 0.3, ease: "easeOut" }}
             className="w-full h-full"
           >
-            {children}
+            <ErrorBoundary>{children}</ErrorBoundary>
           </motion.div>
         </AnimatePresence>
       </main>

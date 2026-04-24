@@ -6,6 +6,7 @@
 import { useState, useEffect, CSSProperties } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { STALE_TIMES } from "@/lib/queryDefaults";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -186,9 +187,9 @@ function StatCard({ label, value, sub, gradient, Icon, loading }: StatCardProps)
 
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
 function OverviewTab({ user, setTab }: { user: any; setTab: (t: Tab) => void }) {
-  const { data: watches, isLoading: wL } = useQuery<WatchEntry[]>({ queryKey: ["/api/watches"], retry: false });
-  const { data: changes, isLoading: cL } = useQuery<{ changes: SponsorChange[]; totalCount: number }>({ queryKey: ["/api/sponsor-changes"], retry: false });
-  const { data: verifs, isLoading: vL }  = useQuery<Verification[]>({ queryKey: ["/api/my-verifications"], retry: false });
+  const { data: watches, isLoading: wL } = useQuery<WatchEntry[]>({ queryKey: ["/api/watches"], staleTime: STALE_TIMES.FREQUENT, retry: false });
+  const { data: changes, isLoading: cL } = useQuery<{ changes: SponsorChange[]; totalCount: number }>({ queryKey: ["/api/sponsor-changes"], staleTime: STALE_TIMES.INFREQUENT, retry: false });
+  const { data: verifs, isLoading: vL }  = useQuery<Verification[]>({ queryKey: ["/api/my-verifications"], staleTime: STALE_TIMES.NORMAL, retry: false });
 
   const plan        = user?.subscriptionStatus || "free";
   const firstName   = user?.firstName || user?.email?.split("@")[0] || "there";
@@ -344,11 +345,12 @@ function MonitorTab({ user }: { user: any }) {
   const isPro = ["starter","pro","unlimited","enterprise"].includes(user?.subscriptionStatus||"");
   const hasIntelligence = ["pro","unlimited","enterprise"].includes(user?.subscriptionStatus||"");
 
-  const { data: watches, isLoading } = useQuery<WatchEntry[]>({ queryKey:["/api/watches"], retry:false });
+  const { data: watches, isLoading } = useQuery<WatchEntry[]>({ queryKey:["/api/watches"], staleTime: STALE_TIMES.FREQUENT, retry:false });
 
   const { data: results, isFetching: searching } = useQuery<SponsorSearchResult[]>({
     queryKey:["/api/sponsors/search", dq],
     enabled: dq.trim().length >= 3,
+    staleTime: STALE_TIMES.FREQUENT,
     queryFn: async () => {
       const r = await fetch(`/api/sponsors/search?q=${encodeURIComponent(dq.trim())}`, { credentials:"include" });
       if(!r.ok) throw new Error();
@@ -680,7 +682,7 @@ function NotificationsTab() {
   const qc = useQueryClient();
   const { toast } = useToast();
 
-  const { data: prefs, isLoading } = useQuery<NotifPrefs>({ queryKey:["/api/notifications/preferences"], retry:false });
+  const { data: prefs, isLoading } = useQuery<NotifPrefs>({ queryKey:["/api/notifications/preferences"], staleTime: STALE_TIMES.FREQUENT, retry:false });
 
   const patchM = useMutation({
     mutationFn: (patch: Partial<NotifPrefs>) => apiRequest("PATCH","/api/notifications/preferences",patch),
@@ -773,7 +775,7 @@ function HistoryTab() {
   const { toast } = useToast();
   const [expanded, setExpanded] = useState<number|null>(null);
 
-  const { data: verifs, isLoading } = useQuery<Verification[]>({ queryKey:["/api/my-verifications"], retry:false });
+  const { data: verifs, isLoading } = useQuery<Verification[]>({ queryKey:["/api/my-verifications"], staleTime: STALE_TIMES.NORMAL, retry:false });
 
   const copy = (text: string, label: string) => navigator.clipboard.writeText(text).then(() => toast({title:"Copied", description:`${label} copied`}));
 
@@ -906,7 +908,7 @@ function SupportTab() {
   const [message, setMessage] = useState("");
 
   const { data: tickets, isLoading } = useQuery<SupportTicket[]>({
-    queryKey: ["/api/support/tickets"], retry: false,
+    queryKey: ["/api/support/tickets"], staleTime: STALE_TIMES.FREQUENT, retry: false,
   });
 
   const submitM = useMutation({

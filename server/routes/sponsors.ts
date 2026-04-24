@@ -10,7 +10,7 @@ import { ensureIndexReady, isIndexReady, searchSponsors, searchSponsorsFallback,
 import { recordSearchRequest } from "../services/monitoringService";
 import { generateHeadline, signDigest } from "../services/aiDigest";
 import { storage } from "../storage";
-import { cacheGet, cacheSet } from "../utils/redisClient";
+import { cacheGet, cacheSet, cacheFlushPattern } from "../utils/redisClient";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 
 // ── Tiered Rate Limiters for Search ──────────────────────────────────────────
@@ -234,6 +234,11 @@ export function registerSponsorRoutes(app: Express): void {
 
   app.get('/api/daily-digest/current', async (_req: any, res) => {
     try {
+      // Cache key uses sponsors: prefix so it gets flushed nightly
+      const cacheKey = 'sponsors:daily-digest:current';
+      const cached = await cacheGet(cacheKey);
+      if (cached) return res.json(cached);
+
       const result = await db
         .select()
         .from(dailyDigest)
@@ -265,7 +270,7 @@ export function registerSponsorRoutes(app: Express): void {
         .where(eq(sponsorCanonical.status, "ACTIVE"));
       const activeSponsors = activeResult?.count ?? 0;
 
-      res.json({
+      const response = {
         available: true,
         type: isSeed ? "overview" : "daily",
         date: digest.snapshotDate,
@@ -279,7 +284,12 @@ export function registerSponsorRoutes(app: Express): void {
         },
         activeSponsors,
         signature,
-      });
+      };
+
+      // Cache for 5 minutes
+      await cacheSet(cacheKey, response, 300);
+
+      res.json(response);
     } catch (error) {
       console.error("Error fetching daily digest:", error);
       res.status(500).json({ message: "Failed to fetch daily digest." });
@@ -685,6 +695,7 @@ export function registerSponsorRoutes(app: Express): void {
         await ensureReactivationWatch(userId, canonicalMatch.currentName);
       }
 
+      await cacheFlushPattern('watches:*');
       res.status(201).json({ message: "Watch created.", watch: newWatch });
     } catch (error) {
       console.error("Error creating watch:", error);
@@ -695,6 +706,11 @@ export function registerSponsorRoutes(app: Express): void {
   app.get('/api/watches', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
+      const cacheKey = `watches:${userId}`;
+
+      // Try cache first
+      const cached = await cacheGet(cacheKey);
+      if (cached) return res.json(cached);
 
       const watches = await db
         .select()
@@ -743,10 +759,10 @@ export function registerSponsorRoutes(app: Express): void {
       const orgNames = [...new Set(watches.map((w) => w.organisationName).filter(Boolean))];
       const allRecentChanges = orgNames.length > 0
         ? await db
-            .select()
-            .from(sponsorChanges)
-            .where(inArray(sponsorChanges.organisationName, orgNames))
-            .orderBy(desc(sponsorChanges.detectedAt))
+          .select()
+          .from(sponsorChanges)
+          .where(inArray(sponsorChanges.organisationName, orgNames))
+          .orderBy(desc(sponsorChanges.detectedAt))
         : [];
       const changesByOrg = new Map<string, typeof allRecentChanges>();
       for (const c of allRecentChanges) {
@@ -792,6 +808,9 @@ export function registerSponsorRoutes(app: Express): void {
         return { ...watch, currentStatus, recentChanges };
       });
 
+      // Cache the result for 1 minute
+      await cacheSet(cacheKey, enriched, 60);
+
       res.json(enriched);
     } catch (error) {
       console.error("Error fetching watches:", error);
@@ -825,6 +844,7 @@ export function registerSponsorRoutes(app: Express): void {
         .set({ isActive: false })
         .where(eq(companyWatches.id, watchId));
 
+      await cacheFlushPattern('watches:*');
       res.json({ message: "Watch deactivated." });
     } catch (error) {
       console.error("Error deactivating watch:", error);
@@ -862,6 +882,7 @@ export function registerSponsorRoutes(app: Express): void {
         .set({ isActive: true })
         .where(eq(companyWatches.id, watchId));
 
+      await cacheFlushPattern('watches:*');
       res.json({ message: "Watch reactivated." });
     } catch (error) {
       console.error("Error reactivating watch:", error);
