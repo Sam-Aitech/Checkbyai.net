@@ -52,7 +52,8 @@ Forensic analysis of Certificate of Sponsorship PDFs using AI and metadata foren
 ### Prerequisites
 - **Node.js** 20+
 - **PostgreSQL** 14+ (or [Neon](https://neon.tech/) serverless)
-- **Redis** (optional, for job queue)
+- **Redis** (Highly recommended, used for BullMQ job queue and rate limiting)
+- **Firecrawl API Key** (Optional, used as primary scraper fallback for Gov.UK source)
 - **npm** or **pnpm**
 
 ### Local Development
