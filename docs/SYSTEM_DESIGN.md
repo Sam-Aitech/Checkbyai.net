@@ -27,8 +27,8 @@ checkbyai.net is a monolithic Node.js/Express application that serves both the A
 │  └──────────────┬──────┘  └──────────┬──────────┘  └────────────┘ │
 │                 │                    │                              │
 │                 │         ┌──────────▼──────────────────────────┐  │
-│                 │         │       notificationDispatcher.ts     │  │
-│                 │         │  email (Resend) · SMS · WhatsApp     │  │
+│                 │         │  BullMQ Queue (Redis) / Inline      │  │
+│                 │         │  notificationEngine.ts              │  │
 │                 │         └─────────────────────────────────────┘  │
 │                 │                                                   │
 │  ┌──────────────▼──────────────────────────────────────────────┐   │
@@ -96,7 +96,7 @@ Idempotency check
           │
           ▼ ── PHASE 1: CSV Acquisition & Validation ──────────────────────
 discoverCsvUrl()
-  └─ scrape gov.uk HTML → extract CSV href (throws if only HTML fallback)
+  └─ scrape gov.uk via Firecrawl (optional) → Cheerio fallback → extract CSV href
           │
           ▼
 ensureTodaysArchive(today, csvUrl)            [csvArchiver.ts]
@@ -158,17 +158,17 @@ applyStateMachine(diff, today, todayFingerprintedCsvPath)
           ▼
 rebuildSponsorIndex()  ← Fuse.js index rebuilt from sponsor_canonical
           │
-          ▼ ── PHASE 4: Notifications ─────────────────────────────────────
+          ▼ ── PHASE 4: Notifications (BullMQ) ────────────────────────────
 for each alertable change (changeType ≠ NAME_CHANGE):
-  └─ notifyAffectedUsers(change)
+  └─ queue job in BullMQ (addBulk to NOTIFICATION_JOB) 
+       ├─ (Fallback to inline loop if Redis unavailable)
+       ├─ Worker processes job: notifyUsersOfEvent(change)
        ├─ SELECT watches matching normalized org name
-       ├─ Rate limit: skip if user received ≥10 notifications in 24h
-       ├─ getTierConfig → getDeliverAfter: null=immediate, Date=queue
-       ├─ Build email (buildEmailHtml) + SMS/WhatsApp text (buildPlainTextAlert)
-       │   ChangeTypes: REMOVED_REVOKED, GRACE_PERIOD, DOWNGRADED, UPGRADED,
-       │                NEW_LICENCE, RE_ACTIVATED, ROUTE_CHANGE
-       └─ Dispatch: email (Resend) + WhatsApp (Twilio) + SMS (Brevo) in parallel
-          INSERT notification_log with changeId FK
+       ├─ In-memory Rate limit: 3 sends per user per company per hour
+       ├─ getTierConfig → check if email channel allowed
+       ├─ Check user opt-outs (users.notif_prefs)
+       └─ Dispatch: email via Resend
+          INSERT notif_engine_log with changeId FK and success/fail metrics
           │
           ▼
 processDelayedNotifications() ← hourly cron, delivers queued notifications

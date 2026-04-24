@@ -260,6 +260,9 @@ app.use((req, res, next) => {
 
 async function applyPendingMigrations() {
   const client = await pool.connect();
+  // Advisory lock to prevent concurrent migrations across multiple pods
+  // Lock key 9999001 is arbitrary but must be consistent
+  await client.query("SELECT pg_advisory_lock(9999001)");
   try {
     const migrations = [
       `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "cos_beta_enabled" boolean DEFAULT false`,
@@ -457,11 +460,18 @@ async function applyPendingMigrations() {
       await client.query(sql);
     }
     log("Schema migrations applied successfully");
-  } catch (error) {
+} catch (error) {
     logger.error({ err: error }, "Failed to apply schema migrations");
   } finally {
+    // Release advisory lock
+    try {
+      await client.query("SELECT pg_advisory_unlock(9999001)");
+    } catch (unlockErr) {
+      logger.warn({ err: unlockErr }, "Failed to release advisory lock");
+    }
     client.release();
   }
+}
 
   const concurrentIndexes = [
     `CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_sc_status_name" ON "sponsor_canonical"("status", "current_name")`,
@@ -470,63 +480,63 @@ async function applyPendingMigrations() {
     `CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_changes_date_type" ON "sponsor_changes"("snapshot_date" DESC, "change_type")`,
     `CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_changes_fp_detected" ON "sponsor_changes"("fingerprint", "detected_at" DESC) WHERE "fingerprint" IS NOT NULL`,
   ];
-  for (const sql of concurrentIndexes) {
-    try {
-      await pool.query(sql);
-    } catch (err: any) {
-      if (err?.code === '42P07') continue;
-      logger.warn({ err }, "Non-blocking: concurrent index creation failed (will retry next boot)");
-    }
-  }
-}
+   for (const sql of concurrentIndexes) {
+     try {
+       await pool.query(sql);
+     } catch (err: any) {
+       if (err?.code === '42P07') continue;
+       logger.warn({ err }, "Non-blocking: concurrent index creation failed (will retry next boot)");
+     }
+   }
+ 
+ (async () => {
+   await applyPendingMigrations();
+   await checkPythonBackend();
+   
+   // Probe Redis: initialise BullMQ queues + shared cache client (no-op if Redis is unavailable)
+   await initJobQueue();
+   await initRedisCache();
+   setupWorkers();
+   
+   const server = await registerRoutes(app);
 
-(async () => {
-  await applyPendingMigrations();
-  await checkPythonBackend();
-  const server = await registerRoutes(app);
+   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+     const status = err.status || err.statusCode || 500;
+     const message = err.message || "Internal Server Error";
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+     if (!res.headersSent) {
+       res.status(status).json({ message });
+     }
+     
+     logger.error({ err, status }, "Unhandled server error");
+   });
 
-    if (!res.headersSent) {
-      res.status(status).json({ message });
-    }
-    
-    logger.error({ err, status }, "Unhandled server error");
-  });
+   // importantly only setup vite in development and after
+   // setting up all the other routes so the catch-all route
+   // doesn't interfere with the other routes
+   if (app.get("env") === "development") {
+     await setupVite(app, server);
+   } else {
+     serveStatic(app);
+   }
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
+   // Eagerly warm the Fuse.js sponsor index so the first request after a restart
+   // hits a warm index rather than triggering an on-demand full-table scan.
+   // Fire-and-forget: a failed warm-up degrades to the normal lazy-build path.
+   rebuildSponsorIndex().catch((err: unknown) =>
+     console.warn("[Startup] Sponsor index warm-up failed (non-fatal):", err instanceof Error ? err.message : String(err))
+   );
 
-  // Probe Redis: initialise BullMQ queues + shared cache client (no-op if Redis is unavailable)
-  await initJobQueue();
-  await initRedisCache();
-  setupWorkers();
-
-  // Eagerly warm the Fuse.js sponsor index so the first request after a restart
-  // hits a warm index rather than triggering an on-demand full-table scan.
-  // Fire-and-forget: a failed warm-up degrades to the normal lazy-build path.
-  rebuildSponsorIndex().catch((err: unknown) =>
-    console.warn("[Startup] Sponsor index warm-up failed (non-fatal):", err instanceof Error ? err.message : String(err))
-  );
-
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = 5000;
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, async () => {
-    log(`serving on port ${port}`);
-    await seedAdminUser();
-  });
+   // ALWAYS serve the app on port 5000
+   // this serves both the API and the client.
+   // It is the only port that is not firewalled.
+   const port = 5000;
+   server.listen({
+     port,
+     host: "0.0.0.0",
+     reusePort: true,
+   }, async () => {
+     log(`serving on port ${port}`);
+     await seedAdminUser();
+    });
 })();
