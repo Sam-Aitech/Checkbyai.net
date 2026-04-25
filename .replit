@@ -4,7 +4,7 @@ hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
 [nix]
 channel = "stable-24_05"
-packages = ["freetype", "glibcLocales", "gumbo", "harfbuzz", "imagemagick", "jbig2dec", "libjpeg_turbo", "mupdf", "oneDNN", "openjpeg", "openssl", "rapidfuzz-cpp", "re2", "swig", "taskflow", "xcbuild"]
+packages = ["freetype", "glibcLocales", "gumbo", "harfbuzz", "imagemagick", "jbig2dec", "libjpeg_turbo", "mupdf", "oneDNN", "openjpeg", "openssl", "rapidfuzz-cpp", "re2", "swig", "taskflow", "xcbuild", "xcodebuild", "zlib"]
 
 [deployment]
 deploymentTarget = "autoscale"

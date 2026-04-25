@@ -88,7 +88,7 @@
     "express": "^4.21.2",
     "express-rate-limit": "^8.2.2",
     "express-session": "^1.18.2",
-    "fast-xml-parser": "^5.5.6",
+    "fast-xml-parser": "^5.7.2",
     "framer-motion": "^11.18.2",
     "fuse.js": "^7.1.0",
     "input-otp": "^1.4.2",
@@ -160,5 +160,12 @@
   "optionalDependencies": {
     "@mendable/firecrawl-js": "~1.21.0",
     "bufferutil": "^4.0.9"
+  },
+  "overrides": {
+    "follow-redirects": ">=1.15.12",
+    "uuid": ">=12.0.0",
+    "@esbuild-kit/core-utils": {
+      "esbuild": ">=0.25.0"
+    }
   }
 }
