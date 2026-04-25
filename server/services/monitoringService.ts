@@ -204,8 +204,24 @@ export function resetMetrics(): void {
  * Register internal monitoring routes.
  *
  * SECURITY: Both routes are protected by isAdmin middleware.
+ *
+ * PRODUCTION NOTE: These routes expose in-memory counters that are
+ * per-process and non-durable. In production they are disabled by default.
+ * Set ENABLE_ADMIN_METRICS_ROUTES=true to opt in.
  */
 export function registerMonitoringRoutes(app: any): void {
+  const isProd = process.env.NODE_ENV === "production";
+  const metricsEnabled = process.env.ENABLE_ADMIN_METRICS_ROUTES === "true";
+
+  if (isProd && !metricsEnabled) {
+    logger.warn(
+      {},
+      "[Monitoring] In-memory /metrics routes are DISABLED in production. " +
+      "Set ENABLE_ADMIN_METRICS_ROUTES=true to enable."
+    );
+    return;
+  }
+
    // GET /metrics — admin-only, returns current in-memory counters.
    app.get("/metrics", isAdmin, (_req: any, res: any) => {
          res.json({

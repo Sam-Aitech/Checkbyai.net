@@ -500,6 +500,7 @@ export const monitorJobRuns = pgTable("monitor_job_runs", {
   notificationsSent: integer("notifications_sent").default(0),
   notificationsSkipped: integer("notifications_skipped").default(0),
   notificationsFailed: integer("notifications_failed").default(0),
+  notificationsQueued: integer("notifications_queued").default(0),
   durationMs: integer("duration_ms"),
   errorMessage: text("error_message"),
   startedAt: timestamp("started_at").defaultNow(),

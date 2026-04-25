@@ -164,7 +164,9 @@ for each alertable change (changeType ≠ NAME_CHANGE):
        ├─ (Fallback to inline loop if Redis unavailable)
        ├─ Worker processes job: notifyUsersOfEvent(change)
        ├─ SELECT watches matching normalized org name
-       ├─ In-memory Rate limit: 3 sends per user per company per hour
+       ├─ Redis sorted-set sliding-window rate limit:
+       │    3 sends per user per company per rolling hour
+       │    (shared across all workers/processes; fail-closed if Redis unavailable)
        ├─ getTierConfig → check if email channel allowed
        ├─ Check user opt-outs (users.notif_prefs)
        └─ Dispatch: email via Resend
