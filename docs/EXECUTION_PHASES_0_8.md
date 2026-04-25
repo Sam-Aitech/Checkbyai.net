@@ -302,7 +302,28 @@ Steady-state regime: phases are frozen; changes follow standard PR review. Runbo
 
 ## Recent Updates (2026-04-24)
 
-### Phase 2c: Sponsor Dashboard State Clarity � Completed
+### Phase 2c: Sponsor Dashboard State Clarity — Completed
+
+Completed on 2026-04-24.
 
 Deliverables:
-1. etc.
+1. `client/src/pages/SponsorDashboard.tsx` — Implemented status-aware grouping: "Watching Active" vs. "Watching Revoked" with red-themed alerts for revoked companies. Added summary cards with status-specific badges and activity badges.
+2. `server/routes/sponsors.ts` — Added `GET /api/watches` Redis caching (TTL 60s) with batch enrichment to prevent N+1 queries. Added pattern-based invalidation (`watches:*`) on mutations.
+3. `server/utils/sponsorMonitorJob.ts` — Implemented first-run notification gating (>10,000 changes) to prevent DB connection pool exhaustion during initial seeding. Added advisory lock (ID: `7483920`) for horizontal scale safety.
+
+### Phase 3: Caching & Hardening — Completed
+
+Completed on 2026-04-24.
+
+Deliverables:
+1. `client/src/lib/queryDefaults.ts` — Centralized `STALE_TIMES` constants (`FREQUENT`, `NORMAL`, `INFREQUENT`, `STATIC`) to ensure consistent data freshness across the app.
+2. `client/src/components/ErrorBoundary.tsx` — New production-grade safety net with automatic refresh and reset capabilities.
+3. `client/src/components/PageLayout.tsx` — Wrapped global layout in `ErrorBoundary` to prevent full-app crashes.
+4. `server/utils/redisClient.ts` — Hardened Redis connectivity and pattern-based flushing support.
+
+Quality Gate (2026-04-24):
+1. `npm run check` (tsc) — Pass
+2. `npm run test:run` — 146/146 Pass
+3. `npm run build` — Pass
+4. `csvdiff.exe` verified in `bin/` for Windows dev.
+
