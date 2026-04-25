@@ -9,6 +9,7 @@ import { applyStateMachine } from "./sponsorStateMachine";
 import { rebuildSponsorIndex } from "./sponsorSearch";
 import { cacheFlushPattern } from "./redisClient";
 import { notifyUsersOfEvent, processQueuedEngineEvents } from "../services/notificationEngine";
+import { getNotificationQueue, NOTIFICATION_JOB } from "../services/jobQueue";
 import { generateHeadline, type RawDigestData } from "../services/aiDigest";
 import { withRetry } from "./dbRetry";
 import { sendAdminAlert } from "./adminAlert";
@@ -128,6 +129,7 @@ async function sendAdminJobCompleteEmail(result: {
   recordsProcessed: number;
   changesDetected?: number;
   changeSummary?: Record<string, number>;
+  notificationsQueued: number;
   notificationsSent: number;
   notificationsSkipped: number;
   notificationsFailed: number;
@@ -186,7 +188,7 @@ async function sendAdminJobCompleteEmail(result: {
           </tr>` : ""}
           <tr>
             <td style="padding: 8px 12px; color: #666; border-bottom: 1px solid #f0f0f0;">Notifications</td>
-            <td style="padding: 8px 12px; color: #333; border-bottom: 1px solid #f0f0f0;">${result.notificationsSent} sent, ${result.notificationsSkipped} skipped, ${result.notificationsFailed} failed</td>
+            <td style="padding: 8px 12px; color: #333; border-bottom: 1px solid #f0f0f0;">${result.notificationsQueued} queued, ${result.notificationsSent} sent, ${result.notificationsSkipped} skipped, ${result.notificationsFailed} failed</td>
           </tr>
         </table>
         ${result.error ? `<div style="background: #fff3f3; padding: 15px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #CC0000;">
@@ -398,14 +400,15 @@ export async function runSponsorMonitorJob(
   notificationsFailed: number;
   error?: string;
 }> {
-  const result = {
-    success: false,
-    recordsProcessed: 0,
-    changes: {} as Record<string, number>,
-    notificationsSent: 0,
-    notificationsSkipped: 0,
-    notificationsFailed: 0,
-  };
+   const result = {
+      success: false,
+      recordsProcessed: 0,
+      notificationsSent: 0,
+      notificationsSkipped: 0,
+      notificationsFailed: 0,
+      notificationsQueued: 0,
+      changes: {} as Record<string, number>,
+   };
 
 
   // ── Distributed lock acquisition (replaces in-process isRunning flag) ─────
@@ -475,7 +478,7 @@ export async function runSponsorMonitorJob(
     }
     if (notifyOnFailure) {
       sendAdminJobCompleteEmail(
-        { success: false, recordsProcessed: result.recordsProcessed, notificationsSent: result.notificationsSent, notificationsSkipped: result.notificationsSkipped, notificationsFailed: result.notificationsFailed, error: errorMsg },
+        { success: false, recordsProcessed: result.recordsProcessed, notificationsQueued: result.notificationsQueued, notificationsSent: result.notificationsSent, notificationsSkipped: result.notificationsSkipped, notificationsFailed: result.notificationsFailed, error: errorMsg },
         failDuration,
         source
       ).catch((e) => console.error('[SponsorMonitorJob] Failed to send admin failure alert email:', e));
@@ -639,30 +642,55 @@ export async function runSponsorMonitorJob(
     }
     result.changes = changeCounts;
 
-    // ── Notifications ──────────────────────────────────────────────────────────
-    // Fire-and-forget via the notification engine. Checks per-event, per-channel
-    // prefs (notif_prefs jsonb), applies rate limit (3/hr per user:company),
-    // and sends immediately. Results logged to notif_log.
-    const alertableChanges = smResult.changes.filter((c) => c.changeType !== "NAME_CHANGE");
-    
-    // First-run optimization: If there are over 10,000 changes, this is an initial 
-    // database seed or a massive structural change. We should not attempt to dispatch 
-    // notifications for every single one of them.
-    if (alertableChanges.length > 10000) {
-      console.log(`[SponsorMonitorJob] Skipping notifications for ${alertableChanges.length} alertable changes (first-run / mass update).`);
-    } else if (alertableChanges.length > 0) {
-      console.log(`[SponsorMonitorJob] Dispatching notifications for ${alertableChanges.length} alertable changes…`);
-      for (const change of alertableChanges) {
-        notifyUsersOfEvent(change).catch((err: any) =>
-          console.error(
-            `[SponsorMonitorJob] Notification engine error for "${change.organisationName}":`,
-            err?.message ?? String(err),
-          )
-        );
-      }
-    } else {
-      console.log("[SponsorMonitorJob] No alertable changes today.");
-    }
+     // ── Notifications ──────────────────────────────────────────────────────────
+     // Enqueue notifications via BullMQ. Checks per-event, per-channel
+     // prefs (notif_prefs jsonb), applies rate limit (3/hr per user:company),
+     // and sends immediately. Results logged to notif_log.
+     const alertableChanges = smResult.changes.filter((c) => c.changeType !== "NAME_CHANGE");
+     
+     // First-run optimization: If there are over 10,000 changes, this is an initial 
+     // database seed or a massive structural change. We should not attempt to dispatch 
+     // notifications for every single one of them.
+     if (alertableChanges.length > 10000) {
+       console.log(`[SponsorMonitorJob] Skipping notifications for ${alertableChanges.length} alertable changes (first-run / mass update).`);
+     } else if (alertableChanges.length > 0) {
+       console.log(`[SponsorMonitorJob] Queueing notifications for ${alertableChanges.length} alertable changes…`);
+       const notifQueue = getNotificationQueue();
+       if (notifQueue) {
+      const jobs = alertableChanges.map(change => ({
+        name: NOTIFICATION_JOB,
+        data: {
+          id: change.id, // NotificationEngine expects 'id'
+          organisationName: change.organisationName,
+          changeType: change.changeType,
+          previousValue: change.previousValue,
+          newValue: change.newValue,
+          snapshotDate: today
+        }
+      }));
+         await notifQueue.addBulk(jobs);
+         result.notificationsQueued = jobs.length;
+       } else {
+          console.log('[SponsorMonitorJob] Notification queue not available (Redis down); falling back to inline processing');
+          // Fallback: process inline but with limits
+          for (const change of alertableChanges.slice(0, 50)) { // Limit fallback to prevent overload
+            const notifResult = await notifyUsersOfEvent(change).catch((err: any) => {
+              console.error(
+                `[SponsorMonitorJob] Notification engine error for "${change.organisationName}":`,
+                err?.message ?? String(err),
+              );
+              return { sent: 0, skipped: 0, failed: 1 }; // Count failures
+            });
+            if (notifResult) {
+              result.notificationsSent += notifResult.sent;
+              result.notificationsSkipped += notifResult.skipped;
+              result.notificationsFailed += notifResult.failed;
+            }
+          }
+       }
+     } else {
+       console.log("[SponsorMonitorJob] No alertable changes today.");
+     }
 
     // ── Daily digest ────────────────────────────────────────────────────────────
     try {
@@ -726,22 +754,22 @@ export async function runSponsorMonitorJob(
     // ── Audit log ────────────────────────────────────────────────────────────────
     const finalDuration = Date.now() - startTime;
     const completionTime = new Date();
-    await withRetry(async () => {
-      await db.insert(monitorJobRuns).values({
-        runDate: today,
-        source,
-        status: "success",
-        recordsProcessed: result.recordsProcessed,
-        changesDetected: smResult.changes.length,
-        changeSummary: changeCounts,
-        notificationsSent:   result.notificationsSent,
-        notificationsSkipped: result.notificationsSkipped,
-        notificationsFailed: result.notificationsFailed,
-        durationMs: finalDuration,
-        completedAt: completionTime,
-      }).onConflictDoUpdate({
-        target: monitorJobRuns.runDate,
-        set: {
+     await withRetry(async () => {
+       await db.insert(monitorJobRuns).values({
+         runDate: today,
+         source,
+         status: "success",
+         recordsProcessed: result.recordsProcessed,
+         changesDetected: smResult.changes.length,
+         changeSummary: changeCounts,
+         notificationsSent:   result.notificationsSent,
+         notificationsSkipped: result.notificationsSkipped,
+         notificationsFailed: result.notificationsFailed,
+         durationMs: finalDuration,
+         completedAt: completionTime,
+       }).onConflictDoUpdate({
+         target: monitorJobRuns.runDate,
+         set: {
           source,
           status: "success",
           recordsProcessed: result.recordsProcessed,
@@ -766,7 +794,7 @@ export async function runSponsorMonitorJob(
       (Object.keys(changeCounts).length > 0
         ? ` (${Object.entries(changeCounts).map(([k, v]) => `${k}: ${v}`).join(", ")})`
         : "") + "\n" +
-      `  Notifications: ${result.notificationsSent} sent, ${result.notificationsSkipped} skipped, ${result.notificationsFailed} failed`,
+      `  Notifications: ${result.notificationsQueued} queued, ${result.notificationsSent} sent, ${result.notificationsSkipped} skipped, ${result.notificationsFailed} failed`,
     );
 
     sendAdminJobCompleteEmail(
@@ -775,6 +803,7 @@ export async function runSponsorMonitorJob(
         recordsProcessed: result.recordsProcessed,
         changesDetected: smResult.changes.length,
         changeSummary: changeCounts,
+        notificationsQueued: result.notificationsQueued,
         notificationsSent:   result.notificationsSent,
         notificationsSkipped: result.notificationsSkipped,
         notificationsFailed: result.notificationsFailed,

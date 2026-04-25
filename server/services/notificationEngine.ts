@@ -14,6 +14,7 @@
 import { db } from "../db";
 import { storage } from "../storage";
 import { eq, and, inArray, lte } from "drizzle-orm";
+import { getRedis } from "../utils/redisClient";
 import {
   companyWatches,
   notifEngineLog,
@@ -56,20 +57,41 @@ const CHANGE_TYPE_MAP: Partial<Record<string, NotifEventType>> = {
 
 // ── Rate limiter ──────────────────────────────────────────────────────────────
 // Keyed by `${userId}:${companyName}` — 3 sends per user per company per hour.
-
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 const RATE_LIMIT_MAX = 3;
-const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
-const rateLimiter = new Map<string, number[]>();
 
-function isRateLimited(userId: string, companyName: string): boolean {
-  const key = `${userId}:${companyName}`;
+// Redis-backed rate limiter (1 hour sliding window)
+async function isRateLimited(userId: string | number, companyName: string): Promise<boolean> {
+  const redis = getRedis();
+  if (!redis) {
+    // Per user decision: hard-block notifications if Redis unavailable
+    throw new Error('Redis required for rate limiting - notifications blocked');
+  }
+  
+  // Create a stable hash of the company name for the key
+  const companyHash = Buffer.from(companyName, 'utf8').toString('base64url').substring(0, 16);
+  const key = `ratelimit:${userId}:${companyHash}`;
   const now = Date.now();
-  const cutoff = now - RATE_LIMIT_WINDOW_MS;
-  const timestamps = (rateLimiter.get(key) ?? []).filter(t => t > cutoff);
-  if (timestamps.length >= RATE_LIMIT_MAX) return true;
-  timestamps.push(now);
-  rateLimiter.set(key, timestamps);
-  return false;
+  const windowStart = now - RATE_LIMIT_WINDOW_MS;
+  
+  try {
+    // Use a pipeline for atomic operation
+    const multi = redis.multi();
+    multi.zremrangebyscore(key, 0, windowStart); // Remove old entries
+    multi.zadd(key, now, `${now}`);              // Add current timestamp
+    multi.zcard(key);                            // Get count
+    multi.expire(key, Math.ceil(RATE_LIMIT_WINDOW_MS / 1000)); // Refresh TTL
+    const results = await multi.exec();
+    
+    // results[2] is the ZCARD result [null, count]
+    const count = results?.[2]?.[1] as number ?? 0;
+    return count > RATE_LIMIT_MAX;
+  } catch (err) {
+    logger.warn({ err: err instanceof Error ? err.message : String(err) }, 
+                '[NotificationEngine] Rate limiter check failed - allowing notification');
+    // Fail open for rate limiter to avoid blocking notifications on Redis glitches
+    return false;
+  }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -239,18 +261,32 @@ async function logEvent(
  * Call fire-and-forget from the sponsor monitor job:
  *   notifyUsersOfEvent(change).catch(err => console.error(...));
  */
-export async function notifyUsersOfEvent(change: SponsorChange): Promise<void> {
+let _pausedCache: { value: boolean; expiresAt: number } | null = null;
+
+export function invalidateNotificationsPausedCache(): void {
+  _pausedCache = null;
+}
+
+async function isNotificationsPaused(): Promise<boolean> {
+  if (_pausedCache && Date.now() < _pausedCache.expiresAt) return _pausedCache.value;
+  const flag = await storage.getSystemSetting('notifications_paused');
+  _pausedCache = { value: flag === 'true', expiresAt: Date.now() + 60_000 };
+  return _pausedCache.value;
+}
+
+export async function notifyUsersOfEvent(change: SponsorChange): Promise<{ sent: number; skipped: number; failed: number }> {
+  let sent = 0, skipped = 0, failed = 0;
+
   // Global kill switch — admin can pause all notifications via /api/admin/notifications/pause
-  const pausedFlag = await storage.getSystemSetting('notifications_paused');
-  if (pausedFlag === 'true') {
-    log.info({ organisationName: change.organisationName }, 'Notifications paused by admin — skipping dispatch');
-    return;
-  }
+  if (await isNotificationsPaused()) {
+     log.info({ organisationName: change.organisationName }, 'Notifications paused by admin — skipping dispatch');
+     return { sent: 0, skipped: 0, failed: 0 };
+   }
 
   const changeId = change.id;
   if (changeId === undefined) {
     console.warn("[NotificationEngine] changeId not set, skipping:", change.organisationName);
-    return;
+    return { sent, skipped, failed };
   }
 
   // Resolve snake_case prefs key from DB changeType (ALL_CAPS).
@@ -270,7 +306,7 @@ export async function notifyUsersOfEvent(change: SponsorChange): Promise<void> {
         ),
       );
 
-    if (activeWatches.length === 0) return;
+    if (activeWatches.length === 0) return { sent, skipped, failed };
 
     const uniqueUserIds = [...new Set(activeWatches.map(w => w.userId))];
 
@@ -305,25 +341,33 @@ export async function notifyUsersOfEvent(change: SponsorChange): Promise<void> {
     for (const userId of uniqueUserIds) {
       try {
         const user = userMap.get(userId);
-        if (!user) continue;
+        if (!user) {
+          skipped++;
+          continue;
+        }
 
         // Free tier: no email channel — skip without logging
         const tierConfig = getTierConfig(user.subscriptionStatus);
-        if (!tierConfig.channels.includes("email")) continue;
+        if (!tierConfig.channels.includes("email")) {
+          skipped++;
+          continue;
+        }
 
         // Per-event, per-channel opt-out check (notif_prefs jsonb on users table)
         if (!isEventEnabled(user.notifPrefs as NotifPrefs | null, prefsKey)) {
           await logEvent(userId, changeId, prefsKey, companyName, false, {
             errorDetails: "Event type opted out",
           });
+          skipped++;
           continue;
         }
 
         // In-memory rate limit: 3 sends per user per company per hour
-        if (isRateLimited(userId, companyName)) {
+        if (await isRateLimited(userId, companyName)) {
           await logEvent(userId, changeId, prefsKey, companyName, false, {
             errorDetails: "Rate limit exceeded",
           });
+          skipped++;
           continue;
         }
 
@@ -336,6 +380,7 @@ export async function notifyUsersOfEvent(change: SponsorChange): Promise<void> {
           await logEvent(userId, changeId, prefsKey, companyName, false, {
             errorDetails: "Email disabled or no address on file",
           });
+          skipped++;
           continue;
         }
 
@@ -346,19 +391,29 @@ export async function notifyUsersOfEvent(change: SponsorChange): Promise<void> {
           providerMessageId: sendResult.providerMessageId,
         });
 
+        if (sendResult.success) {
+          sent++;
+        } else {
+          failed++;
+        }
+
         console.log(
           `[NotificationEngine] ${sendResult.success ? "Sent" : "Failed"} ${prefsKey} to ${recipientEmail} (user ${userId})`,
         );
-      } catch (err: unknown) {
-        const errMsg = err instanceof Error ? err.message : String(err);
-        log.error({ err, userId, changeId }, `Error processing user ${userId}: ${errMsg}`);
-        await logEvent(userId, changeId, prefsKey, companyName, false, { errorDetails: errMsg });
-      }
-    }
-  } catch (err) {
-    log.error({ err, changeId }, "Fatal error for change");
-  }
-}
+       } catch (err: unknown) {
+         failed++;
+         const errMsg = err instanceof Error ? err.message : String(err);
+         log.error({ err, userId, changeId }, `Error processing user ${userId}: ${errMsg}`);
+         await logEvent(userId, changeId, prefsKey, companyName, false, { errorDetails: errMsg });
+       }
+     }
+   } catch (err) {
+     log.error({ err, changeId }, "Fatal error for change");
+   }
+   
+   // Return metrics for aggregation
+   return { sent, skipped, failed };
+ }
 
 /**
  * Drains pre-Part-5 queued entries from notif_engine_log (legacy table).

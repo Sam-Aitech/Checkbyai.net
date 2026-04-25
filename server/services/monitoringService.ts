@@ -1,4 +1,5 @@
 import { logger } from "../utils/logger";
+import { sendViaResend } from "./notificationEngine";
 import { isAdmin } from "../auth";
 
 // ---------------------------------------------------------------------------
@@ -90,25 +91,25 @@ function checkSearchAlerts(): void {
 
   // Only alert after a meaningful sample size.
   if (metrics.searchRequests >= 20) {
-        const errorRate = metrics.searchErrors / metrics.searchRequests;
-        if (errorRate > ALERT_THRESHOLDS.searchErrorRate) {
-                if (shouldAlert("searchErrorRate", now)) {
-                          sendAlert(
-                                      "SEARCH_HIGH_ERROR_RATE",
-                                      `Search error rate is ${(errorRate * 100).toFixed(1)}% (${metrics.searchErrors}/${metrics.searchRequests})`
-                                    );
-                }
-        }
+         const errorRate = metrics.searchErrors / metrics.searchRequests;
+         if (errorRate > ALERT_THRESHOLDS.searchErrorRate) {
+                  if (shouldAlert("searchErrorRate", now)) {
+                           sendAlert(
+                                       "SEARCH_HIGH_ERROR_RATE",
+                                       `Search error rate is ${(errorRate * 100).toFixed(1)}% (${metrics.searchErrors}/${metrics.searchRequests})`
+                                     ).catch(err => logger.error({ err }, "Failed to send alert"));
+                 }
+         }
   }
 
-  if (metrics.avgSearchResponseTime > ALERT_THRESHOLDS.searchResponseTime) {
-        if (shouldAlert("searchResponseTime", now)) {
-                sendAlert(
-                          "SEARCH_SLOW_RESPONSE_TIME",
-                          `Average search response time is ${metrics.avgSearchResponseTime.toFixed(0)}ms`
-                        );
-        }
-  }
+   if (metrics.avgSearchResponseTime > ALERT_THRESHOLDS.searchResponseTime) {
+         if (shouldAlert("searchResponseTime", now)) {
+                 sendAlert(
+                           "SEARCH_SLOW_RESPONSE_TIME",
+                           `Average search response time is ${metrics.avgSearchResponseTime.toFixed(0)}ms`
+                         ).catch(err => logger.error({ err }, "Failed to send alert"));
+         }
+   }
 }
 
 /**
@@ -118,15 +119,15 @@ function checkRegistrationAlerts(): void {
     const now = Date.now();
 
   if (metrics.registrationAttempts >= 10) {
-        const failureRate = metrics.registrationFailures / metrics.registrationAttempts;
-        if (failureRate > ALERT_THRESHOLDS.registrationFailureRate) {
-                if (shouldAlert("registrationFailureRate", now)) {
-                          sendAlert(
-                                      "REGISTRATION_HIGH_FAILURE_RATE",
-                                      `Registration failure rate is ${(failureRate * 100).toFixed(1)}% (${metrics.registrationFailures}/${metrics.registrationAttempts})`
-                                    );
-                }
-        }
+         const failureRate = metrics.registrationFailures / metrics.registrationAttempts;
+         if (failureRate > ALERT_THRESHOLDS.registrationFailureRate) {
+                 if (shouldAlert("registrationFailureRate", now)) {
+                           sendAlert(
+                                       "HIGH_REGISTRATION_FAILURE_RATE",
+                                       `Registration failure rate is ${(failureRate * 100).toFixed(1)}% (${metrics.registrationFailures}/${metrics.registrationAttempts})`
+                                     ).catch(err => logger.error({ err }, "Failed to send alert"));
+                 }
+         }
   }
 }
 
@@ -140,20 +141,43 @@ function shouldAlert(alertType: string, now: number): boolean {
 }
 
 /**
- * Send an alert (in production, integrate with email/SMS/Slack/PagerDuty).
+ * Send an alert via Resend email.
  */
-function sendAlert(alertType: string, message: string): void {
+async function sendAlert(alertType: string, message: string): Promise<void> {
     const timestamp = new Date().toISOString();
     metrics.lastAlertSent[alertType] = Date.now();
 
   // Use structured logger only — no bare console.log in production.
   logger.warn({ alertType, message, timestamp }, `[ALERT] ${alertType}: ${message}`);
 
-  // TODO: wire up a real notification channel before enabling in production:
-  //   - Email service (Resend / Brevo)
-  //   - SMS service (Twilio)
-  //   - Slack webhook
-  //   - PagerDuty
+  // Send via Resend email
+  try {
+    const adminEmail = process.env.ADMIN_EMAIL;
+    if (!adminEmail) {
+      logger.warn({ alertType }, 'ADMIN_EMAIL not configured - skipping alert email');
+      return;
+    }
+
+    const emailSubject = `[CheckByAI Alert] ${alertType}`;
+    const emailHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px;">
+          <h2 style="color: #dc3545; margin-top: 0;">CheckByAI System Alert</h2>
+          <p><strong>Alert Type:</strong> ${alertType}</p>
+          <p><strong>Message:</strong> ${message}</p>
+          <p><strong>Timestamp:</strong> ${timestamp}</p>
+        </div>
+        <div style="margin-top: 20px; font-size: 12px; color: #6c757d;">
+          This is an automated alert from your CheckByAI Sponsor Monitor system.
+        </div>
+      </div>
+    `;
+
+    await sendViaResend(adminEmail, emailSubject, emailHtml);
+  } catch (err) {
+    logger.error({ err: err instanceof Error ? err.message : String(err) }, 
+                  `[MonitoringService] Failed to send alert email`);
+  }
 }
 
 /**
@@ -180,38 +204,21 @@ export function resetMetrics(): void {
  * Register internal monitoring routes.
  *
  * SECURITY: Both routes are protected by isAdmin middleware.
- *
- * PRODUCTION NOTE: These routes expose in-memory counters that are
- * per-process and non-durable. They are only registered outside of
- * production (NODE_ENV !== 'production') until a durable, multi-instance
- * metrics backend is in place. In production, disable these routes and use
- * a dedicated observability platform (Prometheus, Datadog, etc.).
  */
 export function registerMonitoringRoutes(app: any): void {
-    const isProd = process.env.NODE_ENV === "production";
+   // GET /metrics — admin-only, returns current in-memory counters.
+   app.get("/metrics", isAdmin, (_req: any, res: any) => {
+         res.json({
+                 metrics: getMetrics(),
+                 timestamp: new Date().toISOString(),
+                 thresholds: ALERT_THRESHOLDS,
+                 warning: "In-memory counters only — not shared across instances and reset on restart.",
+         });
+   });
 
-  if (isProd) {
-        logger.warn(
-          {},
-                "[Monitoring] In-memory /metrics routes are DISABLED in production. " +
-                "Wire up a durable metrics backend before re-enabling."
-              );
-        return;
-  }
-
-  // GET /metrics — admin-only, returns current in-memory counters.
-  app.get("/metrics", isAdmin, (_req: any, res: any) => {
-        res.json({
-                metrics: getMetrics(),
-                timestamp: new Date().toISOString(),
-                thresholds: ALERT_THRESHOLDS,
-                warning: "In-memory counters only — not shared across instances and reset on restart.",
-        });
-  });
-
-  // POST /metrics/reset — admin-only, resets all counters.
-  app.post("/metrics/reset", isAdmin, (_req: any, res: any) => {
-        resetMetrics();
-        res.json({ message: "Metrics reset successfully", timestamp: new Date().toISOString() });
-  });
+   // POST /metrics/reset — admin-only, resets all counters.
+   app.post("/metrics/reset", isAdmin, (_req: any, res: any) => {
+         resetMetrics();
+         res.json({ message: "Metrics reset successfully", timestamp: new Date().toISOString() });
+   });
 }

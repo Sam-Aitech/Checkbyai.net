@@ -3,6 +3,7 @@ import IORedis from 'ioredis';
 
 export const SPONSOR_REFRESH_JOB = 'sponsor-refresh';
 export const SCRAPING_JOB = 'scraping-job';
+export const NOTIFICATION_JOB = 'notification-dispatch';
 
 // Plain connection options — passed directly to BullMQ so it creates its own
 // internal ioredis instance. Avoids the type-mismatch caused by bullmq bundling
@@ -16,6 +17,7 @@ const redisOpts = {
 
 let redisAvailable  = false;
 let sponsorQueue:  Queue | null = null;
+let notificationQueue: Queue | null = null;
 
 /** True when Redis was reachable at startup and BullMQ queues are active. */
 export function isQueueAvailable(): boolean { return redisAvailable; }
@@ -25,6 +27,12 @@ export function isQueueAvailable(): boolean { return redisAvailable; }
  * Always check isQueueAvailable() before use.
  */
 export function getSponsorRefreshQueue(): Queue | null { return sponsorQueue; }
+
+/**
+ * The BullMQ notification-dispatch queue, or null when Redis is unavailable.
+ * Always check isQueueAvailable() before use.
+ */
+export function getNotificationQueue(): Queue | null { return notificationQueue; }
 
 /**
  * Probe Redis with a standalone IORedis connection, then create BullMQ
@@ -59,8 +67,9 @@ export async function initJobQueue(): Promise<void> {
 
   probe.disconnect();
 
-  // Redis is reachable — create the queue using plain opts (no shared client).
-  sponsorQueue = new Queue(SPONSOR_REFRESH_JOB, { connection: redisOpts });
+// Redis is reachable — create the queues using plain opts (no shared client).
+sponsorQueue = new Queue(SPONSOR_REFRESH_JOB, { connection: redisOpts });
+notificationQueue = new Queue(NOTIFICATION_JOB, { connection: redisOpts });
 }
 
 /** Registers BullMQ workers. No-op if Redis was unavailable at startup. */
@@ -84,6 +93,15 @@ export function setupWorkers(): void {
     async (job: Job) => {
       const { processScrapingJob } = await import('../workers/scrapingWorker');
       return processScrapingJob(job);
+    },
+    { connection: redisOpts }
+  );
+
+  new Worker(
+    NOTIFICATION_JOB,
+    async (job: Job) => {
+      const { notifyUsersOfEvent } = await import('../services/notificationEngine');
+      return notifyUsersOfEvent(job.data);
     },
     { connection: redisOpts }
   );

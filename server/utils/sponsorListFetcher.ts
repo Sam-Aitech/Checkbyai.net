@@ -10,6 +10,7 @@ import { sponsorList } from "@shared/schema";
 import { eq, desc, lt, sql } from "drizzle-orm";
 import { sendAdminAlert } from "./adminAlert";
 import { ensureTodaysArchive, parseCsvFile } from "./csvArchiver";
+import { logger } from "./logger";
 
 const GOV_UK_PAGE_URL =
   "https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers";
@@ -18,6 +19,35 @@ const USER_AGENT =
   "Mozilla/5.0 (compatible; CheckByAI-SponsorBot/1.0; +https://checkbyai.net)";
 
 const execFileAsync = promisify(execFile);
+
+/**
+ * Attempts to discover CSV URL using Firecrawl (if API key is configured).
+ * Returns null if Firecrawl is not configured or fails.
+ */
+async function discoverViaFirecrawl(homeOfficeUrl: string): Promise<string | null> {
+  if (!process.env.FIRECRAWL_API_KEY) {
+    return null; // Not configured, skip
+  }
+  
+  try {
+    // Dynamically import to avoid making it a hard dependency
+    const FirecrawlApp = (await import('@mendable/firecrawl-js')).default;
+    const app = new FirecrawlApp({ apiKey: process.env.FIRECRAWL_API_KEY! });
+    const result = await app.scrapeUrl(homeOfficeUrl, { formats: ['markdown'] });
+    
+    // Extract CSV URL from markdown content
+    if (result.success && result.markdown) {
+      const match = result.markdown.match(/https?:\/\/[^\s)"]+\.csv/i);
+      return match?.[0] ?? null;
+    }
+    
+    return null;
+  } catch (err) {
+    logger.warn({ err: err instanceof Error ? err.message : String(err) }, 
+                '[SponsorListFetcher] Firecrawl discovery failed - falling back to cheerio');
+    return null;
+  }
+}
 
 export interface SponsorRecord {
   organisationName: string;
@@ -270,10 +300,16 @@ async function findCsvUrl(): Promise<string | ScraplingResponse> {
 
 /**
  * Discovers the CSV download URL for the UK Gov sponsor register.
- * Tries cheerio first, then Scrapling as fallback.
+ * Tries Firecrawl first (if configured), then cheerio, then Scrapling as fallback.
  * Throws if only the HTML fallback is available — the monitor job requires the full CSV.
  */
 export async function discoverCsvUrl(): Promise<string> {
+  // Try Firecrawl first if API key is configured
+  const firecrawlResult = await discoverViaFirecrawl(GOV_UK_PAGE_URL);
+  if (firecrawlResult) {
+    return firecrawlResult;
+  }
+  
   let result;
   try {
     result = await findCsvUrl();
