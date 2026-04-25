@@ -3,7 +3,7 @@
  *
  * Supersedes the legacy notificationDispatcher for the main job loop.
  * Checks users.notif_prefs (jsonb) to skip events the user has opted out of.
- * Uses an in-memory rate limiter (Map<userId, timestamp[]>) — 10 sends per 24h.
+ * Uses a Redis-backed sliding-window rate limiter (sorted set) — 3 sends per user per company per hour.
  * Logs every action to notif_engine_log for audit.
  *
  * Deferred delivery (starter plan, same-day window):
@@ -77,8 +77,9 @@ async function isRateLimited(userId: string | number, companyName: string): Prom
   try {
     // Use a pipeline for atomic operation
     const multi = redis.multi();
+    const member = `${now}:${Math.random().toString(36).slice(2)}`;
     multi.zremrangebyscore(key, 0, windowStart); // Remove old entries
-    multi.zadd(key, now, `${now}`);              // Add current timestamp
+    multi.zadd(key, now, member);                // Add current event with unique member
     multi.zcard(key);                            // Get count
     multi.expire(key, Math.ceil(RATE_LIMIT_WINDOW_MS / 1000)); // Refresh TTL
     const results = await multi.exec();
@@ -87,10 +88,11 @@ async function isRateLimited(userId: string | number, companyName: string): Prom
     const count = results?.[2]?.[1] as number ?? 0;
     return count > RATE_LIMIT_MAX;
   } catch (err) {
-    logger.warn({ err: err instanceof Error ? err.message : String(err) }, 
-                '[NotificationEngine] Rate limiter check failed - allowing notification');
-    // Fail open for rate limiter to avoid blocking notifications on Redis glitches
-    return false;
+    logger.error({ err: err instanceof Error ? err.message : String(err) }, 
+                '[NotificationEngine] Rate limiter check failed - blocking notification (fail-closed)');
+    // Fail closed: block notifications when Redis rate-limit check fails
+    // to prevent exceeding rate limits during Redis outages.
+    throw new Error('Redis rate-limit check failed - notifications blocked');
   }
 }
 

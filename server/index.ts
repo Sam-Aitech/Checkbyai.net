@@ -260,10 +260,10 @@ app.use((req, res, next) => {
 
 async function applyPendingMigrations() {
   const client = await pool.connect();
-  // Advisory lock to prevent concurrent migrations across multiple pods
-  // Lock key 9999001 is arbitrary but must be consistent
-  await client.query("SELECT pg_advisory_lock(9999001)");
   try {
+    // Advisory lock to prevent concurrent migrations across multiple pods
+    // Lock key 9999001 is arbitrary but must be consistent
+    await client.query("SELECT pg_advisory_lock(9999001)");
     const migrations = [
       `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "cos_beta_enabled" boolean DEFAULT false`,
       `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "cos_beta_limit" integer`,
@@ -436,6 +436,7 @@ async function applyPendingMigrations() {
       )`,
       `CREATE INDEX IF NOT EXISTS "idx_shadow_parity_reports_job_created" ON "shadow_parity_reports"("job_name", "created_at")`,
       `CREATE INDEX IF NOT EXISTS "idx_shadow_parity_reports_shadow_run" ON "shadow_parity_reports"("shadow_run_id")`,
+      `ALTER TABLE "monitor_job_runs" ADD COLUMN IF NOT EXISTS "notifications_queued" integer DEFAULT 0`,
       `ALTER TABLE "diff_results" ADD COLUMN IF NOT EXISTS "diff_json" JSONB`,
       `ALTER TABLE "csv_archive" ADD COLUMN IF NOT EXISTS "sync_status" TEXT NOT NULL DEFAULT 'SYNCED'`,
       `CREATE INDEX IF NOT EXISTS "idx_csv_archive_sync_status" ON "csv_archive"("sync_status", "snapshot_date" DESC) WHERE "sync_status" != 'SYNCED'`,
@@ -460,7 +461,7 @@ async function applyPendingMigrations() {
       await client.query(sql);
     }
     log("Schema migrations applied successfully");
-} catch (error) {
+  } catch (error) {
     logger.error({ err: error }, "Failed to apply schema migrations");
   } finally {
     // Release advisory lock
@@ -471,8 +472,9 @@ async function applyPendingMigrations() {
     }
     client.release();
   }
-}
 
+  // Concurrent indexes run after migrations (outside the advisory lock since
+  // CREATE INDEX CONCURRENTLY cannot run inside a transaction/lock).
   const concurrentIndexes = [
     `CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_sc_status_name" ON "sponsor_canonical"("status", "current_name")`,
     `CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_sc_status_town" ON "sponsor_canonical"("status", "town_city")`,
@@ -480,16 +482,17 @@ async function applyPendingMigrations() {
     `CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_changes_date_type" ON "sponsor_changes"("snapshot_date" DESC, "change_type")`,
     `CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_changes_fp_detected" ON "sponsor_changes"("fingerprint", "detected_at" DESC) WHERE "fingerprint" IS NOT NULL`,
   ];
-   for (const sql of concurrentIndexes) {
-     try {
-       await pool.query(sql);
-     } catch (err: any) {
-       if (err?.code === '42P07') continue;
-       logger.warn({ err }, "Non-blocking: concurrent index creation failed (will retry next boot)");
-     }
-   }
- 
- (async () => {
+  for (const sql of concurrentIndexes) {
+    try {
+      await pool.query(sql);
+    } catch (err: any) {
+      if (err?.code === '42P07') continue;
+      logger.warn({ err }, "Non-blocking: concurrent index creation failed (will retry next boot)");
+    }
+  }
+}
+
+(async () => {
    await applyPendingMigrations();
    await checkPythonBackend();
    

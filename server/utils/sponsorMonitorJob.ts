@@ -398,6 +398,7 @@ export async function runSponsorMonitorJob(
   notificationsSent: number;
   notificationsSkipped: number;
   notificationsFailed: number;
+  notificationsQueued: number;
   error?: string;
 }> {
    const result = {
@@ -765,6 +766,7 @@ export async function runSponsorMonitorJob(
          notificationsSent:   result.notificationsSent,
          notificationsSkipped: result.notificationsSkipped,
          notificationsFailed: result.notificationsFailed,
+         notificationsQueued: result.notificationsQueued,
          durationMs: finalDuration,
          completedAt: completionTime,
        }).onConflictDoUpdate({
@@ -778,6 +780,7 @@ export async function runSponsorMonitorJob(
           notificationsSent:   result.notificationsSent,
           notificationsSkipped: result.notificationsSkipped,
           notificationsFailed: result.notificationsFailed,
+          notificationsQueued: result.notificationsQueued,
           durationMs: finalDuration,
           completedAt: completionTime,
         },
