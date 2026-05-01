@@ -1,10 +1,10 @@
 import { cn } from '@/lib/utils'
 import { useState, useEffect, useRef, Suspense, lazy } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useInView } from 'react-intersection-observer'
-import { Zap, Lock, ArrowRight, Play, Bell, Activity, CheckCircle, XCircle, AlertTriangle, ShieldCheck, Eye, Search, Loader2 } from 'lucide-react'
-import { ShieldMonitorIcon, AlertBellIcon, DocumentVerifyIcon, TimelineClockIcon, EarlyWarningIcon, CreditCoinIcon,
+import { Zap, Lock, ArrowRight, Play, Bell, Activity, CheckCircle, XCircle, AlertTriangle, ShieldCheck, Search, Loader2, ChevronDown } from 'lucide-react'
+import { ShieldMonitorIcon, DocumentVerifyIcon, TimelineClockIcon, EarlyWarningIcon,
   HeroAlertIcon,
   HeroTrackedIcon,
   HeroGDPRLockIcon,
@@ -352,6 +352,69 @@ function UrgencyBanner() {
   );
 }
 
+// ── Dark-themed dropdown for the home page hero nav ──────────────────────────
+
+interface HeroNavItem { href: string; label: string; desc: string }
+
+function HeroNavDropdown({ label, items }: { label: string; items: HeroNavItem[] }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        onClick={() => setOpen(v => !v)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className="flex items-center gap-1 px-4 py-2 text-sm text-white/70 hover:text-white font-medium rounded-full hover:bg-white/10 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+      >
+        {label}
+        <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 6 }}
+            transition={{ duration: 0.15 }}
+            onMouseEnter={() => setOpen(true)}
+            onMouseLeave={() => setOpen(false)}
+            role="menu"
+            className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-60 bg-slate-900/95 backdrop-blur-xl rounded-xl border border-white/10 shadow-2xl shadow-black/40 overflow-hidden z-50"
+          >
+            <div className="p-1.5">
+              {items.map(item => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setOpen(false)}
+                  role="menuitem"
+                  className="flex flex-col gap-0.5 px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors group"
+                >
+                  <span className="text-sm font-semibold text-white group-hover:text-emerald-300 transition-colors">{item.label}</span>
+                  <span className="text-xs text-white/50">{item.desc}</span>
+                </Link>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 interface HeroSectionProps {
   onStartVerification?: () => void;
 }
@@ -552,30 +615,38 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
 
           <div className="relative z-10 max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
             <nav className="flex justify-between items-center py-4 mb-6">
-              <Link href="/" className="flex items-center gap-2.5">
+              <Link href="/" className="flex items-center shrink-0">
                 <img src={logoImg} alt="CheckByAi.net" width={160} height={40} className="h-10 sm:h-12 w-auto object-contain" />
               </Link>
+
+              {/* Desktop grouped nav */}
               <div className="hidden md:flex items-center gap-1">
-                {[
-                  { href: "/sponsors", label: "Sponsor Register" },
-                  { href: "/sponsor-monitor", label: "Sponsor Monitor" },
-                  { href: "/dashboard", label: "Verify CoS" },
-                  { href: "/pricing", label: "Pricing" },
-                  { href: "/cos-guide", label: "CoS Guide" },
-                  { href: "/api-docs", label: "API" },
-                ].map((link) => (
-                  <Link key={link.href} href={link.href} className="px-4 py-2 text-sm text-white/70 hover:text-white font-medium rounded-full hover:bg-white/10 transition-all duration-200">{link.label}</Link>
-                ))}
+                <HeroNavDropdown
+                  label="Monitor"
+                  items={[
+                    { href: "/sponsors",        label: "Sponsor Register",  desc: "Search 124,000+ licensed sponsors" },
+                    { href: "/sponsor-monitor", label: "Sponsor Monitor",   desc: "Instant alerts when a licence changes" },
+                    { href: "/sponsor-changes", label: "Licence Changes",   desc: "Recent additions and revocations" },
+                  ]}
+                />
+                <Link href="/dashboard" className="px-4 py-2 text-sm text-white/70 hover:text-white font-medium rounded-full hover:bg-white/10 transition-all duration-200">Verify CoS</Link>
+                <Link href="/pricing"   className="px-4 py-2 text-sm text-white/70 hover:text-white font-medium rounded-full hover:bg-white/10 transition-all duration-200">Pricing</Link>
+                <HeroNavDropdown
+                  label="Resources"
+                  items={[
+                    { href: "/cos-guide",  label: "CoS Guide",  desc: "Certificate of Sponsorship explained" },
+                    { href: "/ai-guide",   label: "AI Guide",   desc: "How our AI verification works" },
+                    { href: "/technology", label: "Technology", desc: "The tech behind CheckByAI" },
+                    { href: "/api-docs",   label: "API Docs",   desc: "Integrate via our REST API" },
+                  ]}
+                />
               </div>
+
               <div className="flex items-center gap-2">
-                <Link href="/sponsor-monitor">
-                  <Button size="sm" className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-full px-5 font-bold text-sm shadow-lg shadow-emerald-500/20 hidden sm:flex">
-                    <Bell className="w-3.5 h-3.5 mr-1.5" />Get Alerts
-                  </Button>
+                <Link href="/pricing" className="hidden sm:flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-full shadow-lg shadow-emerald-500/20 transition-all">
+                  <Bell className="w-3.5 h-3.5" />Get Alerts
                 </Link>
-                <Link href="/login">
-                  <Button size="sm" variant="outline" className="border-white/30 text-white hover:bg-white/10 rounded-full px-5 font-semibold text-sm bg-transparent">Sign In</Button>
-                </Link>
+                <Link href="/login" className="px-4 py-2 text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-all">Sign In</Link>
               </div>
             </nav>
 
