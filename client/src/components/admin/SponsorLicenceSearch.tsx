@@ -97,10 +97,10 @@ export default function SponsorLicenceSearch() {
       const res = await fetch(`/api/sponsors/directory?${params.toString()}`, {
         credentials: 'include',
       });
-      if (!res.ok) throw new Error('Failed to load sponsor directory');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setData(await res.json());
     } catch {
-      setError('Could not load sponsor directory. Check that the register has been initialised.');
+      setError('The register is temporarily unavailable. Please try again in a moment.');
     } finally {
       setLoading(false);
     }
@@ -179,9 +179,21 @@ export default function SponsorLicenceSearch() {
       <CardContent>
         {/* Error */}
         {error && (
-          <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm mb-4">
-            <XCircle className="w-4 h-4 shrink-0" />
-            {error}
+          <div className="flex flex-col gap-3 p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm mb-4">
+            <div className="flex items-center gap-2">
+              <XCircle className="w-4 h-4 shrink-0" />
+              <span>{error}</span>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => load(nameInput, statusFilter, page)}
+              disabled={loading}
+              className="self-start border-red-500/30 text-red-400 hover:bg-red-500/10"
+            >
+              <RefreshCw className={`w-3 h-3 mr-1 ${loading ? 'animate-spin' : ''}`} />
+              Try again
+            </Button>
           </div>
         )}
 
@@ -205,10 +217,17 @@ export default function SponsorLicenceSearch() {
           </div>
         )}
 
-        {/* Loading */}
+        {/* Skeleton loading */}
         {loading && (
-          <div className="flex justify-center py-12">
-            <div className="w-8 h-8 border-4 border-cyan-200 border-t-cyan-500 rounded-full animate-spin" />
+          <div className="space-y-2 animate-pulse">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 p-3 rounded-lg border border-gray-100 dark:border-slate-700">
+                <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded w-2/5" />
+                <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded w-1/5" />
+                <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded w-1/5" />
+                <div className="h-5 bg-gray-200 dark:bg-slate-700 rounded-full w-16 ml-auto" />
+              </div>
+            ))}
           </div>
         )}
 

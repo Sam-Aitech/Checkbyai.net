@@ -16,6 +16,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.2] — 2026-05-01
+
+### Fixed
+- **Sponsor register page**: Replaced vague "Could not load the register" error with a user-safe message and a **Try again** retry button (`SponsorLicenceSearch.tsx`)
+- **Loading UX**: Replaced spinning loader with an 8-row skeleton placeholder for better perceived performance
+- **Trust proxy**: Added `app.set('trust proxy', 1)` so `req.ip` resolves correctly behind Nginx / cloud load balancers (previously returned `undefined`, breaking rate limiter key generation)
+- **Rate limiter IP fallback**: Changed fallback IP from empty string to `"127.0.0.1"` so in-process rate limiters function when `req.ip` is not set
+- **Null-safe subscription status**: Fixed `TypeError` crash in `personalizedRateLimiter` when `req.user.subscriptionStatus` is `null`
+- **Startup integrity check**: Added `sponsor_canonical` row count check on server boot — emits `warn` if the table is empty with remediation instructions for ops
+
+### Changed
+- **`sponsorListFetcher.ts`**: Removed all deprecated functions with no active callers — `storeSnapshot`, `getLatestSnapshotDate`, `cleanupOldSnapshots`, `downloadAndParseSponsorList`, `downloadAndStreamSponsorList` — along with the `InitProgressCallback` type. These all targeted the retired `sponsor_list` table
+- **`sponsorListFetcher.ts`**: Removed unused imports: `db`, `sponsorList`, `eq`, `desc`, `lt`
+- **Rate limiter store**: Added TODO comment to wire Redis-backed store for shared counters across pods (Phase-2)
+- **`@mendable/firecrawl-js`**: Installed missing optional dependency listed in `package.json` (fixes TypeScript compile error)
+
+---
+
+## [1.0.2] — 2026-04-07
+
+### Fixed
+- **Proxy-aware IP handling**: Enabled `trust proxy` in Express so `req.ip` resolves correctly behind Nginx/load balancers
+- **Startup integrity guard**: Added startup check for `sponsor_canonical` row count with explicit warning when the register is empty
+- **Rate limiter null safety**: Fixed `subscriptionStatus` checks to avoid runtime `TypeError` when status is null
+- **Rate limiter fallback key**: Replaced empty-string IP fallback with `127.0.0.1` for safer limiter key generation
+- **Sponsors page error UX**: Replaced internal-style error copy with user-safe messaging and added a one-click retry action
+- **Sponsors page loading UX**: Replaced spinner-only loading with multi-row skeleton placeholders for better perceived performance
+
+### Changed
+- **Legacy sponsor ingestion cleanup**: Removed deprecated `storeSnapshot`, `getLatestSnapshotDate`, and `cleanupOldSnapshots` functions
+- **Retired table references removed**: Removed stale `sponsorList` usage and related unused imports from `sponsorListFetcher.ts`
+
+---
+
 ## [1.0.1] — 2026-04-06
 
 ### Fixed

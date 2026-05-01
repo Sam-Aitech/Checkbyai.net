@@ -99,6 +99,10 @@ async function seedAdminUser() {
 
 const app = express();
 
+// Trust the first proxy so req.ip is the real client IP behind Nginx/load balancer.
+// Without this, req.ip is undefined or 127.0.0.1, which breaks all IP-based rate limiting.
+app.set('trust proxy', 1);
+
 app.use(compression({
   level: 6,
   threshold: 1024,
@@ -495,6 +499,27 @@ async function applyPendingMigrations() {
 (async () => {
    await applyPendingMigrations();
    await checkPythonBackend();
+
+   // ── Startup data integrity check ─────────────────────────────────────────
+   // Warn ops if sponsor_canonical is empty — the register will show no data
+   // until the ETL pipeline has completed at least one successful run.
+   try {
+     const countResult = await pool.query<{ count: string }>(
+       "SELECT COUNT(*)::text AS count FROM sponsor_canonical"
+     );
+     const rowCount = parseInt(countResult.rows[0]?.count ?? "0", 10);
+     if (rowCount === 0) {
+       logger.warn(
+         "[Startup] sponsor_canonical table is EMPTY. " +
+         "The sponsor register will show no data until the ETL pipeline completes. " +
+         "Trigger a manual refresh via POST /api/admin/ops/reconcile or ensure the nightly cron is scheduled."
+       );
+     } else {
+       logger.info({ rowCount }, "[Startup] sponsor_canonical loaded — register is ready.");
+     }
+   } catch (err) {
+     logger.error({ err }, "[Startup] Failed to check sponsor_canonical row count — DB may be unavailable.");
+   }
    
    // Probe Redis: initialise BullMQ queues + shared cache client (no-op if Redis is unavailable)
    await initJobQueue();

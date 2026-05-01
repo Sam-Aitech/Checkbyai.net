@@ -20,9 +20,10 @@ const rateLimiterFactory = (maxPerMinute: number) => rateLimit({
   max: maxPerMinute,
   standardHeaders: true,
   legacyHeaders: false,
+  // req.ip is correctly resolved after app.set('trust proxy', 1) in server/index.ts.
   keyGenerator: (req) => {
     // Use user ID if authenticated, otherwise IP
-    return (req as any).user?.id || ipKeyGenerator(req.ip ?? "");
+    return (req as any).user?.id || ipKeyGenerator(req.ip ?? "127.0.0.1");
   },
 });
 
@@ -36,21 +37,20 @@ const authenticatedSearchRateLimit = rateLimiterFactory(120);
 const personalizedRateLimiter = (baseLimit: number) => rateLimit({
   windowMs: 60 * 1_000,
   max: (req: any) => {
-    // Higher limits for premium/subscriber users
-    if (req.user?.subscriptionStatus?.includes('pro') || 
-        req.user?.subscriptionStatus?.includes('unlimited') ||
-        req.user?.subscriptionStatus?.includes('enterprise')) {
+    // Null-safe: subscriptionStatus may be null for free users.
+    const sub: string = req.user?.subscriptionStatus ?? "";
+    if (sub.includes('pro') || sub.includes('unlimited') || sub.includes('enterprise')) {
       return baseLimit * 3; // 3x for premium users
     }
-    if (req.user?.subscriptionStatus?.includes('starter') ||
-        req.user?.subscriptionStatus?.includes('notification')) {
+    if (sub.includes('starter') || sub.includes('notification')) {
       return baseLimit * 2; // 2x for starter users
     }
     return baseLimit; // Default for free/trial users
   },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => ((req as any).user?.id || ipKeyGenerator(req.ip ?? "")),
+  // req.ip is correctly resolved after app.set('trust proxy', 1) in server/index.ts.
+  keyGenerator: (req) => ((req as any).user?.id || ipKeyGenerator(req.ip ?? "127.0.0.1")),
 });
 
 function getWatchLimit(subscriptionStatus: string | null): number {
@@ -58,8 +58,9 @@ function getWatchLimit(subscriptionStatus: string | null): number {
 }
 
 // ── API Rate Limiters ─────────────────────────────────────────────────────────
-// In-process store per instance. For multi-server deployments consider adding a
-// Redis store (e.g. rate-limit-redis) so counters are shared across pods.
+// TODO(Phase-2): Add rate-limit-redis store so counters are shared across pods.
+// Currently in-process — effective limit is N×max with multiple instances.
+// Tracked: https://github.com/Sam-Aitech/Checkbyai.net/issues/RATE-LIMIT-GLOBAL
 const directoryRateLimit = rateLimit({
   windowMs: 60 * 1_000,  // 1 minute
   max: 60,
