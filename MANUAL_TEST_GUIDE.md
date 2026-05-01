@@ -1,4 +1,43 @@
-# Quick Manual Test Guide - Feedback System
+# Quick Manual Test Guide
+
+---
+
+## Navigation Redesign (2026-05-01)
+
+### Test 1: Inner-page nav — grouped structure
+1. Open any page other than home (e.g. `/sponsors`)
+2. Verify desktop nav shows: **Monitor ▾** | **Verify CoS** | **Pricing** | **Resources ▾** | Sign In | Get Alerts
+3. Hover **Monitor** → dropdown shows: Sponsor Register, Sponsor Monitor, Licence Changes (each with icon + description)
+4. Hover **Resources** → dropdown shows: CoS Guide, AI Guide, Technology, API Docs
+5. Click a dropdown item → navigates correctly, dropdown closes
+6. **Get Alerts** button: emerald green (`bg-emerald-600`)
+7. Active page link has primary-color highlight
+
+### Test 2: Home page hero nav — dark-themed dropdown
+1. Open `/`
+2. Nav inside gradient: same 4-group structure, white text
+3. Hover **Monitor ▾** → dark slate dropdown appears with emerald hover on labels
+4. Hover **Resources ▾** → same
+5. **Get Alerts** button: emerald-600
+
+### Test 3: Mobile nav
+1. Resize to <1024px width
+2. Hamburger menu opens a panel with three sections:
+   - Monitor (with icon links)
+   - Verify CoS + Pricing
+   - Resources (with icon links)
+3. Emerald **Get Licence Alerts** CTA at bottom
+4. Sign In link visible above CTA
+5. Escape key closes menu; focus returns to burger button
+
+### Test 4: Keyboard / a11y
+- Tab through nav links — all have visible focus ring
+- Enter/Space on dropdown triggers open
+- Escape closes dropdown
+
+---
+
+## Feedback System
 
 ## 🎯 Quick 5-Minute Test
 
