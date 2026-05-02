@@ -10,6 +10,7 @@ import { users, verificationResults } from "@shared/schema";
 import { isAuthenticated } from "../auth";
 import { verifyLimiter } from "../middleware/rateLimiter";
 import { PDFAnalyzer } from "../services/pdfAnalyzer";
+import { COSAuthenticityChecker } from "../services/cosAuthenticityChecker";
 import { getClientIp, hashIpAddress } from "../ipRateLimit";
 
 function generateReceiptId(): string {
@@ -156,8 +157,16 @@ export function registerVerificationRoutes(app: Express): void {
       } else {
         // Normal AI analysis path — load admin knowledge to feed into analysis
         const pdfAnalyzer = new PDFAnalyzer();
-        const extractedMetadata = await pdfAnalyzer.extractMetadata(req.file.path);
-        const trustedPatterns = await storage.getTrustedPatterns();
+
+        // Read the file buffer once: used for the document hash AND passed to the
+        // CoS checker so it can count startxref occurrences without a second disk read.
+        const fileBuffer = await fs.promises.readFile(req.file.path);
+        const pdfBinary = fileBuffer.toString('binary');
+
+        const [extractedMetadata, trustedPatterns] = await Promise.all([
+          pdfAnalyzer.extractMetadata(req.file.path),
+          storage.getTrustedPatterns(),
+        ]);
 
         // Load admin-accumulated knowledge in parallel (non-fatal if missing)
         const [activeRules, hitlFakes] = await Promise.all([
@@ -180,13 +189,14 @@ export function registerVerificationRoutes(app: Express): void {
           })),
         };
 
-        const analysisResult = await pdfAnalyzer.analyzeAgainstTrustedPatterns(
-          extractedMetadata,
-          trustedPatterns,
-          adminContext,
-        );
+        // Run AI analysis and CoS authenticity check truly in parallel.
+        const [analysisResult, cosCheckResult] = await Promise.all([
+          pdfAnalyzer.analyzeAgainstTrustedPatterns(extractedMetadata, trustedPatterns, adminContext),
+          Promise.resolve(new COSAuthenticityChecker().check(pdfBinary, extractedMetadata)),
+        ]);
         result = analysisResult.result;
         analysis = analysisResult;
+        analysis.cosCheck = cosCheckResult;
         metadata = {
           // File Format Info
           format: 'Pdf',
@@ -271,6 +281,7 @@ export function registerVerificationRoutes(app: Express): void {
         forensicAnalysis: analysis.details?.forensicAnalysis || null,
         adminOverride: isAdminOverride,
         metadata: isAdminOverride ? {} : metadata,
+        cosCheck: analysis.cosCheck ?? null,
         timestamp: new Date().toISOString()
       });
 

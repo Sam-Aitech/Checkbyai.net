@@ -16,6 +16,7 @@ interface VerificationResult {
   documentHash?: string;
   metadata?: Record<string, any>;
   verificationId?: number;
+  cosCheck?: import('../../../shared/mis-types').COSCheckResult | null;
 }
 
 interface FileUploadSimpleProps {
@@ -180,6 +181,7 @@ export default function FileUploadSimple({
         documentHash: data.documentHash,
         metadata: data.metadata || {},
         verificationId: data.id,
+        cosCheck: data.cosCheck ?? null,
       };
 
       setResult(transformedResult);

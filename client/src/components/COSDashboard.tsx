@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'wouter';
 import FileUploadSimple from './FileUploadSimple';
 import Enhanced3DDemo from './Enhanced3DDemo';
-import VerificationResults from './VerificationResults';
+import VerificationResultsTabbed from './VerificationResultsTabbed';
 import MetadataGroupsPanel from './MetadataGroupsPanel';
 import { useAuth } from '@/hooks/useAuth';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -66,6 +66,7 @@ interface VerificationResult {
   documentHash?: string;
   metadata?: Record<string, any>;
   verificationId?: number;
+  cosCheck?: import('../../../shared/mis-types').COSCheckResult | null;
 }
 
 export default function COSDashboard() {
@@ -684,8 +685,12 @@ export default function COSDashboard() {
                     </button>
                   </div>
 
-                  {/* Forensic verdict + checks */}
-                  <VerificationResults result={verificationResult} verificationId={verificationResult.verificationId} />
+                  {/* Forensic verdict + checks + metadata inspector */}
+                  <VerificationResultsTabbed
+                    result={verificationResult}
+                    verificationId={verificationResult.verificationId}
+                    isAdmin={isAdmin}
+                  />
 
                   {/* Structured metadata panel — admin only */}
                   {isAdmin && verificationResult.metadata && Object.keys(verificationResult.metadata).length > 0 && (
