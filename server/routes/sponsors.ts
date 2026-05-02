@@ -12,14 +12,18 @@ import { generateHeadline, signDigest } from "../services/aiDigest";
 import { storage } from "../storage";
 import { cacheGet, cacheSet, cacheFlushPattern } from "../utils/redisClient";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
+import { makeRateLimitStore } from "../utils/redisRateLimitStore";
 
 // ── Tiered Rate Limiters for Search ──────────────────────────────────────────
-// Authenticated users get higher limits, anonymous get reasonable limits
-const rateLimiterFactory = (maxPerMinute: number) => rateLimit({
+// Authenticated users get higher limits, anonymous get reasonable limits.
+// Stores are Redis-backed when Redis is available (shared across pods);
+// express-rate-limit falls back to in-process MemoryStore automatically.
+const rateLimiterFactory = (maxPerMinute: number, prefix: string) => rateLimit({
   windowMs: 60 * 1_000,
   max: maxPerMinute,
   standardHeaders: true,
   legacyHeaders: false,
+  store: makeRateLimitStore(prefix),
   // req.ip is correctly resolved after app.set('trust proxy', 1) in server/index.ts.
   keyGenerator: (req) => {
     // Use user ID if authenticated, otherwise IP
@@ -28,10 +32,10 @@ const rateLimiterFactory = (maxPerMinute: number) => rateLimit({
 });
 
 // Anonymous search - 30 requests/minute (prevents abuse)
-const freeSearchRateLimit = rateLimiterFactory(30);
+const freeSearchRateLimit = rateLimiterFactory(30, "rl:search:free:");
 
 // Authenticated search - 120 requests/minute (for power users)
-const authenticatedSearchRateLimit = rateLimiterFactory(120);
+const authenticatedSearchRateLimit = rateLimiterFactory(120, "rl:search:auth:");
 
 // Custom key generator for personalized limits
 const personalizedRateLimiter = (baseLimit: number) => rateLimit({
@@ -49,6 +53,7 @@ const personalizedRateLimiter = (baseLimit: number) => rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  store: makeRateLimitStore("rl:search:personalized:"),
   // req.ip is correctly resolved after app.set('trust proxy', 1) in server/index.ts.
   keyGenerator: (req) => ((req as any).user?.id || ipKeyGenerator(req.ip ?? "127.0.0.1")),
 });
@@ -58,14 +63,14 @@ function getWatchLimit(subscriptionStatus: string | null): number {
 }
 
 // ── API Rate Limiters ─────────────────────────────────────────────────────────
-// TODO(Phase-2): Add rate-limit-redis store so counters are shared across pods.
-// Currently in-process — effective limit is N×max with multiple instances.
-// Tracked: https://github.com/Sam-Aitech/Checkbyai.net/issues/RATE-LIMIT-GLOBAL
+// Counters are stored in Redis when available (shared across pods).
+// Falls back to in-process MemoryStore automatically when Redis is offline.
 const directoryRateLimit = rateLimit({
   windowMs: 60 * 1_000,  // 1 minute
   max: 60,
   standardHeaders: true,  // RateLimit-* headers (RFC 6585)
   legacyHeaders: false,
+  store: makeRateLimitStore("rl:directory:"),
   // No custom keyGenerator — express-rate-limit v8's built-in ipKeyGenerator handles IPv6
   message: { message: "Too many requests. Please wait before browsing the directory again." },
 });
@@ -75,6 +80,7 @@ const changesRateLimit = rateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
+  store: makeRateLimitStore("rl:changes:"),
   // No custom keyGenerator — express-rate-limit v8's built-in ipKeyGenerator handles IPv6
   message: { message: "Too many requests. Please wait before fetching sponsor changes again." },
 });
