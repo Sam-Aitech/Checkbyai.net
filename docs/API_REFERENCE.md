@@ -122,6 +122,8 @@ Returns the currently authenticated user.
 
 ## 3. COS Check
 
+COS Check combines AI-powered document analysis with the **Metadata Inspector (MIS)** — a forensic scanner that detects PDF tampering by analyzing metadata, XMP fields, incremental updates, and editing tool fingerprints.
+
 ### `POST /api/verify`
 Uploads and forensically analyses a COS PDF document.
 
@@ -147,11 +149,53 @@ Uploads and forensically analyses a COS PDF document.
     "xmpHistory": [],
     "fonts": ["Calibri", "Arial"]
   },
+  "cosCheck": {
+    "verdict": "GENUINE",
+    "reason": null,
+    "checks": [
+      { "name": "Apache FOP Producer", "passed": true, "detail": "OK" },
+      { "name": "XMP Fields Present", "passed": true, "detail": "All 8 fields found" },
+      { "name": "XMP Field Order", "passed": true, "detail": "Correct order" },
+      { "name": "Info/XMP Consistency", "passed": true, "detail": "Metadata matches" },
+      { "name": "Incremental Updates", "passed": true, "detail": "No modifications" },
+      { "name": "Editing Tool Fingerprint", "passed": true, "detail": "No suspicious tools" }
+    ],
+    "xmpTags": {
+      "dc:date": "2025-11-01",
+      "dc:format": "application/pdf",
+      "dc:language": "en",
+      "pdf:PDFVersion": "1.5",
+      "pdf:Producer": "Apache FOP 2.8",
+      "xmp:CreateDate": "2025-11-01T10:00:00Z",
+      "xmp:CreatorTool": "Apache FOP 2.8",
+      "xmp:MetadataDate": "2025-11-01T10:00:00Z"
+    },
+    "docStats": {
+      "pages": 2,
+      "characters": 2450,
+      "words": 310,
+      "fileSizeBytes": 125480
+    },
+    "forensic": {
+      "incrementalUpdates": 0,
+      "infoXmpConsistency": "MATCH",
+      "toolFingerprint": "None detected",
+      "suspiciousIndicators": []
+    }
+  },
   "creditsRemaining": 4
 }
 ```
 
 **`result` values:** `"genuine"` | `"suspicious"` | `"fake"`
+
+**`cosCheck` field:**
+Metadata Inspector result (when user has COS Check access). For non-admin users, only `verdict` and `reason` are returned. Admin users see full forensic details including all 6 checks, XMP tags, PDF properties, document stats, and suspicious indicators.
+
+- `verdict`: `"GENUINE"` | `"EDITED"` — PDF authenticity status
+- `reason`: Null if GENUINE; otherwise a brief reason (e.g., "missing dc:language, xmp:MetadataDate")
+- `checks`: Array of 6 authenticity checks (Apache FOP producer, XMP fields present, XMP field order, info/XMP consistency, incremental updates, editing tool fingerprint)
+- Admin-only fields: `xmpTags`, `pdfProperties`, `docStats`, `forensic`
 
 **Response 400:**
 ```json

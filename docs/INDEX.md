@@ -15,6 +15,7 @@
 | [ARCHITECTURE_DECISIONS.md](ARCHITECTURE_DECISIONS.md) | Engineering | Why architectural choices were made (ADRs) |
 | [ENTERPRISE_EXECUTION_PLAN.md](ENTERPRISE_EXECUTION_PLAN.md) | Leadership / Engineering / Ops | CTO-approved hardening roadmap for enterprise readiness, delivery order, and exit criteria |
 | [EXECUTION_PHASES_0_8.md](EXECUTION_PHASES_0_8.md) | Leadership / Engineering / PM | End-to-end program status from Phase 0 through Phase 8 (completed vs remaining, GitHub build plan) |
+| [COS_CHECK_MIS.md](COS_CHECK_MIS.md) | Engineering | COS Check Metadata Inspector architecture, 6-point authenticity checks, type definitions, client integration |
 
 ---
 
@@ -51,6 +52,7 @@ Phase 5: generateHeadline() + monitor_job_runs audit
 | `server/utils/sponsorSearch.ts` | In-memory Fuse.js search index |
 | `server/utils/sponsorListFetcher.ts` | gov.uk CSV URL discovery + DTO types (SponsorChange, ChangeType) |
 | `server/services/pdfAnalyzer.ts` | PDF forensic analysis engine |
+| `server/services/cosAuthenticityChecker.ts` | COS Check Metadata Inspector — 6-point authenticity verification |
 | `server/services/aiService.ts` | AI provider abstraction + fallback chain |
 | `server/utils/tierConfig.ts` | Subscription tier feature gates |
 | `server/db.ts` | Neon PostgreSQL pool + Drizzle ORM |

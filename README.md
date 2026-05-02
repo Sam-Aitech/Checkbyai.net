@@ -22,12 +22,17 @@ Automated monitoring of the [UK Home Office Register of Licensed Sponsors](https
 
 **Perfect for:** Visa holders, immigration advisers, HR compliance teams
 
-### 2. **COS Check**
+### 2. **COS Check — PDF Metadata Inspector (MIS)**
 Forensic analysis of Certificate of Sponsorship PDFs using AI and metadata forensics. Detects:
 - Document tampering (Photoshop, GIMP, Canva edits)
-- Fabricated metadata
-- Suspicious modification dates
-- Encryption/signature issues
+- Fabricated metadata (missing or reordered XMP fields)
+- Suspicious modification dates and metadata inconsistencies
+- Incremental updates and editing tool fingerprints
+- Invalid certificate generation (non-Apache FOP producers)
+
+**Two-tier verification:**
+- **User View** — Verdict only: GENUINE (green shield) or EDITED (red shield) with one-line reason
+- **Admin View** — Full forensics: all 6 authenticity checks, XMP tags table, PDF properties, document stats, suspicious indicators
 
 **Perfect for:** Anyone verifying a COS document authenticity
 
@@ -42,6 +47,7 @@ Forensic analysis of Certificate of Sponsorship PDFs using AI and metadata foren
 | **Job Alerts** | — | — | ✅ | ✅ | ✅ |
 | **Companies House Data** | — | — | ✅ | ✅ | ✅ |
 | **COS Check Verifications** | Limited | Limited | Pay-per-check | Unlimited | Unlimited |
+| **COS Check MIS** | — | — | ✅ | ✅ | ✅ |
 | **API Access** | — | — | — | ✅ | ✅ |
 | **Expert Review** | — | — | Optional | Optional | Included |
 
