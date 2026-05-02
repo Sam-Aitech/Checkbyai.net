@@ -53,6 +53,7 @@ function Router() {
         <Route path="/admin/:domain" component={SimpleAdmin} />
         <Route path="/admin" component={SimpleAdmin} />
         <Route path="/dashboard" component={DashboardPage} />
+        <Route path="/verify-cos" component={DashboardPage} />
         <Route path="/pricing" component={Pricing} />
         <Route path="/cos-pricing" component={CosPricing} />
         <Route path="/checkout/success" component={CheckoutSuccess} />

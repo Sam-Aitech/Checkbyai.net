@@ -16,7 +16,6 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import BrandLogo from "@/components/BrandLogo";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -903,7 +902,7 @@ export default function SponsorMonitor() {
   const hasSearchResults = effectiveResults && effectiveResults.length > 0;
 
   return (
-    <PageLayout hideNav hideFooter>
+    <PageLayout darkNav>
       <SEOHead
         title="Is Your Employer's Sponsor Licence Still Valid? | Free Check | CheckByAI"
         description="Check any UK employer's sponsor licence status for free. Get instant alerts if it's revoked, suspended or downgraded — before it affects your visa."
@@ -952,25 +951,6 @@ export default function SponsorMonitor() {
       />
 
       <StickyAlertBanner />
-
-      <nav className="sticky top-0 z-50 bg-slate-950/95 backdrop-blur-xl border-b border-slate-800">
-        <div className="max-w-5xl mx-auto px-4 flex items-center justify-between h-14">
-          <Link href="/" className="flex items-center shrink-0">
-            <BrandLogo variant="dark" />
-          </Link>
-          <div className="hidden sm:flex items-center gap-1">
-            <Link href="/dashboard" className="px-3 py-1.5 text-sm text-slate-300 hover:text-white transition-colors rounded-lg hover:bg-white/5">Verify CoS</Link>
-            <Link href="/pricing" className="px-3 py-1.5 text-sm text-slate-300 hover:text-white transition-colors rounded-lg hover:bg-white/5">Pricing</Link>
-            <Link href="/sponsor-monitor" className="px-3 py-1.5 text-sm text-white bg-white/10 rounded-lg font-medium">Sponsor Monitor</Link>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button size="sm" variant="ghost" onClick={scrollToSearch} className="text-slate-300 hover:text-white hover:bg-white/5 text-xs hidden sm:flex">Search Free</Button>
-            <Button size="sm" onClick={() => setLocation("/pricing")} className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold">
-              <Bell className="w-3.5 h-3.5 mr-1" />Get Alerts
-            </Button>
-          </div>
-        </div>
-      </nav>
 
       <HeroSection onScrollToSearch={scrollToSearch} />
       <LandingDigest />
@@ -1331,18 +1311,6 @@ export default function SponsorMonitor() {
           <p className="text-xs text-slate-500 mt-4">From £24.99/month. Cancel anytime.</p>
         </div>
       </section>
-
-      <footer className="bg-slate-950 border-t border-slate-800 text-slate-400 py-8">
-        <div className="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
-            <BrandLogo variant="dark" showText size="sm" className="opacity-70 grayscale hover:grayscale-0 transition-all duration-300" />
-          <div className="flex items-center gap-4">
-            <Link href="/dashboard" className="hover:text-white transition-colors">Verify CoS</Link>
-            <Link href="/pricing" className="hover:text-white transition-colors">Pricing</Link>
-            <Link href="/sponsor-changes" className="hover:text-white transition-colors">Recent Changes</Link>
-          </div>
-          <p>We monitor the official UK Home Office register.</p>
-        </div>
-      </footer>
 
       <MobileStickyBar />
 

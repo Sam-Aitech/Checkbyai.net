@@ -2,6 +2,7 @@ import { Link, useLocation } from "wouter";
 import { Menu, X, LayoutDashboard, ChevronDown, Bell, Search, TrendingUp, BookOpen, Cpu, FileCheck, Code2 } from "lucide-react";
 import UserProfile from "./UserProfile";
 import Footer from "./Footer";
+import BrandLogo from "./BrandLogo";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import logoImg from "@assets/logo_material.png";
@@ -12,6 +13,7 @@ interface PageLayoutProps {
   children: React.ReactNode;
   hideNav?: boolean;
   hideFooter?: boolean;
+  darkNav?: boolean;
 }
 
 interface NavChild {
@@ -36,7 +38,7 @@ const navItems: NavItem[] = [
       { href: "/sponsor-changes", label: "Licence Changes",   desc: "Recent additions, revocations and downgrades",   icon: <TrendingUp className="w-4 h-4" /> },
     ],
   },
-  { href: "/dashboard", label: "Verify CoS" },
+  { href: "/verify-cos", label: "Verify CoS" },
   { href: "/pricing",   label: "Pricing" },
   {
     label: "Resources",
@@ -51,9 +53,10 @@ const navItems: NavItem[] = [
 
 interface NavDropdownProps {
   item: NavItem;
+  dark?: boolean;
 }
 
-function NavDropdown({ item }: NavDropdownProps) {
+function NavDropdown({ item, dark = false }: NavDropdownProps) {
   const [open, setOpen] = useState(false);
   const [location] = useLocation();
   const ref = useRef<HTMLDivElement>(null);
@@ -77,9 +80,9 @@ function NavDropdown({ item }: NavDropdownProps) {
         aria-expanded={open}
         aria-haspopup="menu"
         className={`flex items-center gap-1 px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
-          isChildActive
-            ? "text-primary bg-primary/10 font-semibold"
-            : "text-muted-foreground hover:text-foreground hover:bg-muted"
+          dark
+            ? isChildActive ? "text-white bg-white/10 font-semibold" : "text-slate-300 hover:text-white hover:bg-white/5"
+            : isChildActive ? "text-primary bg-primary/10 font-semibold" : "text-muted-foreground hover:text-foreground hover:bg-muted"
         }`}
       >
         {item.label}
@@ -128,7 +131,7 @@ function NavDropdown({ item }: NavDropdownProps) {
   );
 }
 
-export default function PageLayout({ children, hideNav = false, hideFooter = false }: PageLayoutProps) {
+export default function PageLayout({ children, hideNav = false, hideFooter = false, darkNav = false }: PageLayoutProps) {
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const shouldReduceMotion = useReducedMotion();
@@ -188,19 +191,21 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
   return (
     <div className="min-h-screen flex flex-col bg-background">
       {!hideNav && (
-        <nav className="sticky top-0 z-50 bg-white/80 dark:bg-background/80 backdrop-blur-xl border-b border-border/50">
+        <nav className={`sticky top-0 z-50 backdrop-blur-xl border-b ${darkNav ? "bg-slate-950/95 border-slate-800" : "bg-white/80 dark:bg-background/80 border-border/50"}`}>
           <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
             <div className="flex justify-between items-center h-16">
 
               {/* Logo */}
               <Link href="/" className="flex items-center shrink-0">
-                <img src={logoImg} alt="CheckByAi.net" width={160} height={40} className="h-10 sm:h-12 w-auto object-contain" />
+                {darkNav
+                  ? <BrandLogo variant="dark" />
+                  : <img src={logoImg} alt="CheckByAi.net" width={160} height={40} className="h-10 sm:h-12 w-auto object-contain" />}
               </Link>
 
               {/* Desktop nav */}
               <div className="hidden lg:flex items-center gap-1">
                 {navItems.map((item) => {
-                  if (item.children) return <NavDropdown key={item.label} item={item} />;
+                  if (item.children) return <NavDropdown key={item.label} item={item} dark={darkNav} />;
                   const isActive = location === item.href;
                   return (
                     <Link
@@ -208,9 +213,9 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
                       href={item.href!}
                       aria-current={isActive ? "page" : undefined}
                       className={`px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
-                        isActive
-                          ? "text-primary bg-primary/10 font-semibold"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                        darkNav
+                          ? isActive ? "text-white bg-white/10 font-semibold" : "text-slate-300 hover:text-white hover:bg-white/5"
+                          : isActive ? "text-primary bg-primary/10 font-semibold" : "text-muted-foreground hover:text-foreground hover:bg-muted"
                       }`}
                     >
                       {item.label}
@@ -233,17 +238,19 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
                   <>
                     <Link
                       href="/login"
-                      className="hidden sm:block px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                      className={`hidden sm:block px-4 py-2 text-sm font-medium rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${darkNav ? "text-slate-300 hover:text-white hover:bg-white/5" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
                     >
                       Sign In
                     </Link>
-                    <Link
-                      href="/pricing"
-                      className="hidden sm:flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-full shadow-sm shadow-emerald-500/20 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
-                    >
-                      <Bell className="w-3.5 h-3.5" />
-                      Get Alerts
-                    </Link>
+                    {location !== "/pricing" && (
+                      <Link
+                        href="/pricing"
+                        className="hidden sm:flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-full shadow-sm shadow-emerald-500/20 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
+                      >
+                        <Bell className="w-3.5 h-3.5" />
+                        Get Alerts
+                      </Link>
+                    )}
                   </>
                 )}
 
@@ -251,7 +258,7 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
 
                 <button
                   ref={menuButtonRef}
-                  className="lg:hidden p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  className={`lg:hidden p-2 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${darkNav ? "text-slate-300 hover:text-white hover:bg-white/5" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
                   onClick={() => setMobileOpen(!mobileOpen)}
                   aria-label="Toggle navigation menu"
                   aria-expanded={mobileOpen}
@@ -276,13 +283,13 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
                 animate={menuVariants.animate}
                 exit={menuVariants.exit}
                 transition={shouldReduceMotion ? { duration: 0.15 } : { type: "spring", stiffness: 100, damping: 15 }}
-                className="lg:hidden border-t border-border/50 bg-white/95 dark:bg-background/95 backdrop-blur-xl overflow-hidden"
+                className={`lg:hidden border-t backdrop-blur-xl overflow-hidden ${darkNav ? "border-slate-800 bg-slate-900/95" : "border-border/50 bg-white/95 dark:bg-background/95"}`}
               >
                 <div className="px-5 py-4 space-y-4">
 
                   {/* Monitor group */}
                   <div>
-                    <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground/50 px-3 mb-1">Monitor</p>
+                    <p className={`text-[10px] font-bold tracking-widest uppercase px-3 mb-1 ${darkNav ? "text-slate-500" : "text-muted-foreground/50"}`}>Monitor</p>
                     {monitorGroup.children?.map(child => (
                       <Link
                         key={child.href}
@@ -291,18 +298,18 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
                         aria-current={location === child.href ? "page" : undefined}
                         className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                           location === child.href
-                            ? "text-primary bg-primary/10 font-semibold"
-                            : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                            ? darkNav ? "text-white bg-white/10 font-semibold" : "text-primary bg-primary/10 font-semibold"
+                            : darkNav ? "text-slate-300 hover:text-white hover:bg-white/5" : "text-muted-foreground hover:text-foreground hover:bg-muted"
                         }`}
                       >
-                        <span className="text-muted-foreground shrink-0">{child.icon}</span>
+                        <span className={`shrink-0 ${darkNav ? "text-slate-400" : "text-muted-foreground"}`}>{child.icon}</span>
                         {child.label}
                       </Link>
                     ))}
                   </div>
 
                   {/* Standalone links */}
-                  <div className="border-t border-border/50 pt-3">
+                  <div className={`border-t pt-3 ${darkNav ? "border-slate-800" : "border-border/50"}`}>
                     {[navItems[1], navItems[2]].map(item => (
                       <Link
                         key={item.href}
@@ -311,8 +318,8 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
                         aria-current={location === item.href ? "page" : undefined}
                         className={`block px-3 py-2.5 text-sm font-medium rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                           location === item.href
-                            ? "text-primary bg-primary/10 font-semibold"
-                            : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                            ? darkNav ? "text-white bg-white/10 font-semibold" : "text-primary bg-primary/10 font-semibold"
+                            : darkNav ? "text-slate-300 hover:text-white hover:bg-white/5" : "text-muted-foreground hover:text-foreground hover:bg-muted"
                         }`}
                       >
                         {item.label}
@@ -321,8 +328,8 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
                   </div>
 
                   {/* Resources group */}
-                  <div className="border-t border-border/50 pt-3">
-                    <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground/50 px-3 mb-1">Resources</p>
+                  <div className={`border-t pt-3 ${darkNav ? "border-slate-800" : "border-border/50"}`}>
+                    <p className={`text-[10px] font-bold tracking-widest uppercase px-3 mb-1 ${darkNav ? "text-slate-500" : "text-muted-foreground/50"}`}>Resources</p>
                     {resourcesGroup.children?.map(child => (
                       <Link
                         key={child.href}
@@ -331,18 +338,18 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
                         aria-current={location === child.href ? "page" : undefined}
                         className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                           location === child.href
-                            ? "text-primary bg-primary/10 font-semibold"
-                            : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                            ? darkNav ? "text-white bg-white/10 font-semibold" : "text-primary bg-primary/10 font-semibold"
+                            : darkNav ? "text-slate-300 hover:text-white hover:bg-white/5" : "text-muted-foreground hover:text-foreground hover:bg-muted"
                         }`}
                       >
-                        <span className="text-muted-foreground shrink-0">{child.icon}</span>
+                        <span className={`shrink-0 ${darkNav ? "text-slate-400" : "text-muted-foreground"}`}>{child.icon}</span>
                         {child.label}
                       </Link>
                     ))}
                   </div>
 
                   {/* CTA */}
-                  <div className="border-t border-border/50 pt-3">
+                  <div className={`border-t pt-3 ${darkNav ? "border-slate-800" : "border-border/50"}`}>
                     {isAuthenticated && (isPro || isAdmin) ? (
                       <Link
                         href="/pro-dashboard"
@@ -357,18 +364,20 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
                         <Link
                           href="/login"
                           onClick={closeMobileMenu}
-                          className="block w-full px-4 py-2.5 text-sm font-medium text-center text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl transition-colors mb-2"
+                          className={`block w-full px-4 py-2.5 text-sm font-medium text-center rounded-xl transition-colors mb-2 ${darkNav ? "text-slate-300 hover:text-white hover:bg-white/5" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
                         >
                           Sign In
                         </Link>
-                        <Link
-                          href="/pricing"
-                          onClick={closeMobileMenu}
-                          className="flex items-center justify-center gap-2 w-full px-4 py-3 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all"
-                        >
-                          <Bell className="w-4 h-4" />
-                          Get Licence Alerts
-                        </Link>
+                        {location !== "/pricing" && (
+                          <Link
+                            href="/pricing"
+                            onClick={closeMobileMenu}
+                            className="flex items-center justify-center gap-2 w-full px-4 py-3 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all"
+                          >
+                            <Bell className="w-4 h-4" />
+                            Get Licence Alerts
+                          </Link>
+                        )}
                       </>
                     )}
                   </div>
