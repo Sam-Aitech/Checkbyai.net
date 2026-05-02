@@ -194,9 +194,20 @@ export function registerVerificationRoutes(app: Express): void {
           pdfAnalyzer.analyzeAgainstTrustedPatterns(extractedMetadata, trustedPatterns, adminContext),
           Promise.resolve(new COSAuthenticityChecker().check(pdfBinary, extractedMetadata)),
         ]);
-        result = analysisResult.result;
         analysis = analysisResult;
         analysis.cosCheck = cosCheckResult;
+
+        // The specialist COS authenticity checker (6 targeted checks) is authoritative.
+        // If it clears the document as GENUINE, trust it over the general pattern analyser
+        // which can false-positive on Apache FOP version string differences.
+        if (cosCheckResult.verdict === 'GENUINE' && analysisResult.result !== 'genuine') {
+          console.log(`[COS] cosCheck GENUINE overrides pattern analysis '${analysisResult.result}' — treating as genuine`);
+          result = 'genuine';
+          analysis.result = 'genuine';
+          analysis.confidence = Math.max(analysis.confidence as number, 85);
+        } else {
+          result = analysisResult.result;
+        }
         metadata = {
           // File Format Info
           format: 'Pdf',

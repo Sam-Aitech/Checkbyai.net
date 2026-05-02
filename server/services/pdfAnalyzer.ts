@@ -131,6 +131,7 @@ const SUSPICIOUS_SOFTWARE = [
 ];
 
 const KNOWN_GENUINE_PRODUCERS = [
+  'apache fop',                                          // UK Home Office official COS generator
   'microsoft word', 'microsoft office', 'acrobat', 'adobe acrobat',
   'libreoffice', 'openoffice', 'google docs', 'gov.uk',
   'home office', 'uk visas', 'hmrc'
@@ -735,7 +736,9 @@ export class PDFAnalyzer {
   
   private normalizeProducer(producer: string): string {
     const normalized = producer.toLowerCase().trim();
-    
+
+    // Apache FOP is the official UK Home Office COS generator — all versions are equivalent
+    if (normalized.includes('apache') && normalized.includes('fop')) return 'apache-fop';
     if (normalized.includes('microsoft') || normalized.includes('word')) return 'microsoft';
     if (normalized.includes('adobe') || normalized.includes('acrobat')) return 'adobe';
     if (normalized.includes('libreoffice') || normalized.includes('openoffice')) return 'libreoffice';
@@ -744,7 +747,7 @@ export class PDFAnalyzer {
     if (normalized.includes('photoshop')) return 'photoshop';
     if (normalized.includes('illustrator')) return 'illustrator';
     if (!normalized || normalized === 'unknown') return 'unknown';
-    
+
     return normalized;
   }
 
@@ -804,7 +807,11 @@ export class PDFAnalyzer {
       // 2. HITL — if human experts previously flagged docs with matching producer as fake, apply a penalty
       for (const cas of adminContext.hitlKnowledge) {
         const caseProducer = ((cas.metadata?.producer) || '').toLowerCase();
-        if (caseProducer && docProducer && docProducer.includes(caseProducer.split(' ')[0])) {
+        const isSignificantMatch = caseProducer &&
+          docProducer &&
+          this.normalizeProducer(docProducer) === this.normalizeProducer(caseProducer) &&
+          this.normalizeProducer(caseProducer) !== 'unknown';
+        if (isSignificantMatch) {
           const reason = cas.adminFeedback || 'No reason provided';
           ruleResult.checks.push({
             name: 'Human Expert Correction (HITL)',
