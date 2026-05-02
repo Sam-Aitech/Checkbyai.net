@@ -16,6 +16,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.3] — 2026-05-02
+
+### Fixed
+- **Nav — self-referential CTA**: "Get Alerts" button in the shared nav (desktop + mobile) is now hidden when the user is already on `/pricing`, eliminating the redundant self-link
+- **Nav — Verify CoS URL mismatch**: "Verify CoS" nav link previously pointed to `/dashboard`; corrected to `/verify-cos`. Added `/verify-cos` as an alias route in `App.tsx` (renders `DashboardPage`)
+- **SponsorMonitor — rogue custom nav/footer**: `SponsorMonitor.tsx` was rendering its own bespoke `<nav>` and `<footer>` (bypassing the shared `PageLayout`), causing nav inconsistency across pages — different links, no Monitor dropdown, no Resources section
+
+### Changed
+- **`PageLayout.tsx`**: Added `darkNav?: boolean` prop. When `true`, the sticky nav renders with a `bg-slate-950/95 border-slate-800` dark-slate palette, swaps the logo to `<BrandLogo variant="dark" />`, and switches all desktop links, dropdowns, hamburger, mobile menu, section headers, dividers, and Sign In CTA to dark-aware colour classes (`text-slate-300/text-white` palette)
+- **`PageLayout.tsx` — `NavDropdown`**: Added `dark?: boolean` prop; button and active-state colours respond to dark mode
+- **`SponsorMonitor.tsx`**: Replaced `<PageLayout hideNav hideFooter>` with `<PageLayout darkNav>`. Removed ~30-line custom inline `<nav>` block and ~12-line custom inline `<footer>` block. Removed unused `BrandLogo` import. The page now uses the full shared nav (Monitor dropdown, Verify CoS, Pricing, Resources) in dark styling and the shared gradient footer
+
+---
+
 ## [1.0.2] — 2026-05-01
 
 ### Fixed

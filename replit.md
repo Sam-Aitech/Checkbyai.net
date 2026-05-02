@@ -13,6 +13,7 @@ The system features a dual-portal design: an Admin Portal for managing genuine C
 - **Framework**: React with TypeScript
 - **Styling**: Tailwind CSS with shadcn/ui
 - **UI/UX Decisions**: Professional color scheme, adaptive color-changing result badges with gradient backgrounds and animations, mobile optimization with responsive design, and SEO-optimized pages with unique metadata and structured data.
+- **Shared Layout (`PageLayout.tsx`)**: All pages use `PageLayout` for sticky nav + footer + page-transition animation. Props: `hideNav` (omit nav), `hideFooter` (omit footer), `darkNav` (dark-slate nav variant — `bg-slate-950/95`, `BrandLogo variant=dark`, slate-300/white link palette). `NavDropdown` accepts matching `dark` prop. The "Get Alerts" CTA in the nav is suppressed on `/pricing` to prevent a self-referential link. `SponsorMonitor` uses `<PageLayout darkNav>` — it has no custom nav/footer of its own. Route `/verify-cos` is an alias for `/dashboard` (renders `DashboardPage`).
 - **3D Graphics**: Three.js with @react-three/fiber for an animated landing page.
 
 **Backend:**
