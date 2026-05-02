@@ -1,4 +1,30 @@
 """
+DEPRECATED — sponsor_etl.py (SQLite-staging FastAPI router)
+============================================================
+This module is no longer mounted in main.py as of 2026-05-02.
+
+Why retired:
+  • Used SQLite as a staging store then served rows via HTTP to Node.js — an
+    unnecessary two-database hop.
+  • Node.js sponsorMonitorJob (server/utils/sponsorMonitorJob.ts) already owns
+    the full ETL: downloads the Gov.uk CSV, diffs against yesterday's archive,
+    reconciles directly into PostgreSQL sponsor_canonical, and fires
+    user notifications — all without any Python HTTP dependency.
+  • Parallel SQLite-backed write path caused register to show no data when the
+    Python process was offline at Node.js startup.
+
+Replacement:
+  • For Python-native environments: backend/sponsor_etl_cron.py — a standalone
+    script that writes directly to PostgreSQL sponsor_canonical (no SQLite staging,
+    no HTTP layer).
+  • For production: the Node.js cron is the authoritative ETL path.
+
+This file is kept as an archive. Do not re-mount in main.py.
+"""
+
+# ── Legacy code below — not executed ─────────────────────────────────────────
+
+"""
 sponsor_etl.py — UK Gov Sponsor Licence Register ETL microservice
 Adds three deterministic, paginated endpoints to the existing FastAPI backend:
 
