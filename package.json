@@ -154,8 +154,10 @@
     "@types/pino-http": "^5.8.4",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
+    "@types/supertest": "^7.2.0",
     "@types/ws": "^8.18.1",
     "dotenv": "^17.4.2",
+    "supertest": "^7.2.2",
     "vitest": "^4.1.1"
   },
   "optionalDependencies": {
