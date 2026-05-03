@@ -2,14 +2,93 @@ import type { Express } from "express";
 import * as crypto from "crypto";
 import Stripe from "stripe";
 import { db } from "../db";
-import { sql, eq, lt } from "drizzle-orm";
+import { sql, eq, lt, and, inArray } from "drizzle-orm";
 import { withRetry } from "../utils/dbRetry";
-import { users, processedCheckouts, DEFAULT_NOTIF_PREFS } from "@shared/schema";
+import { users, processedCheckouts, companyWatches, sponsorCanonical, DEFAULT_NOTIF_PREFS } from "@shared/schema";
 import { sendEmailReliably } from "../utils/resilientEmail";
 import { getAppUrl } from "../utils/appUrl";
 import { isAuthenticated } from "../auth";
 import { storage } from "../storage";
 import { logger } from "../utils/logger";
+import { getWatchLimit } from "../utils/tierConfig";
+import { normalizeName, generateFingerprint } from "../utils/sponsorListFetcher";
+
+/**
+ * Best-effort: after a successful Notification Engine checkout, auto-create
+ * a company_watches row for the company the user pre-selected on the sponsor
+ * page. Idempotent (no-op if a watch already exists or limit is reached) and
+ * never throws — failures are logged but never break the checkout flow.
+ */
+async function autoCreateWatchFromPayment(userId: string, companyName: string): Promise<void> {
+  try {
+    const trimmed = companyName.trim();
+    if (!trimmed) return;
+
+    const normalized = normalizeName(trimmed);
+
+    // Skip if user already has any watch (active or inactive) for this name
+    const existing = await db
+      .select({ id: companyWatches.id, isActive: companyWatches.isActive })
+      .from(companyWatches)
+      .where(and(
+        eq(companyWatches.userId, userId),
+        eq(companyWatches.organisationNameNormalized, normalized),
+      ))
+      .limit(1);
+    if (existing.length > 0) {
+      if (!existing[0].isActive) {
+        await db.update(companyWatches)
+          .set({ isActive: true })
+          .where(eq(companyWatches.id, existing[0].id));
+        logger.info({ userId, companyName: trimmed }, '[AutoWatch] Reactivated existing watch after payment');
+      } else {
+        logger.info({ userId, companyName: trimmed }, '[AutoWatch] Watch already active, skipping');
+      }
+      return;
+    }
+
+    // Resolve the canonical sponsor — fingerprint first, then normalized scan
+    type CanonicalRow = typeof sponsorCanonical.$inferSelect;
+    const fp = generateFingerprint(trimmed, '', '');
+    let match: CanonicalRow | null = (await db.select().from(sponsorCanonical)
+      .where(eq(sponsorCanonical.fingerprint, fp)).limit(1))[0] ?? null;
+
+    if (!match) {
+      const candidates = await db.select().from(sponsorCanonical)
+        .where(inArray(sponsorCanonical.status, ['ACTIVE', 'NEWLY_GRANTED', 'REMOVED_REVOKED', 'GRACE_PERIOD']));
+      match = candidates.find(c => normalizeName(c.currentName) === normalized) ?? null;
+    }
+
+    if (!match) {
+      logger.warn({ userId, companyName: trimmed }, '[AutoWatch] Company not found in sponsor register; skipping auto-watch');
+      return;
+    }
+
+    // Respect the user's tier watch limit (defensive — usually first watch)
+    const user = await storage.getUser(userId);
+    const limit = getWatchLimit(user?.subscriptionStatus);
+    if (limit !== -1) {
+      const active = await db.select({ id: companyWatches.id }).from(companyWatches)
+        .where(and(eq(companyWatches.userId, userId), eq(companyWatches.isActive, true)));
+      if (active.length >= limit) {
+        logger.warn({ userId, limit, current: active.length }, '[AutoWatch] Watch limit reached, skipping');
+        return;
+      }
+    }
+
+    await db.insert(companyWatches).values({
+      userId,
+      organisationName: match.currentName,
+      organisationNameNormalized: normalized,
+      townCity: match.townCity,
+      fingerprint: match.fingerprint,
+      isActive: true,
+    });
+    logger.info({ userId, companyName: match.currentName, fingerprint: match.fingerprint }, '[AutoWatch] Created watch from checkout companyName');
+  } catch (err) {
+    logger.error({ err, userId, companyName }, '[AutoWatch] Failed to auto-create watch from payment — non-fatal');
+  }
+}
 
 const CHECKOUT_HMAC_SECRET = process.env.CHECKOUT_HMAC_SECRET;
 if (!CHECKOUT_HMAC_SECRET && process.env.NODE_ENV === "production") {
@@ -383,12 +462,14 @@ export function registerBillingRoutes(app: Express): void {
         const session = event.data.object as any;
         let userId = session.metadata?.userId;
         let packageType = session.metadata?.packageType;
+        let companyName: string | undefined;
 
         if (!userId && session.client_reference_id) {
           const verified = verifyClientReferenceId(session.client_reference_id);
           if (verified) {
             userId = verified.userId;
             packageType = verified.packageType;
+            companyName = verified.companyName;
           } else {
             console.error('Invalid client_reference_id signature:', session.client_reference_id);
           }
@@ -455,6 +536,9 @@ export function registerBillingRoutes(app: Express): void {
             }), 'webhook-checkout-notification-starter');
             sendSubscriptionNotifications(userId, 'Notification Engine Starter', 'notification_starter', sessionEmail).catch((err) => console.error('[Subscription] Notification failed:', err));
             storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'starter', reason: 'Checkout: Sponsor Monitor Starter', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
+            if (companyName) {
+              autoCreateWatchFromPayment(userId, companyName).catch((err) => logger.error({ err }, '[AutoWatch] webhook starter failed'));
+            }
           } else if (packageType === 'notification_pro') {
             await withRetry(() => db.transaction(async (tx) => {
               await tx.update(users).set({
@@ -468,6 +552,9 @@ export function registerBillingRoutes(app: Express): void {
             }), 'webhook-checkout-notification-pro');
             sendSubscriptionNotifications(userId, 'Notification Engine Pro', 'notification_pro', sessionEmail).catch((err) => console.error('[Subscription] Notification failed:', err));
             storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'pro', reason: 'Checkout: Sponsor Monitor Pro', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
+            if (companyName) {
+              autoCreateWatchFromPayment(userId, companyName).catch((err) => logger.error({ err }, '[AutoWatch] webhook pro failed'));
+            }
           } else if (packageType === 'cos_check') {
             await withRetry(() => db.transaction(async (tx) => {
               await tx.update(users).set({
@@ -520,6 +607,26 @@ export function registerBillingRoutes(app: Express): void {
     } catch (error: unknown) {
       console.error('Error fetching packages:', error);
       res.status(500).json({ message: 'Failed to fetch packages' });
+    }
+  });
+
+  // Stripe Customer Portal — lets paid users self-serve: update card, view
+  // invoices, cancel subscription. Returns a short-lived portal URL.
+  app.post('/api/billing/portal', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.id);
+      if (!user?.stripeCustomerId) {
+        return res.status(400).json({ message: 'No active subscription found. Subscribe to a plan first.' });
+      }
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const portalSession = await stripe.billingPortal.sessions.create({
+        customer: user.stripeCustomerId,
+        return_url: `${baseUrl}/pro-dashboard`,
+      });
+      res.json({ url: portalSession.url });
+    } catch (error: unknown) {
+      console.error('Billing portal error:', error);
+      res.status(500).json({ message: 'Failed to open billing portal. Please try again.' });
     }
   });
 
@@ -678,6 +785,9 @@ export function registerBillingRoutes(app: Express): void {
                   updatedAt: new Date(),
                 }).where(eq(users.id, sessionUserId));
               }), 'checkout-verify-notification-starter');
+              if (companyName) {
+                await autoCreateWatchFromPayment(sessionUserId, companyName);
+              }
             } else if (packageType === 'notification_pro') {
               await withRetry(() => db.transaction(async (tx) => {
                 await tx.update(users).set({
@@ -689,6 +799,9 @@ export function registerBillingRoutes(app: Express): void {
                   updatedAt: new Date(),
                 }).where(eq(users.id, sessionUserId));
               }), 'checkout-verify-notification-pro');
+              if (companyName) {
+                await autoCreateWatchFromPayment(sessionUserId, companyName);
+              }
             }
           }
 

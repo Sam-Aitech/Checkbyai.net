@@ -11,14 +11,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { Crown, User, LogOut, Settings } from "lucide-react";
+import { Crown, User, LogOut, Settings, LayoutDashboard, CreditCard } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
 
 export default function UserProfile() {
   const { user, isAuthenticated, isPro, isAdmin } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const [openingPortal, setOpeningPortal] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -31,6 +33,26 @@ export default function UserProfile() {
       window.location.reload();
     } catch (error) {
       console.error("Logout error:", error);
+    }
+  };
+
+  const handleOpenBillingPortal = async () => {
+    try {
+      setOpeningPortal(true);
+      const res = await apiRequest("POST", "/api/billing/portal");
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error(data.message || "No portal URL returned");
+      }
+    } catch (error: any) {
+      toast({
+        title: "Could not open billing portal",
+        description: error.message || "Please try again in a moment.",
+        variant: "destructive",
+      });
+      setOpeningPortal(false);
     }
   };
 
@@ -83,6 +105,19 @@ export default function UserProfile() {
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           
+          {isPro && (
+            <>
+              <DropdownMenuItem onClick={() => setLocation('/pro-dashboard')} data-testid="menu-pro-dashboard">
+                <LayoutDashboard className="mr-2 h-4 w-4" />
+                <span>Pro Dashboard</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleOpenBillingPortal} disabled={openingPortal} data-testid="menu-manage-subscription">
+                <CreditCard className="mr-2 h-4 w-4" />
+                <span>{openingPortal ? "Opening…" : "Manage Subscription"}</span>
+              </DropdownMenuItem>
+            </>
+          )}
+
           {!isPro && (
             <DropdownMenuItem onClick={() => setLocation('/pricing')}>
               <Crown className="mr-2 h-4 w-4" />
