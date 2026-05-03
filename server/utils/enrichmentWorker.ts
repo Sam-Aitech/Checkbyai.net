@@ -37,10 +37,51 @@ const ADVISORY_LOCK_KEY = 7483922; // Distinct from 7483920 (monitor) and 748392
 const PYTHON_BACKEND_URL = process.env.PYTHON_BACKEND_URL || "http://localhost:8000";
 const BATCH_SIZE = 50;
 const QUEUE_PAUSE_MS = 5 * 60 * 1000; // 5 min on CF block or mass rate limit
+const SIDECAR_OFFLINE_CACHE_MS = 30 * 60 * 1000; // 30 min before re-checking a downed sidecar
 const MAX_ATTEMPTS = 5;
 
 /** In-memory pause timestamp. Survives within a single process. */
 let queuePausedUntil = 0;
+
+/**
+ * Timestamp until which the Python sidecar is considered offline.
+ * Avoids hammering a dead sidecar 50 times per batch — checked once per
+ * batch at the start, cached for 30 minutes after the first connection failure.
+ */
+let sidecarOfflineUntil = 0;
+
+/**
+ * Pings the Python sidecar's health endpoint.
+ * Returns true if the sidecar is reachable, false otherwise.
+ * Result is cached in `sidecarOfflineUntil` for SIDECAR_OFFLINE_CACHE_MS.
+ */
+async function isSidecarAvailable(): Promise<boolean> {
+  if (Date.now() < sidecarOfflineUntil) {
+    return false; // Still within offline cache window — skip without pinging
+  }
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5_000); // 5 s timeout
+    const res = await fetch(`${PYTHON_BACKEND_URL}/api/health`, {
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (res.ok) {
+      return true;
+    }
+    log.warn({ status: res.status }, "[EnrichmentWorker] Sidecar health check returned non-OK status.");
+    sidecarOfflineUntil = Date.now() + SIDECAR_OFFLINE_CACHE_MS;
+    return false;
+  } catch {
+    log.warn(
+      { url: PYTHON_BACKEND_URL },
+      "[EnrichmentWorker] Sidecar unreachable — skipping enrichment batch for 30 min.",
+    );
+    sidecarOfflineUntil = Date.now() + SIDECAR_OFFLINE_CACHE_MS;
+    return false;
+  }
+}
 
 // ── Advisory lock ─────────────────────────────────────────────────────────────
 
@@ -194,6 +235,17 @@ export async function runEnrichmentBatch(): Promise<{ processed: number; errors:
   if (Date.now() < queuePausedUntil) {
     const resumesIn = Math.ceil((queuePausedUntil - Date.now()) / 1000);
     log.info({ resumesIn }, "Enrichment queue paused — skipping batch.");
+    return { processed: 0, errors: 0 };
+  }
+
+  // Gate: confirm sidecar is alive before claiming items from the queue.
+  // If offline, return cleanly (0 errors) rather than failing all 50 claimed items.
+  const sidecarUp = await isSidecarAvailable();
+  if (!sidecarUp) {
+    log.info(
+      { sidecarUrl: PYTHON_BACKEND_URL },
+      "runEnrichmentBatch: Python sidecar offline — skipping batch (no errors counted).",
+    );
     return { processed: 0, errors: 0 };
   }
 
