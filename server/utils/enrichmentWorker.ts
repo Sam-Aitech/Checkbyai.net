@@ -2,7 +2,7 @@
  * Enrichment Worker — Pro Intelligence Pipeline
  * ===============================================
  * Manages the async enrichment of ~124k sponsor records with:
- *   - Companies House financial/incorporation data (via official API or stealth fallback)
+ *   - Companies House financial/incorporation data (via official CH REST API directly)
  *   - Historical licence timeline (scraped from licensed-sponsors-uk.com via Crawl4AI)
  *
  * Architecture:
@@ -12,8 +12,8 @@
  *   - Exponential backoff + jitter on transient failures; 5-minute queue pause on CF blocks.
  *
  * Cron schedule:
- *   - 02:00 UTC daily  → seedEnrichmentQueue (inserts missing rows, respects priorities)
- *   - :15 every hour   → runEnrichmentBatch (processes up to 50 items per run)
+ *   - 02:00 UTC daily  -> seedEnrichmentQueue (inserts missing rows, respects priorities)
+ *   - :15 every hour   -> runEnrichmentBatch (processes up to 50 items per run)
  */
 
 import cron from "node-cron";
@@ -25,7 +25,7 @@ import {
   sponsorCanonical,
   companyWatches,
 } from "@shared/schema";
-import { eq, sql, and, inArray, lte } from "drizzle-orm";
+import { eq, sql, inArray } from "drizzle-orm";
 import { logger } from "./logger";
 import { startJobRun, finishJobRun } from "./jobTelemetry";
 
@@ -33,51 +33,32 @@ const log = logger.child({ module: "EnrichmentWorker" });
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const ADVISORY_LOCK_KEY = 7483922; // Distinct from 7483920 (monitor) and 7483921 (job alerts)
+const ADVISORY_LOCK_KEY = 7483922;
 const PYTHON_BACKEND_URL = process.env.PYTHON_BACKEND_URL || "http://localhost:8000";
+const CH_API_KEY = process.env.COMPANIES_HOUSE_API_KEY ?? "";
+const CH_BASE = "https://api.company-information.service.gov.uk";
+const FUZZY_ACCEPT_SCORE = 72; // minimum token-overlap % to accept a CH name match
 const BATCH_SIZE = 50;
-const QUEUE_PAUSE_MS = 5 * 60 * 1000; // 5 min on CF block or mass rate limit
-const SIDECAR_OFFLINE_CACHE_MS = 30 * 60 * 1000; // 30 min before re-checking a downed sidecar
+const QUEUE_PAUSE_MS = 5 * 60 * 1000;
+const SIDECAR_OFFLINE_CACHE_MS = 30 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
 
-/** In-memory pause timestamp. Survives within a single process. */
 let queuePausedUntil = 0;
-
-/**
- * Timestamp until which the Python sidecar is considered offline.
- * Avoids hammering a dead sidecar 50 times per batch — checked once per
- * batch at the start, cached for 30 minutes after the first connection failure.
- */
 let sidecarOfflineUntil = 0;
 
-/**
- * Pings the Python sidecar's health endpoint.
- * Returns true if the sidecar is reachable, false otherwise.
- * Result is cached in `sidecarOfflineUntil` for SIDECAR_OFFLINE_CACHE_MS.
- */
 async function isSidecarAvailable(): Promise<boolean> {
-  if (Date.now() < sidecarOfflineUntil) {
-    return false; // Still within offline cache window — skip without pinging
-  }
-
+  if (Date.now() < sidecarOfflineUntil) return false;
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5_000); // 5 s timeout
-    const res = await fetch(`${PYTHON_BACKEND_URL}/api/health`, {
-      signal: controller.signal,
-    });
+    const timer = setTimeout(() => controller.abort(), 5_000);
+    const res = await fetch(`${PYTHON_BACKEND_URL}/api/health`, { signal: controller.signal });
     clearTimeout(timer);
-    if (res.ok) {
-      return true;
-    }
+    if (res.ok) return true;
     log.warn({ status: res.status }, "[EnrichmentWorker] Sidecar health check returned non-OK status.");
     sidecarOfflineUntil = Date.now() + SIDECAR_OFFLINE_CACHE_MS;
     return false;
   } catch {
-    log.warn(
-      { url: PYTHON_BACKEND_URL },
-      "[EnrichmentWorker] Sidecar unreachable — skipping enrichment batch for 30 min.",
-    );
+    log.warn({ url: PYTHON_BACKEND_URL }, "[EnrichmentWorker] Sidecar unreachable — will use direct CH API for companies_house jobs.");
     sidecarOfflineUntil = Date.now() + SIDECAR_OFFLINE_CACHE_MS;
     return false;
   }
@@ -87,9 +68,7 @@ async function isSidecarAvailable(): Promise<boolean> {
 
 async function tryAcquireEnrichmentLock(): Promise<boolean> {
   try {
-    const result = await db.execute(
-      sql`SELECT pg_try_advisory_lock(${ADVISORY_LOCK_KEY}) AS acquired`
-    );
+    const result = await db.execute(sql`SELECT pg_try_advisory_lock(${ADVISORY_LOCK_KEY}) AS acquired`);
     return (result.rows[0] as any)?.acquired === true;
   } catch {
     return false;
@@ -97,12 +76,169 @@ async function tryAcquireEnrichmentLock(): Promise<boolean> {
 }
 
 async function releaseEnrichmentLock(): Promise<void> {
-  await db
-    .execute(sql`SELECT pg_advisory_unlock(${ADVISORY_LOCK_KEY})`)
-    .catch(() => {});
+  await db.execute(sql`SELECT pg_advisory_unlock(${ADVISORY_LOCK_KEY})`).catch(() => {});
 }
 
-// ── Sidecar HTTP client ───────────────────────────────────────────────────────
+// ── Direct Companies House REST API client ────────────────────────────────────
+
+/**
+ * Token-ratio fuzzy scorer — case-insensitive word overlap, strips common legal suffixes.
+ * Returns 0-100. No external deps.
+ */
+function fuzzyScore(a: string, b: string): number {
+  const normalise = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9 ]/g, " ")
+      .replace(/\b(ltd|limited|plc|llp|llc|inc|co|the|and)\b/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  const na = normalise(a);
+  const nb = normalise(b);
+  if (na === nb) return 100;
+  const setA = new Set(na.split(" ").filter(Boolean));
+  const setB = new Set(nb.split(" ").filter(Boolean));
+  if (setA.size === 0 || setB.size === 0) return 0;
+  let intersection = 0;
+  for (const w of setA) if (setB.has(w)) intersection++;
+  return Math.round((2 * intersection / (setA.size + setB.size)) * 100);
+}
+
+interface ChProfile {
+  company_number: string | null;
+  company_status: string | null;
+  company_type: string | null;
+  incorporation_date: string | null;
+  sic_codes: string[];
+  registered_address: string | null;
+  last_filed_accounts_date: string | null;
+  next_conf_stmt_due_date: string | null;
+  dissolved_at: string | null;
+  historical_names: string[];
+  companies_house_source: boolean;
+  fuzzy_match_score: number;
+  nature_of_business: null;
+  website_url: null;
+}
+
+async function fetchChDirect(companyName: string): Promise<ChProfile> {
+  if (!CH_API_KEY) {
+    const err: any = new Error("COMPANIES_HOUSE_API_KEY not set");
+    err.httpStatus = 503;
+    throw err;
+  }
+
+  const authHeader = "Basic " + Buffer.from(`${CH_API_KEY}:`).toString("base64");
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15_000);
+
+  try {
+    const searchRes = await fetch(
+      `${CH_BASE}/search/companies?q=${encodeURIComponent(companyName)}&items_per_page=5`,
+      { headers: { Authorization: authHeader }, signal: controller.signal },
+    );
+
+    if (searchRes.status === 429) {
+      clearTimeout(timer);
+      const err: any = new Error("Companies House rate limit hit");
+      err.httpStatus = 429;
+      throw err;
+    }
+    if (!searchRes.ok) {
+      clearTimeout(timer);
+      const err: any = new Error(`CH search HTTP ${searchRes.status}`);
+      err.httpStatus = searchRes.status;
+      throw err;
+    }
+
+    const searchJson = await searchRes.json();
+    const items: any[] = searchJson.items ?? [];
+
+    if (items.length === 0) {
+      clearTimeout(timer);
+      const err: any = new Error(`No CH results for "${companyName}"`);
+      err.httpStatus = 404;
+      throw err;
+    }
+
+    const scored = items.map((item: any) => ({
+      item,
+      score: fuzzyScore(companyName, item.title ?? ""),
+    }));
+    scored.sort((a, b) => b.score - a.score);
+    const { item: best, score: bestScore } = scored[0];
+
+    if (bestScore < FUZZY_ACCEPT_SCORE) {
+      clearTimeout(timer);
+      log.info(
+        { companyName, bestCandidate: best.title, score: bestScore },
+        "[CH Direct] No confident match — skipping.",
+      );
+      const err: any = new Error(`No confident CH match for "${companyName}" (score=${bestScore})`);
+      err.httpStatus = 404;
+      throw err;
+    }
+
+    const companyNumber: string = best.company_number ?? "";
+
+    const [profileRes, filingRes] = await Promise.all([
+      fetch(`${CH_BASE}/company/${companyNumber}`, {
+        headers: { Authorization: authHeader },
+        signal: controller.signal,
+      }),
+      fetch(
+        `${CH_BASE}/company/${companyNumber}/filing-history?category=accounts&items_per_page=1`,
+        { headers: { Authorization: authHeader }, signal: controller.signal },
+      ),
+    ]);
+
+    clearTimeout(timer);
+
+    const profile: any = profileRes.ok ? await profileRes.json() : {};
+    const filing: any = filingRes.ok ? await filingRes.json() : {};
+
+    const addr = profile.registered_office_address ?? {};
+    const addrParts = [
+      addr.address_line_1,
+      addr.address_line_2,
+      addr.locality,
+      addr.postal_code,
+      addr.country,
+    ].filter(Boolean);
+
+    const lastFiled: string | null = (filing.items ?? [])[0]?.date ?? null;
+
+    const sicCodes: string[] = (profile.sic_codes ?? []).map((s: any) =>
+      typeof s === "object" ? (s.sic_code ?? String(s)) : String(s),
+    );
+
+    const historicalNames: string[] = (profile.previous_company_names ?? []).map(
+      (n: any) => n.name ?? "",
+    );
+
+    return {
+      company_number: profile.company_number ?? companyNumber,
+      company_status: profile.company_status ?? null,
+      company_type: profile.type ?? null,
+      incorporation_date: profile.date_of_creation ?? null,
+      sic_codes: sicCodes,
+      registered_address: addrParts.join(", ") || null,
+      last_filed_accounts_date: lastFiled,
+      next_conf_stmt_due_date: profile.confirmation_statement?.next_due ?? null,
+      dissolved_at: profile.date_of_cessation ?? null,
+      historical_names: historicalNames,
+      companies_house_source: true,
+      fuzzy_match_score: Math.round(bestScore) / 100,
+      nature_of_business: null,
+      website_url: null,
+    };
+  } catch (err: any) {
+    clearTimeout(timer);
+    throw err;
+  }
+}
+
+// ── Sidecar HTTP client (licence history only) ───────────────────────────────
 
 interface SidecarCall {
   fingerprint: string;
@@ -134,24 +270,14 @@ async function callSidecar<T>(
   }
 }
 
-// ── Exponential backoff with jitter ──────────────────────────────────────────
-
 function backoffDelayMs(attemptCount: number): number {
-  const base = Math.pow(2, attemptCount) * 30_000; // 30s → 60s → 120s → 240s → 480s
+  const base = Math.pow(2, attemptCount) * 30_000;
   const jitter = Math.floor(Math.random() * 15_000);
   return base + jitter;
 }
 
 // ── Nightly queue seeder ──────────────────────────────────────────────────────
 
-/**
- * Inserts enrichment_queue rows for all sponsors that don't already have one.
- * Uses INSERT … ON CONFLICT DO NOTHING — fully idempotent.
- * Priority:
- *   10 — sponsors on any user's active watchlist
- *    5 — NEWLY_GRANTED sponsors (high user interest, appeared today)
- *    0 — all remaining ACTIVE sponsors
- */
 export async function seedEnrichmentQueue(): Promise<{ inserted: number }> {
   const lockAcquired = await tryAcquireEnrichmentLock();
   if (!lockAcquired) {
@@ -160,7 +286,6 @@ export async function seedEnrichmentQueue(): Promise<{ inserted: number }> {
   }
 
   try {
-    // Collect fingerprints by priority bucket
     const [watched, newlyGranted, active] = await Promise.all([
       db
         .selectDistinct({ fingerprint: companyWatches.fingerprint })
@@ -176,28 +301,29 @@ export async function seedEnrichmentQueue(): Promise<{ inserted: number }> {
         .where(eq(sponsorCanonical.status, "ACTIVE")),
     ]);
 
-    const watchedSet = new Set(watched.map((r) => r.fingerprint).filter((f): f is string => f !== null));
-    const newlyGrantedSet = new Set(newlyGranted.map((r) => r.fingerprint).filter((f): f is string => f !== null));
+    const watchedSet = new Set(
+      watched.map((r) => r.fingerprint).filter((f): f is string => f !== null),
+    );
+    const newlyGrantedSet = new Set(
+      newlyGranted.map((r) => r.fingerprint).filter((f): f is string => f !== null),
+    );
     const jobTypes = ["companies_house", "licence_history"] as const;
     type Row = typeof enrichmentQueue.$inferInsert;
     const rows: Row[] = [];
 
     for (const fp of watchedSet) {
-      for (const jt of jobTypes) {
+      for (const jt of jobTypes)
         rows.push({ fingerprint: fp, jobType: jt, priority: 10, status: "pending", nextAttemptAt: new Date() });
-      }
     }
     for (const { fingerprint: fp } of newlyGranted) {
       if (watchedSet.has(fp)) continue;
-      for (const jt of jobTypes) {
+      for (const jt of jobTypes)
         rows.push({ fingerprint: fp, jobType: jt, priority: 5, status: "pending", nextAttemptAt: new Date() });
-      }
     }
     for (const { fingerprint: fp } of active) {
       if (watchedSet.has(fp) || newlyGrantedSet.has(fp)) continue;
-      for (const jt of jobTypes) {
+      for (const jt of jobTypes)
         rows.push({ fingerprint: fp, jobType: jt, priority: 0, status: "pending", nextAttemptAt: new Date() });
-      }
     }
 
     if (rows.length === 0) {
@@ -205,7 +331,6 @@ export async function seedEnrichmentQueue(): Promise<{ inserted: number }> {
       return { inserted: 0 };
     }
 
-    // Insert in chunks of 500 to stay within Neon's parameter limit per query
     const CHUNK = 500;
     let inserted = 0;
     for (let i = 0; i < rows.length; i += CHUNK) {
@@ -226,11 +351,6 @@ export async function seedEnrichmentQueue(): Promise<{ inserted: number }> {
 
 // ── Batch processor ───────────────────────────────────────────────────────────
 
-/**
- * Claims up to BATCH_SIZE ready items from the queue using FOR UPDATE SKIP LOCKED
- * (PostgreSQL-native advisory row-locking — race-safe for horizontal scaling).
- * Dispatches each item to the Python sidecar and writes results back to DB.
- */
 export async function runEnrichmentBatch(): Promise<{ processed: number; errors: number }> {
   if (Date.now() < queuePausedUntil) {
     const resumesIn = Math.ceil((queuePausedUntil - Date.now()) / 1000);
@@ -238,21 +358,23 @@ export async function runEnrichmentBatch(): Promise<{ processed: number; errors:
     return { processed: 0, errors: 0 };
   }
 
-  // Gate: confirm sidecar is alive before claiming items from the queue.
-  // If offline, return cleanly (0 errors) rather than failing all 50 claimed items.
+  const chApiAvailable = CH_API_KEY.length > 0;
   const sidecarUp = await isSidecarAvailable();
-  if (!sidecarUp) {
+
+  if (!chApiAvailable && !sidecarUp) {
     log.info(
       { sidecarUrl: PYTHON_BACKEND_URL },
-      "runEnrichmentBatch: Python sidecar offline — skipping batch (no errors counted).",
+      "runEnrichmentBatch: no CH API key and sidecar offline — skipping batch.",
     );
     return { processed: 0, errors: 0 };
   }
 
+  if (chApiAvailable) {
+    log.info("[EnrichmentWorker] Using direct Companies House API for companies_house jobs.");
+  }
+
   const workerId = `node-${process.pid}-${Date.now()}`;
 
-  // Claim batch atomically: FOR UPDATE SKIP LOCKED prevents duplicate claims
-  // across concurrent workers or horizontal instances.
   const claimResult = await db.execute<typeof enrichmentQueue.$inferSelect>(sql`
     UPDATE enrichment_queue
     SET    status     = 'in_progress',
@@ -279,7 +401,6 @@ export async function runEnrichmentBatch(): Promise<{ processed: number; errors:
 
   log.info({ count: batch.length }, "runEnrichmentBatch: batch claimed.");
 
-  // Prefetch sponsor names for all fingerprints in the batch
   const fingerprints = [...new Set(batch.map((r) => r.fingerprint))];
   const sponsorRows = await db
     .select({
@@ -303,8 +424,15 @@ export async function runEnrichmentBatch(): Promise<{ processed: number; errors:
 
     try {
       if (item.jobType === "companies_house") {
-        await processCompaniesHouseItem(item, companyName, town);
+        await processCompaniesHouseItem(item, companyName, town, chApiAvailable, sidecarUp);
       } else {
+        if (!sidecarUp) {
+          await db
+            .update(enrichmentQueue)
+            .set({ status: "pending", lockedAt: null, lockedBy: null, updatedAt: new Date() })
+            .where(eq(enrichmentQueue.id, item.id));
+          continue;
+        }
         await processLicenceHistoryItem(item, companyName, town);
       }
       processed++;
@@ -321,7 +449,6 @@ export async function runEnrichmentBatch(): Promise<{ processed: number; errors:
       } else if (httpStatus === 404) {
         await setItemStatus(item, "no_match", err.message);
       } else {
-        // Transient error — exponential backoff
         const nextAttempt = (item.attemptCount ?? 0) + 1;
         if (nextAttempt >= MAX_ATTEMPTS) {
           await setItemStatus(item, "failed", err.message);
@@ -345,7 +472,6 @@ export async function runEnrichmentBatch(): Promise<{ processed: number; errors:
     }
   }
 
-  // Pause the in-process queue if the entire batch hit rate limits or any CF block
   if (captchaBlockedCount > 0 || rateLimitedCount >= batch.length) {
     queuePausedUntil = Date.now() + QUEUE_PAUSE_MS;
     log.warn(
@@ -364,61 +490,59 @@ async function processCompaniesHouseItem(
   item: typeof enrichmentQueue.$inferSelect,
   companyName: string,
   town: string | null,
+  chApiAvailable: boolean,
+  sidecarUp: boolean,
 ): Promise<void> {
-  const { status, data } = await callSidecar<Record<string, any>>(
-    "/api/v1/enrich/companies-house",
-    { fingerprint: item.fingerprint, company_name: companyName, town },
-  );
+  let data: Record<string, any> | null = null;
 
-  if (status !== 200 || !data) {
-    const err: any = new Error(`CH sidecar HTTP ${status} for "${companyName}"`);
-    err.httpStatus = status;
-    throw err;
+  if (chApiAvailable) {
+    data = (await fetchChDirect(companyName)) as Record<string, any>;
+  } else if (sidecarUp) {
+    const result = await callSidecar<Record<string, any>>(
+      "/api/v1/enrich/companies-house",
+      { fingerprint: item.fingerprint, company_name: companyName, town },
+    );
+    if (result.status !== 200 || !result.data) {
+      const err: any = new Error(`CH sidecar HTTP ${result.status} for "${companyName}"`);
+      err.httpStatus = result.status;
+      throw err;
+    }
+    data = result.data;
+  } else {
+    await db
+      .update(enrichmentQueue)
+      .set({ status: "pending", lockedAt: null, lockedBy: null, updatedAt: new Date() })
+      .where(eq(enrichmentQueue.id, item.id));
+    return;
   }
+
+  const enrichmentValues = {
+    fingerprint: item.fingerprint,
+    companyNumber: data.company_number ?? null,
+    natureOfBusiness: data.nature_of_business ?? null,
+    registeredAddress: data.registered_address ?? null,
+    websiteUrl: data.website_url ?? null,
+    scrapeStatus: "success" as const,
+    scrapedAt: new Date(),
+    lastAttempted: new Date(),
+    companyStatus: data.company_status ?? null,
+    companyType: data.company_type ?? null,
+    incorporationDate: data.incorporation_date ?? null,
+    sicCodes: data.sic_codes ?? [],
+    lastFiledAccountsDate: data.last_filed_accounts_date ?? null,
+    nextConfStmtDueDate: data.next_conf_stmt_due_date ?? null,
+    dissolvedAt: data.dissolved_at ?? null,
+    companiesHouseSource: data.companies_house_source ?? false,
+    fuzzyMatchScore: data.fuzzy_match_score != null ? String(data.fuzzy_match_score) : null,
+    historicalNamesRaw: data.historical_names ?? [],
+  };
 
   await db
     .insert(sponsorEnrichment)
-    .values({
-      fingerprint: item.fingerprint,
-      companyNumber: data.company_number ?? null,
-      natureOfBusiness: data.nature_of_business ?? null,
-      registeredAddress: data.registered_address ?? null,
-      websiteUrl: data.website_url ?? null,
-      scrapeStatus: "success",
-      scrapedAt: new Date(),
-      lastAttempted: new Date(),
-      companyStatus: data.company_status ?? null,
-      companyType: data.company_type ?? null,
-      incorporationDate: data.incorporation_date ?? null,
-      sicCodes: data.sic_codes ?? [],
-      lastFiledAccountsDate: data.last_filed_accounts_date ?? null,
-      nextConfStmtDueDate: data.next_conf_stmt_due_date ?? null,
-      dissolvedAt: data.dissolved_at ?? null,
-      companiesHouseSource: data.companies_house_source ?? false,
-      fuzzyMatchScore: data.fuzzy_match_score != null ? String(data.fuzzy_match_score) : null,
-      historicalNamesRaw: data.historical_names ?? [],
-    })
+    .values(enrichmentValues)
     .onConflictDoUpdate({
       target: sponsorEnrichment.fingerprint,
-      set: {
-        companyNumber: data.company_number ?? null,
-        natureOfBusiness: data.nature_of_business ?? null,
-        registeredAddress: data.registered_address ?? null,
-        websiteUrl: data.website_url ?? null,
-        scrapeStatus: "success",
-        scrapedAt: new Date(),
-        lastAttempted: new Date(),
-        companyStatus: data.company_status ?? null,
-        companyType: data.company_type ?? null,
-        incorporationDate: data.incorporation_date ?? null,
-        sicCodes: data.sic_codes ?? [],
-        lastFiledAccountsDate: data.last_filed_accounts_date ?? null,
-        nextConfStmtDueDate: data.next_conf_stmt_due_date ?? null,
-        dissolvedAt: data.dissolved_at ?? null,
-        companiesHouseSource: data.companies_house_source ?? false,
-        fuzzyMatchScore: data.fuzzy_match_score != null ? String(data.fuzzy_match_score) : null,
-        historicalNamesRaw: data.historical_names ?? [],
-      },
+      set: enrichmentValues,
     });
 
   await setItemStatus(item, "completed", null);
@@ -441,12 +565,10 @@ async function processLicenceHistoryItem(
   }
 
   if (data.length === 0) {
-    // No history rows is acceptable — mark completed, not failed
     await setItemStatus(item, "completed", "no_history_rows");
     return;
   }
 
-  // Insert timeline rows in chunks — UNIQUE constraint deduplicates on replay
   const rows = data.map((r) => ({
     fingerprint: item.fingerprint,
     recordedDate: r.recorded_date,
@@ -520,7 +642,6 @@ export function startEnrichmentCron(): void {
   const batchCutover = (process.env.CUTOVER_ENRICHMENT_BATCH ?? "false").trim().toLowerCase();
 
   if (seedCutover !== "true" && seedCutover !== "1") {
-    // Nightly queue seed — 02:00 UTC
     cron.schedule("0 2 * * *", async () => {
       try {
         log.info("Nightly enrichment queue seed starting...");
@@ -547,7 +668,6 @@ export function startEnrichmentCron(): void {
   }
 
   if (batchCutover !== "true" && batchCutover !== "1") {
-    // Hourly batch processor — :15 past each hour
     cron.schedule("15 * * * *", async () => {
       try {
         const telemetry = startJobRun("enrichmentBatch", "cron", "inline");
