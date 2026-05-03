@@ -3,7 +3,7 @@ import type { Express } from "express";
 import { CALLBACK_CONFIG, JOB_TIMEOUT_MS } from "../config/jobBudgets";
 import { and, desc, eq, gte, ne, sql } from "drizzle-orm";
 import { db } from "../db";
-import { jobTriggerAudit, shadowParityReports, shadowRunResults, incidentTickets } from "@shared/schema";
+import { jobTriggerAudit, shadowParityReports, shadowRunResults, incidentTickets, monitorJobRuns } from "@shared/schema";
 import { requireRole } from "../middleware/roleGuard";
 import { opsTriggerLimiter } from "../middleware/rateLimiter";
 import { isSafeCallbackUrl, signPayload } from "../utils/callbackSigner";
@@ -784,4 +784,56 @@ export function registerOpsRoutes(app: Express): void {
       }
     },
   );
+
+  // ── External cron ping ─────────────────────────────────────────────────────
+  // POST /api/ops/cron-ping
+  //
+  // Lightweight endpoint for an external scheduler (e.g. GitHub Actions) to
+  // trigger the sponsor monitor job without needing a session cookie.
+  // Authenticated via the CRON_SECRET env var sent as:
+  //   Authorization: Bearer <CRON_SECRET>
+  //
+  // Returns 202 immediately; the job runs asynchronously in the background.
+  // Returns 409 if the job already succeeded today (idempotent).
+  // Returns 423 if the job is currently running.
+  app.post("/api/ops/cron-ping", async (req: any, res) => {
+    const cronSecret = process.env.CRON_SECRET;
+    if (!cronSecret) {
+      log.warn("[CronPing] CRON_SECRET env var not set — endpoint disabled.");
+      return res.status(503).json({ message: "External cron not configured." });
+    }
+
+    const authHeader = String(req.headers["authorization"] ?? "");
+    const provided = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+
+    if (!provided || provided !== cronSecret) {
+      log.warn({ ip: req.ip }, "[CronPing] Invalid or missing secret.");
+      return res.status(401).json({ message: "Unauthorized." });
+    }
+
+    const today = new Date().toISOString().split("T")[0];
+    const existing = await db
+      .select({ status: monitorJobRuns.status })
+      .from(monitorJobRuns)
+      .where(eq(monitorJobRuns.runDate, today))
+      .limit(1)
+      .catch(() => []);
+
+    if (existing.length > 0 && (existing[0] as any).status === "success") {
+      log.info("[CronPing] Today's job already succeeded — skipping.");
+      return res.status(409).json({ message: "Already ran today.", date: today });
+    }
+
+    if (existing.length > 0 && (existing[0] as any).status === "running") {
+      log.info("[CronPing] Job already running — skipping.");
+      return res.status(423).json({ message: "Job currently running.", date: today });
+    }
+
+    log.info({ date: today }, "[CronPing] External cron ping accepted — triggering sponsor monitor job.");
+    runSponsorMonitorJob("cron", true).catch((err) => {
+      log.error({ err }, "[CronPing] Sponsor monitor job failed.");
+    });
+
+    return res.status(202).json({ message: "Job triggered.", date: today });
+  });
 }

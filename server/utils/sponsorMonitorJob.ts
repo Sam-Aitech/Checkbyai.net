@@ -1,7 +1,7 @@
 import cron from "node-cron";
 import { db } from "../db";
 import { dailyDigest, monitorJobRuns, diffResults, sponsorCanonical, csvArchive } from "@shared/schema";
-import { eq, sql, and } from "drizzle-orm";
+import { eq, sql, and, inArray, gte } from "drizzle-orm";
 import { discoverCsvUrl, generateFingerprint, type SponsorChange } from "./sponsorListFetcher";
 import { ensureTodaysArchive, getArchiveForDate, parseCsvFile } from "./csvArchiver";
 import { runCsvDiff, type CsvDiffResult } from "./binaryRunner";
@@ -912,6 +912,90 @@ async function hasTodayJobSucceeded(): Promise<boolean | null> {
   }
 }
 
+/**
+ * Returns the dates of the last N calendar days (including today) that were
+ * weekdays (Mon–Fri UTC), newest first.
+ */
+function recentWeekdays(lookbackDays: number): string[] {
+  const dates: string[] = [];
+  const d = new Date();
+  d.setUTCHours(0, 0, 0, 0);
+  for (let i = 0; i < lookbackDays; i++) {
+    const check = new Date(d);
+    check.setUTCDate(d.getUTCDate() - i);
+    const day = check.getUTCDay();
+    if (day >= 1 && day <= 5) {
+      dates.push(check.toISOString().split("T")[0]);
+    }
+  }
+  return dates; // newest first
+}
+
+/**
+ * Startup catch-up: queries monitor_job_runs for the last 7 weekdays.
+ * If any have no successful run recorded, triggers the job immediately
+ * (using "today's" CSV, which always reflects the latest published register).
+ *
+ * Designed for Autoscale deployments where the in-process cron at 00:30 UTC
+ * fires into a dead server. On every cold start we check and self-heal.
+ */
+async function checkMissedJobsAndCatchUp(): Promise<void> {
+  try {
+    const weekdays = recentWeekdays(7);
+    if (weekdays.length === 0) return;
+
+    const cutoff = new Date();
+    cutoff.setUTCDate(cutoff.getUTCDate() - 7);
+
+    const successfulRuns = await db
+      .select({ runDate: monitorJobRuns.runDate })
+      .from(monitorJobRuns)
+      .where(
+        and(
+          inArray(monitorJobRuns.runDate, weekdays),
+          eq(monitorJobRuns.status, "success"),
+        ),
+      );
+
+    const successDates = new Set(successfulRuns.map((r) => r.runDate));
+
+    // Find the most recent missed weekday (weekdays[0] = today, [1] = yesterday, …)
+    // Skip today if it's very early (before 00:35 UTC) — the cron will handle it.
+    const nowUTCHour = new Date().getUTCHours();
+    const nowUTCMin  = new Date().getUTCMinutes();
+    const tooEarlyForToday = nowUTCHour === 0 && nowUTCMin < 35;
+
+    const missed = weekdays.find((date, idx) => {
+      if (idx === 0 && tooEarlyForToday) return false; // skip today before 00:35
+      return !successDates.has(date);
+    });
+
+    if (!missed) {
+      log.info("[SponsorMonitorJob] Startup catch-up: all recent weekday jobs are present.");
+      return;
+    }
+
+    log.warn(
+      { missedDate: missed, successDates: [...successDates] },
+      `[SponsorMonitorJob] Startup catch-up: no successful run found for ${missed} (and possibly earlier). Triggering now.`,
+    );
+
+    await sendAdminAlert(
+      "ℹ️ CheckByAI: Startup catch-up triggered",
+      `<p>Server booted and detected a missed sponsor monitor job.</p>
+       <p>Most recent missed weekday: <strong>${missed}</strong></p>
+       <p>Successful runs found: ${[...successDates].join(", ") || "none in last 7 days"}</p>
+       <p>Running now to fetch the latest register CSV and apply any accumulated changes.</p>`,
+    ).catch(() => {});
+
+    runSponsorMonitorJob("startup-catchup", true).catch((err) => {
+      log.error({ err }, "[SponsorMonitorJob] Startup catch-up job failed.");
+    });
+  } catch (err) {
+    log.error({ err }, "[SponsorMonitorJob] checkMissedJobsAndCatchUp failed.");
+  }
+}
+
 export function startSponsorMonitorCron(): void {
   seedInitialDigest().catch((err) => {
     console.error("[SponsorMonitorJob] Error in initial digest seed:", err);
@@ -946,6 +1030,16 @@ export function startSponsorMonitorCron(): void {
   }
 
   console.log("[SponsorMonitorJob] Cron setup complete.");
+
+  // Startup catch-up: 2 minutes after boot, check for missed weekday jobs.
+  // On Autoscale deployments the in-process cron fires into a dead server —
+  // this self-heals by triggering the job immediately on any cold start that
+  // finds a missed day in the last 7 weekdays.
+  setTimeout(() => {
+    checkMissedJobsAndCatchUp().catch((err) => {
+      log.error({ err }, "[SponsorMonitorJob] Startup catch-up check failed unexpectedly.");
+    });
+  }, 2 * 60 * 1000); // 2 min — lets DB migrations and search index finish first
 }
 
 export async function isJobRunning(): Promise<boolean> {

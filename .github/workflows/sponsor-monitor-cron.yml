@@ -1,0 +1,59 @@
+name: Sponsor Monitor – Daily Cron
+
+# Runs Mon–Fri at 00:35 UTC (5 min after the register is typically published).
+# This is the reliable external trigger that replaces the unreliable in-process
+# node-cron which silently fails on Autoscale when the server is sleeping.
+#
+# Required repository secrets (Settings → Secrets → Actions):
+#   CRON_SECRET  — must match the CRON_SECRET env var set in the Replit deployment
+#   CRON_URL     — production base URL, e.g. https://checkbyai.net
+
+on:
+  schedule:
+    - cron: "35 0 * * 1-5"   # 00:35 UTC, Mon–Fri
+  workflow_dispatch:           # allow manual trigger from the GitHub UI
+
+jobs:
+  ping:
+    name: Trigger sponsor monitor job
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Ping cron endpoint
+        id: ping
+        run: |
+          HTTP_STATUS=$(curl --silent --output /tmp/response.json \
+            --write-out "%{http_code}" \
+            --max-time 30 \
+            --retry 3 \
+            --retry-delay 10 \
+            --retry-all-errors \
+            -X POST \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            "${{ secrets.CRON_URL }}/api/ops/cron-ping")
+
+          echo "http_status=$HTTP_STATUS" >> $GITHUB_OUTPUT
+          echo "Response body:"
+          cat /tmp/response.json
+
+      - name: Evaluate response
+        run: |
+          STATUS=${{ steps.ping.outputs.http_status }}
+          echo "HTTP status: $STATUS"
+
+          # 202 = job triggered successfully
+          # 409 = job already ran today (idempotent — not an error)
+          # 423 = job is currently running (fine, another process got there first)
+          if [ "$STATUS" = "202" ]; then
+            echo "✅ Job triggered successfully."
+          elif [ "$STATUS" = "409" ]; then
+            echo "ℹ️  Job already completed today — nothing to do."
+          elif [ "$STATUS" = "423" ]; then
+            echo "ℹ️  Job is currently running — skipping duplicate trigger."
+          else
+            echo "❌ Unexpected HTTP status: $STATUS"
+            cat /tmp/response.json
+            exit 1
+          fi
