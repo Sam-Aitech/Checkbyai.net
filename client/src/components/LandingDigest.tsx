@@ -141,11 +141,14 @@ export default function LandingDigest() {
           transition={{ type: "spring", stiffness: 80, damping: 18 }}
           className={`relative overflow-hidden rounded-2xl border bg-gradient-to-br ${borderStyle} p-8 sm:p-10`}
         >
-          <div className="absolute top-4 right-4">
+          <div className="absolute top-4 right-4 flex flex-col items-end gap-1">
             <span className="badge-live">
               <span className="badge-live-dot" />
               Live Data
             </span>
+            {formattedDate && (
+              <p className="text-[10px] text-muted-foreground">Updated {formattedDate}</p>
+            )}
           </div>
 
           <div className="text-center mb-4">

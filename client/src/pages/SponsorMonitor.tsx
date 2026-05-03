@@ -98,6 +98,14 @@ interface CompanyHistoryData {
   history: HistoryEvent[];
 }
 
+interface DigestSummary {
+  available: boolean;
+  type: "overview" | "daily";
+  date: string;
+  counts: { added: number; updated: number; removed: number };
+  activeSponsors: number;
+}
+
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
@@ -400,14 +408,27 @@ function CompanyHistoryDialog({ fingerprint, companyName, open, onOpenChange, is
 
 function StickyAlertBanner() {
   const [dismissed, setDismissed] = useState(false);
+  const { data } = useQuery<DigestSummary>({
+    queryKey: ["/api/daily-digest/current"],
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
   if (dismissed) return null;
+  if (!data?.available || !data.counts || data.counts.removed === 0) return null;
+
+  const dateLabel = data.date
+    ? new Date(data.date + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+    : null;
+  const count = data.counts.removed;
 
   return (
     <div className="bg-red-700 text-white relative">
       <div className="max-w-5xl mx-auto px-4 py-2.5 flex items-center justify-center gap-2 text-center">
         <Activity className="w-4 h-4 shrink-0 animate-pulse" />
         <p className="text-xs sm:text-sm font-medium">
-          <span className="font-bold">URGENT:</span> 3 sponsor licences revoked in the last 48 hours. Last alert sent 14 minutes ago to 847 subscribers.
+          <span className="font-bold">URGENT:</span>{" "}
+          {count} sponsor licence{count !== 1 ? "s" : ""} revoked{dateLabel ? ` on ${dateLabel}` : " in the last check"}. Subscribe to get instant alerts.
         </p>
         <button onClick={() => setDismissed(true)} className="hidden sm:flex absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-white/10 rounded transition-colors" aria-label="Close banner">
           <X className="w-4 h-4" />
@@ -458,23 +479,70 @@ function HeroSection({ onScrollToSearch }: { onScrollToSearch: () => void }) {
 }
 
 function ProofBar() {
+  const { data, isLoading } = useQuery<DigestSummary>({
+    queryKey: ["/api/daily-digest/current"],
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  const formattedDate = data?.date
+    ? new Date(data.date + "T00:00:00").toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : null;
+
+  const changesText = (() => {
+    if (!data?.available || !data.counts) return null;
+    const { removed, updated, added } = data.counts;
+    const parts: string[] = [];
+    if (removed > 0) parts.push(`${removed} revoked`);
+    if (updated > 0) parts.push(`${updated} updated`);
+    if (added > 0) parts.push(`${added} new`);
+    return parts.length > 0 ? parts.join(", ") : "No changes";
+  })();
+
   return (
     <section className="bg-slate-900 border-y border-slate-800">
       <div className="max-w-4xl mx-auto px-4 py-4">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-0 sm:divide-x sm:divide-slate-700 text-center">
           <div className="px-4">
-            <p className="text-2xl font-bold text-white">47,823</p>
-            <p className="text-sm text-slate-300 mt-0.5">Companies checked last night</p>
+            {isLoading ? (
+              <Skeleton className="h-8 w-24 mx-auto bg-slate-700 mb-1" />
+            ) : (
+              <p className="text-2xl font-bold text-white">
+                {data?.activeSponsors ? data.activeSponsors.toLocaleString() : "—"}
+              </p>
+            )}
+            <p className="text-sm text-slate-300 mt-0.5">Active licensed sponsors</p>
           </div>
           <div className="px-4">
-            <p className="text-2xl font-bold text-red-400">3 downgraded, 1 revoked</p>
+            {isLoading ? (
+              <Skeleton className="h-8 w-40 mx-auto bg-slate-700 mb-1" />
+            ) : (
+              <p className="text-2xl font-bold text-red-400">
+                {changesText ?? "—"}
+              </p>
+            )}
             <p className="text-sm text-slate-300 mt-0.5">Changes detected</p>
           </div>
           <div className="px-4">
-            <p className="text-2xl font-bold text-emerald-400">04:32 AM GMT</p>
+            {isLoading ? (
+              <Skeleton className="h-8 w-28 mx-auto bg-slate-700 mb-1" />
+            ) : (
+              <p className="text-2xl font-bold text-emerald-400">
+                {formattedDate ?? "—"}
+              </p>
+            )}
             <p className="text-sm text-slate-300 mt-0.5">
-              Alerts sent{" "}
-              <Link href="/sponsor-changes" className="underline hover:no-underline text-slate-200">View Recent Changes</Link>
+              Last checked{" "}
+              <Link
+                href="/sponsor-changes"
+                className="inline-flex items-center gap-1 text-emerald-400 font-medium hover:text-emerald-300 transition-colors"
+              >
+                View Changes <ArrowRight className="w-3 h-3" />
+              </Link>
             </p>
           </div>
         </div>
@@ -580,16 +648,41 @@ function FeatureBlocks() {
 }
 
 function SocialProof() {
+  const { data: changesData } = useQuery<{ changes: SponsorChange[]; totalCount: number }>({
+    queryKey: ["/api/sponsor-changes"],
+    staleTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  const recentChange = changesData?.changes?.find(
+    (c) => c.changeType === "REMOVED" || c.changeType === "REMOVED_REVOKED" || c.changeType === "DOWNGRADED",
+  );
+
+  const recentAlertText = (() => {
+    if (!recentChange) return null;
+    const when = recentChange.detectedAt
+      ? new Date(recentChange.detectedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+      : null;
+    if (recentChange.changeType === "DOWNGRADED") {
+      const from = recentChange.previousValue || "A-Rating";
+      const to = recentChange.newValue || "B-Rating";
+      return `'${recentChange.organisationName}' downgraded from ${from} to ${to}${when ? ` — detected ${when}` : ""}.`;
+    }
+    return `'${recentChange.organisationName}' licence revoked${when ? ` — detected ${when}` : ""}.`;
+  })();
+
   return (
     <section className="py-12 bg-slate-50 dark:bg-slate-950/50 border-y border-border/50">
       <div className="max-w-4xl mx-auto px-4">
-        <div className="bg-slate-900 dark:bg-slate-800 text-white rounded-xl p-4 mb-8 flex items-start gap-3">
-          <Activity className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5 animate-pulse" />
-          <p className="text-sm">
-            <span className="font-bold text-emerald-400">Recent alert:</span>{" "}
-            Alert sent to 43 users monitoring 'TechSolutions Ltd' on 14 Jan at 00:33 AM. Licence downgraded from A to B-Rating.
-          </p>
-        </div>
+        {recentAlertText && (
+          <div className="bg-slate-900 dark:bg-slate-800 text-white rounded-xl p-4 mb-8 flex items-start gap-3">
+            <Activity className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5 animate-pulse" />
+            <p className="text-sm">
+              <span className="font-bold text-emerald-400">Recent change detected:</span>{" "}
+              {recentAlertText}
+            </p>
+          </div>
+        )}
         <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
           <CardContent className="py-8">
             <div className="flex items-start gap-4">

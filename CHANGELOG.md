@@ -16,6 +16,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.4] — 2026-05-03
+
+### Fixed
+- **SponsorMonitor — ProofBar data inconsistency (QA #5)**: `ProofBar` was showing hardcoded values (`47,823 active sponsors`, `3 downgraded, 1 revoked`, `04:32 AM GMT`) while `LandingDigest` below it showed real API data — creating a factual contradiction visible to users. Replaced all three stat slots with `useQuery<DigestSummary>({ queryKey: ["/api/daily-digest/current"] })`. Renders `Skeleton` while loading and `"—"` when data is unavailable. React Query deduplicates the request with `LandingDigest`, so no additional network calls are made
+- **LandingDigest — Live Data badge had no timestamp (QA #6)**: "Live Data" badge was CSS-only with no indication of data freshness. Added a `"Updated {formattedDate}"` caption directly below the badge (e.g. "Updated Sunday, 3 May 2025") in `text-[10px] text-muted-foreground`
+- **SponsorMonitor — "View Recent Changes" link styling (QA #7)**: "View Recent Changes" previously used an `underline` class which clashed with the dark `bg-slate-900` bar. Replaced with an `inline-flex` anchor using `text-emerald-400 font-medium hover:text-emerald-300 transition-colors` and an `ArrowRight` icon from lucide-react
+- **SponsorMonitor — StickyAlertBanner hardcoded content**: Banner showed hardcoded `"3 sponsor licences revoked in the last 48 hours. Last alert sent 14 minutes ago to 847 subscribers."` regardless of live data. Replaced with `useQuery<DigestSummary>` against the already-cached `/api/daily-digest/current` endpoint. Banner now: (a) hides entirely when `counts.removed === 0` to avoid false urgency, (b) shows the real revocation count and snapshot date, (c) drops the fabricated subscriber count
+- **SponsorMonitor — SocialProof hardcoded content**: "Recent alert" box showed a fabricated event (`TechSolutions Ltd, 14 Jan at 00:33 AM, downgraded A→B-Rating`). Replaced with `useQuery<SponsorChange[]>({ queryKey: ["/api/sponsor-changes"] })` which picks the most recent REMOVED, REMOVED_REVOKED, or DOWNGRADED event and renders it with real organisation name, change type, and detected date. The box hides when there are no qualifying changes in the 7-day feed. The testimonial quote card below it is unchanged
+
+---
+
 ## [1.0.3] — 2026-05-02
 
 ### Fixed
