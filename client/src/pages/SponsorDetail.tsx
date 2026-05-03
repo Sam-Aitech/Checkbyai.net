@@ -264,8 +264,8 @@ export default function SponsorDetail() {
               {isBRated && (
                 <Badge className="bg-amber-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">B-Rated</Badge>
               )}
-              <Link href={`/sponsor-monitor?company=${encodeURIComponent(data.currentName)}`}>
-                <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-full px-3 h-7 text-xs gap-1">
+              <Link href={`/pricing?plan=starter&company=${encodeURIComponent(data.currentName)}`}>
+                <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-full px-3 h-7 text-xs gap-1" data-testid="button-set-alert-header">
                   <Bell className="w-3 h-3" />Set Alert
                 </Button>
               </Link>
@@ -575,8 +575,8 @@ export default function SponsorDetail() {
                   via WhatsApp, email, or SMS.
                 </p>
                 <div className="flex gap-3 flex-wrap">
-                  <Link href="/pricing">
-                    <Button className="bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-full px-6">
+                  <Link href={`/pricing?plan=starter&company=${encodeURIComponent(data.currentName)}`}>
+                    <Button className="bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-full px-6" data-testid="button-set-alert-cta">
                       Set Up Alerts — from £24.99/mo
                     </Button>
                   </Link>
