@@ -282,6 +282,7 @@ export const sponsorCanonical = pgTable(
     fingerprint: text("fingerprint").notNull(),
     currentName: text("current_name").notNull(),
     townCity: text("town_city"),
+    county: text("county"),
     typeRating: text("type_rating"),
     route: text("route"),
     status: text("status").notNull().default("ACTIVE"), // ACTIVE | NEWLY_GRANTED | GRACE_PERIOD | REMOVED_REVOKED

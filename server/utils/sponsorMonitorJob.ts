@@ -242,9 +242,11 @@ async function buildFirstRunDiff(rawFilePath: string): Promise<CsvDiffResult> {
  *                absent from today's CSV (→ Phase D GRACE_PERIOD / REMOVED_REVOKED)
  *   Modifications — same fingerprint, different typeRating (UPGRADED/DOWNGRADED)
  *
- * Note: county is not stored in sponsor_canonical, so county-only changes are
- * not detectable here. Route changes always produce a new fingerprint (deletion
- * + addition) and are handled by Phase E rename detection, not Phase B.
+ * Note: county is now stored in sponsor_canonical. County-only changes on
+ * existing records are still not surfaced as discrete change events (low
+ * business value), but new inserts will carry the correct county value.
+ * Route changes always produce a new fingerprint (deletion + addition) and
+ * are handled by Phase E rename detection, not Phase B.
  */
 async function buildGapDayDiff(rawFilePath: string): Promise<CsvDiffResult> {
   const start = Date.now();
@@ -264,6 +266,7 @@ async function buildGapDayDiff(rawFilePath: string): Promise<CsvDiffResult> {
       fingerprint: sponsorCanonical.fingerprint,
       currentName: sponsorCanonical.currentName,
       townCity:    sponsorCanonical.townCity,
+      county:      sponsorCanonical.county,
       typeRating:  sponsorCanonical.typeRating,
       route:       sponsorCanonical.route,
       status:      sponsorCanonical.status,
@@ -302,8 +305,7 @@ async function buildGapDayDiff(rawFilePath: string): Promise<CsvDiffResult> {
         "Route":             r.route,
       });
     } else {
-      // Company exists and is active — check for typeRating change (only attribute
-      // detectable from canonical; county is not stored there)
+      // Company exists and is active — check for typeRating change
       const prevRating = canonical.typeRating ?? "";
       if (prevRating !== r.typeRating) {
         modifications.push({
@@ -311,7 +313,7 @@ async function buildGapDayDiff(rawFilePath: string): Promise<CsvDiffResult> {
             fingerprint:         fp,
             "Organisation Name": canonical.currentName,
             "Town/City":         canonical.townCity ?? "",
-            "County":            "",            // not stored in canonical
+            "County":            canonical.county ?? "",
             "Type & Rating":     prevRating,
             "Route":             canonical.route ?? "",
           },

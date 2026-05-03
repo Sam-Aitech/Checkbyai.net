@@ -224,6 +224,7 @@ export async function applyStateMachine(
    const additionRecords: CompanyRecord[] = diff.Additions.map(row => ({
      organisationName: (row["Organisation Name"] ?? row["organisation name"] ?? "").trim(),
      townCity: (row["Town/City"] ?? row["town/city"] ?? "").trim() || null,
+     county: (row["County"] ?? row["county"] ?? "").trim() || null,
      route: (row["Route"] ?? row["route"] ?? "").trim() || null,
      fingerprint: (row["fingerprint"] ?? "").trim(),
      typeRating: (row["Type & Rating"] ?? row["type & rating"] ?? "").trim() || null
@@ -384,6 +385,7 @@ export async function applyStateMachine(
         fingerprint:      fp,
         currentName:      orgName,
         townCity:         row.townCity,
+        county:           row.county ?? null,
         typeRating:       row.typeRating,
         route:            row.route,
         status:           "NEWLY_GRANTED",

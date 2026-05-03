@@ -4,6 +4,7 @@ import { generateFingerprint, normalizeName } from "./sponsorListFetcher";
 export interface CompanyRecord {
   organisationName: string;
   townCity: string | null;
+  county?: string | null;
   route: string | null;
   fingerprint: string;
   typeRating?: string | null;
