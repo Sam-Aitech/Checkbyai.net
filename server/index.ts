@@ -550,11 +550,19 @@ async function applyPendingMigrations() {
    // One-shot cache invalidation on boot: ensures the NOT_LISTED → REMOVED_REVOKED
    // backfill is reflected in the watch list immediately on the first deploy
    // after this fix (and is a cheap no-op on subsequent restarts).
+   // Flush both watches:* (per-user watch list) and sponsors:* (directory,
+   // search, stats, changes) so every status-derived view immediately reflects
+   // the NOT_LISTED → REMOVED_REVOKED backfill — no stale TTL window.
    try {
-     const flushed = await cacheFlushPattern("watches:*");
-     if (flushed > 0) log(`Flushed ${flushed} stale watches:* cache entries on boot`);
+     const [watchesFlushed, sponsorsFlushed] = await Promise.all([
+       cacheFlushPattern("watches:*"),
+       cacheFlushPattern("sponsors:*"),
+     ]);
+     if (watchesFlushed > 0 || sponsorsFlushed > 0) {
+       log(`Flushed ${watchesFlushed} watches:* + ${sponsorsFlushed} sponsors:* cache entries on boot`);
+     }
    } catch (err) {
-     logger.warn({ err }, "Non-blocking: watches:* cache flush failed on boot");
+     logger.warn({ err }, "Non-blocking: status cache flush failed on boot");
    }
    setupWorkers();
    
