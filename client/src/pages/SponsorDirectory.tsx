@@ -4,7 +4,7 @@ import { Link } from "wouter";
 import {
   Search, Building2, MapPin, Route, Star, CheckCircle, Zap, XCircle,
   Clock, AlertTriangle, ChevronLeft, ChevronRight, ExternalLink, Shield,
-  Loader2, RefreshCw, Download,
+  Loader2, RefreshCw, Download, HelpCircle,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -51,7 +51,7 @@ interface DirectoryResponse {
 function StatusBadge({ status, typeRating }: { status: string; typeRating: string | null }) {
   const isBRated = (typeRating || "").toLowerCase().includes("b");
 
-  if (status === "REMOVED_REVOKED") {
+  if (status === "REMOVED_REVOKED" || status === "NOT_LISTED") {
     return (
       <Badge className="bg-red-600 text-white border-red-700 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
         <XCircle className="w-3 h-3 mr-1" />
@@ -85,19 +85,27 @@ function StatusBadge({ status, typeRating }: { status: string; typeRating: strin
       </Badge>
     );
   }
-  return (
-    <div className="flex items-center gap-1 flex-wrap">
-      <Badge className="bg-emerald-600 text-white border-emerald-700 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
-        <CheckCircle className="w-3 h-3 mr-1" />
-        Active
-      </Badge>
-      {isBRated && (
-        <Badge className="bg-amber-500 text-white border-amber-600 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
-          <AlertTriangle className="w-3 h-3 mr-1" />
-          B-Rated
+  if (status === "ACTIVE") {
+    return (
+      <div className="flex items-center gap-1 flex-wrap">
+        <Badge className="bg-emerald-600 text-white border-emerald-700 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
+          <CheckCircle className="w-3 h-3 mr-1" />
+          Active
         </Badge>
-      )}
-    </div>
+        {isBRated && (
+          <Badge className="bg-amber-500 text-white border-amber-600 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
+            <AlertTriangle className="w-3 h-3 mr-1" />
+            B-Rated
+          </Badge>
+        )}
+      </div>
+    );
+  }
+  return (
+    <Badge className="bg-slate-500 text-white border-slate-600 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
+      <HelpCircle className="w-3 h-3 mr-1" />
+      Unknown
+    </Badge>
   );
 }
 
@@ -105,7 +113,7 @@ function StatusBadge({ status, typeRating }: { status: string; typeRating: strin
 
 function rowClass(status: string) {
   if (status === "NEWLY_GRANTED")   return "border-l-2 border-l-orange-400 bg-orange-50/40 dark:bg-orange-950/10";
-  if (status === "REMOVED_REVOKED") return "border-l-2 border-l-red-400    bg-red-50/30    dark:bg-red-950/10 opacity-75";
+  if (status === "REMOVED_REVOKED" || status === "NOT_LISTED") return "border-l-2 border-l-red-400    bg-red-50/30    dark:bg-red-950/10 opacity-75";
   if (status === "GRACE_PERIOD")    return "border-l-2 border-l-yellow-400 bg-yellow-50/30 dark:bg-yellow-950/10";
   return "";
 }

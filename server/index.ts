@@ -8,7 +8,7 @@ import { logger } from "./utils/logger";
 
 // Import the job queue setup
 import { initJobQueue, setupWorkers } from "./services/jobQueue";
-import { initRedisCache } from "./utils/redisClient";
+import { initRedisCache, cacheFlushPattern } from "./utils/redisClient";
 import { rebuildSponsorIndex } from "./utils/sponsorSearch";
 
 // Startup validation — fail fast if truly critical env vars are missing
@@ -464,6 +464,29 @@ async function applyPendingMigrations() {
     for (const sql of migrations) {
       await client.query(sql);
     }
+
+    // ── One-time backfill: retire the legacy "NOT_LISTED" status value ──────
+    // The current schema enum is ACTIVE | NEWLY_GRANTED | GRACE_PERIOD | REMOVED_REVOKED.
+    // Earlier ingestion code wrote NOT_LISTED rows that were never migrated,
+    // which caused the Sponsor Monitor UI to render a green "Active" badge for
+    // companies whose licence had actually been revoked. This backfill is
+    // idempotent — once all rows are migrated, the WHERE clause matches none.
+    try {
+      const notListedFix = await client.query<{ count: string }>(
+        `UPDATE "sponsor_canonical"
+         SET    "status"     = 'REMOVED_REVOKED',
+                "removed_at" = COALESCE("removed_at", ("last_seen" + INTERVAL '1 day')::timestamptz)
+         WHERE  "status" = 'NOT_LISTED'
+         RETURNING 1`,
+      );
+      const fixedRows = notListedFix.rowCount ?? 0;
+      if (fixedRows > 0) {
+        log(`Migrated ${fixedRows} legacy NOT_LISTED rows → REMOVED_REVOKED`);
+      }
+    } catch (err) {
+      logger.warn({ err }, "Non-blocking: NOT_LISTED → REMOVED_REVOKED backfill failed");
+    }
+
     log("Schema migrations applied successfully");
   } catch (error) {
     logger.error({ err: error }, "Failed to apply schema migrations");
@@ -524,6 +547,15 @@ async function applyPendingMigrations() {
    // Probe Redis: initialise BullMQ queues + shared cache client (no-op if Redis is unavailable)
    await initJobQueue();
    await initRedisCache();
+   // One-shot cache invalidation on boot: ensures the NOT_LISTED → REMOVED_REVOKED
+   // backfill is reflected in the watch list immediately on the first deploy
+   // after this fix (and is a cheap no-op on subsequent restarts).
+   try {
+     const flushed = await cacheFlushPattern("watches:*");
+     if (flushed > 0) log(`Flushed ${flushed} stale watches:* cache entries on boot`);
+   } catch (err) {
+     logger.warn({ err }, "Non-blocking: watches:* cache flush failed on boot");
+   }
    setupWorkers();
    
    const server = await registerRoutes(app);

@@ -455,7 +455,12 @@ export async function applyStateMachine(
     `[StateMachine] Phase C: +${toInsertNew.length} new, ${toReactivate.length} reactivated, ${toRecoverFlicker.length} flicker recovered.`,
   );
 
-  // Fire reactivation watch notifications (non-blocking — errors are caught internally)
+  // Fire reactivation watch notifications (non-blocking — errors are caught internally).
+  // CONTRACT: when a previously REMOVED_REVOKED sponsor reappears in today's CSV,
+  // its canonical row transitions back to NEWLY_GRANTED (Phase C above) and a
+  // RE_ACTIVATED change is logged. notifyReactivationWatchers() emails every user
+  // who has this company on their watchlist — this is the "Licence is back" alert
+  // surfaced on the Sponsor Monitor page. Do not remove without updating that flow.
   await notifyReactivationWatchers(reactivationCandidates);
 
   // ── Phase D: Deletions (first and second misses) ──────────────────────────

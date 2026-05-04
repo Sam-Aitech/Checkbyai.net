@@ -88,7 +88,7 @@ function normalizeCompanyName(name: string): string {
 }
 
 function isRevokedStatus(status: string | undefined): boolean {
-  return status === "REMOVED_REVOKED";
+  return status === "REMOVED_REVOKED" || status === "NOT_LISTED";
 }
 
 function StatusBadge({ status }: { status: string | undefined }) {
@@ -98,7 +98,7 @@ function StatusBadge({ status }: { status: string | undefined }) {
         Active
       </Badge>
     );
-  if (status === "REMOVED_REVOKED")
+  if (status === "REMOVED_REVOKED" || status === "NOT_LISTED")
     return (
       <Badge className="bg-red-500/10 text-red-600 border border-red-500/20 text-xs">
         Revoked

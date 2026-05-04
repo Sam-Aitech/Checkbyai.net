@@ -787,10 +787,15 @@ export function registerSponsorRoutes(app: Express): void {
           status: "UNKNOWN",
         };
 
+        // A sponsor is "listed" on the official register if they're ACTIVE or
+        // NEWLY_GRANTED. GRACE_PERIOD, REMOVED_REVOKED and the legacy NOT_LISTED
+        // value all mean the licence is no longer (fully) on the register.
+        const isListed = (s: string) => s === "ACTIVE" || s === "NEWLY_GRANTED";
+
         if (watch.fingerprint) {
           const c = canonicalByFingerprint.get(watch.fingerprint);
           if (c) {
-            currentStatus = { listed: c.status === "ACTIVE", typeRating: c.typeRating, route: c.route, status: c.status };
+            currentStatus = { listed: isListed(c.status), typeRating: c.typeRating, route: c.route, status: c.status };
           }
         } else {
           const normalized = watch.organisationNameNormalized;
@@ -802,7 +807,7 @@ export function registerSponsorRoutes(app: Express): void {
             return true;
           });
           if (match) {
-            currentStatus = { listed: match.status === "ACTIVE", typeRating: match.typeRating, route: match.route, status: match.status };
+            currentStatus = { listed: isListed(match.status), typeRating: match.typeRating, route: match.route, status: match.status };
             db.update(companyWatches)
               .set({ fingerprint: match.fingerprint })
               .where(eq(companyWatches.id, watch.id))

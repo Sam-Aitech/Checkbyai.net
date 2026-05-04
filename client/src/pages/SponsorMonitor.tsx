@@ -8,6 +8,7 @@ import {
   Bell, Mail, MessageSquare, Phone, CheckCircle2, Send, Save, History, CheckCheck, XOctagon, Clock3,
   ExternalLink, Linkedin, CheckCircle, FileText, Lock, X, Zap, ShieldCheck, Smartphone,
   ChevronDown, ChevronRight, Activity, Timer, FileSearch, Wifi, ArrowRight, Briefcase, BarChart3,
+  HelpCircle,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -121,7 +122,9 @@ function StatusBadge({ status, typeRating }: { status: string; typeRating: strin
   const rating = (typeRating || "").toLowerCase();
   const isBRated = rating.includes("b rating") || rating.includes("b-rating") || rating === "b";
 
-  if (status === "REMOVED_REVOKED") {
+  // NOT_LISTED is a retired legacy status that means the company is no longer
+  // on the register. Treat it as REMOVED so it never silently renders as Active.
+  if (status === "REMOVED_REVOKED" || status === "NOT_LISTED") {
     return (
       <Badge className="bg-red-600 text-white border-red-700 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide">
         <XCircle className="w-3 h-3 mr-1" />
@@ -148,24 +151,36 @@ function StatusBadge({ status, typeRating }: { status: string; typeRating: strin
     );
   }
 
-  return (
-    <div className="flex items-center gap-1.5 flex-wrap">
-      <Badge className="bg-emerald-600 text-white border-emerald-700 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide">
-        <CheckCircle className="w-3 h-3 mr-1" />
-        Active
-      </Badge>
-      {isBRated && (
-        <Badge className="bg-amber-500 text-white border-amber-600 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide">
-          <AlertTriangle className="w-3 h-3 mr-1" />
-          B-Rated
+  if (status === "ACTIVE") {
+    return (
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <Badge className="bg-emerald-600 text-white border-emerald-700 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide">
+          <CheckCircle className="w-3 h-3 mr-1" />
+          Active
         </Badge>
-      )}
-    </div>
+        {isBRated && (
+          <Badge className="bg-amber-500 text-white border-amber-600 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide">
+            <AlertTriangle className="w-3 h-3 mr-1" />
+            B-Rated
+          </Badge>
+        )}
+      </div>
+    );
+  }
+
+  // Unknown / future status — render neutral grey badge, NEVER silently as Active.
+  return (
+    <Badge className="bg-slate-500 text-white border-slate-600 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide">
+      <HelpCircle className="w-3 h-3 mr-1" />
+      Unknown
+    </Badge>
   );
 }
 
 function getWatchStatusBadge(currentStatus: WatchEntry["currentStatus"]) {
-  const canonicalStatus = currentStatus.status || (currentStatus.listed ? "ACTIVE" : "REMOVED_REVOKED");
+  // If the live canonical status is missing, render Unknown rather than guessing
+  // ACTIVE — a missing status usually means we lost the canonical row.
+  const canonicalStatus = currentStatus.status || "UNKNOWN";
   return <StatusBadge status={canonicalStatus} typeRating={currentStatus.typeRating} />;
 }
 
@@ -1302,7 +1317,7 @@ export default function SponsorMonitor() {
                               {watch.currentStatus.route && <span className="inline-flex items-center gap-1"><Route className="w-3.5 h-3.5" />{watch.currentStatus.route}</span>}
                               <span className="inline-flex items-center gap-1"><CalendarDays className="w-3.5 h-3.5" />Watching since {formatDate(watch.createdAt)}</span>
                             </div>
-                            {(watch.currentStatus.status === "REMOVED_REVOKED") && (
+                            {(watch.currentStatus.status === "REMOVED_REVOKED" || watch.currentStatus.status === "NOT_LISTED") && (
                               <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 mt-1">
                                 <Bell className="w-3 h-3 shrink-0" />
                                 Licence revoked — you&apos;ll be alerted if they reapply

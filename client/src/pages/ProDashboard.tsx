@@ -139,10 +139,11 @@ function greeting() { const h = new Date().getHours(); return h<12?"Good morning
 function StatusPill({ status }: { status?: string }) {
   const s = status || "";
   const cfg =
-    s === "REMOVED_REVOKED" ? { bg: "rgba(239,68,68,0.12)",   border: "rgba(239,68,68,0.25)",  color: "#FCA5A5", label: "Revoked" } :
+    (s === "REMOVED_REVOKED" || s === "NOT_LISTED") ? { bg: "rgba(239,68,68,0.12)",   border: "rgba(239,68,68,0.25)",  color: "#FCA5A5", label: "Revoked" } :
     s === "GRACE_PERIOD"    ? { bg: "rgba(245,158,11,0.12)",   border: "rgba(245,158,11,0.25)", color: "#FCD34D", label: "Grace" } :
     s === "NEWLY_GRANTED"   ? { bg: "rgba(245,158,11,0.12)",   border: "rgba(245,158,11,0.25)", color: "#FCD34D", label: "New" } :
-                              { bg: "rgba(16,185,129,0.12)",   border: "rgba(16,185,129,0.25)", color: "#6EE7B7", label: "Active" };
+    s === "ACTIVE"          ? { bg: "rgba(16,185,129,0.12)",   border: "rgba(16,185,129,0.25)", color: "#6EE7B7", label: "Active" } :
+                              { bg: "rgba(100,116,139,0.12)",  border: "rgba(100,116,139,0.25)",color: "#CBD5E1", label: "Unknown" };
   return (
     <span style={{ background: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.color, fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", padding: "2px 8px", borderRadius: 99, textTransform: "uppercase" }}>
       {cfg.label}
@@ -193,7 +194,7 @@ function OverviewTab({ user, setTab }: { user: any; setTab: (t: Tab) => void }) 
 
   const plan        = user?.subscriptionStatus || "free";
   const firstName   = user?.firstName || user?.email?.split("@")[0] || "there";
-  const revokedN    = watches?.filter(w => w.currentStatus?.status === "REMOVED_REVOKED").length || 0;
+  const revokedN    = watches?.filter(w => w.currentStatus?.status === "REMOVED_REVOKED" || w.currentStatus?.status === "NOT_LISTED").length || 0;
 
   // Only show changes for the user's own watched companies
   const watchedNames = new Set((watches||[]).map(w => w.organisationName.toLowerCase()));

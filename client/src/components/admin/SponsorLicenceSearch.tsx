@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import {
   Search, ChevronLeft, ChevronRight, RefreshCw,
-  CheckCircle, XCircle, Clock, AlertTriangle, Zap, Building2,
+  CheckCircle, XCircle, Clock, AlertTriangle, Zap, Building2, HelpCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,7 +29,7 @@ interface DirectoryResponse {
 function StatusBadge({ status, typeRating }: { status: string; typeRating: string | null }) {
   const isBRated = (typeRating || '').toLowerCase().includes('b');
 
-  if (status === 'REMOVED_REVOKED') {
+  if (status === 'REMOVED_REVOKED' || status === 'NOT_LISTED') {
     return (
       <Badge className="bg-red-500/20 text-red-400 border-red-500/30 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
         <XCircle className="w-3 h-3 mr-1" />
@@ -53,19 +53,27 @@ function StatusBadge({ status, typeRating }: { status: string; typeRating: strin
       </Badge>
     );
   }
-  return (
-    <div className="flex items-center gap-1 flex-wrap">
-      <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
-        <CheckCircle className="w-3 h-3 mr-1" />
-        Active
-      </Badge>
-      {isBRated && (
-        <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
-          <AlertTriangle className="w-3 h-3 mr-1" />
-          B-Rated
+  if (status === 'ACTIVE') {
+    return (
+      <div className="flex items-center gap-1 flex-wrap">
+        <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
+          <CheckCircle className="w-3 h-3 mr-1" />
+          Active
         </Badge>
-      )}
-    </div>
+        {isBRated && (
+          <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
+            <AlertTriangle className="w-3 h-3 mr-1" />
+            B-Rated
+          </Badge>
+        )}
+      </div>
+    );
+  }
+  return (
+    <Badge className="bg-slate-500/20 text-slate-400 border-slate-500/30 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
+      <HelpCircle className="w-3 h-3 mr-1" />
+      Unknown
+    </Badge>
   );
 }
 
