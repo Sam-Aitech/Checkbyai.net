@@ -123,9 +123,14 @@ checkbyai.net (port 5000)
 │   ├── Sponsor Monitor routes
 │   ├── COS Check routes
 │   └── Admin routes
-├── Background Jobs (in-process cron)
-│   ├── sponsorMonitorJob.ts — daily 00:30 UTC
+├── Background Jobs (in-process)
+│   ├── sponsorMonitorJob.ts — nightly cron at 00:30 UTC Mon–Fri
+│   ├── Startup catchup — 5-min timer fires on every boot to retrigger
+│   │   missed runs (bypasses per-hour throttle, uses advisory lock)
 │   └── jobAlertJob.ts — weekly digest
+├── GitHub Actions External Cron
+│   └── sponsor-monitor-cron.yml — 00:35 UTC Mon–Fri → POST /api/ops/cron-ping
+│       (reliability fallback if in-process cron misfires on restart)
 └── PostgreSQL (Neon serverless, Drizzle ORM)
 
 External services:
@@ -391,13 +396,17 @@ Set `LOG_LEVEL=debug` in `.env` for verbose output.
 ### Sponsor Monitor
 
 ```bash
-# Check pipeline status
+# Public health endpoint (no auth, safe for uptime monitors)
+curl http://localhost:5000/api/health/sponsor-monitor
+# Returns status: ok | stale | running | unknown, lastRun details, nextCronUtc
+
+# Check pipeline status (admin)
 curl http://localhost:5000/api/admin/sponsor-monitor/status
 
-# View recent job runs
+# View recent job runs (admin)
 curl http://localhost:5000/api/admin/sponsor-monitor/job-history
 
-# Trigger manual run
+# Trigger manual run (admin)
 curl -X POST http://localhost:5000/api/admin/sponsor-monitor/run
 ```
 

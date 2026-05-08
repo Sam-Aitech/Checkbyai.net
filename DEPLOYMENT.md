@@ -23,18 +23,22 @@ This guide covers deploying CheckByAI to production, managing environment variab
 
 ## Architecture
 
-CheckByAI runs as a **single Node.js process** on one port. No separate job runner is needed — background cron jobs run in-process.
+CheckByAI runs as a **single Node.js process** on one port. No separate job runner is needed — background cron jobs run in-process. A GitHub Actions external cron provides a reliable fallback trigger for the nightly sponsor monitor job.
 
 ```
 Internet → Cloudflare (CDN + DDoS) → Server (port 5000)
                                           ├── React static files
                                           ├── Express API
-                                          ├── Cron jobs (in-process)
+                                          ├── Cron jobs (in-process, 00:30 UTC)
+                                          ├── Startup catchup (5-min timer on boot)
                                           └── WebSocket (Socket.io)
                                                │
                                     Neon PostgreSQL (TLS)
                                     Redis (optional, BullMQ)
                                     Python FastAPI (localhost:8000, optional)
+
+GitHub Actions (00:35 UTC, Mon–Fri) → POST /api/ops/cron-ping  → Server
+  (external reliability layer — triggers job if in-process cron missed)
 ```
 
 ---
@@ -343,7 +347,20 @@ A Dockerfile is in progress — see [GitHub Issues](https://github.com/Sam-Aitec
 GET /api/health
 # Returns: { status: "ok", sponsorCount: N }
 
-# Sponsor monitor status
+# Sponsor monitor health (public — no auth required)
+GET /api/health/sponsor-monitor
+# Returns: { status: "ok"|"stale"|"running"|"unknown",
+#            running: bool,
+#            lastRun: { date, success, hoursAgo, recordsProcessed,
+#                       changesDetected, notificationsSent, error },
+#            nextCronUtc: "Mon-Fri 00:30 UTC",
+#            timestamp }
+# status "ok"      = last run succeeded and was <48h ago
+# status "stale"   = last run failed, or >48h since last success
+# status "running" = job is currently in progress
+# status "unknown" = no run history yet
+
+# Sponsor monitor admin status (detailed)
 GET /api/admin/sponsor-monitor/status
 # Requires: admin session
 
@@ -379,7 +396,7 @@ Set `LOG_LEVEL=debug` in `.env` for verbose output.
 
 | Metric | Alert threshold | Endpoint |
 |--------|----------------|----------|
-| Sponsor monitor cron | Failed = alert | `/api/admin/sponsor-monitor/job-history` |
+| Sponsor monitor cron | `status: "stale"` | `GET /api/health/sponsor-monitor` |
 | DB connection pool | >8/10 connections | Neon dashboard |
 | HTTP error rate | >5% 5xx | Application logs |
 | Redis queue depth | >1000 jobs | Redis Insight |
@@ -388,9 +405,25 @@ Set `LOG_LEVEL=debug` in `.env` for verbose output.
 ### Alerting Recommendations
 
 - Set up uptime monitoring (e.g., Better Uptime, UptimeRobot) on `/api/health`
-- Alert if nightly sponsor monitor job fails (check `job_runs` table)
+- Monitor `/api/health/sponsor-monitor` — alert when `status` is `"stale"` (no auth required, safe for external monitors)
 - Alert on Stripe webhook failures (monitor payment logs)
 - Alert on email delivery failures (Resend/Brevo webhooks)
+
+### GitHub Actions External Cron
+
+`.github/workflows/sponsor-monitor-cron.yml` runs at **00:35 UTC Mon–Fri** and POSTs to `POST /api/ops/cron-ping`. This acts as a reliable external trigger if the in-process node-cron at 00:30 UTC misfires (common on auto-scaling platforms that may restart the process mid-cron).
+
+Required GitHub secrets:
+
+| Secret | Description |
+|--------|-------------|
+| `CRON_SECRET` | Bearer token checked by `/api/ops/cron-ping` |
+| `CRON_URL` | Base URL of the production server (e.g. `https://checkbyai.net`) |
+
+Response codes from `/api/ops/cron-ping`:
+- `202` — job triggered successfully
+- `409` — job already ran today (no-op, safe to ignore)
+- `423` — job is currently running (race avoided via advisory lock)
 
 ---
 
@@ -434,7 +467,9 @@ psql $DATABASE_URL < backup_YYYYMMDD_HHMMSS.sql
 | Incident | First check | Resolution |
 |----------|-------------|------------|
 | Blank search results | `GET /api/admin/sponsor-monitor/status` → `snapshotRecordCount` | Trigger manual run |
+| Daily cron status stale | `GET /api/health/sponsor-monitor` → `status: "stale"` | Server auto-recovers 5 min after restart; check logs for root cause |
 | Daily cron failed | `GET /api/admin/sponsor-monitor/job-history` → `errorMessage` | Check logs; fix cause; re-trigger |
+| GitHub Actions cron failed | GitHub Actions tab → workflow run | Verify `CRON_SECRET` + `CRON_URL` secrets are set |
 | Record count abort | Admin alert email received | Investigate gov.uk CSV manually |
 | Notifications not sent | `GET /api/admin/sponsor-monitor/notification-stats` | Check email/SMS provider status |
 | `csvdiff` binary missing | Phase 2 failure in job logs | `npm run setup:binaries` |
