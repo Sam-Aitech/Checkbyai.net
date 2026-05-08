@@ -16,6 +16,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.5] — 2026-05-08
+
+### Fixed
+- **SponsorMonitorJob — Phase E rename detection caused nightly crash (critical)**: `detectRenames()` in `sponsorStateMachine.ts` was updating the `fingerprint` primary key of the old GRACE_PERIOD row to the new candidate fingerprint. Because Phase C had already inserted a NEWLY_GRANTED row with that fingerprint, this produced a unique constraint violation that crashed the job every night a rename was detected. Fixed by updating the NEWLY_GRANTED record (`candidate.fp`) with merged historical name data and the original `grantedAt`, then deleting the superseded GRACE_PERIOD record (`oldFP`) — no PK mutation required.
+- **SponsorMonitorJob — no automatic recovery after midnight crash**: If the server restarted after 00:30 UTC (e.g., OOM from 140k-record processing), `checkAndTriggerIfNeeded()` only fired via `setInterval` — up to 60 minutes later. Admins had to manually trigger or restart the server. Added a `setTimeout(5 min)` startup catchup in `registerRoutes()` that calls `checkAndTriggerIfNeeded(true)` so the job self-recovers within 5 minutes of boot with no admin action.
+- **SponsorMonitorJob — `hour < 1` guard blocked midnight-hour recovery**: After a midnight crash+restart, the guard `if (hour < 1) return` inside `checkAndTriggerIfNeeded()` prevented triggering until 01:00 UTC, compounding the delay. Startup calls now bypass this guard and only yield during the exact cron execution window (00:20–00:45 UTC) to avoid racing with an actively running cron.
+- **SponsorMonitorJob — `onConflictDoUpdate` overwrote original trigger source**: When a failed cron run was retried via "startup-catchup", the success audit log in `monitor_job_runs` overwrote the original `source` field ("cron") with the retry source — making it look like the cron never ran. Removed `source` from the `onConflictDoUpdate` SET clause so the first-written trigger source is preserved.
+- **`sponsor_watches` table missing from migrations**: The `sponsor_watches` table was defined in `shared/schema.ts` but had no corresponding migration SQL file, meaning the table did not exist in production. Added `migrations/0015_sponsor_watches.sql`. Without this, `notifyReactivationWatchers()` was silently failing on every run.
+
+### Added
+- **`GET /api/health/sponsor-monitor`**: New dedicated health endpoint returning `{ status, running, lastRun: { date, success, hoursAgo, ... }, nextCronUtc }`. Status is `"ok"` (ran within 48h and succeeded), `"stale"` (failed or too old), `"running"` (job in progress), or `"unknown"` (no data). Useful for uptime monitors and admin dashboards.
+- **`checkAndTriggerIfNeeded(startup?: boolean)`**: New `startup` parameter on the trigger-check function. When `true`, bypasses the 1-hour per-process throttle and the broad midnight-hour guard, and uses source `"startup-catchup"` for observability.
+
+---
+
 ## [1.0.4] — 2026-05-03
 
 ### Fixed

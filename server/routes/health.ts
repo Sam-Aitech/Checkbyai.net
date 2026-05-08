@@ -37,4 +37,43 @@ export function registerHealthRoutes(app: Express): void {
       jobs,
     });
   });
+
+  // Dedicated sponsor monitor health endpoint — useful for uptime monitors and admin dashboards.
+  app.get('/api/health/sponsor-monitor', async (req, res) => {
+    const lastRun = getLastRunInfo();
+    const jobRunning = await isJobRunning();
+
+    let hoursAgo: number | null = null;
+    let status: "ok" | "stale" | "running" | "unknown" = "unknown";
+
+    if (jobRunning) {
+      status = "running";
+    } else if (lastRun) {
+      const lastRunDate = new Date(lastRun.date + "T00:00:00Z");
+      hoursAgo = Math.floor((Date.now() - lastRunDate.getTime()) / (1000 * 60 * 60));
+      if (lastRun.success) {
+        status = hoursAgo <= 48 ? "ok" : "stale";
+      } else {
+        status = "stale";
+      }
+    }
+
+    res.json({
+      status,
+      running: jobRunning,
+      lastRun: lastRun
+        ? {
+            date: lastRun.date,
+            success: lastRun.success,
+            hoursAgo,
+            recordsProcessed: lastRun.recordsProcessed,
+            changesDetected: lastRun.changesDetected,
+            notificationsSent: lastRun.notificationsSent,
+            error: lastRun.error ?? null,
+          }
+        : null,
+      nextCronUtc: "Mon–Fri 00:30 UTC",
+      timestamp: new Date().toISOString(),
+    });
+  });
 }

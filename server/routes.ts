@@ -34,6 +34,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.error("[Startup] Failed to clean processed checkouts:", err)
   );
 
+  // Startup catchup: fires 5 minutes after boot to recover from overnight cron failures
+  // or server restarts that happened after 00:30 UTC. The advisory lock and idempotency
+  // checks inside runSponsorMonitorJob prevent duplicate runs if the cron already fired.
+  setTimeout(() => {
+    checkAndTriggerIfNeeded(true).catch((err) =>
+      console.error("[SponsorMonitor] Startup catchup check failed:", err)
+    );
+  }, 5 * 60 * 1000);
+
+  // Continue checking every hour as ongoing safety net
   setInterval(() => {
     checkAndTriggerIfNeeded().catch((err) =>
       console.error("[SponsorMonitor] Trigger check failed:", err)

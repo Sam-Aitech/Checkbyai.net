@@ -665,27 +665,27 @@ async function detectRenames(
           newHistorical.push(existing.currentName);
         }
 
+        // Fix: avoid PK mutation (updating fingerprint to candidate.fp would conflict with the
+        // NEWLY_GRANTED record for candidate.fp that was already inserted in Phase C).
+        // Instead: update the NEWLY_GRANTED record (candidate.fp) with merged data,
+        // then delete the old GRACE_PERIOD record (oldFP).
         await db
           .update(sponsorCanonical)
           .set({
-            fingerprint:     candidate.fp,
             currentName:     candidate.name,
             status:          "ACTIVE",
             lastSeen:        today,
             consecutiveMisses: 0,
             historicalNames: newHistorical,
+            // Preserve the original grant date so history is correct
+            ...(existing.grantedAt ? { grantedAt: existing.grantedAt } : {}),
           })
-          .where(eq(sponsorCanonical.fingerprint, oldFP));
+          .where(eq(sponsorCanonical.fingerprint, candidate.fp));
 
-        // Remove the NEWLY_GRANTED insert (it's actually the same company)
+        // Delete the old GRACE_PERIOD record (superseded by the rename above)
         await db
           .delete(sponsorCanonical)
-          .where(
-            and(
-              eq(sponsorCanonical.fingerprint, candidate.fp),
-              eq(sponsorCanonical.status, "NEWLY_GRANTED"),
-            ),
-          );
+          .where(eq(sponsorCanonical.fingerprint, oldFP));
 
         changes.push({
           organisationName: candidate.name,

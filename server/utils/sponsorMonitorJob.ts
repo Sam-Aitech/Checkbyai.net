@@ -774,7 +774,8 @@ export async function runSponsorMonitorJob(
        }).onConflictDoUpdate({
          target: monitorJobRuns.runDate,
          set: {
-          source,
+          // Do NOT overwrite `source` — preserve the original trigger source (e.g., "cron")
+          // even when a retry (e.g., "startup-catchup") produces the successful run.
           status: "success",
           recordsProcessed: result.recordsProcessed,
           changesDetected: smResult.changes.length,
@@ -1062,28 +1063,44 @@ export async function isJobRunning(): Promise<boolean> {
   }
 }
 
-export async function checkAndTriggerIfNeeded(): Promise<void> {
+export async function checkAndTriggerIfNeeded(startup = false): Promise<void> {
   const now = Date.now();
-  if (now - lastRequestCheckTime < REQUEST_CHECK_INTERVAL_MS) {
+  // Startup calls bypass the per-hour throttle so the first check after a restart
+  // fires immediately (after the 5-minute warm-up delay set in routes.ts).
+  if (!startup && now - lastRequestCheckTime < REQUEST_CHECK_INTERVAL_MS) {
     return;
   }
-  lastRequestCheckTime = now;
+  if (!startup) {
+    lastRequestCheckTime = now;
+  }
 
   try {
     if (!isWeekday()) return;
     const alreadyRan = await hasTodayJobSucceeded();
     if (alreadyRan === null || alreadyRan) return;
 
-    const hour = new Date().getUTCHours();
-    if (hour < 1) {
-      return;
+    const utcHour = new Date().getUTCHours();
+    const utcMinute = new Date().getUTCMinutes();
+
+    if (!startup) {
+      // Regular hourly check: defer to cron during the midnight window (00:00–01:00 UTC).
+      if (utcHour < 1) return;
+    } else {
+      // Startup catchup: skip only the exact cron execution window (00:20–00:45 UTC)
+      // to avoid racing with a cron that is actively running. The advisory lock inside
+      // runSponsorMonitorJob would block a duplicate run anyway, but this avoids noise.
+      if (utcHour === 0 && utcMinute >= 20 && utcMinute < 45) {
+        console.log("[SponsorMonitorJob] Startup catchup: cron window active (00:20–00:45 UTC), deferring.");
+        return;
+      }
     }
 
-    console.log("[SponsorMonitorJob] Request-triggered check: today's job has not run. Triggering now...");
-    runSponsorMonitorJob("request-trigger").catch((err) => {
-      console.error("[SponsorMonitorJob] Request-triggered job error:", err);
+    const source = startup ? "startup-catchup" : "request-trigger";
+    console.log(`[SponsorMonitorJob] ${startup ? "Startup-catchup" : "Request"}-triggered check: today's job has not run. Triggering now (source: ${source})...`);
+    runSponsorMonitorJob(source).catch((err) => {
+      console.error(`[SponsorMonitorJob] ${startup ? "Startup-catchup" : "Request"}-triggered job error:`, err);
     });
   } catch (err) {
-    console.error("[SponsorMonitorJob] Request-triggered check error:", err);
+    console.error("[SponsorMonitorJob] Trigger check error:", err);
   }
 }
