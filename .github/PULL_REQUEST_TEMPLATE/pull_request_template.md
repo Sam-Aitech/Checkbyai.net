@@ -33,7 +33,7 @@ Closes #
 - [ ] No personal machine paths, usernames, or local env details in the diff
 - [ ] No API keys, tokens, or secrets added (use `.env.example` for new vars)
 - [ ] Sensitive `.env` values are documented in `.env.example` (value redacted)
-- [ ] `cos_verifier.py` changes maintain the public-stub-only contract
+- [ ] `backend/cos_verifier.py` changes do not expose proprietary logic, secrets, or private implementation details
 
 ## Testing
 - [ ] Unit tests added / updated
