@@ -11,3 +11,46 @@ backend/etl_sponsors.db
 bin/
 # Daily CSV archive files (large binary data, not for source control)
 data/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+
+# Editor/IDE
+.vscode/
+.idea/
+*.suo
+
+# Test artifacts
+*.pdf
+test_files/
+attached_assets/
+
+# Personal machine paths
+Users/
+/Users/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+.venv/
+env/
+
+# Logs
+*.log
+logs/
+
+# Build outputs
+build/
+.next/
+out/
