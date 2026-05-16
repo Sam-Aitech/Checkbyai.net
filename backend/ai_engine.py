@@ -14,17 +14,15 @@ proprietary and not included in this open-source distribution.
 Service Boundary
 -----------------
 All AI verification requests are handled via the internal AI service.
-See docs/API_CONTRACT.md for integration details.
+See CONTRIBUTING.md for integration and contribution details.
 
 For contributors:
   - Do NOT add proprietary logic to this file.
   - Raise an issue if you need to extend the AI interface.
   - See CONTRIBUTING.md for the contribution guidelines.
 
-Copyright (c) 2024-2026 CheckByAI. All rights reserved.
-Proprietary and confidential. Unauthorised use prohibited.
+Licensed under the MIT License. See LICENSE for details.
 """
-
 from typing import Dict, Any, Optional
 
 
@@ -46,7 +44,7 @@ class AIEngine:
         """
         raise NotImplementedError(
             "AI Engine is a proprietary service. "
-            "See docs/API_CONTRACT.md for integration."
+            "See CONTRIBUTING.md for integration details."
         )
 
     async def analyze_document(self, file_path: str) -> Dict[str, Any]:
@@ -58,14 +56,32 @@ class AIEngine:
 
         Returns:
             Dict containing verification result, confidence score,
-            and metadata. Schema defined in docs/API_CONTRACT.md.
+            and metadata.
 
         Raises:
             NotImplementedError: Core logic is proprietary.
         """
         raise NotImplementedError(
             "AI Engine is a proprietary service. "
-            "See docs/API_CONTRACT.md for integration."
+            "See CONTRIBUTING.md for integration details."
+        )
+
+    async def extract_metadata(self, file_path: str) -> Dict[str, Any]:
+        """
+        Extract metadata from an uploaded document.
+
+        Args:
+            file_path: Path to the uploaded document.
+
+        Returns:
+            Dict containing extracted document metadata.
+
+        Raises:
+            NotImplementedError: Core logic is proprietary.
+        """
+        raise NotImplementedError(
+            "AI Engine is a proprietary service. "
+            "See CONTRIBUTING.md for integration details."
         )
 
     async def verify_cos(
@@ -82,12 +98,11 @@ class AIEngine:
 
         Returns:
             Verification result with status, confidence, and flags.
-            Schema defined in docs/API_CONTRACT.md.
 
         Raises:
             NotImplementedError: Core logic is proprietary.
         """
         raise NotImplementedError(
             "AI Engine is a proprietary service. "
-            "See docs/API_CONTRACT.md for integration."
+            "See CONTRIBUTING.md for integration details."
         )
