@@ -28,7 +28,7 @@ Closes #
 - 
 
 ## Security & IP Checklist
-<!-- MANDATORY for every PR touching backend/ or shared/ -->
+<!-- MANDATORY for every PR touching server/, shared/, or backend/ (Python sidecar) -->
 - [ ] No proprietary algorithm logic, ML model weights, or scoring thresholds are exposed
 - [ ] No personal machine paths, usernames, or local env details in the diff
 - [ ] No API keys, tokens, or secrets added (use `.env.example` for new vars)
