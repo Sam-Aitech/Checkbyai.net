@@ -47,7 +47,7 @@ Closes #
 ## Commit Hygiene
 <!-- Confirm before requesting review -->
 - [ ] All commits follow `<type>(<scope>): <subject>` Conventional Commits format
-- [ ] No `Update`, `fix`, `WIP`, or `Published your App` commit messages
+- [ ] No low-signal non-conventional commit subjects (for example: bare `update`, bare `fix`, `WIP`, or `Published your App`)
 - [ ] Branch is up-to-date with `main`
 - [ ] PR title matches the squash-merge commit message format
 
