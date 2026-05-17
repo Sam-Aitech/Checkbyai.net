@@ -19,6 +19,7 @@ Admin endpoints additionally require `role = 'admin'` on the user record.
 | `authLimiter` | `/api/auth/login` | 10 req / 15 min per IP |
 | `otpLimiter` | All `/api/auth/*/send-otp` and `*/verify-otp` | 5 req / 15 min per IP |
 | `verifyLimiter` | `POST /api/verify` | 10 req / 1 hour per IP |
+| `feedbackLimiter` | `POST /api/feedback` | 3 req / 15 min per IP |
 
 ---
 
@@ -251,6 +252,49 @@ Returns the authenticated user's verification history.
     "createdAt": "2026-03-10T09:00:00.000Z"
   }
 ]
+```
+
+---
+
+### `POST /api/feedback`
+Submit user feedback on verification accuracy. Rate-limited to 3 requests per 15 minutes.
+
+**Rate limit:** `feedbackLimiter` — 3 req / 15 min per IP
+
+**Request body:**
+```json
+{
+  "verificationId": 42,
+  "rating": 4,
+  "comment": "The analysis was very thorough and accurate.",
+  "helpful": true,
+  "accuracy": "accurate",
+  "suggestedResult": "genuine"
+}
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `verificationId` | integer | No | FK → verification_results.id |
+| `rating` | integer | Yes | 1–5 star rating |
+| `comment` | text | No | Free-text feedback |
+| `helpful` | boolean | No | Was the analysis helpful? |
+| `accuracy` | text | No | 'accurate' \| 'inaccurate' \| 'unsure' |
+| `suggestedResult` | text | No | User's suggested result |
+
+When authenticated via session cookie, `userId` is set automatically from the session.
+
+**Response 201:**
+```json
+{
+  "id": 1,
+  "verificationId": 42,
+  "userId": "abc123",
+  "rating": 4,
+  "comment": "The analysis was very thorough and accurate.",
+  "helpful": true,
+  "createdAt": "2026-05-18T12:00:00.000Z"
+}
 ```
 
 ---

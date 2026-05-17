@@ -91,11 +91,10 @@ async function autoCreateWatchFromPayment(userId: string, companyName: string): 
 }
 
 const CHECKOUT_HMAC_SECRET = process.env.CHECKOUT_HMAC_SECRET;
-if (!CHECKOUT_HMAC_SECRET && process.env.NODE_ENV === "production") {
-  throw new Error("CHECKOUT_HMAC_SECRET is required in production");
+if (!CHECKOUT_HMAC_SECRET) {
+  throw new Error("CHECKOUT_HMAC_SECRET is required");
 }
-// Fallback for development/testing only - use empty string as last resort
-const hmacSecret = CHECKOUT_HMAC_SECRET || process.env.SESSION_SECRET || process.env.STRIPE_SECRET_KEY || "";
+const hmacSecret = CHECKOUT_HMAC_SECRET;
 
 function signClientReferenceId(userId: string, packageType: string, companyName?: string): string {
   const encodedCompany = companyName ? encodeURIComponent(companyName) : '';

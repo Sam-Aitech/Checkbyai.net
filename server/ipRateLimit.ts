@@ -9,15 +9,8 @@ export function hashIpAddress(ip: string): string {
   return crypto.createHash("sha256").update(ip + salt).digest("hex");
 }
 
-// Get client IP address respecting proxy headers
+// Get client IP address from the trusted proxy chain
 export function getClientIp(req: Request): string {
-  // Trust proxy headers (Replit sets X-Forwarded-For)
-  const forwarded = req.headers["x-forwarded-for"];
-  if (forwarded) {
-    const ips = typeof forwarded === "string" ? forwarded.split(",") : forwarded;
-    return ips[0].trim();
-  }
-  
   return req.ip || req.socket.remoteAddress || "unknown";
 }
 

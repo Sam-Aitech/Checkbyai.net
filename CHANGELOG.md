@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **SEC-001 (Critical) — Path traversal on file upload endpoints**: Three endpoints (`/api/admin/extract-metadata`, `/api/admin/trusted-patterns`, `/api/verify`) used `req.file.path` directly without sanitization, allowing path traversal via crafted filenames. Created `server/utils/uploadGuard.ts` with `sanitizeUploadPath()` that resolves paths relative to the uploads directory and rejects traversal attempts.
+- **SEC-002 — HMAC secret fallback chain**: `hmacSecret` in billing.ts fell back through multiple env vars (`CHECKOUT_HMAC_SECRET` → `STRIPE_WEBHOOK_SECRET` → `secret`), leaking which env vars are set to an attacker who can provoke an error. Now requires `CHECKOUT_HMAC_SECRET` unconditionally.
+- **SEC-003 — Timing-safe cron secret comparison**: `/api/ops/cron-ping` used string comparison (`!==`) against the cron secret, vulnerable to timing attacks. Replaced with `crypto.timingSafeEqual`.
+- **SEC-004 — Timing-safe OTP comparison**: Two OTP verification code paths in `auth.ts` used string comparison (`!==`). Replaced both with `crypto.timingSafeEqual`.
+- **SEC-005/006 — X-Forwarded-For IP spoofing**: `getClientIp()` in `ipRateLimit.ts` parsed the `X-Forwarded-For` header directly, allowing an attacker to spoof their IP and bypass rate limits. Now uses `req.ip` (trusted proxy chain) exclusively.
+- **SEC-008/009 — Paid submissions IDOR**: `POST /api/paid/submit/:submissionId` and `GET /api/paid/status/:submissionId` lacked ownership checks, allowing any authenticated user to submit documents to or read the status of another user's submission. Added `userId` column to `paid_submissions` table, stored at creation time, with ownership guard checks in both endpoints.
+
+### Added
+- **`POST /api/feedback` extracted to dedicated route**: Moved from `/api/admin` catch-all to `server/routes/feedback.ts` with its own rate limiter (3 req / 15 min) for better isolation and observability.
+- **Soft-delete for verification logs**: `verification_results` now has a `deleted_at` column. `deleteVerificationLog()` uses `UPDATE ... SET deleted_at = now()` instead of `DELETE`. All 13 read queries filter with `deleted_at IS NULL`.
+
 ### Planned
 - Docker containerization
 - PostgreSQL Row Level Security (RLS) policies

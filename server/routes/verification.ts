@@ -12,6 +12,7 @@ import { verifyLimiter } from "../middleware/rateLimiter";
 import { PDFAnalyzer } from "../services/pdfAnalyzer";
 import { COSAuthenticityChecker } from "../services/cosAuthenticityChecker";
 import { getClientIp, hashIpAddress } from "../ipRateLimit";
+import { sanitizeUploadPath } from "../utils/uploadGuard";
 
 function generateReceiptId(): string {
   const random1 = crypto.randomBytes(4).toString('hex').toUpperCase();
@@ -42,6 +43,7 @@ export const upload = multer({
 
 export function registerVerificationRoutes(app: Express): void {
   app.post('/api/verify', verifyLimiter, upload.single('file'), async (req: any, res) => {
+    let safeFilePath;
     try {
       // Beta gate: CoS Check is invite-only
       if (!req.isAuthenticated()) {
@@ -73,6 +75,8 @@ export function registerVerificationRoutes(app: Express): void {
       if (!req.file) {
         return res.status(400).json({ message: 'No file uploaded' });
       }
+
+      safeFilePath = sanitizeUploadPath(req.file.path);
 
       let userId: string | undefined = betaUserId;
 
@@ -123,7 +127,7 @@ export function registerVerificationRoutes(app: Express): void {
       }
 
       // Generate document hash for audit trail
-      const documentHash = generateDocumentHash(req.file.path);
+      const documentHash = generateDocumentHash(safeFilePath);
       const receiptId = generateReceiptId();
 
       // ── Admin-override short-circuit ──────────────────────────────────────
@@ -160,11 +164,11 @@ export function registerVerificationRoutes(app: Express): void {
 
         // Read the file buffer once: used for the document hash AND passed to the
         // CoS checker so it can count startxref occurrences without a second disk read.
-        const fileBuffer = await fs.promises.readFile(req.file.path);
+        const fileBuffer = await fs.promises.readFile(safeFilePath);
         const pdfBinary = fileBuffer.toString('binary');
 
         const [extractedMetadata, trustedPatterns] = await Promise.all([
-          pdfAnalyzer.extractMetadata(req.file.path),
+          pdfAnalyzer.extractMetadata(safeFilePath),
           storage.getTrustedPatterns(),
         ]);
 
@@ -300,11 +304,10 @@ export function registerVerificationRoutes(app: Express): void {
       console.error('Verification error:', error);
       res.status(500).json({ message: 'Verification failed' });
     } finally {
-      // Delete uploaded file immediately after processing (security measure)
-      if (req.file && req.file.path) {
+      if (safeFilePath) {
         try {
           const fsModule = await import('fs');
-          fsModule.promises.unlink(req.file.path).catch(() => {
+          fsModule.promises.unlink(safeFilePath).catch(() => {
             // Silently fail if file already deleted
           });
         } catch (err) {

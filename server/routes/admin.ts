@@ -26,6 +26,7 @@ import { upload } from "./verification";
 import { sendEmailReliably } from "../utils/resilientEmail";
 import { getAppUrl } from "../utils/appUrl";
 import { checkBinaryHealth } from "../utils/binaryRunner";
+import { sanitizeUploadPath } from "../utils/uploadGuard";
 import { isJobRunning, getLastRunInfo, runSponsorMonitorJob } from "../utils/sponsorMonitorJob";
 import { rebuildSponsorIndex } from "../utils/sponsorSearch";
 import { isQueueAvailable, getSponsorRefreshQueue } from "../services/jobQueue";
@@ -97,13 +98,15 @@ export function registerAdminRoutes(app: Express): void {
   });
 
   app.post('/api/admin/trusted-patterns', isAdmin, upload.single('file'), async (req, res) => {
+    let safeFilePath;
     try {
       if (!req.file) {
         return res.status(400).json({ message: 'No file uploaded' });
       }
 
+      safeFilePath = sanitizeUploadPath(req.file.path);
       const pdfAnalyzer = new PDFAnalyzer();
-      const metadata = await pdfAnalyzer.extractMetadata(req.file.path);
+      const metadata = await pdfAnalyzer.extractMetadata(safeFilePath);
       const patterns = { metadata, documentType: 'trusted_cos' };
 
       const aiInstructions = req.body?.aiInstructions || null;
@@ -119,6 +122,14 @@ export function registerAdminRoutes(app: Express): void {
     } catch (error) {
       console.error("Error creating trusted pattern:", error);
       res.status(500).json({ message: "Failed to create trusted pattern" });
+    } finally {
+      if (safeFilePath) {
+        try {
+          fs.unlink(safeFilePath, () => {});
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+      }
     }
   });
 
@@ -134,13 +145,15 @@ export function registerAdminRoutes(app: Express): void {
   });
 
   app.post('/api/admin/extract-metadata', isAdmin, upload.single('file'), async (req: any, res) => {
+    let safeFilePath;
     try {
       if (!req.file) {
         return res.status(400).json({ message: 'No file uploaded' });
       }
 
+      safeFilePath = sanitizeUploadPath(req.file.path);
       const pdfAnalyzer = new PDFAnalyzer();
-      const metadata = await pdfAnalyzer.extractMetadata(req.file.path);
+      const metadata = await pdfAnalyzer.extractMetadata(safeFilePath);
 
       res.json({
         metadata: {
@@ -160,9 +173,9 @@ export function registerAdminRoutes(app: Express): void {
       console.error("Error extracting metadata:", error);
       res.status(500).json({ message: "Failed to extract metadata" });
     } finally {
-      if ((req as any).file?.path) {
+      if (safeFilePath) {
         try {
-          await fs.promises.unlink((req as any).file.path);
+          await fs.promises.unlink(safeFilePath);
         } catch (e) {
           // Ignore cleanup errors
         }
@@ -1415,25 +1428,6 @@ Format your response in clear, professional markdown.`;
     }
   });
 
-  app.post('/api/feedback', async (req: any, res) => {
-    try {
-      const feedbackData = insertFeedbackSchema.parse(req.body);
-
-      if (req.isAuthenticated()) {
-        feedbackData.userId = req.user.id;
-      }
-
-      const newFeedback = await storage.createFeedback(feedbackData);
-      res.json(newFeedback);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid feedback data", errors: error.errors });
-      }
-      console.error("Error creating feedback:", error);
-      res.status(500).json({ message: "Failed to submit feedback" });
-    }
-  });
-
   app.get('/api/feedback/stats', isAdmin, async (req, res) => {
     try {
       const stats = await storage.getFeedbackStats();
@@ -1488,6 +1482,7 @@ Format your response in clear, professional markdown.`;
       });
 
       const submission = await storage.createPaidSubmission({
+        userId: req.user.id,
         email: '',
         packageType,
         paymentStatus: 'pending',
@@ -1545,6 +1540,10 @@ Format your response in clear, professional markdown.`;
         return res.status(404).json({ message: 'Submission not found' });
       }
 
+      if (submission.userId !== req.user.id) {
+        return res.status(403).json({ message: 'Forbidden' });
+      }
+
       if (submission.paymentStatus !== 'paid') {
         return res.status(400).json({ message: 'Payment not completed' });
       }
@@ -1589,6 +1588,10 @@ Format your response in clear, professional markdown.`;
 
       if (!submission) {
         return res.status(404).json({ message: 'Submission not found' });
+      }
+
+      if (submission.userId !== req.user.id) {
+        return res.status(403).json({ message: 'Forbidden' });
       }
 
       res.json({

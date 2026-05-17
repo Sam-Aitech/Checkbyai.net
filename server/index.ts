@@ -472,6 +472,8 @@ async function applyPendingMigrations() {
       `CREATE INDEX IF NOT EXISTS "idx_sponsor_watches_user_id" ON "sponsor_watches"("user_id")`,
       `CREATE INDEX IF NOT EXISTS "idx_sponsor_watches_status" ON "sponsor_watches"("status")`,
       `CREATE INDEX IF NOT EXISTS "idx_sponsor_watches_company_name" ON "sponsor_watches"("company_name")`,
+      `ALTER TABLE "verification_results" ADD COLUMN IF NOT EXISTS "deleted_at" timestamp`,
+      `CREATE INDEX IF NOT EXISTS "idx_verification_results_deleted_at" ON "verification_results"("deleted_at")`,
     ];
     for (const sql of migrations) {
       await client.query(sql);

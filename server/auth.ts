@@ -425,7 +425,8 @@ export async function setupAuth(app: Express) {
       }
 
       // Check code and expiry
-      if (user.verificationCode !== code) {
+      if (!user.verificationCode || user.verificationCode.length !== code.length ||
+          !crypto.timingSafeEqual(Buffer.from(user.verificationCode), Buffer.from(code))) {
         return res.status(400).json({ message: "Invalid verification code" });
       }
 
@@ -535,7 +536,8 @@ export async function setupAuth(app: Express) {
       }
 
       // Check code and expiry
-      if (user.verificationCode !== code) {
+      if (!user.verificationCode || user.verificationCode.length !== code.length ||
+          !crypto.timingSafeEqual(Buffer.from(user.verificationCode), Buffer.from(code))) {
         return res.status(400).json({ message: "Invalid verification code" });
       }
 

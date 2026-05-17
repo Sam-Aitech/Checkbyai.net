@@ -1,6 +1,6 @@
 # Data Model Document
 # checkbyai.net
-**Version:** 2.0 | **Last Updated:** 2026-03-20
+**Version:** 2.1 | **Last Updated:** 2026-05-18
 
 ---
 
@@ -113,6 +113,7 @@ COS Check analysis results. Documents are never stored; only metadata and result
 | `adminFeedback` | text | Admin override reasoning |
 | `adminReviewedBy` | text | Admin user ID who reviewed |
 | `adminReviewedAt` | timestamp | Time of admin review |
+| `deletedAt` | timestamp | Soft-delete timestamp (null = active) |
 | `createdAt` | timestamp | Verification timestamp |
 
 ---
