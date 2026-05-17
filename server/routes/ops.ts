@@ -5,7 +5,7 @@ import { and, desc, eq, gte, ne, sql } from "drizzle-orm";
 import { db } from "../db";
 import { jobTriggerAudit, shadowParityReports, shadowRunResults, incidentTickets, monitorJobRuns } from "@shared/schema";
 import { requireRole } from "../middleware/roleGuard";
-import { opsTriggerLimiter } from "../middleware/rateLimiter";
+import { opsTriggerLimiter } from "../middlheware/rateLimiter";
 import { isSafeCallbackUrl, signPayload } from "../utils/callbackSigner";
 import { isUuidV4 } from "../utils/idempotency";
 import { generateCorrelationId, startJobRun, finishJobRun } from "../utils/jobTelemetry";
@@ -103,6 +103,13 @@ async function markAuditCompleted(params: {
 }
 
 async function sendSignedCallback(callbackUrl: string, payload: Record<string, unknown>): Promise<void> {
+    // ── SSRF guard: validate on every call including retries ─────────────
+    const safe = await isSafeCallbackUrl(callbackUrl);
+    if (!safe) {
+          throw new Error(`SSRF_BLOCKED: callbackUrl failed safety check — only external HTTPS URLs resolving to public IPs are permitted.`
+                              );
+    }
+    // ──────────────────────────────────────────────────────────────────────
   const secret = process.env.CALLBACK_SIGNING_SECRET;
   if (!secret) {
     throw new Error("CALLBACK_SIGNING_SECRET is not configured");
