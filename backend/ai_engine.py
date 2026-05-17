@@ -70,27 +70,10 @@ class AIEngine:
         """
         Extract metadata from an uploaded document.
 
-        Args:
-            file_path: Path to the uploaded document.
-
-        Returns:
-            Dict containing extracted document metadata.
-
-        Raises:
-            NotImplementedError: Core logic is proprietary.
-        """
-        raise NotImplementedError(
-            "AI Engine is a proprietary service. "
-            "See CONTRIBUTING.md for integration details."
-        )
-
-    async def extract_metadata(self, file_path: str) -> Dict[str, Any]:
-        """
-        Backward-compatible alias for legacy callers expecting document
-        metadata extraction as a separate contract method.
+        Backward-compatible alias - delegates to analyze_document.
 
         Args:
-            file_path: Path to the uploaded PDF document.
+            file_path: Path to the uploaded PDF or document.
 
         Returns:
             Dict containing document analysis/metadata.
