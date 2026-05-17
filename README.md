@@ -28,11 +28,11 @@ Forensic analysis of Certificate of Sponsorship PDFs using AI and metadata foren
 - Fabricated metadata (missing or reordered XMP fields)
 - Suspicious modification dates and metadata inconsistencies
 - Incremental updates and editing tool fingerprints
-- Invalid certificate generation (non-Apache FOP producers)
+- Invalid certificate generation (non-Apache)
 
 **Two-tier verification:**
 - **User View** — Verdict only: GENUINE (green shield) or EDITED (red shield) with one-line reason
-- **Admin View** — Full forensics: all 6 authenticity checks, XMP tags table, PDF properties, document stats, suspicious indicators
+- **Admin View** — Full forensics: all 6 authenticity checks.
 
 **Perfect for:** Anyone verifying a COS document authenticity
 
@@ -128,7 +128,6 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed setup instructions.
 
 **External Services:**
 - **Stripe** — Payment processing
-- **OpenAI / Claude** — AI analysis for COS verification
 - **Cloudflare Turnstile** — CAPTCHA/bot protection
 - **Resend / Brevo** — Email delivery
 - **Twilio** — SMS/WhatsApp notifications
