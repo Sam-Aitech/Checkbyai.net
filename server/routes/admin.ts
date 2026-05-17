@@ -30,6 +30,7 @@ import { isJobRunning, getLastRunInfo, runSponsorMonitorJob } from "../utils/spo
 import { rebuildSponsorIndex } from "../utils/sponsorSearch";
 import { isQueueAvailable, getSponsorRefreshQueue } from "../services/jobQueue";
 import { getWatchLimit } from "../utils/tierConfig";
+import { sanitizeUploadPath } from "../utils/uploadGuard";
 
 const SPONSOR_JOB_LOCK_KEY = 7483920; // Same key as sponsorMonitorJob — init and nightly are mutually exclusive
 
@@ -101,9 +102,11 @@ export function registerAdminRoutes(app: Express): void {
       if (!req.file) {
         return res.status(400).json({ message: 'No file uploaded' });
       }
-
+        // Path-traversal guard: assert req.file.path is inside uploads/
+              const safeFilePath = sanitizeUploadPath((req as any).file.path);
+      
       const pdfAnalyzer = new PDFAnalyzer();
-      const metadata = await pdfAnalyzer.extractMetadata(req.file.path);
+      const metadata = await pdfAnalyzer.extractMetadata(safeFilePath);
       const patterns = { metadata, documentType: 'trusted_cos' };
 
       const aiInstructions = req.body?.aiInstructions || null;
@@ -140,7 +143,7 @@ export function registerAdminRoutes(app: Express): void {
       }
 
       const pdfAnalyzer = new PDFAnalyzer();
-      const metadata = await pdfAnalyzer.extractMetadata(req.file.path);
+      const metadata = await pdfAnalyzer.extractMetadata(safeFilePath);
 
       res.json({
         metadata: {
@@ -160,7 +163,7 @@ export function registerAdminRoutes(app: Express): void {
       console.error("Error extracting metadata:", error);
       res.status(500).json({ message: "Failed to extract metadata" });
     } finally {
-      if ((req as any).file?.path) {
+      if (safeFilePath) {
         try {
           await fs.promises.unlink((req as any).file.path);
         } catch (e) {
