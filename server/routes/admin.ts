@@ -142,6 +142,8 @@ export function registerAdminRoutes(app: Express): void {
         return res.status(400).json({ message: 'No file uploaded' });
       }
 
+      // SEC-001: safeFilePath was missing here — caused ReferenceError + path-traversal bypass
+      const safeFilePath = sanitizeUploadPath((req as any).file.path);
       const pdfAnalyzer = new PDFAnalyzer();
       const metadata = await pdfAnalyzer.extractMetadata(safeFilePath);
 
@@ -165,7 +167,7 @@ export function registerAdminRoutes(app: Express): void {
     } finally {
       if (safeFilePath) {
         try {
-          await fs.promises.unlink((req as any).file.path);
+          await fs.promises.unlink(safeFilePath);
         } catch (e) {
           // Ignore cleanup errors
         }
@@ -1418,7 +1420,8 @@ Format your response in clear, professional markdown.`;
     }
   });
 
-  app.post('/api/feedback', async (req: any, res) => {
+  // SEC-007: added isAuthenticated guard — was fully unauthenticated (spam risk)
+  app.post('/api/feedback', isAuthenticated, async (req: any, res) => {
     try {
       const feedbackData = insertFeedbackSchema.parse(req.body);
 
@@ -1552,6 +1555,11 @@ Format your response in clear, professional markdown.`;
         return res.status(400).json({ message: 'Payment not completed' });
       }
 
+      // SEC-008: IDOR fix — verify caller owns this submission
+      if (submission.userId && submission.userId !== (req as any).user?.id) {
+        return res.status(403).json({ message: 'Forbidden: you do not own this submission' });
+      }
+
       const {
         howApplied,
         emailsReceived,
@@ -1602,6 +1610,11 @@ Format your response in clear, professional markdown.`;
         reportDelivered: submission.reportDelivered,
         createdAt: submission.createdAt,
       });
+    }
+
+    // SEC-009: IDOR fix — verify caller owns this submission
+    if (submission.userId && submission.userId !== (req as any).user?.id) {
+      return res.status(403).json({ message: 'Forbidden: you do not own this submission' });
     } catch (error: unknown) {
       console.error('Status error:', error);
       res.status(500).json({ message: 'Failed to get status' });
