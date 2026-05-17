@@ -84,6 +84,23 @@ class AIEngine:
             "See CONTRIBUTING.md for integration details."
         )
 
+    async def extract_metadata(self, file_path: str) -> Dict[str, Any]:
+        """
+        Backward-compatible alias for legacy callers expecting document
+        metadata extraction as a separate contract method.
+
+        Args:
+            file_path: Path to the uploaded PDF document.
+
+        Returns:
+            Dict containing document analysis/metadata.
+
+        Raises:
+            NotImplementedError: Propagated from analyze_document in the
+            open-source build unless implemented by the private service.
+        """
+        return await self.analyze_document(file_path)
+
     async def verify_cos(
         self,
         document_data: Dict[str, Any],
