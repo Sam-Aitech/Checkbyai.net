@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import crypto from "crypto";
 import { storage } from "./storage";
+import { logger } from "./utils/logger";
 
 // Hash IP address for privacy (GDPR compliance)
 export function hashIpAddress(ip: string): string {
@@ -59,11 +60,22 @@ export async function checkIpRateLimit(
     
     next();
   } catch (error) {
-    console.error("IP rate limit check error:", error);
-    // On error, allow the request to proceed (fail open)
-    next();
+        // FAIL CLOSED: On any error (e.g. Redis outage), BLOCK the request.
+        // Failing open on a fraud-protection platform would allow unlimited
+        // document submissions during any storage or Redis downtime.
+        logger.error(
+          { err: error },
+                "IP rate-limit check failed \u2014 blocking request to prevent abuse during outage",
+              );
+        return res.status(503).json({
+                message:
+                          "Verification service temporarily unavailable. " +
+                          "Please try again in a few minutes.",
+                code: "rate_limit_unavailable",
+        });
   }
-}
+  
+  }
 
 // Record verification for IP
 export async function recordIpVerification(hashedIp: string): Promise<void> {
