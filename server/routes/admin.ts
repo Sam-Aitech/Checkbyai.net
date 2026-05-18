@@ -130,7 +130,7 @@ export function registerAdminRoutes(app: Express): void {
     } finally {
       if (safeFilePath) {
         try {
-          fs.unlink(sanitizeUploadPath(safeFilePath), () => {});
+          fs.unlink(safeFilePath, () => {});
         } catch (e) {
           // Ignore cleanup errors
         }
@@ -181,7 +181,7 @@ export function registerAdminRoutes(app: Express): void {
     } finally {
       if (safeFilePath) {
         try {
-          await fs.promises.unlink(sanitizeUploadPath(safeFilePath));
+          await fs.promises.unlink(safeFilePath);
         } catch (e) {
           // Ignore cleanup errors
         }
@@ -1589,11 +1589,6 @@ Format your response in clear, professional markdown.`;
         return res.status(400).json({ message: 'Payment not completed' });
       }
 
-      // SEC-008: IDOR fix — verify caller owns this submission
-      if (submission.userId && submission.userId !== (req as any).user?.id) {
-        return res.status(403).json({ message: 'Forbidden: you do not own this submission' });
-      }
-
       const {
         howApplied,
         emailsReceived,
@@ -1636,7 +1631,12 @@ Format your response in clear, professional markdown.`;
         return res.status(404).json({ message: 'Submission not found' });
       }
 
-      if (submission.userId !== (req as any).user?.id) {
+      const currentUserId = (req as any).user?.id;
+      if (!currentUserId) {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
+
+      if (submission.userId !== currentUserId) {
         return res.status(403).json({ message: 'Forbidden' });
       }
 
