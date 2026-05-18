@@ -20,8 +20,8 @@ function generateReceiptId(): string {
   return `CBA-${random1}-${random2}`;
 }
 
-function generateDocumentHash(filePath: string): string {
-  const fileBuffer = fs.readFileSync(filePath);
+async function generateDocumentHash(filePath: string): Promise<string> {
+  const fileBuffer = await fs.promises.readFile(filePath);
   return crypto.createHash('sha256').update(fileBuffer).digest('hex');
 }
 
@@ -43,6 +43,7 @@ export const upload = multer({
 
 export function registerVerificationRoutes(app: Express): void {
   app.post('/api/verify', verifyLimiter, upload.single('file'), async (req: any, res) => {
+    let safeFilePath: string | undefined;
     try {
       // Beta gate: CoS Check is invite-only
       if (!req.isAuthenticated()) {
@@ -74,6 +75,9 @@ export function registerVerificationRoutes(app: Express): void {
       if (!req.file) {
         return res.status(400).json({ message: 'No file uploaded' });
       }
+
+      safeFilePath = sanitizeUploadPath(req.file.path);
+      const safePath = safeFilePath;
 
       let userId: string | undefined = betaUserId;
 
@@ -123,11 +127,8 @@ export function registerVerificationRoutes(app: Express): void {
         }
       }
 
-        // Path-traversal guard: assert req.file.path is inside uploads/
-              const safeFilePath = sanitizeUploadPath(req.file.path);
-      
       // Generate document hash for audit trail
-        const documentHash = generateDocumentHash(safeFilePath);
+      const documentHash = await generateDocumentHash(safePath);
       const receiptId = generateReceiptId();
 
       // ── Admin-override short-circuit ──────────────────────────────────────
@@ -164,11 +165,11 @@ export function registerVerificationRoutes(app: Express): void {
 
         // Read the file buffer once: used for the document hash AND passed to the
         // CoS checker so it can count startxref occurrences without a second disk read.
-        const fileBuffer = await fs.promises.readFile(safeFilePath);
+        const fileBuffer = await fs.promises.readFile(safePath);
         const pdfBinary = fileBuffer.toString('binary');
 
         const [extractedMetadata, trustedPatterns] = await Promise.all([
-          pdfAnalyzer.extractMetadata(safeFilePath),
+          pdfAnalyzer.extractMetadata(safePath),
           storage.getTrustedPatterns(),
         ]);
 

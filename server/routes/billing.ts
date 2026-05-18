@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import rateLimit from "express-rate-limit";
 import * as crypto from "crypto";
 import Stripe from "stripe";
 import { db } from "../db";
@@ -91,8 +92,8 @@ async function autoCreateWatchFromPayment(userId: string, companyName: string): 
 }
 
 const CHECKOUT_HMAC_SECRET = process.env.CHECKOUT_HMAC_SECRET;
-if (!CHECKOUT_HMAC_SECRET && process.env.NODE_ENV === "production") {
-  throw new Error("CHECKOUT_HMAC_SECRET is required in production");
+if (!CHECKOUT_HMAC_SECRET) {
+  throw new Error("CHECKOUT_HMAC_SECRET is required");
 }
 // Fallback for development/testing only - use empty string as last resort
 // SEC-002: removed insecure fallback chain — CHECKOUT_HMAC_SECRET is required in all environments
@@ -143,8 +144,11 @@ function verifyClientReferenceId(clientRefId: string): { userId: string; package
   }
 }
 
-async function markSessionProcessed(sessionId: string): Promise<void> {
-  await db.insert(processedCheckouts).values({ sessionId }).onConflictDoNothing();
+async function tryClaimSession(sessionId: string): Promise<boolean> {
+  const result = await db.execute(
+    sql`INSERT INTO processed_checkouts (session_id) VALUES (${sessionId}) ON CONFLICT (session_id) DO NOTHING RETURNING session_id`
+  );
+  return (result as any).rowCount > 0;
 }
 
 async function isSessionProcessed(sessionId: string): Promise<boolean> {
@@ -165,7 +169,7 @@ if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
 }
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-11-17.clover" as any,
+  apiVersion: "2025-11-17.clover",
 });
 
 async function sendSubscriptionNotifications(
@@ -406,7 +410,7 @@ export function registerBillingRoutes(app: Express): void {
         const invoice = event.data.object as any;
         const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
         if (customerId && invoice.subscription) {
-          const user = await storage.getUserByStripeCustomerId(customerId);
+          const user = await withRetry(() => storage.getUserByStripeCustomerId(customerId), 'webhook-invoice-user-fetch');
           if (user) {
             if (user.subscriptionStatus && user.subscriptionStatus !== 'free') {
               await storage.updateUserSubscription(user.id, {
@@ -480,8 +484,7 @@ export function registerBillingRoutes(app: Express): void {
           }
         }
 
-        if (userId && packageType && session.payment_status === 'paid' && !(await isSessionProcessed(session.id))) {
-          await markSessionProcessed(session.id);
+        if (userId && packageType && session.payment_status === 'paid' && await tryClaimSession(session.id)) {
           const sessionEmail = session.customer_details?.email || session.customer_email || undefined;
           const prevUser = await storage.getUser(userId);
           const prevStatus = prevUser?.subscriptionStatus || 'free';
@@ -740,8 +743,7 @@ export function registerBillingRoutes(app: Express): void {
         }
 
         if (sessionUserId && sessionUserId === req.user.id) {
-          if (!(await isSessionProcessed(sessionId))) {
-            await markSessionProcessed(sessionId);
+          if (await tryClaimSession(sessionId)) {
             if (packageType === 'starter') {
               await withRetry(() => db.transaction(async (tx) => {
                 await tx.update(users).set({
@@ -832,7 +834,15 @@ export function registerBillingRoutes(app: Express): void {
     }
   });
 
-  app.get('/api/stripe/publishable-key', async (req, res) => {
+  const stripeKeyLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: "Too many requests. Please try again later." },
+  });
+
+  app.get('/api/stripe/publishable-key', stripeKeyLimiter, async (req, res) => {
     try {
       const { getStripePublishableKey } = await import('../stripeClient');
       const key = await getStripePublishableKey();

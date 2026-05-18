@@ -126,7 +126,6 @@ export interface IStorage {
   getStats(): Promise<{
     trustedPatterns: number;
     verificationsToday: number;
-    suspiciousToday: number;
     totalUsers: number;
     proUsers: number;
   }>;
@@ -674,7 +673,7 @@ export class DatabaseStorage implements IStorage {
     return await db
       .select()
       .from(verificationResults)
-      .where(eq(verificationResults.userId, userId))
+      .where(and(eq(verificationResults.userId, userId), isNull(verificationResults.deletedAt)))
       .orderBy(desc(verificationResults.verifiedAt))
       .limit(limit);
   }
@@ -683,7 +682,7 @@ export class DatabaseStorage implements IStorage {
     const [result] = await db
       .select()
       .from(verificationResults)
-      .where(eq(verificationResults.receiptId, receiptId));
+      .where(and(eq(verificationResults.receiptId, receiptId), isNull(verificationResults.deletedAt)));
     return result;
   }
 
@@ -694,7 +693,8 @@ export class DatabaseStorage implements IStorage {
       .where(
         sql`${verificationResults.documentHash} = ${documentHash}
             AND ${verificationResults.adminStatus} = 'fake'
-            AND ${verificationResults.adminFeedback} IS NOT NULL`
+            AND ${verificationResults.adminFeedback} IS NOT NULL
+            AND ${verificationResults.deletedAt} IS NULL`
       )
       .orderBy(desc(verificationResults.adminReviewedAt))
       .limit(1);
@@ -705,6 +705,7 @@ export class DatabaseStorage implements IStorage {
     return await db
       .select()
       .from(verificationResults)
+      .where(isNull(verificationResults.deletedAt))
       .orderBy(desc(verificationResults.verifiedAt))
       .limit(limit);
   }
@@ -713,7 +714,7 @@ export class DatabaseStorage implements IStorage {
     const [result] = await db
       .select()
       .from(verificationResults)
-      .where(eq(verificationResults.id, id));
+      .where(and(eq(verificationResults.id, id), isNull(verificationResults.deletedAt)));
     return result;
   }
 
@@ -755,7 +756,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     // Build where conditions
-    const conditions = [];
+    const conditions = [isNull(verificationResults.deletedAt)];
 
     if (status && status !== 'all') {
       conditions.push(eq(verificationResults.result, status));
@@ -807,44 +808,28 @@ export class DatabaseStorage implements IStorage {
   async getStats(): Promise<{
     trustedPatterns: number;
     verificationsToday: number;
-    suspiciousToday: number;
     totalUsers: number;
     proUsers: number;
   }> {
     const today = new Date().toISOString().split('T')[0];
-    
-    const [trustedPatternsCount] = await db
-      .select({ count: count() })
-      .from(trustedPatterns)
-      .where(eq(trustedPatterns.status, 'active'));
-    
-    const [verificationsToday] = await db
-      .select({ count: count() })
-      .from(verificationResults)
-      .where(gte(verificationResults.verifiedAt, new Date(today)));
-    
-    const [suspiciousToday] = await db
-      .select({ count: count() })
-      .from(verificationResults)
-      .where(
-        gte(verificationResults.verifiedAt, new Date(today))
-      );
-    
-    const [totalUsers] = await db
-      .select({ count: count() })
-      .from(users);
-    
-    const [proUsers] = await db
-      .select({ count: count() })
-      .from(users)
-      .where(inArray(users.subscriptionStatus, ['starter', 'pro', 'unlimited', 'enterprise']));
-    
+
+    const [
+      trustedPatternsCount,
+      verificationsToday,
+      totalUsers,
+      proUsers,
+    ] = await Promise.all([
+      db.select({ count: count() }).from(trustedPatterns).where(eq(trustedPatterns.status, 'active')),
+      db.select({ count: count() }).from(verificationResults).where(and(gte(verificationResults.verifiedAt, new Date(today)), isNull(verificationResults.deletedAt))),
+      db.select({ count: count() }).from(users),
+      db.select({ count: count() }).from(users).where(inArray(users.subscriptionStatus, ['starter', 'pro', 'unlimited', 'enterprise'])),
+    ]);
+
     return {
-      trustedPatterns: trustedPatternsCount.count,
-      verificationsToday: verificationsToday.count,
-      suspiciousToday: Math.floor(suspiciousToday.count * 0.15), // Approximate suspicious rate
-      totalUsers: totalUsers.count,
-      proUsers: proUsers.count,
+      trustedPatterns: trustedPatternsCount[0].count,
+      verificationsToday: verificationsToday[0].count,
+      totalUsers: totalUsers[0].count,
+      proUsers: proUsers[0].count,
     };
   }
 
@@ -1113,13 +1098,13 @@ export class DatabaseStorage implements IStorage {
     return await db
       .select()
       .from(verificationResults)
-      .where(eq(verificationResults.adminStatus, 'fake'))
+      .where(and(eq(verificationResults.adminStatus, 'fake'), isNull(verificationResults.deletedAt)))
       .orderBy(desc(verificationResults.adminReviewedAt))
       .limit(limit);
   }
 
   async deleteVerificationLog(id: number): Promise<void> {
-    await db.delete(verificationResults).where(eq(verificationResults.id, id));
+    await db.update(verificationResults).set({ deletedAt: new Date() }).where(eq(verificationResults.id, id));
   }
 
   async getVerificationLogsWithHITL(page: number, limit: number, adminStatus?: string): Promise<{
@@ -1131,9 +1116,13 @@ export class DatabaseStorage implements IStorage {
   }> {
     const offset = (page - 1) * limit;
 
-    const whereClause = adminStatus && adminStatus !== 'all'
+    const statusClause = adminStatus && adminStatus !== 'all'
       ? eq(verificationResults.adminStatus, adminStatus)
       : undefined;
+
+    const whereClause = statusClause
+      ? and(statusClause, isNull(verificationResults.deletedAt))
+      : isNull(verificationResults.deletedAt);
 
     const [countResult] = await db
       .select({ count: count() })

@@ -1,6 +1,6 @@
 # Security Design Document
 # checkbyai.net
-**Version:** 1.1 | **Classification:** Internal | **Last Updated:** 2026-03-20
+**Version:** 1.3 | **Classification:** Internal | **Last Updated:** 2026-05-18
 
 ---
 
@@ -288,6 +288,31 @@ OPENAI_API_KEY         — AI analysis (falls back to Claude/DeepSeek)
 
 ## 11. Outstanding Security Items
 
+### Sprint 3 Fixes (2026-05-18)
+| ID | Item | Status |
+|---|---|---|
+| SEC-021 | Inline migrations replaced with Drizzle migration files | Fixed — `migrations/0016_*.sql`, `0017_*.sql`; `applyPendingMigrations()` removed |
+| SEC-022 | Remove fabricated `suspiciousToday` stat | Fixed — removed from `getStats()` response and `StatsResponse` type |
+| SEC-023 | Sanitize adminFeedback in LLM prompts | Fixed — `sanitizeForPrompt()` strips `< >` \` { }` |
+| SEC-024 | Compression filter skips `/api/auth` routes | Fixed — auth responses no longer compressed |
+| SEC-025 | `generateDocumentHash` async with `fs.promises.readFile` | Fixed — no longer blocks event loop |
+| SEC-026 | Normalize IP cooldown to 1-day | Fixed — `ipRateLimit.ts` changed from 7-day to 1-day |
+| SEC-027 | `APP_URL` env var with Replit fallback | Fixed — warns if both missing |
+| SEC-028 | Atomic session claim via `tryClaimSession()` | Fixed — single INSERT ... ON CONFLICT replaces check-then-mark race |
+| SEC-029 | `user_id` column on sessions table | Fixed — migration `0017_sessions_user_id.sql` |
+
+### Sprint 2 Fixes (2026-05-18)
+| ID | Item | Status |
+|---|---|---|
+| SEC-011 | `SESSION_SECRET` null check at startup | Fixed — throws if missing |
+| SEC-013 | HSTS `preload` directive | Fixed — `max-age=63072000; includeSubDomains; preload` |
+| SEC-014 | `safeFilePath` in finally block | Fixed (Sprint 1) — declared before try, used in finally |
+| SEC-016 | Phone OTP store moved to Redis | Fixed — `server/utils/phoneOtpStore.ts` with in-memory fallback |
+| SEC-017 | Rate limit on `/api/stripe/publishable-key` | Fixed — 10 req/min |
+| SEC-018 | System settings allowed-keys validation | Fixed — `ALLOWED_SYSTEM_SETTINGS` whitelist |
+| SEC-019 | Full UUID for admin user IDs | Fixed — `crypto.randomUUID()` without truncation |
+
+### Remaining Items
 | Priority | Item | Status |
 |---|---|---|
 | HIGH | PostgreSQL Row Level Security (RLS) policies | Not implemented — application-layer only |

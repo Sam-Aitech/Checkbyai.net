@@ -15,6 +15,7 @@ COPY . .
 
 # Build: Vite frontend → dist/public, esbuild server → dist/index.js
 RUN npm run build
+RUN npm prune --omit=dev
 
 # ─────────────────────────────────────────────────────────────
 # Stage 2: Runtime

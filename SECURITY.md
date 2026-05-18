@@ -90,10 +90,14 @@ We will not take legal action against researchers who:
 ### Authentication
 
 - **Email OTP** — 6-digit codes with 10-minute expiry, cleared on use
-- **Google OAuth** — CSRF-protected with `state` parameter validation
-- **Admin access** — OTP-only (no passwords), email-verified admin identity
-- **Session cookies** — `httpOnly`, `secure`, `sameSite: lax`, 7-day expiry
-- **CAPTCHA** — Cloudflare Turnstile on authentication endpoints
+- **Admin OTP** — Cloudflare Turnstile CAPTCHA required before sending (QA-011)
+- **OTP comparison** — `crypto.timingSafeEqual()` to prevent timing attacks (SEC-004)
+- **Google OAuth** — CSRF-protected with `state` parameter validation; callback URL configurable via `APP_URL` env var (SEC-027)
+- **Admin access** — OTP-only (no passwords), email-verified admin identity; full UUID generation (SEC-019)
+- **Session cookies** — `httpOnly`, `secure`, `sameSite: lax`, 7-day expiry; `SESSION_SECRET` validated at startup (SEC-011)
+- **Session claims** — Atomic INSERT ... ON CONFLICT DO NOTHING (tryClaimSession) to prevent race conditions (SEC-028)
+- **Compression** — Responses to `/api/auth/*` excluded from compression to mitigate BREACH-style attacks (SEC-024)
+- **CAPTCHA** — Cloudflare Turnstile on all authentication endpoints; CSP includes `https://challenges.cloudflare.com` (QA-017)
 
 ### Data Protection
 
@@ -101,16 +105,20 @@ We will not take legal action against researchers who:
 - **Immigration documents (COS)** — never stored; permanently deleted immediately after forensic analysis; only SHA-256 hash retained
 - **Passwords** — we do not store passwords; authentication is OTP-only
 - **Database connections** — TLS enforced via Neon PostgreSQL
+- **Verification logs** — soft-delete (`deleted_at` column) preserves audit trail; all queries filter out soft-deleted rows (SEC-007, SEC-010)
 
 ### Network & Application Security
 
-- **Rate limiting** — per-IP limits on OTP, search, and file upload endpoints
+- **Rate limiting** — per-IP limits on OTP, search, file upload, admin, and Stripe key endpoints; 1-day IP cooldown on verifications (SEC-017, SEC-026)
 - **Input validation** — Zod schema validation on all mutation endpoints
 - **SQL injection** — Drizzle ORM with parameterized queries only
-- **XSS prevention** — React JSX auto-escaping + Content-Security-Policy headers
-- **Prototype pollution** — `express.urlencoded({ extended: false })`
-- **File uploads** — MIME type enforcement (PDF only), 10MB size limit, temp-dir isolation
+- **XSS prevention** — React JSX auto-escaping + Content-Security-Policy headers (including Cloudflare Turnstile domains)
+- **Prototype pollution** — `express.urlencoded({ extended: false })` + `hasOwnProperty` guard on preference merges (QA-019)
+- **File uploads** — MIME type enforcement (PDF only), 10MB size limit, temp-dir isolation, sanitized path resolution via `sanitizeUploadPath()` (SEC-001)
 - **CSRF protection** — SameSite cookies + OAuth state parameter
+- **HSTS** — `max-age=63072000; includeSubDomains; preload` for HSTS preload list eligibility (SEC-013)
+- **Clocked cron** — Timing-safe comparison for cron secret to prevent timing attacks (SEC-003)
+- **Redis** — Password-protected via `--requirepass` in docker-compose (QA-020)
 
 ### Dependency Management
 
@@ -127,6 +135,7 @@ We will not take legal action against researchers who:
 | No PostgreSQL Row Level Security | Application-layer access control only | All routes enforce `isAuthenticated`/`isAdmin` middleware |
 | Session in PostgreSQL | Session fixation if DB is compromised | Session IDs are opaque nanoids; regenerated on auth |
 | Phone OTP verification | SIM swap attacks | Out-of-scope for current threat model; low-risk channel |
+| CSP `unsafe-inline` on scripts | Reduced XSS protection | Deferred — requires migrating all inline event handlers to external files (SEC-012) |
 
 These are documented to be transparent — not to invite exploitation.
 

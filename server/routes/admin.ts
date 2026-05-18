@@ -26,11 +26,15 @@ import { upload } from "./verification";
 import { sendEmailReliably } from "../utils/resilientEmail";
 import { getAppUrl } from "../utils/appUrl";
 import { checkBinaryHealth } from "../utils/binaryRunner";
+import { sanitizeUploadPath } from "../utils/uploadGuard";
 import { isJobRunning, getLastRunInfo, runSponsorMonitorJob } from "../utils/sponsorMonitorJob";
 import { rebuildSponsorIndex } from "../utils/sponsorSearch";
 import { isQueueAvailable, getSponsorRefreshQueue } from "../services/jobQueue";
 import { getWatchLimit } from "../utils/tierConfig";
-import { sanitizeUploadPath } from "../utils/uploadGuard";
+
+function sanitizeForPrompt(text: string): string {
+  return text.replace(/[<>`{}]/g, '');
+}
 
 const SPONSOR_JOB_LOCK_KEY = 7483920; // Same key as sponsorMonitorJob — init and nightly are mutually exclusive
 
@@ -98,15 +102,16 @@ export function registerAdminRoutes(app: Express): void {
   });
 
   app.post('/api/admin/trusted-patterns', isAdmin, upload.single('file'), async (req, res) => {
+    let safeFilePath: string | undefined;
     try {
       if (!req.file) {
         return res.status(400).json({ message: 'No file uploaded' });
       }
-        // Path-traversal guard: assert req.file.path is inside uploads/
-              const safeFilePath = sanitizeUploadPath((req as any).file.path);
+      safeFilePath = sanitizeUploadPath((req as any).file.path);
+      const safePath = safeFilePath;
       
       const pdfAnalyzer = new PDFAnalyzer();
-      const metadata = await pdfAnalyzer.extractMetadata(safeFilePath);
+      const metadata = await pdfAnalyzer.extractMetadata(safePath);
       const patterns = { metadata, documentType: 'trusted_cos' };
 
       const aiInstructions = req.body?.aiInstructions || null;
@@ -122,6 +127,14 @@ export function registerAdminRoutes(app: Express): void {
     } catch (error) {
       console.error("Error creating trusted pattern:", error);
       res.status(500).json({ message: "Failed to create trusted pattern" });
+    } finally {
+      if (safeFilePath) {
+        try {
+          fs.unlink(safeFilePath, () => {});
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+      }
     }
   });
 
@@ -137,15 +150,16 @@ export function registerAdminRoutes(app: Express): void {
   });
 
   app.post('/api/admin/extract-metadata', isAdmin, upload.single('file'), async (req: any, res) => {
+    let safeFilePath: string | undefined;
     try {
       if (!req.file) {
         return res.status(400).json({ message: 'No file uploaded' });
       }
 
-      // SEC-001: safeFilePath was missing here — caused ReferenceError + path-traversal bypass
-      const safeFilePath = sanitizeUploadPath((req as any).file.path);
+      safeFilePath = sanitizeUploadPath((req as any).file.path);
+      const safePath = safeFilePath;
       const pdfAnalyzer = new PDFAnalyzer();
-      const metadata = await pdfAnalyzer.extractMetadata(safeFilePath);
+      const metadata = await pdfAnalyzer.extractMetadata(safePath);
 
       res.json({
         metadata: {
@@ -246,7 +260,7 @@ export function registerAdminRoutes(app: Express): void {
           knowledgeContext += `  Producer: ${metadata?.producer || 'Unknown'}\n`;
           knowledgeContext += `  AI said: ${entry.result} (${entry.confidence}% confidence)\n`;
           knowledgeContext += `  Human verdict: FAKE\n`;
-          knowledgeContext += `  Expert reasoning: ${entry.adminFeedback || 'No details'}\n\n`;
+          knowledgeContext += `  Expert reasoning: ${sanitizeForPrompt(entry.adminFeedback || 'No details')}\n\n`;
         });
         knowledgeContext += '</human_expert_corrections>\n';
       }
@@ -1087,9 +1101,14 @@ Format your response in clear, professional markdown.`;
     }
   });
 
+  const ALLOWED_SYSTEM_SETTINGS = ['defaultDailyLimit', 'notifications_paused'] as const;
+
   app.patch('/api/admin/system-settings/:key', isAdmin, async (req: any, res) => {
     try {
       const { key } = req.params;
+      if (!ALLOWED_SYSTEM_SETTINGS.includes(key as typeof ALLOWED_SYSTEM_SETTINGS[number])) {
+        return res.status(400).json({ message: `Invalid setting key: '${key}'. Allowed: ${ALLOWED_SYSTEM_SETTINGS.join(', ')}` });
+      }
       const { value } = req.body;
       if (value === undefined || value === null) {
         return res.status(400).json({ message: 'value is required' });
@@ -1423,14 +1442,14 @@ Format your response in clear, professional markdown.`;
   // SEC-007: added isAuthenticated guard — was fully unauthenticated (spam risk)
   app.post('/api/feedback', isAuthenticated, async (req: any, res) => {
     try {
-      const feedbackData = insertFeedbackSchema.parse(req.body);
+      const { userId: _ignoredUserId, ...feedbackBody } = req.body ?? {};
+      const feedbackData = insertFeedbackSchema.parse(feedbackBody);
+      const createData = req.isAuthenticated()
+        ? { ...feedbackData, userId: req.user.id }
+        : feedbackData;
 
-      if (req.isAuthenticated()) {
-        feedbackData.userId = req.user.id;
-      }
-
-      const newFeedback = await storage.createFeedback(feedbackData);
-      res.json(newFeedback);
+      const newFeedback = await storage.createFeedback(createData);
+      res.status(201).json(newFeedback);
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid feedback data", errors: error.errors });
@@ -1493,7 +1512,13 @@ Format your response in clear, professional markdown.`;
         },
       });
 
+      const currentUserId = (req as any).user?.id;
+      if (!currentUserId) {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
+
       const submission = await storage.createPaidSubmission({
+        userId: currentUserId,
         email: '',
         packageType,
         paymentStatus: 'pending',
@@ -1551,13 +1576,17 @@ Format your response in clear, professional markdown.`;
         return res.status(404).json({ message: 'Submission not found' });
       }
 
-      if (submission.paymentStatus !== 'paid') {
-        return res.status(400).json({ message: 'Payment not completed' });
+      const currentUserId = (req as any).user?.id;
+      if (!currentUserId) {
+        return res.status(401).json({ message: 'Unauthorized' });
       }
 
-      // SEC-008: IDOR fix — verify caller owns this submission
-      if (submission.userId && submission.userId !== (req as any).user?.id) {
-        return res.status(403).json({ message: 'Forbidden: you do not own this submission' });
+      if (submission.userId !== currentUserId) {
+        return res.status(403).json({ message: 'Forbidden' });
+      }
+
+      if (submission.paymentStatus !== 'paid') {
+        return res.status(400).json({ message: 'Payment not completed' });
       }
 
       const {
@@ -1602,6 +1631,15 @@ Format your response in clear, professional markdown.`;
         return res.status(404).json({ message: 'Submission not found' });
       }
 
+      const currentUserId = (req as any).user?.id;
+      if (!currentUserId) {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
+
+      if (submission.userId !== currentUserId) {
+        return res.status(403).json({ message: 'Forbidden' });
+      }
+
       res.json({
         id: submission.id,
         packageType: submission.packageType,
@@ -1610,11 +1648,6 @@ Format your response in clear, professional markdown.`;
         reportDelivered: submission.reportDelivered,
         createdAt: submission.createdAt,
       });
-    }
-
-    // SEC-009: IDOR fix — verify caller owns this submission
-    if (submission.userId && submission.userId !== (req as any).user?.id) {
-      return res.status(403).json({ message: 'Forbidden: you do not own this submission' });
     } catch (error: unknown) {
       console.error('Status error:', error);
       res.status(500).json({ message: 'Failed to get status' });
@@ -1813,7 +1846,7 @@ Format your response in clear, professional markdown.`;
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: 'CoS Verify UK <reports@cosverify.uk>',
+          from: 'CheckByAI <reports@checkbyai.net>',
           to: [submission.email],
           subject: `Your CoS Verification Report - ${submission.expertVerdict?.toUpperCase() || 'COMPLETE'}`,
           html: reportHtml,
@@ -1870,7 +1903,7 @@ Format your response in clear, professional markdown.`;
           const ruleText =
             `CRITICAL ADMIN OVERRIDE [${overrideDate}]: Document initially verified as '${originalResult}' (${originalConfidence}% confidence) was confirmed FAKE by a human expert.\n` +
             `Producer: ${producer}\n` +
-            `Admin reasoning: ${adminFeedback.trim()}\n` +
+            `Admin reasoning: ${sanitizeForPrompt(adminFeedback.trim())}\n` +
             `Action required: Apply heightened scrutiny to documents with similar metadata patterns. Do not classify as Genuine without explicit justification.`;
 
           await storage.createGlobalAiRule({
@@ -1925,7 +1958,7 @@ Format your response in clear, professional markdown.`;
           knowledgeContext += `Producer: ${metadata?.producer || 'Unknown'}\n`;
           knowledgeContext += `AI said: ${entry.result} (${entry.confidence}% confidence)\n`;
           knowledgeContext += `Admin override: FAKE\n`;
-          knowledgeContext += `Admin reasoning: ${entry.adminFeedback || 'No details provided'}\n\n`;
+          knowledgeContext += `Admin reasoning: ${sanitizeForPrompt(entry.adminFeedback || 'No details provided')}\n\n`;
         });
 
         knowledgeContext += 'DO NOT repeat the mistake of marking similar patterns as Genuine.\n';
@@ -2259,6 +2292,7 @@ Format your response in clear, professional markdown.`;
       const base = (existing.notifPrefs as NotifPrefs | null) ?? DEFAULT_NOTIF_PREFS;
       const merged: NotifPrefs = { ...base };
       for (const [k, v] of Object.entries(patch)) {
+        if (!Object.prototype.hasOwnProperty.call(DEFAULT_NOTIF_PREFS, k)) continue;
         const key = k as keyof NotifPrefs;
         if (merged[key]) {
           merged[key] = { ...merged[key], ...v, channels: { ...merged[key].channels, ...(v as any).channels } };

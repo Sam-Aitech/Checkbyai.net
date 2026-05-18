@@ -5,7 +5,7 @@ import { and, desc, eq, gte, ne, sql } from "drizzle-orm";
 import { db } from "../db";
 import { jobTriggerAudit, shadowParityReports, shadowRunResults, incidentTickets, monitorJobRuns } from "@shared/schema";
 import { requireRole } from "../middleware/roleGuard";
-import { opsTriggerLimiter } from "../middlheware/rateLimiter";
+import { opsTriggerLimiter } from "../middleware/rateLimiter";
 import { isSafeCallbackUrl, signPayload } from "../utils/callbackSigner";
 import { isUuidV4 } from "../utils/idempotency";
 import { generateCorrelationId, startJobRun, finishJobRun } from "../utils/jobTelemetry";
@@ -23,6 +23,8 @@ import {
   tryAutoRemediate,
   type IncidentSeverity,
 } from "../utils/incidentManager";
+
+if (!opsTriggerLimiter) throw new Error('opsTriggerLimiter failed to import — check ../middleware/rateLimiter exports');
 
 const log = logger.child({ module: "OpsRoutes" });
 
@@ -813,7 +815,8 @@ export function registerOpsRoutes(app: Express): void {
     const authHeader = String(req.headers["authorization"] ?? "");
     const provided = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
 
-    if (!provided || provided !== cronSecret) {
+    if (!provided || provided.length !== cronSecret.length ||
+        !crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(cronSecret))) {
       log.warn({ ip: req.ip }, "[CronPing] Invalid or missing secret.");
       return res.status(401).json({ message: "Unauthorized." });
     }

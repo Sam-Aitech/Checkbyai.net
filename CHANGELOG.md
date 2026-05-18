@@ -9,6 +9,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **SEC-001 (Critical) — Path traversal on file upload endpoints**: Three endpoints (`/api/admin/extract-metadata`, `/api/admin/trusted-patterns`, `/api/verify`) used `req.file.path` directly without sanitization, allowing path traversal via crafted filenames. Created `server/utils/uploadGuard.ts` with `sanitizeUploadPath()` that resolves paths relative to the uploads directory and rejects traversal attempts.
+- **SEC-002 — HMAC secret fallback chain**: `hmacSecret` in billing.ts fell back through multiple env vars (`CHECKOUT_HMAC_SECRET` → `STRIPE_WEBHOOK_SECRET` → `secret`), leaking which env vars are set to an attacker who can provoke an error. Now requires `CHECKOUT_HMAC_SECRET` unconditionally.
+- **SEC-003 — Timing-safe cron secret comparison**: `/api/ops/cron-ping` used string comparison (`!==`) against the cron secret, vulnerable to timing attacks. Replaced with `crypto.timingSafeEqual`.
+- **SEC-004 — Timing-safe OTP comparison**: Two OTP verification code paths in `auth.ts` used string comparison (`!==`). Replaced both with `crypto.timingSafeEqual`.
+- **SEC-005/006 — X-Forwarded-For IP spoofing**: `getClientIp()` in `ipRateLimit.ts` parsed the `X-Forwarded-For` header directly, allowing an attacker to spoof their IP and bypass rate limits. Now uses `req.ip` (trusted proxy chain) exclusively.
+- **SEC-008/009 — Paid submissions IDOR**: `POST /api/paid/submit/:submissionId` and `GET /api/paid/status/:submissionId` lacked ownership checks, allowing any authenticated user to submit documents to or read the status of another user's submission. Added `userId` column to `paid_submissions` table, stored at creation time, with ownership guard checks in both endpoints.
+
+### Added
+- **`POST /api/feedback` extracted to dedicated route**: Moved from `/api/admin` catch-all to `server/routes/feedback.ts` with its own rate limiter (3 req / 15 min) for better isolation and observability.
+- **Soft-delete for verification logs**: `verification_results` now has a `deleted_at` column. `deleteVerificationLog()` uses `UPDATE ... SET deleted_at = now()` instead of `DELETE`. All 13 read queries filter with `deleted_at IS NULL`.
+
+### Sprint 2 Fixes
+- **SEC-011 — `SESSION_SECRET` null check**: Replaced `process.env.SESSION_SECRET!` with explicit null check that throws at startup if missing.
+- **SEC-013 — HSTS preload**: Changed HSTS header from `max-age=31536000; includeSubDomains` to `max-age=63072000; includeSubDomains; preload` (2-year max-age + preload for HSTS preload list eligibility).
+- **SEC-016 — Redis-backed phone OTP store**: Replaced in-memory `Map` with Redis SET + TTL via `server/utils/phoneOtpStore.ts`. Graceful in-memory fallback when Redis is unavailable. Eliminates OTP loss on server restart and enables horizontal scaling.
+- **SEC-017 — Rate limit on `/api/stripe/publishable-key`**: Added `rateLimit({ windowMs: 60s, max: 10 })` to prevent enumeration abuse.
+- **SEC-018 — System settings allowed-keys validation**: Added `ALLOWED_SYSTEM_SETTINGS = ['defaultDailyLimit', 'notifications_paused']` whitelist to `PATCH /api/admin/system-settings/:key` — rejects unknown keys with 400.
+- **SEC-019 — Full UUID for admin user IDs**: Replaced `crypto.randomUUID().slice(0, 8)` with full `crypto.randomUUID()` to eliminate collision risk.
+
+### Sprint 3 Fixes
+- **SEC-021 — Inline migrations replaced with Drizzle migration files**: Removed 200+ lines of inline SQL from `index.ts`. Schema migrations now live in `migrations/` directory (0016, 0017) and run via `npm run db:migrate` (CI/CD only). `applyPendingMigrations()` replaced with `applyDataFixbacks()` for one-time data backfills only.
+- **SEC-022 — Removed fabricated `suspiciousToday` stat**: The `suspiciousToday` field in `getStats()` was a duplicate query with a fabricated multiplier (`* 0.15`). Removed from `StatsResponse` type, `getStats()` implementation, and `api-types.ts`.
+- **SEC-023 — Sanitized adminFeedback in LLM prompts**: Added `sanitizeForPrompt()` that strips `< >` backticks and `{}` from admin feedback before injection into LLM system prompts. Applied to all 3 usage sites.
+- **SEC-024 — Compression filter skips `/api/auth` routes**: Auth responses (OTP, session cookies) no longer compressed — reduces attack surface for BREACH-style attacks.
+- **SEC-025 — `generateDocumentHash` made async**: Replaced `fs.readFileSync` with `fs.promises.readFile` to avoid blocking the event loop during file hashing.
+- **SEC-026 — Normalized IP cooldown to 1-day**: `ipRateLimit.ts` used 7-day cooldown while `verification.ts` used 1-day. Both now consistently use 1-day.
+- **SEC-027 — `APP_URL` env var with Replit fallback**: Google OAuth callback URL now uses `APP_URL` as primary, `REPLIT_DOMAINS` as fallback, with startup warning if both missing.
+- **SEC-028 — Atomic session claim via `tryClaimSession()`**: Replaced check-then-mark race condition with single `INSERT ... ON CONFLICT DO NOTHING RETURNING id` — only one webhook handler can claim a session.
+- **SEC-029 — `user_id` column on sessions table**: Added `user_id` varchar column with index to `sessions` table for efficient user-based session queries and invalidation.
+
+### Sprint 4 Quality Fixes
+- **QA-001 — `package.json` name → `checkbyai`**: Updated project name from placeholder to `checkbyai` for package registry consistency.
+- **QA-003 — `ADVISORY_LOCK_KEY` extracted to `server/constants.ts`**: Moved the advisory lock key constant out of the migration block into a dedicated constants module for reuse.
+- **QA-004 — `getStats` queries parallelized**: Wrapped 4 independent DB queries in `Promise.all` for ~3× latency reduction on the admin stats endpoint.
+- **QA-005 — `is_test` column on `sponsorChanges`**: Added `is_test` boolean column to `sponsorChanges` table for filtering test data from production change feeds. Migration `0018`.
+- **QA-007 — Email/brand fix**: Changed `CoS Verify UK <reports@cosverify.uk>` to `CheckByAI <reports@checkbyai.net>` in admin email sender.
+- **QA-008 — Dockerfile `npm prune --omit=dev`**: Added `npm prune --omit=dev` after `npm ci` in multi-stage Docker build to remove dev dependencies from the production image (~40% image size reduction).
+- **QA-009 — `.dockerignore` add `uploads/`**: Excluded the runtime uploads directory from Docker build context to reduce image size and prevent stale files.
+- **QA-011 — Turnstile CAPTCHA on `/api/auth/admin/send-otp`**: Added Cloudflare Turnstile verification to the admin OTP endpoint. Requires `turnstileToken` in request body. Gated behind `TURNSTILE_SECRET_KEY` env var — skips verification if unconfigured.
+- **QA-013 — `cleanupExpiredOtps` already removed**: The function was removed in Sprint 2 when OTP storage moved to Redis with built-in TTL (SEC-016). No further action needed.
+- **QA-014 — `parseIntParam()` helper**: Created `server/utils/parseParam.ts` with a `parseIntParam()` utility that safely parses URL parameters and returns `null` for invalid inputs.
+- **QA-015 — Stripe apiVersion typing**: Removed `as any` cast on `apiVersion: "2025-11-17.clover"` — TypeScript now correctly validates the version string.
+- **QA-017 — Cloudflare challenges in CSP**: Added `https://challenges.cloudflare.com` to `frame-src` and `script-src` in the Content-Security-Policy header to allow Turnstile CAPTCHA to render and execute.
+- **QA-018 — User-fetch retry on invoice webhook**: Wrapped `storage.getUserByStripeCustomerId()` in `withRetry()` for the `invoice.payment_succeeded` webhook handler to handle transient DB failures.
+- **QA-019 — `hasOwnProperty` guard on `notifPrefs` merge**: Added `Object.prototype.hasOwnProperty.call(DEFAULT_NOTIF_PREFS, k)` check before merging notification preference patches to prevent prototype pollution.
+- **QA-020 — Redis requirepass**: Added `redis-server --requirepass ${REDIS_PASSWORD:-redis}` to docker-compose.yml, with password passed to `redis-cli ping` in healthcheck.
+
 ### Planned
 - Docker containerization
 - PostgreSQL Row Level Security (RLS) policies

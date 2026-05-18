@@ -158,6 +158,7 @@ export const verificationResults = pgTable(
     adminReviewedBy: varchar("admin_reviewed_by").references(() => users.id),
     adminReviewedAt: timestamp("admin_reviewed_at"),
     accuracyScore: integer("accuracy_score"), // AI accuracy rating after human review
+    deletedAt: timestamp("deleted_at"),
   },
   (table) => [
     index("idx_verification_verified_at").on(table.verifiedAt),
@@ -191,6 +192,7 @@ export const feedback = pgTable("feedback", {
 // Paid expert submissions table
 export const paidSubmissions = pgTable("paid_submissions", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  userId: varchar("user_id").references(() => users.id),
   email: varchar("email").notNull(),
   packageType: varchar("package_type").notNull(), // 'normal' (£19.99) or 'full' (£49.99)
   paymentStatus: varchar("payment_status").default("pending"), // 'pending', 'paid', 'failed', 'refunded'
@@ -236,6 +238,7 @@ export const paidSubmissions = pgTable("paid_submissions", {
   index("idx_paid_submissions_stripe_session_id").on(table.stripeSessionId),
   index("idx_paid_submissions_review_status").on(table.reviewStatus),
   index("idx_paid_submissions_email").on(table.email),
+  index("idx_paid_submissions_user_id").on(table.userId),
 ]);
 
 // Expert requests table for Master Package orders
@@ -367,6 +370,7 @@ export const sponsorChanges = pgTable(
     newValue: varchar("new_value"),
     detectedAt: timestamp("detected_at").defaultNow(),
     snapshotDate: date("snapshot_date").notNull(),
+    isTest: boolean("is_test").default(false),
   },
   (table) => [
     index("idx_sponsor_changes_org_name").on(table.organisationName),

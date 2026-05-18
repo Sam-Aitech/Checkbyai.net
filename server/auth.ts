@@ -24,8 +24,10 @@ export function getSession() {
     ttl: sessionTtl,
     tableName: "sessions",
   });
+  const sessionSecret = process.env.SESSION_SECRET;
+  if (!sessionSecret) throw new Error('SESSION_SECRET is required');
   return session({
-    secret: process.env.SESSION_SECRET!,
+    secret: sessionSecret,
     store: sessionStore,
     resave: false,
     saveUninitialized: false,
@@ -263,10 +265,14 @@ export async function setupAuth(app: Express) {
 
   // Google OAuth Strategy
   if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-    const currentDomain = process.env.REPLIT_DOMAINS?.split(',')[0] || 'localhost:5000';
+    const appUrl = process.env.APP_URL || (process.env.REPLIT_DOMAINS?.split(',')[0] ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}` : null);
+    if (!appUrl) {
+      console.warn('[Auth] APP_URL and REPLIT_DOMAINS are both missing — Google OAuth callback may not work correctly');
+    }
+    const currentDomain = appUrl || 'localhost:5000';
     const fullCallbackURL = currentDomain.includes('localhost') 
       ? `http://${currentDomain}/api/auth/google/callback`
-      : `https://${currentDomain}/api/auth/google/callback`;
+      : `${currentDomain}/api/auth/google/callback`;
     
     passport.use(new GoogleStrategy({
       clientID: process.env.GOOGLE_CLIENT_ID,
@@ -425,7 +431,8 @@ export async function setupAuth(app: Express) {
       }
 
       // Check code and expiry
-      if (user.verificationCode !== code) {
+      if (!user.verificationCode || user.verificationCode.length !== code.length ||
+          !crypto.timingSafeEqual(Buffer.from(user.verificationCode), Buffer.from(code))) {
         return res.status(400).json({ message: "Invalid verification code" });
       }
 
@@ -465,10 +472,29 @@ export async function setupAuth(app: Express) {
   // Admin OTP: Send verification code via Resend
   app.post("/api/auth/admin/send-otp", otpLimiter, async (req, res) => {
     try {
-      const { email } = req.body;
+      const { email, turnstileToken } = req.body;
       
       if (!email || !email.includes("@")) {
         return res.status(400).json({ message: "Valid email required" });
+      }
+
+      if (process.env.TURNSTILE_SECRET_KEY && !turnstileToken) {
+        return res.status(400).json({ message: "CAPTCHA verification required" });
+      }
+
+      if (process.env.TURNSTILE_SECRET_KEY) {
+        const turnstileResponse = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            secret: process.env.TURNSTILE_SECRET_KEY,
+            response: turnstileToken,
+          }),
+        });
+        const turnstileData = await turnstileResponse.json();
+        if (!turnstileData.success) {
+          return res.status(400).json({ message: "CAPTCHA verification failed" });
+        }
       }
 
       // Check if email matches ADMIN_EMAIL
@@ -487,7 +513,7 @@ export async function setupAuth(app: Express) {
       
       if (!adminUser) {
         adminUser = await storage.upsertUser({
-          id: "admin_" + crypto.randomUUID().slice(0, 8),
+          id: "admin_" + crypto.randomUUID(),
           email: email,
           authProvider: "admin",
           role: "admin",
@@ -535,7 +561,8 @@ export async function setupAuth(app: Express) {
       }
 
       // Check code and expiry
-      if (user.verificationCode !== code) {
+      if (!user.verificationCode || user.verificationCode.length !== code.length ||
+          !crypto.timingSafeEqual(Buffer.from(user.verificationCode), Buffer.from(code))) {
         return res.status(400).json({ message: "Invalid verification code" });
       }
 
