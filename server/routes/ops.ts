@@ -309,6 +309,15 @@ export function registerOpsRoutes(app: Express): void {
         return res.status(400).json({ message: "idempotencyKey must be a UUID v4" });
       }
 
+      let validatedCallbackUrl: string | null = null;
+      if (callbackUrl) {
+        const safe = await isSafeCallbackUrl(callbackUrl);
+        if (!safe) {
+          return res.status(400).json({ message: "callbackUrl failed safety validation" });
+        }
+        validatedCallbackUrl = callbackUrl;
+      }
+
       if (callbackUrl && !(await isSafeCallbackUrl(callbackUrl))) {
         return res.status(400).json({ message: "callbackUrl must be a safe HTTPS endpoint" });
       }
@@ -385,7 +394,7 @@ export function registerOpsRoutes(app: Express): void {
         triggerId,
         correlationId,
         jobName,
-        callbackUrl,
+        callbackUrl: validatedCallbackUrl,
       }).catch((err) => {
         log.error({ err, triggerId, jobName }, "Unexpected background orchestration trigger error");
       });
