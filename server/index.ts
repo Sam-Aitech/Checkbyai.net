@@ -1,5 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import compression from "compression";
+import rateLimit from "express-rate-limit";
+import { makeRateLimitStore } from "./utils/redisRateLimitStore";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { storage } from "./storage";
@@ -113,6 +115,22 @@ app.use(compression({
   },
 }));
 
+
+// Global catch-all fallback rate limiter (200 req / 15 min per IP).
+// Covers all endpoints that don't have their own tighter limiter.
+// This resolves the bulk of the 100+ CodeQL "Missing rate limiting" alerts.
+const globalFallbackLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 200,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: makeRateLimitStore("rl:global:"),
+    message: { message: "Too many requests. Please try again later." },
+    // Skip static asset paths — served by Vite/CDN in production
+    skip: (req: any) =>
+          req.path.startsWith("/assets/") || req.path.startsWith("/static/"),
+});
+app.use(globalFallbackLimiter);
 // WWW redirect middleware - redirect www to non-www
 app.use((req, res, next) => {
   if (req.headers.host && req.headers.host.startsWith('www.')) {

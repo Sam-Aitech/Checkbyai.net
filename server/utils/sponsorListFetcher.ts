@@ -163,18 +163,33 @@ async function findCsvUrlPrimary(): Promise<string> {
   const html = await response.text();
   const $ = cheerio.load(html);
 
-  let csvUrl: string | null = null;
-  $("a[href]").each((_i, el) => {
-    const href = $(el).attr("href");
-    if (
-      href &&
-      href.includes("assets.publishing.service.gov.uk") &&
-      href.endsWith(".csv")
-    ) {
-      csvUrl = href;
-      return false;
-    }
-  });
+        // Security fix: use exact hostname allowlist instead of substring includes().
+        // href.includes("assets.publishing.service.gov.uk") is bypassable with a URL
+        // like: https://evil.com/?q=assets.publishing.service.gov.uk/file.csv
+        // Ref: CodeQL alert #130 (High — Incomplete URL substring sanitization)
+        function isAllowedCsvHref(raw: string): boolean {
+                    try {
+                                  const parsed = new URL(raw);
+                                  if (parsed.protocol !== "https:") return false;
+                                  const ALLOWED_HOSTS = new Set(["assets.publishing.service.gov.uk"]);
+                                  if (!ALLOWED_HOSTS.has(parsed.hostname.toLowerCase())) return false;
+                                  if (!parsed.pathname.toLowerCase().endsWith(".csv")) return false;
+                                  return true;
+                    } catch {
+                                  return false;
+                    }
+        }
+
+          let csvUrl: string | null = null;
+          $("a[href]").each((_i, el) => {
+                      const href = $(el).attr("href");
+                      if (href && isAllowedCsvHref(href)) {
+                                    csvUrl = href;
+                                    return false;
+                      }
+          });
+  
+        });
 
   if (!csvUrl) {
     throw new Error(

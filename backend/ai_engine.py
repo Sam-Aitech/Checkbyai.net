@@ -1,461 +1,108 @@
 """
-AI Engine for COS Verification System
-Handles PDF analysis and verification using PyMuPDF and machine learning
-"""
+AI Engine — CheckByAI Core Service
 
-import os
-import tempfile
-from typing import Dict, List, Any, Optional
-import numpy as np
-from datetime import datetime
-import fitz  # PyMuPDF
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
-import json
+This module is part of the CheckByAI proprietary AI inference layer.
+The implementation is maintained in a private service repository and
+deployed as an internal microservice.
+
+Public Interface (API Contract)
+================================
+This file defines the public-facing interface contract only.
+The core AI logic, ML models, and verification algorithms are
+proprietary and not included in this open-source distribution.
+
+Service Boundary
+-----------------
+All AI verification requests are handled via the internal AI service.
+See CONTRIBUTING.md for integration and contribution details.
+
+For contributors:
+  - Do NOT add proprietary logic to this file.
+  - Raise an issue if you need to extend the AI interface.
+  - See CONTRIBUTING.md for the contribution guidelines.
+
+Licensed under the MIT License. See LICENSE for details.
+"""
+from typing import Dict, Any, Optional
 
 
 class AIEngine:
     """
-    AI-powered PDF analysis engine for Certificate of Sponsorship verification
+    Public interface contract for the CheckByAI AI Engine.
+
+    The concrete implementation is hosted in the private
+    core-engine service and accessed via internal API.
+
+    Do not implement business logic here.
     """
-    
-    def __init__(self):
-        self.vectorizer = TfidfVectorizer(
-            max_features=1000,
-            stop_words='english',
-            ngram_range=(1, 2)
+
+    async def initialize(self) -> None:
+        """
+        Initialise the AI engine service connection.
+        Raises NotImplementedError in open-source build.
+        See private service for implementation.
+        """
+        raise NotImplementedError(
+            "AI Engine is a proprietary service. "
+            "See CONTRIBUTING.md for integration details."
         )
-        
-    async def initialize(self):
-        """Initialize the AI engine"""
-        print("AI Engine initialized successfully")
-        
+
+    async def analyze_document(self, file_path: str) -> Dict[str, Any]:
+        """
+        Analyse a CoS document and return verification results.
+
+        Args:
+            file_path: Path to the uploaded PDF document.
+
+        Returns:
+            Dict containing verification result, confidence score,
+            and metadata.
+
+        Raises:
+            NotImplementedError: Core logic is proprietary.
+        """
+        raise NotImplementedError(
+            "AI Engine is a proprietary service. "
+            "See CONTRIBUTING.md for integration details."
+        )
+
     async def extract_metadata(self, file_path: str) -> Dict[str, Any]:
-        """Extract comprehensive metadata from PDF using PyMuPDF"""
-        try:
-            doc = fitz.open(file_path)
-            
-            # Get raw metadata dictionary
-            raw_metadata = doc.metadata
-            
-            # Get XMP metadata as a string using metadata_xml
-            xmp_data = doc.metadata_xml
-            
-            # Parse XMP metadata for specific namespace tags
-            xmp_metadata = {}
-            if xmp_data:
-                xmp_metadata = self._parse_xmp_metadata(xmp_data)
-            
-            # Basic metadata with XMP enhancement
-            extracted_metadata = {
-                'producer': raw_metadata.get('producer', '') or xmp_metadata.get('pdf:Producer', ''),
-                'creator': raw_metadata.get('creator', '') or xmp_metadata.get('xmp:CreatorTool', ''),
-                'title': raw_metadata.get('title', '') or xmp_metadata.get('dc:title', ''),
-                'subject': raw_metadata.get('subject', '') or xmp_metadata.get('dc:subject', ''),
-                'author': raw_metadata.get('author', '') or xmp_metadata.get('dc:creator', ''),
-                'creation_date': raw_metadata.get('creationDate', '') or xmp_metadata.get('xmp:CreateDate', ''),
-                'modification_date': raw_metadata.get('modDate', '') or xmp_metadata.get('xmp:ModifyDate', ''),
-                'metadata_date': xmp_metadata.get('xmp:MetadataDate', ''),
-                'pages': doc.page_count,
-                'file_size': os.path.getsize(file_path),
-                'pdf_version': xmp_metadata.get('pdf:PDFVersion', '1.4'),
-                'language': xmp_metadata.get('dc:language', 'en-US'),
-                'format': xmp_metadata.get('dc:format', 'application/pdf'),
-                'creator_tool': xmp_metadata.get('xmp:CreatorTool', ''),
-                'is_encrypted': raw_metadata.get('encryption', False),
-                
-                # Complete XMP tags for organized display
-                'xmp_tags': {
-                    'dc:date': xmp_metadata.get('dc:date', raw_metadata.get('creationDate', '')),
-                    'dc:format': xmp_metadata.get('dc:format', 'application/pdf'),
-                    'dc:language': xmp_metadata.get('dc:language', 'en-US'),
-                    'pdf:PDFVersion': xmp_metadata.get('pdf:PDFVersion', '1.4'),
-                    'pdf:Producer': raw_metadata.get('producer', '') or xmp_metadata.get('pdf:Producer', ''),
-                    'xmp:CreateDate': raw_metadata.get('creationDate', '') or xmp_metadata.get('xmp:CreateDate', ''),
-                    'xmp:CreatorTool': raw_metadata.get('creator', '') or xmp_metadata.get('xmp:CreatorTool', ''),
-                    'xmp:MetadataDate': xmp_metadata.get('xmp:MetadataDate', raw_metadata.get('modDate', ''))
-                },
-                
-                # Raw data for technical analysis
-                'raw_metadata': raw_metadata,
-                'raw_xmp_data': xmp_data,
-                'parsed_xmp': xmp_metadata
-            }
-            
-            # Additional analysis
-            text_content = ""
-            for page_num in range(doc.page_count):
-                page = doc[page_num]
-                text_content += page.get_text()
-            
-            extracted_metadata.update({
-                'text_length': len(text_content),
-                'word_count': len(text_content.split()),
-                'fonts_used': self._extract_fonts(doc),
-                'images_count': self._count_images(doc),
-                'has_tables': self._detect_tables(text_content),
-                'language_indicators': self._detect_language_patterns(text_content)
-            })
-            
-            doc.close()
-            
-            print(f"Successfully extracted metadata from {file_path}")
-            print(f"XMP data length: {len(xmp_data) if xmp_data else 0}")
-            print(f"Parsed XMP tags: {list(xmp_metadata.keys()) if xmp_metadata else 'None'}")
-            
-            return extracted_metadata
-            
-        except Exception as e:
-            print(f"Error extracting metadata: {e}")
-            return {
-                'error': str(e),
-                'pages': 0,
-                'file_size': os.path.getsize(file_path) if os.path.exists(file_path) else 0,
-                'xmp_tags': {},
-                'raw_metadata': {},
-                'raw_xmp_data': None,
-                'parsed_xmp': {}
-            }
-    
-    async def extract_patterns(self, file_path: str) -> Dict[str, Any]:
-        """Extract document patterns for trusted pattern storage"""
-        try:
-            doc = fitz.open(file_path)
-            
-            # Extract text from all pages
-            full_text = ""
-            for page_num in range(doc.page_count):
-                page = doc[page_num]
-                full_text += page.get_text()
-            
-            patterns = {
-                'document_structure': self._analyze_text_structure(full_text),
-                'metadata_patterns': doc.metadata,
-                'page_count': doc.page_count,
-                'fonts': self._extract_fonts(doc),
-                'creation_info': {
-                    'producer': doc.metadata.get('producer', ''),
-                    'creator': doc.metadata.get('creator', ''),
-                    'creation_date': doc.metadata.get('creationDate', '')
-                }
-            }
-            
-            doc.close()
-            return patterns
-            
-        except Exception as e:
-            print(f"Error extracting patterns: {e}")
-            return {}
-    
-    async def analyze_against_patterns(
-        self, 
-        metadata: Dict[str, Any], 
-        trusted_patterns: List[Any]
+        """
+        Extract metadata from an uploaded document.
+
+        Backward-compatible alias - delegates to analyze_document.
+
+        Args:
+            file_path: Path to the uploaded PDF or document.
+
+        Returns:
+            Dict containing document analysis/metadata.
+
+        Raises:
+            NotImplementedError: Propagated from analyze_document in the
+            open-source build unless implemented by the private service.
+        """
+        return await self.analyze_document(file_path)
+
+    async def verify_cos(
+        self,
+        document_data: Dict[str, Any],
+        sponsor_data: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        """Analyze document against trusted patterns using multiple methods"""
-        
-        if not trusted_patterns:
-            return {
-                'result': 'suspicious',
-                'confidence': 30.0,
-                'details': {
-                    'metadata_verification': {},
-                    'pattern_matching': {},
-                    'vector_similarity': 0.0,
-                    'ml_confidence': 30.0
-                }
-            }
-        
-        # Metadata verification
-        metadata_score = await self._verify_metadata(metadata, trusted_patterns)
-        
-        # Pattern matching
-        pattern_score = await self._match_patterns(metadata, trusted_patterns)
-        
-        # Vector similarity
-        vector_score = await self._calculate_vector_similarity(metadata, trusted_patterns)
-        
-        # Calculate final confidence
-        confidence = (metadata_score * 0.4 + pattern_score * 0.4 + vector_score * 0.2)
-        
-        # Determine result based on confidence
-        if confidence >= 80:
-            result = 'genuine'
-        elif confidence >= 50:
-            result = 'suspicious'
-        else:
-            result = 'fake'
-        
-        return {
-            'result': result,
-            'confidence': confidence,
-            'details': {
-                'metadata_verification': {
-                    'creation_date': {'status': 'verified' if metadata_score > 70 else 'suspicious', 'score': metadata_score},
-                    'producer': {'status': 'verified' if pattern_score > 70 else 'suspicious', 'score': pattern_score},
-                    'creator': {'status': 'verified' if vector_score > 70 else 'suspicious', 'score': vector_score}
-                },
-                'pattern_matching': {
-                    'document_structure': pattern_score,
-                    'formatting_patterns': metadata_score,
-                    'vector_similarity': vector_score
-                },
-                'vector_similarity': vector_score,
-                'ml_confidence': confidence
-            }
-        }
-    
-    def _extract_fonts(self, doc) -> List[str]:
-        """Extract fonts used in the document"""
-        fonts = set()
-        for page_num in range(doc.page_count):
-            page = doc[page_num]
-            blocks = page.get_text("dict")["blocks"]
-            for block in blocks:
-                if "lines" in block:
-                    for line in block["lines"]:
-                        for span in line["spans"]:
-                            fonts.add(span.get("font", ""))
-        return list(fonts)
-    
-    def _count_images(self, doc) -> int:
-        """Count images in the document"""
-        image_count = 0
-        for page_num in range(doc.page_count):
-            page = doc[page_num]
-            image_count += len(page.get_images())
-        return image_count
-    
-    def _detect_tables(self, text: str) -> bool:
-        """Simple table detection based on text patterns"""
-        lines = text.split('\n')
-        table_indicators = 0
-        for line in lines:
-            if '\t' in line or line.count(' ') > 10:
-                table_indicators += 1
-        return table_indicators > 5
-    
-    def _detect_language_patterns(self, text: str) -> Dict[str, Any]:
-        """Detect language patterns in the text"""
-        common_words = {
-            'english': ['the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had', 'her', 'was', 'one', 'our', 'out', 'day', 'get', 'has', 'him', 'his', 'how', 'man', 'new', 'now', 'old', 'see', 'two', 'way', 'who', 'boy', 'did', 'its', 'let', 'put', 'say', 'she', 'too', 'use'],
-            'certificate_terms': ['certificate', 'sponsorship', 'visa', 'immigration', 'skilled', 'worker', 'tier', 'points']
-        }
-        
-        text_lower = text.lower()
-        patterns = {}
-        
-        for lang, words in common_words.items():
-            count = sum(1 for word in words if word in text_lower)
-            patterns[f'{lang}_score'] = count / len(words) * 100
-            
-        return patterns
-    
-    def _analyze_text_structure(self, text: str) -> Dict[str, Any]:
-        """Analyze text structure patterns"""
-        lines = text.split('\n')
-        return {
-            'total_lines': len(lines),
-            'non_empty_lines': len([line for line in lines if line.strip()]),
-            'avg_line_length': np.mean([len(line) for line in lines]),
-            'has_headings': any(line.isupper() and len(line) < 50 for line in lines),
-            'paragraph_count': len([line for line in lines if len(line.strip()) > 100])
-        }
-    
-    async def _verify_metadata(self, metadata: Dict[str, Any], trusted_patterns: List[Any]) -> float:
-        """Verify metadata against trusted patterns"""
-        scores = []
-        
-        for pattern in trusted_patterns:
-            pattern_data = pattern.get('patterns', {}) if hasattr(pattern, 'patterns') else pattern
-            metadata_patterns = pattern_data.get('metadata_patterns', {})
-            
-            # Compare producers
-            if metadata.get('producer') and metadata_patterns.get('producer'):
-                similarity = self._string_similarity(
-                    metadata['producer'], 
-                    metadata_patterns['producer']
-                )
-                scores.append(similarity * 100)
-            
-            # Compare creators
-            if metadata.get('creator') and metadata_patterns.get('creator'):
-                similarity = self._string_similarity(
-                    metadata['creator'], 
-                    metadata_patterns['creator']
-                )
-                scores.append(similarity * 100)
-        
-        return np.mean(scores) if scores else 30.0
-    
-    async def _match_patterns(self, metadata: Dict[str, Any], trusted_patterns: List[Any]) -> float:
-        """Match document patterns"""
-        scores = []
-        
-        for pattern in trusted_patterns:
-            pattern_data = pattern.get('patterns', {}) if hasattr(pattern, 'patterns') else pattern
-            
-            # Compare document structure
-            structure_score = self._compare_structure(metadata, pattern_data)
-            scores.append(structure_score)
-            
-            # Compare fonts
-            if 'fonts_used' in metadata and 'fonts' in pattern_data:
-                font_score = self._compare_fonts(
-                    metadata['fonts_used'], 
-                    pattern_data['fonts']
-                )
-                scores.append(font_score * 100)
-        
-        return np.mean(scores) if scores else 40.0
-    
-    async def _calculate_vector_similarity(self, metadata: Dict[str, Any], trusted_patterns: List[Any]) -> float:
-        """Calculate vector similarity using TF-IDF"""
-        try:
-            # Prepare text for vectorization
-            current_text = " ".join([
-                str(metadata.get('title', '')),
-                str(metadata.get('subject', '')),
-                str(metadata.get('producer', '')),
-                str(metadata.get('creator', ''))
-            ])
-            
-            pattern_texts = []
-            for pattern in trusted_patterns:
-                pattern_data = pattern.get('patterns', {}) if hasattr(pattern, 'patterns') else pattern
-                metadata_patterns = pattern_data.get('metadata_patterns', {})
-                pattern_text = " ".join([
-                    str(metadata_patterns.get('title', '')),
-                    str(metadata_patterns.get('subject', '')),
-                    str(metadata_patterns.get('producer', '')),
-                    str(metadata_patterns.get('creator', ''))
-                ])
-                pattern_texts.append(pattern_text)
-            
-            if not pattern_texts or not current_text.strip():
-                return 35.0
-            
-            # Calculate TF-IDF similarity
-            all_texts = [current_text] + pattern_texts
-            tfidf_matrix = self.vectorizer.fit_transform(all_texts)
-            similarities = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:])
-            
-            return float(np.max(similarities) * 100)
-            
-        except Exception as e:
-            print(f"Error calculating vector similarity: {e}")
-            return 35.0
-    
-    def _string_similarity(self, str1: str, str2: str) -> float:
-        """Calculate string similarity using simple edit distance"""
-        if not str1 or not str2:
-            return 0.0
-            
-        # Normalize strings
-        str1 = str1.lower().strip()
-        str2 = str2.lower().strip()
-        
-        if str1 == str2:
-            return 1.0
-            
-        # Simple Levenshtein distance approximation
-        max_len = max(len(str1), len(str2))
-        if max_len == 0:
-            return 1.0
-            
-        distance = abs(len(str1) - len(str2))
-        for i in range(min(len(str1), len(str2))):
-            if str1[i] != str2[i]:
-                distance += 1
-                
-        return max(0.0, 1.0 - (distance / max_len))
-    
-    def _compare_structure(self, metadata: Dict[str, Any], pattern_data: Dict[str, Any]) -> float:
-        """Compare document structure"""
-        score = 0.0
-        comparisons = 0
-        
-        # Compare page count
-        if 'pages' in metadata and 'page_count' in pattern_data:
-            if metadata['pages'] == pattern_data['page_count']:
-                score += 100
-            else:
-                score += max(0, 100 - abs(metadata['pages'] - pattern_data['page_count']) * 10)
-            comparisons += 1
-        
-        # Compare image count
-        if 'images_count' in metadata:
-            expected_images = pattern_data.get('images_count', 0)
-            if metadata['images_count'] == expected_images:
-                score += 100
-            else:
-                score += max(0, 100 - abs(metadata['images_count'] - expected_images) * 20)
-            comparisons += 1
-            
-        return score / comparisons if comparisons > 0 else 50.0
-    
-    def _parse_xmp_metadata(self, xmp_xml: str) -> Dict[str, Any]:
-        """Parse XMP XML metadata to extract namespace-specific tags"""
-        xmp_data = {}
-        
-        try:
-            # Simple XML parsing for common XMP tags
-            import re
-            
-            # Extract common XMP namespace tags
-            patterns = {
-                'dc:title': r'<dc:title[^>]*>([^<]*)</dc:title>',
-                'dc:creator': r'<dc:creator[^>]*>([^<]*)</dc:creator>',
-                'dc:subject': r'<dc:subject[^>]*>([^<]*)</dc:subject>',
-                'dc:date': r'<dc:date[^>]*>([^<]*)</dc:date>',
-                'dc:format': r'<dc:format[^>]*>([^<]*)</dc:format>',
-                'dc:language': r'<dc:language[^>]*>([^<]*)</dc:language>',
-                'pdf:Producer': r'<pdf:Producer[^>]*>([^<]*)</pdf:Producer>',
-                'pdf:PDFVersion': r'<pdf:PDFVersion[^>]*>([^<]*)</pdf:PDFVersion>',
-                'xmp:CreateDate': r'<xmp:CreateDate[^>]*>([^<]*)</xmp:CreateDate>',
-                'xmp:ModifyDate': r'<xmp:ModifyDate[^>]*>([^<]*)</xmp:ModifyDate>',
-                'xmp:MetadataDate': r'<xmp:MetadataDate[^>]*>([^<]*)</xmp:MetadataDate>',
-                'xmp:CreatorTool': r'<xmp:CreatorTool[^>]*>([^<]*)</xmp:CreatorTool>'
-            }
-            
-            for tag, pattern in patterns.items():
-                match = re.search(pattern, xmp_xml, re.IGNORECASE)
-                if match:
-                    xmp_data[tag] = match.group(1).strip()
-            
-            # Also try attribute-based extraction
-            attr_patterns = {
-                'dc:date': r'dc:date="([^"]*)"',
-                'dc:format': r'dc:format="([^"]*)"',
-                'dc:language': r'dc:language="([^"]*)"',
-                'pdf:Producer': r'pdf:Producer="([^"]*)"',
-                'pdf:PDFVersion': r'pdf:PDFVersion="([^"]*)"',
-                'xmp:CreateDate': r'xmp:CreateDate="([^"]*)"',
-                'xmp:ModifyDate': r'xmp:ModifyDate="([^"]*)"',
-                'xmp:MetadataDate': r'xmp:MetadataDate="([^"]*)"',
-                'xmp:CreatorTool': r'xmp:CreatorTool="([^"]*)"'
-            }
-            
-            for tag, pattern in attr_patterns.items():
-                if tag not in xmp_data:  # Only if not already found
-                    match = re.search(pattern, xmp_xml, re.IGNORECASE)
-                    if match:
-                        xmp_data[tag] = match.group(1).strip()
-                        
-        except Exception as e:
-            print(f"Error parsing XMP metadata: {e}")
-        
-        return xmp_data
-    
-    def _compare_fonts(self, fonts1: List[str], fonts2: List[str]) -> float:
-        """Compare font usage between documents"""
-        if not fonts1 or not fonts2:
-            return 0.5
-            
-        set1 = set(fonts1)
-        set2 = set(fonts2)
-        
-        intersection = len(set1.intersection(set2))
-        union = len(set1.union(set2))
-        
-        return intersection / union if union > 0 else 0.5
+        """
+        Verify a Certificate of Sponsorship against known patterns.
+
+        Args:
+            document_data: Extracted document metadata.
+            sponsor_data: Optional sponsor licence data for cross-reference.
+
+        Returns:
+            Verification result with status, confidence, and flags.
+
+        Raises:
+            NotImplementedError: Core logic is proprietary.
+        """
+        raise NotImplementedError(
+            "AI Engine is a proprietary service. "
+            "See CONTRIBUTING.md for integration details."
+        )

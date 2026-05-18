@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { XMLParser } from 'fast-xml-parser';
+import { sanitizeUploadPath } from '../utils/uploadGuard';
 
 /**
  * Yields control back to the Node.js event loop, preventing CPU-intensive
@@ -140,9 +141,11 @@ const KNOWN_GENUINE_PRODUCERS = [
 export class PDFAnalyzer {
   async extractMetadata(filePath: string): Promise<PDFMetadata> {
     try {
+            // Path-traversal guard: assert filePath is inside the uploads directory
+            const safePath = sanitizeUploadPath(filePath);
       const [buffer, stats] = await Promise.all([
-        fs.promises.readFile(filePath),
-        fs.promises.stat(filePath),
+          fs.promises.readFile(safePath),
+          fs.promises.stat(safePath),
       ]);
       const pdfString = buffer.toString('binary');
       const fileSize = stats.size;

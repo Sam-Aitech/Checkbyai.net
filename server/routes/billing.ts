@@ -95,7 +95,13 @@ const CHECKOUT_HMAC_SECRET = process.env.CHECKOUT_HMAC_SECRET;
 if (!CHECKOUT_HMAC_SECRET) {
   throw new Error("CHECKOUT_HMAC_SECRET is required");
 }
+// Fallback for development/testing only - use empty string as last resort
+// SEC-002: removed insecure fallback chain — CHECKOUT_HMAC_SECRET is required in all environments
+// Falling back to SESSION_SECRET or STRIPE_SECRET_KEY mixed security domains and empty string = forgeable signatures.
 const hmacSecret = CHECKOUT_HMAC_SECRET;
+if (!hmacSecret) {
+  throw new Error("CHECKOUT_HMAC_SECRET is required — set it in your environment variables (generate with: openssl rand -hex 32)");
+}
 
 function signClientReferenceId(userId: string, packageType: string, companyName?: string): string {
   const encodedCompany = companyName ? encodeURIComponent(companyName) : '';

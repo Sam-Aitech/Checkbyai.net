@@ -126,6 +126,9 @@ export function registerVerificationRoutes(app: Express): void {
         }
       }
 
+        // Path-traversal guard: assert req.file.path is inside uploads/
+              const safeFilePath = sanitizeUploadPath(req.file.path);
+      
       // Generate document hash for audit trail
       const documentHash = await generateDocumentHash(safeFilePath);
       const receiptId = generateReceiptId();
@@ -304,7 +307,8 @@ export function registerVerificationRoutes(app: Express): void {
       console.error('Verification error:', error);
       res.status(500).json({ message: 'Verification failed' });
     } finally {
-      if (safeFilePath) {
+      // Delete uploaded file immediately after processing (security measure)
+      if (req.file && safeFilePath) {
         try {
           const fsModule = await import('fs');
           fsModule.promises.unlink(safeFilePath).catch(() => {
