@@ -25,43 +25,38 @@ async function runJobWithSentryTrace<T>(
   queueName: string,
   processor: () => Promise<T>,
 ): Promise<T> {
-  const transaction = Sentry.startTransaction({
-    name: `BullMQ ${queueName}`,
-    op: 'bullmq.job',
-  });
-  transaction.setData('bullmq.queue', queueName);
-  transaction.setData('bullmq.job.id', String(job.id ?? 'unknown'));
-  transaction.setData('bullmq.job.name', job.name);
-  transaction.setData('bullmq.attemptsMade', job.attemptsMade);
-
-  const jobSpan = transaction.startChild({
-    op: 'bullmq.process',
-    description: job.name,
-  });
-
-  try {
-    const result = await processor();
-    jobSpan.setStatus('ok');
-    transaction.setStatus('ok');
-    return result;
-  } catch (error) {
-    jobSpan.setStatus('internal_error');
-    transaction.setStatus('internal_error');
-    Sentry.captureException(error, {
-      tags: {
-        queue: queueName,
-        jobName: job.name,
-      },
-      extra: {
-        jobId: job.id,
-        attemptsMade: job.attemptsMade,
-      },
-    });
-    throw error;
-  } finally {
-    jobSpan.finish();
-    transaction.finish();
-  }
+  return Sentry.startSpan(
+    {
+      name: `BullMQ ${queueName}`,
+      op: 'bullmq.job',
+      forceTransaction: true,
+    },
+    async () => {
+      return Sentry.startSpan(
+        {
+          name: job.name,
+          op: 'bullmq.process',
+        },
+        async () => {
+          try {
+            return await processor();
+          } catch (error) {
+            Sentry.captureException(error, {
+              tags: {
+                queue: queueName,
+                jobName: job.name,
+              },
+              extra: {
+                jobId: job.id ?? 'missing-job-id',
+                attemptsMade: job.attemptsMade,
+              },
+            });
+            throw error;
+          }
+        },
+      );
+    },
+  );
 }
 
 /** True when Redis was reachable at startup and BullMQ queues are active. */
