@@ -108,9 +108,10 @@ export function registerAdminRoutes(app: Express): void {
         return res.status(400).json({ message: 'No file uploaded' });
       }
       safeFilePath = sanitizeUploadPath((req as any).file.path);
+      const safePath = safeFilePath;
       
       const pdfAnalyzer = new PDFAnalyzer();
-      const metadata = await pdfAnalyzer.extractMetadata(safeFilePath);
+      const metadata = await pdfAnalyzer.extractMetadata(safePath);
       const patterns = { metadata, documentType: 'trusted_cos' };
 
       const aiInstructions = req.body?.aiInstructions || null;
@@ -129,7 +130,7 @@ export function registerAdminRoutes(app: Express): void {
     } finally {
       if (safeFilePath) {
         try {
-          fs.unlink(safeFilePath, () => {});
+          fs.unlink(sanitizeUploadPath(safeFilePath), () => {});
         } catch (e) {
           // Ignore cleanup errors
         }
@@ -156,8 +157,9 @@ export function registerAdminRoutes(app: Express): void {
       }
 
       safeFilePath = sanitizeUploadPath((req as any).file.path);
+      const safePath = safeFilePath;
       const pdfAnalyzer = new PDFAnalyzer();
-      const metadata = await pdfAnalyzer.extractMetadata(safeFilePath);
+      const metadata = await pdfAnalyzer.extractMetadata(safePath);
 
       res.json({
         metadata: {
@@ -179,7 +181,7 @@ export function registerAdminRoutes(app: Express): void {
     } finally {
       if (safeFilePath) {
         try {
-          await fs.promises.unlink(safeFilePath);
+          await fs.promises.unlink(sanitizeUploadPath(safeFilePath));
         } catch (e) {
           // Ignore cleanup errors
         }
@@ -1510,8 +1512,13 @@ Format your response in clear, professional markdown.`;
         },
       });
 
+      const currentUserId = (req as any).user?.id;
+      if (!currentUserId) {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
+
       const submission = await storage.createPaidSubmission({
-        userId: (req as any).user?.id,
+        userId: currentUserId,
         email: '',
         packageType,
         paymentStatus: 'pending',
@@ -1569,7 +1576,12 @@ Format your response in clear, professional markdown.`;
         return res.status(404).json({ message: 'Submission not found' });
       }
 
-      if (submission.userId !== (req as any).user?.id) {
+      const currentUserId = (req as any).user?.id;
+      if (!currentUserId) {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
+
+      if (submission.userId !== currentUserId) {
         return res.status(403).json({ message: 'Forbidden' });
       }
 

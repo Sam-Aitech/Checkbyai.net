@@ -15,6 +15,7 @@ COPY . .
 
 # Build: Vite frontend → dist/public, esbuild server → dist/index.js
 RUN npm run build
+RUN npm prune --omit=dev
 
 # ─────────────────────────────────────────────────────────────
 # Stage 2: Runtime
@@ -35,9 +36,8 @@ RUN addgroup -g 1001 -S nodejs && \
 WORKDIR /app
 
 # Copy only production node_modules and built output from builder
-COPY --from=builder --chown=checkbyai:nodejs /app/package.json /app/package-lock.json ./
+COPY --from=builder --chown=checkbyai:nodejs /app/package.json ./
 COPY --from=builder --chown=checkbyai:nodejs /app/node_modules ./node_modules
-RUN npm prune --omit=dev
 COPY --from=builder --chown=checkbyai:nodejs /app/dist ./dist
 COPY --from=builder --chown=checkbyai:nodejs /app/migrations ./migrations
 COPY --from=builder --chown=checkbyai:nodejs /app/shared ./shared

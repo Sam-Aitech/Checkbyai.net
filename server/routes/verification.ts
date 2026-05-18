@@ -77,6 +77,7 @@ export function registerVerificationRoutes(app: Express): void {
       }
 
       safeFilePath = sanitizeUploadPath(req.file.path);
+      const safePath = safeFilePath;
 
       let userId: string | undefined = betaUserId;
 
@@ -127,7 +128,7 @@ export function registerVerificationRoutes(app: Express): void {
       }
 
       // Generate document hash for audit trail
-      const documentHash = await generateDocumentHash(safeFilePath);
+      const documentHash = await generateDocumentHash(safePath);
       const receiptId = generateReceiptId();
 
       // ── Admin-override short-circuit ──────────────────────────────────────
@@ -164,11 +165,11 @@ export function registerVerificationRoutes(app: Express): void {
 
         // Read the file buffer once: used for the document hash AND passed to the
         // CoS checker so it can count startxref occurrences without a second disk read.
-        const fileBuffer = await fs.promises.readFile(safeFilePath);
+        const fileBuffer = await fs.promises.readFile(safePath);
         const pdfBinary = fileBuffer.toString('binary');
 
         const [extractedMetadata, trustedPatterns] = await Promise.all([
-          pdfAnalyzer.extractMetadata(safeFilePath),
+          pdfAnalyzer.extractMetadata(safePath),
           storage.getTrustedPatterns(),
         ]);
 
