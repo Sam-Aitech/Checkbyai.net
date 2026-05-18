@@ -1,10 +1,14 @@
 import path from "path";
 import fs from "fs";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { sanitizeUploadPath, UPLOADS_DIR } from "../uploadGuard";
 
 describe("sanitizeUploadPath", () => {
+  beforeEach(() => {
+    fs.rmSync(UPLOADS_DIR, { recursive: true, force: true });
+  });
+
   afterEach(() => {
     fs.rmSync(UPLOADS_DIR, { recursive: true, force: true });
   });
@@ -14,6 +18,7 @@ describe("sanitizeUploadPath", () => {
     const filePath = path.join(UPLOADS_DIR, "nested", "document.pdf");
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     fs.writeFileSync(filePath, "ok");
+    expect(fs.existsSync(filePath)).toBe(true);
 
     expect(sanitizeUploadPath(filePath)).toBe(fs.realpathSync(filePath));
   });
