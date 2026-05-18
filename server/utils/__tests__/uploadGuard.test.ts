@@ -1,10 +1,14 @@
 import path from "path";
 import fs from "fs";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { sanitizeUploadPath, UPLOADS_DIR } from "../uploadGuard";
 
 describe("sanitizeUploadPath", () => {
+  afterEach(() => {
+    fs.rmSync(UPLOADS_DIR, { recursive: true, force: true });
+  });
+
   it("allows paths inside the uploads directory", () => {
     fs.mkdirSync(UPLOADS_DIR, { recursive: true });
     const filePath = path.join(UPLOADS_DIR, "nested", "document.pdf");
