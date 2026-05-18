@@ -24,22 +24,31 @@ export const UPLOADS_DIR = path.resolve(
  * @returns Resolved absolute path guaranteed to be inside UPLOADS_DIR
  */
 export function sanitizeUploadPath(rawPath: string): string {
-    const resolved = path.resolve(rawPath);
-
-  // Ensure the resolved path is strictly inside UPLOADS_DIR.
-  // path.sep appended so that a dir named "uploads-evil" doesn't match.
-  const isInside =
-        resolved === UPLOADS_DIR ||
-        resolved.startsWith(UPLOADS_DIR + path.sep);
-
-  if (!isInside) {
-        const err = new Error(
-                `PATH_TRAVERSAL_BLOCKED: "${resolved}" is outside the permitted uploads directory (${UPLOADS_DIR}). ` +
-                `This may indicate a path-traversal attack attempt.`,
-              );
-        (err as any).statusCode = 400;
-        throw err;
+  if (typeof rawPath !== "string" || rawPath.trim() === "") {
+    const err = new Error("INVALID_UPLOAD_PATH: upload path is missing or invalid.");
+    (err as any).statusCode = 400;
+    throw err;
   }
 
-  return resolved;
+  // Anchor resolution to the trusted uploads root so absolute and traversal
+  // inputs cannot escape containment checks.
+  const candidate = path.resolve(UPLOADS_DIR, rawPath);
+  const relative = path.relative(UPLOADS_DIR, candidate);
+
+  // Reject anything that resolves outside uploads root.
+  const isInside =
+    relative !== "" &&
+    !relative.startsWith("..") &&
+    !path.isAbsolute(relative);
+
+  if (!isInside) {
+    const err = new Error(
+      `PATH_TRAVERSAL_BLOCKED: "${candidate}" is outside the permitted uploads directory (${UPLOADS_DIR}). ` +
+      `This may indicate a path-traversal attack attempt.`,
+    );
+    (err as any).statusCode = 400;
+    throw err;
+  }
+
+  return candidate;
 }
