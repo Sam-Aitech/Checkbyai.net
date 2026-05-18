@@ -812,31 +812,24 @@ export class DatabaseStorage implements IStorage {
     proUsers: number;
   }> {
     const today = new Date().toISOString().split('T')[0];
-    
-    const [trustedPatternsCount] = await db
-      .select({ count: count() })
-      .from(trustedPatterns)
-      .where(eq(trustedPatterns.status, 'active'));
-    
-    const [verificationsToday] = await db
-      .select({ count: count() })
-      .from(verificationResults)
-      .where(and(gte(verificationResults.verifiedAt, new Date(today)), isNull(verificationResults.deletedAt)));
-    
-    const [totalUsers] = await db
-      .select({ count: count() })
-      .from(users);
-    
-    const [proUsers] = await db
-      .select({ count: count() })
-      .from(users)
-      .where(inArray(users.subscriptionStatus, ['starter', 'pro', 'unlimited', 'enterprise']));
-    
+
+    const [
+      trustedPatternsCount,
+      verificationsToday,
+      totalUsers,
+      proUsers,
+    ] = await Promise.all([
+      db.select({ count: count() }).from(trustedPatterns).where(eq(trustedPatterns.status, 'active')),
+      db.select({ count: count() }).from(verificationResults).where(and(gte(verificationResults.verifiedAt, new Date(today)), isNull(verificationResults.deletedAt))),
+      db.select({ count: count() }).from(users),
+      db.select({ count: count() }).from(users).where(inArray(users.subscriptionStatus, ['starter', 'pro', 'unlimited', 'enterprise'])),
+    ]);
+
     return {
-      trustedPatterns: trustedPatternsCount.count,
-      verificationsToday: verificationsToday.count,
-      totalUsers: totalUsers.count,
-      proUsers: proUsers.count,
+      trustedPatterns: trustedPatternsCount[0].count,
+      verificationsToday: verificationsToday[0].count,
+      totalUsers: totalUsers[0].count,
+      proUsers: proUsers[0].count,
     };
   }
 

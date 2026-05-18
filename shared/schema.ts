@@ -369,6 +369,7 @@ export const sponsorChanges = pgTable(
     newValue: varchar("new_value"),
     detectedAt: timestamp("detected_at").defaultNow(),
     snapshotDate: date("snapshot_date").notNull(),
+    isTest: boolean("is_test").default(false),
   },
   (table) => [
     index("idx_sponsor_changes_org_name").on(table.organisationName),

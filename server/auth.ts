@@ -472,10 +472,29 @@ export async function setupAuth(app: Express) {
   // Admin OTP: Send verification code via Resend
   app.post("/api/auth/admin/send-otp", otpLimiter, async (req, res) => {
     try {
-      const { email } = req.body;
+      const { email, turnstileToken } = req.body;
       
       if (!email || !email.includes("@")) {
         return res.status(400).json({ message: "Valid email required" });
+      }
+
+      if (process.env.TURNSTILE_SECRET_KEY && !turnstileToken) {
+        return res.status(400).json({ message: "CAPTCHA verification required" });
+      }
+
+      if (process.env.TURNSTILE_SECRET_KEY) {
+        const turnstileResponse = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            secret: process.env.TURNSTILE_SECRET_KEY,
+            response: turnstileToken,
+          }),
+        });
+        const turnstileData = await turnstileResponse.json();
+        if (!turnstileData.success) {
+          return res.status(400).json({ message: "CAPTCHA verification failed" });
+        }
       }
 
       // Check if email matches ADMIN_EMAIL

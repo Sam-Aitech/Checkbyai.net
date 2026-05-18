@@ -36,6 +36,7 @@ WORKDIR /app
 
 # Copy only production node_modules and built output from builder
 COPY --from=builder --chown=checkbyai:nodejs /app/package.json ./
+RUN npm prune --omit=dev
 COPY --from=builder --chown=checkbyai:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=checkbyai:nodejs /app/dist ./dist
 COPY --from=builder --chown=checkbyai:nodejs /app/migrations ./migrations

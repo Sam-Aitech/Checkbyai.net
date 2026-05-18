@@ -163,7 +163,7 @@ if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
 }
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-11-17.clover" as any,
+  apiVersion: "2025-11-17.clover",
 });
 
 async function sendSubscriptionNotifications(
@@ -404,7 +404,7 @@ export function registerBillingRoutes(app: Express): void {
         const invoice = event.data.object as any;
         const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
         if (customerId && invoice.subscription) {
-          const user = await storage.getUserByStripeCustomerId(customerId);
+          const user = await withRetry(() => storage.getUserByStripeCustomerId(customerId), 'webhook-invoice-user-fetch');
           if (user) {
             if (user.subscriptionStatus && user.subscriptionStatus !== 'free') {
               await storage.updateUserSubscription(user.id, {

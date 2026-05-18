@@ -1809,7 +1809,7 @@ Format your response in clear, professional markdown.`;
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: 'CoS Verify UK <reports@cosverify.uk>',
+          from: 'CheckByAI <reports@checkbyai.net>',
           to: [submission.email],
           subject: `Your CoS Verification Report - ${submission.expertVerdict?.toUpperCase() || 'COMPLETE'}`,
           html: reportHtml,
@@ -2255,6 +2255,7 @@ Format your response in clear, professional markdown.`;
       const base = (existing.notifPrefs as NotifPrefs | null) ?? DEFAULT_NOTIF_PREFS;
       const merged: NotifPrefs = { ...base };
       for (const [k, v] of Object.entries(patch)) {
+        if (!Object.prototype.hasOwnProperty.call(DEFAULT_NOTIF_PREFS, k)) continue;
         const key = k as keyof NotifPrefs;
         if (merged[key]) {
           merged[key] = { ...merged[key], ...v, channels: { ...merged[key].channels, ...(v as any).channels } };

@@ -49,3 +49,6 @@ test_response.pdf
 # Docs (not needed at runtime)
 docs/
 attached_assets/
+
+# Uploads (never needed in container)
+uploads/
