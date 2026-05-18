@@ -126,7 +126,6 @@ export interface IStorage {
   getStats(): Promise<{
     trustedPatterns: number;
     verificationsToday: number;
-    suspiciousToday: number;
     totalUsers: number;
     proUsers: number;
   }>;
@@ -809,7 +808,6 @@ export class DatabaseStorage implements IStorage {
   async getStats(): Promise<{
     trustedPatterns: number;
     verificationsToday: number;
-    suspiciousToday: number;
     totalUsers: number;
     proUsers: number;
   }> {
@@ -825,13 +823,6 @@ export class DatabaseStorage implements IStorage {
       .from(verificationResults)
       .where(and(gte(verificationResults.verifiedAt, new Date(today)), isNull(verificationResults.deletedAt)));
     
-    const [suspiciousToday] = await db
-      .select({ count: count() })
-      .from(verificationResults)
-      .where(
-        and(gte(verificationResults.verifiedAt, new Date(today)), isNull(verificationResults.deletedAt))
-      );
-    
     const [totalUsers] = await db
       .select({ count: count() })
       .from(users);
@@ -844,7 +835,6 @@ export class DatabaseStorage implements IStorage {
     return {
       trustedPatterns: trustedPatternsCount.count,
       verificationsToday: verificationsToday.count,
-      suspiciousToday: Math.floor(suspiciousToday.count * 0.15), // Approximate suspicious rate
       totalUsers: totalUsers.count,
       proUsers: proUsers.count,
     };

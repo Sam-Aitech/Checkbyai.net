@@ -20,8 +20,8 @@ function generateReceiptId(): string {
   return `CBA-${random1}-${random2}`;
 }
 
-function generateDocumentHash(filePath: string): string {
-  const fileBuffer = fs.readFileSync(filePath);
+async function generateDocumentHash(filePath: string): Promise<string> {
+  const fileBuffer = await fs.promises.readFile(filePath);
   return crypto.createHash('sha256').update(fileBuffer).digest('hex');
 }
 
@@ -127,7 +127,7 @@ export function registerVerificationRoutes(app: Express): void {
       }
 
       // Generate document hash for audit trail
-      const documentHash = generateDocumentHash(safeFilePath);
+      const documentHash = await generateDocumentHash(safeFilePath);
       const receiptId = generateReceiptId();
 
       // ── Admin-override short-circuit ──────────────────────────────────────

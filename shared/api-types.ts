@@ -3,7 +3,6 @@ import type { User, TrustedPattern, VerificationResult } from "./schema";
 export interface StatsResponse {
   trustedPatterns: number;
   verificationsToday: number;
-  suspiciousToday: number;
   suspiciousDocs?: number;
   successRate?: number;
   totalUsers: number;

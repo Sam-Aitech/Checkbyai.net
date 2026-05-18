@@ -29,6 +29,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **SEC-018 — System settings allowed-keys validation**: Added `ALLOWED_SYSTEM_SETTINGS = ['defaultDailyLimit', 'notifications_paused']` whitelist to `PATCH /api/admin/system-settings/:key` — rejects unknown keys with 400.
 - **SEC-019 — Full UUID for admin user IDs**: Replaced `crypto.randomUUID().slice(0, 8)` with full `crypto.randomUUID()` to eliminate collision risk.
 
+### Sprint 3 Fixes
+- **SEC-021 — Inline migrations replaced with Drizzle migration files**: Removed 200+ lines of inline SQL from `index.ts`. Schema migrations now live in `migrations/` directory (0016, 0017) and run via `npm run db:migrate` (CI/CD only). `applyPendingMigrations()` replaced with `applyDataFixbacks()` for one-time data backfills only.
+- **SEC-022 — Removed fabricated `suspiciousToday` stat**: The `suspiciousToday` field in `getStats()` was a duplicate query with a fabricated multiplier (`* 0.15`). Removed from `StatsResponse` type, `getStats()` implementation, and `api-types.ts`.
+- **SEC-023 — Sanitized adminFeedback in LLM prompts**: Added `sanitizeForPrompt()` that strips `< >` backticks and `{}` from admin feedback before injection into LLM system prompts. Applied to all 3 usage sites.
+- **SEC-024 — Compression filter skips `/api/auth` routes**: Auth responses (OTP, session cookies) no longer compressed — reduces attack surface for BREACH-style attacks.
+- **SEC-025 — `generateDocumentHash` made async**: Replaced `fs.readFileSync` with `fs.promises.readFile` to avoid blocking the event loop during file hashing.
+- **SEC-026 — Normalized IP cooldown to 1-day**: `ipRateLimit.ts` used 7-day cooldown while `verification.ts` used 1-day. Both now consistently use 1-day.
+- **SEC-027 — `APP_URL` env var with Replit fallback**: Google OAuth callback URL now uses `APP_URL` as primary, `REPLIT_DOMAINS` as fallback, with startup warning if both missing.
+- **SEC-028 — Atomic session claim via `tryClaimSession()`**: Replaced check-then-mark race condition with single `INSERT ... ON CONFLICT DO NOTHING RETURNING id` — only one webhook handler can claim a session.
+- **SEC-029 — `user_id` column on sessions table**: Added `user_id` varchar column with index to `sessions` table for efficient user-based session queries and invalidation.
+
 ### Planned
 - Docker containerization
 - PostgreSQL Row Level Security (RLS) policies

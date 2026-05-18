@@ -1,6 +1,6 @@
 # Security Design Document
 # checkbyai.net
-**Version:** 1.2 | **Classification:** Internal | **Last Updated:** 2026-05-18
+**Version:** 1.3 | **Classification:** Internal | **Last Updated:** 2026-05-18
 
 ---
 
@@ -287,6 +287,19 @@ OPENAI_API_KEY         — AI analysis (falls back to Claude/DeepSeek)
 ---
 
 ## 11. Outstanding Security Items
+
+### Sprint 3 Fixes (2026-05-18)
+| ID | Item | Status |
+|---|---|---|
+| SEC-021 | Inline migrations replaced with Drizzle migration files | Fixed — `migrations/0016_*.sql`, `0017_*.sql`; `applyPendingMigrations()` removed |
+| SEC-022 | Remove fabricated `suspiciousToday` stat | Fixed — removed from `getStats()` response and `StatsResponse` type |
+| SEC-023 | Sanitize adminFeedback in LLM prompts | Fixed — `sanitizeForPrompt()` strips `< >` \` { }` |
+| SEC-024 | Compression filter skips `/api/auth` routes | Fixed — auth responses no longer compressed |
+| SEC-025 | `generateDocumentHash` async with `fs.promises.readFile` | Fixed — no longer blocks event loop |
+| SEC-026 | Normalize IP cooldown to 1-day | Fixed — `ipRateLimit.ts` changed from 7-day to 1-day |
+| SEC-027 | `APP_URL` env var with Replit fallback | Fixed — warns if both missing |
+| SEC-028 | Atomic session claim via `tryClaimSession()` | Fixed — single INSERT ... ON CONFLICT replaces check-then-mark race |
+| SEC-029 | `user_id` column on sessions table | Fixed — migration `0017_sessions_user_id.sql` |
 
 ### Sprint 2 Fixes (2026-05-18)
 | ID | Item | Status |

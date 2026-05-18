@@ -14,7 +14,7 @@ export function getClientIp(req: Request): string {
   return req.ip || req.socket.remoteAddress || "unknown";
 }
 
-// Check if IP can verify (7-day cooldown)
+// Check if IP can verify (1-day cooldown)
 export async function checkIpRateLimit(
   req: Request,
   res: Response,
@@ -32,16 +32,14 @@ export async function checkIpRateLimit(
       const now = new Date();
       const daysSinceVerification = (now.getTime() - lastVerification.getTime()) / (1000 * 60 * 60 * 24);
       
-      if (daysSinceVerification < 7) {
-        const daysRemaining = Math.ceil(7 - daysSinceVerification);
-        const hoursRemaining = Math.ceil((7 - daysSinceVerification) * 24);
+      if (daysSinceVerification < 1) {
+        const hoursRemaining = Math.ceil((1 - daysSinceVerification) * 24);
         
         return res.status(429).json({
           message: "Rate limit exceeded",
-          error: "You can only verify one document every 7 days",
-          daysRemaining,
+          error: "You can only verify one document per day",
           hoursRemaining,
-          nextVerificationDate: new Date(lastVerification.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          nextVerificationDate: new Date(lastVerification.getTime() + 24 * 60 * 60 * 1000).toISOString(),
         });
       }
     }

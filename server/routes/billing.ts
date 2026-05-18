@@ -138,8 +138,11 @@ function verifyClientReferenceId(clientRefId: string): { userId: string; package
   }
 }
 
-async function markSessionProcessed(sessionId: string): Promise<void> {
-  await db.insert(processedCheckouts).values({ sessionId }).onConflictDoNothing();
+async function tryClaimSession(sessionId: string): Promise<boolean> {
+  const result = await db.execute(
+    sql`INSERT INTO processed_checkouts (session_id) VALUES (${sessionId}) ON CONFLICT (session_id) DO NOTHING RETURNING id`
+  );
+  return (result as any).rowCount > 0;
 }
 
 async function isSessionProcessed(sessionId: string): Promise<boolean> {
@@ -475,8 +478,7 @@ export function registerBillingRoutes(app: Express): void {
           }
         }
 
-        if (userId && packageType && session.payment_status === 'paid' && !(await isSessionProcessed(session.id))) {
-          await markSessionProcessed(session.id);
+        if (userId && packageType && session.payment_status === 'paid' && await tryClaimSession(session.id)) {
           const sessionEmail = session.customer_details?.email || session.customer_email || undefined;
           const prevUser = await storage.getUser(userId);
           const prevStatus = prevUser?.subscriptionStatus || 'free';
@@ -735,8 +737,7 @@ export function registerBillingRoutes(app: Express): void {
         }
 
         if (sessionUserId && sessionUserId === req.user.id) {
-          if (!(await isSessionProcessed(sessionId))) {
-            await markSessionProcessed(sessionId);
+          if (await tryClaimSession(sessionId)) {
             if (packageType === 'starter') {
               await withRetry(() => db.transaction(async (tx) => {
                 await tx.update(users).set({

@@ -32,6 +32,10 @@ import { rebuildSponsorIndex } from "../utils/sponsorSearch";
 import { isQueueAvailable, getSponsorRefreshQueue } from "../services/jobQueue";
 import { getWatchLimit } from "../utils/tierConfig";
 
+function sanitizeForPrompt(text: string): string {
+  return text.replace(/[<>`{}]/g, '');
+}
+
 const SPONSOR_JOB_LOCK_KEY = 7483920; // Same key as sponsorMonitorJob — init and nightly are mutually exclusive
 
 // ── Sponsor Monitor Initialize Job State ─────────────────────────────────────
@@ -254,7 +258,7 @@ export function registerAdminRoutes(app: Express): void {
           knowledgeContext += `  Producer: ${metadata?.producer || 'Unknown'}\n`;
           knowledgeContext += `  AI said: ${entry.result} (${entry.confidence}% confidence)\n`;
           knowledgeContext += `  Human verdict: FAKE\n`;
-          knowledgeContext += `  Expert reasoning: ${entry.adminFeedback || 'No details'}\n\n`;
+          knowledgeContext += `  Expert reasoning: ${sanitizeForPrompt(entry.adminFeedback || 'No details')}\n\n`;
         });
         knowledgeContext += '</human_expert_corrections>\n';
       }
@@ -1862,7 +1866,7 @@ Format your response in clear, professional markdown.`;
           const ruleText =
             `CRITICAL ADMIN OVERRIDE [${overrideDate}]: Document initially verified as '${originalResult}' (${originalConfidence}% confidence) was confirmed FAKE by a human expert.\n` +
             `Producer: ${producer}\n` +
-            `Admin reasoning: ${adminFeedback.trim()}\n` +
+            `Admin reasoning: ${sanitizeForPrompt(adminFeedback.trim())}\n` +
             `Action required: Apply heightened scrutiny to documents with similar metadata patterns. Do not classify as Genuine without explicit justification.`;
 
           await storage.createGlobalAiRule({
@@ -1917,7 +1921,7 @@ Format your response in clear, professional markdown.`;
           knowledgeContext += `Producer: ${metadata?.producer || 'Unknown'}\n`;
           knowledgeContext += `AI said: ${entry.result} (${entry.confidence}% confidence)\n`;
           knowledgeContext += `Admin override: FAKE\n`;
-          knowledgeContext += `Admin reasoning: ${entry.adminFeedback || 'No details provided'}\n\n`;
+          knowledgeContext += `Admin reasoning: ${sanitizeForPrompt(entry.adminFeedback || 'No details provided')}\n\n`;
         });
 
         knowledgeContext += 'DO NOT repeat the mistake of marking similar patterns as Genuine.\n';

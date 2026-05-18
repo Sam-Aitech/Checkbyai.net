@@ -265,10 +265,14 @@ export async function setupAuth(app: Express) {
 
   // Google OAuth Strategy
   if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-    const currentDomain = process.env.REPLIT_DOMAINS?.split(',')[0] || 'localhost:5000';
+    const appUrl = process.env.APP_URL || (process.env.REPLIT_DOMAINS?.split(',')[0] ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}` : null);
+    if (!appUrl) {
+      console.warn('[Auth] APP_URL and REPLIT_DOMAINS are both missing — Google OAuth callback may not work correctly');
+    }
+    const currentDomain = appUrl || 'localhost:5000';
     const fullCallbackURL = currentDomain.includes('localhost') 
       ? `http://${currentDomain}/api/auth/google/callback`
-      : `https://${currentDomain}/api/auth/google/callback`;
+      : `${currentDomain}/api/auth/google/callback`;
     
     passport.use(new GoogleStrategy({
       clientID: process.env.GOOGLE_CLIENT_ID,
