@@ -17,7 +17,7 @@ curl_cffi>=0.15.0             # scrapling static-fetcher transport
 #                             #   playwright install chromium)
 
 # ── PDF processing ────────────────────────────────────────────────────────────
-pymupdf>=1.26.3               # PDF parsing (cos_verifier.py, ai_engine.py)
+pymupdf>=1.27.2.3               # PDF parsing (cos_verifier.py, ai_engine.py)
 
 # ── Machine learning / NLP ────────────────────────────────────────────────────
 scikit-learn>=1.8.0           # TF-IDF cosine similarity (ai_engine.py, cos_verifier.py)
