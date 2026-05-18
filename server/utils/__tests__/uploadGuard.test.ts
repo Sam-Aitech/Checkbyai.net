@@ -1,17 +1,23 @@
 import path from "path";
+import fs from "fs";
 import { describe, expect, it } from "vitest";
 
 import { sanitizeUploadPath, UPLOADS_DIR } from "../uploadGuard";
 
 describe("sanitizeUploadPath", () => {
   it("allows paths inside the uploads directory", () => {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
     const filePath = path.join(UPLOADS_DIR, "nested", "document.pdf");
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, "ok");
 
-    expect(sanitizeUploadPath(filePath)).toBe(path.resolve(filePath));
+    expect(sanitizeUploadPath(filePath)).toBe(fs.realpathSync(filePath));
   });
 
   it("allows the uploads directory root itself", () => {
-    expect(sanitizeUploadPath(UPLOADS_DIR)).toBe(UPLOADS_DIR);
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
+    expect(sanitizeUploadPath(UPLOADS_DIR)).toBe(fs.realpathSync(UPLOADS_DIR));
   });
 
   it("rejects traversal outside the uploads directory", () => {

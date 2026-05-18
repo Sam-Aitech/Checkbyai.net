@@ -146,7 +146,7 @@ function verifyClientReferenceId(clientRefId: string): { userId: string; package
 
 async function tryClaimSession(sessionId: string): Promise<boolean> {
   const result = await db.execute(
-    sql`INSERT INTO processed_checkouts (session_id) VALUES (${sessionId}) ON CONFLICT (session_id) DO NOTHING RETURNING id`
+    sql`INSERT INTO processed_checkouts (session_id) VALUES (${sessionId}) ON CONFLICT (session_id) DO NOTHING RETURNING session_id`
   );
   return (result as any).rowCount > 0;
 }
