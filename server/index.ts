@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import compression from "compression";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
+import * as Sentry from "@sentry/node";
 import { makeRateLimitStore } from "./utils/redisRateLimitStore";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
@@ -64,6 +65,18 @@ if (!process.env.STRIPE_WEBHOOK_SECRET) {
   );
 }
 
+const isProduction = process.env.NODE_ENV === "production";
+const isTestEnv = process.env.NODE_ENV === "test";
+const sentryDsn = process.env.SENTRY_DSN;
+const isSentryEnabled = !isTestEnv && Boolean(sentryDsn);
+
+Sentry.init({
+  dsn: sentryDsn,
+  enabled: isSentryEnabled,
+  environment: process.env.NODE_ENV ?? "development",
+  tracesSampleRate: isProduction ? 0.1 : 1.0,
+});
+
 async function seedAdminUser() {
   try {
     const adminEmail = process.env.ADMIN_EMAIL;
@@ -101,12 +114,16 @@ async function seedAdminUser() {
 }
 
 const app = express();
-const isProduction = process.env.NODE_ENV === "production";
 
 // Trust the first proxy so req.ip is the real client IP behind Nginx/load balancer.
 // Without this, req.ip is undefined or 127.0.0.1, which breaks all IP-based rate limiting.
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
+
+if (isSentryEnabled) {
+  app.use(Sentry.Handlers.requestHandler());
+  app.use(Sentry.Handlers.tracingHandler());
+}
 
 // Helmet is applied first to enforce baseline browser hardening before any other middleware:
 // CSP allows only self + Stripe + Cloudflare Turnstile (with narrowly scoped unsafe-inline/unsafe-eval
@@ -369,11 +386,15 @@ async function applyDataFixbacks() {
    } catch (err) {
      logger.warn({ err }, "Non-blocking: status cache flush failed on boot");
    }
-   setupWorkers();
-   
-   const server = await registerRoutes(app);
+    setupWorkers();
+    
+    const server = await registerRoutes(app);
 
-   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    if (isSentryEnabled) {
+      app.use(Sentry.Handlers.errorHandler());
+    }
+
+    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
      const status = err.status || err.statusCode || 500;
      const message = err.message || "Internal Server Error";
 
