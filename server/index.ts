@@ -110,7 +110,7 @@ app.disable('x-powered-by');
 
 // Helmet is applied first to enforce baseline browser hardening before any other middleware:
 // CSP allows only self + Stripe + Cloudflare Turnstile (with narrowly scoped unsafe-inline/unsafe-eval
-// kept only where required by existing inline SEO JSON-LD/inline styles and Vite dev HMR), HSTS is enabled
+// kept only where required by existing inline SEO JSON-LD + inline styles in client/index.html and Vite dev HMR), HSTS is enabled
 // in production, and frame-ancestors/x-frame-options deny embedding to prevent clickjacking on sensitive pages/PDF flows.
 app.use(helmet({
   contentSecurityPolicy: {
