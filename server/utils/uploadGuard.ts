@@ -25,35 +25,41 @@ export const UPLOADS_DIR = path.resolve(
  * @returns Resolved absolute path guaranteed to be inside UPLOADS_DIR
  */
 export function sanitizeUploadPath(rawPath: string): string {
-    const resolved = path.resolve(rawPath);
+  if (typeof rawPath !== "string" || rawPath.trim() === "") {
+    const err = new Error("INVALID_UPLOAD_PATH: upload path is missing or invalid.");
+    (err as any).statusCode = 400;
+    throw err;
+  }
 
-    let realUploadsDir: string;
-    let realCandidate: string;
-    try {
-        realUploadsDir = fs.realpathSync(UPLOADS_DIR);
-        realCandidate = fs.realpathSync(resolved);
-    } catch {
-        const err = new Error(
-            `PATH_TRAVERSAL_BLOCKED: "${resolved}" could not be canonicalized under uploads directory (${UPLOADS_DIR}).`,
-        );
-        (err as any).statusCode = 400;
-        throw err;
-    }
+  const resolved = path.resolve(rawPath);
 
-    // Ensure the canonicalized candidate path is inside the canonicalized uploads root.
-    const relative = path.relative(realUploadsDir, realCandidate);
-    const isInside =
-        relative === "" ||
-        (!relative.startsWith("..") && !path.isAbsolute(relative));
+  let realUploadsDir: string;
+  let realCandidate: string;
+  try {
+    realUploadsDir = fs.realpathSync(UPLOADS_DIR);
+    realCandidate = fs.realpathSync(resolved);
+  } catch {
+    const err = new Error(
+      `PATH_TRAVERSAL_BLOCKED: "${resolved}" could not be canonicalized under uploads directory (${UPLOADS_DIR}).`,
+    );
+    (err as any).statusCode = 400;
+    throw err;
+  }
 
-    if (!isInside) {
-        const err = new Error(
-            `PATH_TRAVERSAL_BLOCKED: "${realCandidate}" is outside the permitted uploads directory (${realUploadsDir}). ` +
-            `This may indicate a path-traversal attack attempt.`,
-        );
-        (err as any).statusCode = 400;
-        throw err;
-    }
+  // Ensure the canonicalized candidate path is inside the canonicalized uploads root.
+  const relative = path.relative(realUploadsDir, realCandidate);
+  const isInside =
+    relative === "" ||
+    (!relative.startsWith("..") && !path.isAbsolute(relative));
 
-    return realCandidate;
+  if (!isInside) {
+    const err = new Error(
+      `PATH_TRAVERSAL_BLOCKED: "${realCandidate}" is outside the permitted uploads directory (${realUploadsDir}). ` +
+      `This may indicate a path-traversal attack attempt.`,
+    );
+    (err as any).statusCode = 400;
+    throw err;
+  }
+
+  return realCandidate;
 }
