@@ -24,8 +24,10 @@ export function getSession() {
     ttl: sessionTtl,
     tableName: "sessions",
   });
+  const sessionSecret = process.env.SESSION_SECRET;
+  if (!sessionSecret) throw new Error('SESSION_SECRET is required');
   return session({
-    secret: process.env.SESSION_SECRET!,
+    secret: sessionSecret,
     store: sessionStore,
     resave: false,
     saveUninitialized: false,
@@ -488,7 +490,7 @@ export async function setupAuth(app: Express) {
       
       if (!adminUser) {
         adminUser = await storage.upsertUser({
-          id: "admin_" + crypto.randomUUID().slice(0, 8),
+          id: "admin_" + crypto.randomUUID(),
           email: email,
           authProvider: "admin",
           role: "admin",

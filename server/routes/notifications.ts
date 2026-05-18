@@ -9,24 +9,12 @@ import { sendSMS, sendWhatsApp } from "../services/messaging";
 import { isChannelAllowed, getTierConfig } from "../utils/tierConfig";
 import { storage } from "../storage";
 import crypto from "crypto";
+import * as phoneOtpStore from "../utils/phoneOtpStore";
 
-const phoneOtpStore = new Map<string, { code: string; expiresAt: number; attempts: number }>();
-const otpRateLimit = new Map<string, { count: number; resetAt: number }>();
 const MAX_OTP_ATTEMPTS = 5;
 const MAX_OTP_REQUESTS = 3;
-const OTP_RATE_WINDOW = 10 * 60 * 1000;
 
 const PHONE_REGEX = /^\+[1-9]\d{6,14}$/;
-
-function cleanupExpiredOtps() {
-  const now = Date.now();
-  Array.from(phoneOtpStore.entries()).forEach(([key, val]) => {
-    if (val.expiresAt < now) phoneOtpStore.delete(key);
-  });
-  Array.from(otpRateLimit.entries()).forEach(([key, val]) => {
-    if (val.resetAt < now) otpRateLimit.delete(key);
-  });
-}
 
 export function registerNotificationRoutes(app: Express): void {
   app.get('/api/notification-preferences', isAuthenticated, async (req: any, res) => {
@@ -281,23 +269,14 @@ export function registerNotificationRoutes(app: Express): void {
         return res.status(403).json({ message: `${channel === 'whatsapp' ? 'WhatsApp' : 'SMS'} notifications require ${minPlan} plan or above.` });
       }
 
-      cleanupExpiredOtps();
-
-      const rateLimitKey = `${req.user.id}:${channel}`;
-      const rateEntry = otpRateLimit.get(rateLimitKey);
-      if (rateEntry && rateEntry.resetAt > Date.now() && rateEntry.count >= MAX_OTP_REQUESTS) {
+      const rateCount = await phoneOtpStore.getRateCount(req.user.id, channel);
+      if (rateCount >= MAX_OTP_REQUESTS) {
         return res.status(429).json({ message: "Too many verification requests. Please wait 10 minutes before trying again." });
       }
 
       const code = String(crypto.randomInt(100000, 999999));
-      const key = `${req.user.id}:${channel}:${phone_number}`;
-      phoneOtpStore.set(key, { code, expiresAt: Date.now() + 10 * 60 * 1000, attempts: 0 });
-
-      if (rateEntry && rateEntry.resetAt > Date.now()) {
-        rateEntry.count++;
-      } else {
-        otpRateLimit.set(rateLimitKey, { count: 1, resetAt: Date.now() + OTP_RATE_WINDOW });
-      }
+      await phoneOtpStore.setOtp(req.user.id, channel, phone_number, code);
+      await phoneOtpStore.incrementRateCount(req.user.id, channel);
 
       const otpMessage = `Your CheckByAI verification code is: ${code}. It expires in 10 minutes.`;
 
@@ -310,13 +289,13 @@ export function registerNotificationRoutes(app: Express): void {
         }
       } catch (sendErr: any) {
         console.error(`[NotificationOTP] Error sending OTP via ${channel}:`, sendErr.message);
-        phoneOtpStore.delete(key);
+        await phoneOtpStore.deleteOtp(req.user.id, channel, phone_number);
         return res.status(502).json({ message: `Failed to deliver verification code via ${channel}. Please check the number and try again.` });
       }
 
       if (!deliveryResult.success) {
         console.error(`[NotificationOTP] ${channel} delivery failed for ${phone_number}: ${deliveryResult.error}`);
-        phoneOtpStore.delete(key);
+        await phoneOtpStore.deleteOtp(req.user.id, channel, phone_number);
         return res.status(502).json({ message: `Failed to deliver verification code via ${channel}. Please check the number and try again.` });
       }
 
@@ -340,28 +319,21 @@ export function registerNotificationRoutes(app: Express): void {
         return res.status(400).json({ message: "Channel must be 'whatsapp' or 'sms'." });
       }
 
-      cleanupExpiredOtps();
-
-      const key = `${req.user.id}:${channel}:${phone_number}`;
-      const stored = phoneOtpStore.get(key);
+      const stored = await phoneOtpStore.getOtp(req.user.id, channel, phone_number);
 
       if (!stored) {
         return res.status(400).json({ message: "No verification code found. Please request a new code." });
       }
-      if (stored.expiresAt < Date.now()) {
-        phoneOtpStore.delete(key);
-        return res.status(400).json({ message: "Verification code has expired. Please request a new code." });
-      }
       if (stored.attempts >= MAX_OTP_ATTEMPTS) {
-        phoneOtpStore.delete(key);
+        await phoneOtpStore.deleteOtp(req.user.id, channel, phone_number);
         return res.status(429).json({ message: "Too many failed attempts. Please request a new code." });
       }
       if (stored.code !== String(code).trim()) {
-        stored.attempts++;
+        await phoneOtpStore.incrementOtpAttempts(req.user.id, channel, phone_number);
         return res.status(400).json({ message: "Invalid verification code." });
       }
 
-      phoneOtpStore.delete(key);
+      await phoneOtpStore.deleteOtp(req.user.id, channel, phone_number);
 
       const userId = req.user.id;
       const existing = await db

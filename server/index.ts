@@ -134,7 +134,7 @@ app.use((req, res, next) => {
 
   // HSTS — enforce HTTPS in production only
   if (isProd) {
-    res.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    res.header('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
   }
 
   // Permissions-Policy — restrict browser features

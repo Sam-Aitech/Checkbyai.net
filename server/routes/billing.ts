@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import rateLimit from "express-rate-limit";
 import * as crypto from "crypto";
 import Stripe from "stripe";
 import { db } from "../db";
@@ -826,7 +827,15 @@ export function registerBillingRoutes(app: Express): void {
     }
   });
 
-  app.get('/api/stripe/publishable-key', async (req, res) => {
+  const stripeKeyLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: "Too many requests. Please try again later." },
+  });
+
+  app.get('/api/stripe/publishable-key', stripeKeyLimiter, async (req, res) => {
     try {
       const { getStripePublishableKey } = await import('../stripeClient');
       const key = await getStripePublishableKey();

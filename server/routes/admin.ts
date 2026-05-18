@@ -1095,9 +1095,14 @@ Format your response in clear, professional markdown.`;
     }
   });
 
+  const ALLOWED_SYSTEM_SETTINGS = ['defaultDailyLimit', 'notifications_paused'] as const;
+
   app.patch('/api/admin/system-settings/:key', isAdmin, async (req: any, res) => {
     try {
       const { key } = req.params;
+      if (!ALLOWED_SYSTEM_SETTINGS.includes(key as typeof ALLOWED_SYSTEM_SETTINGS[number])) {
+        return res.status(400).json({ message: `Invalid setting key: '${key}'. Allowed: ${ALLOWED_SYSTEM_SETTINGS.join(', ')}` });
+      }
       const { value } = req.body;
       if (value === undefined || value === null) {
         return res.status(400).json({ message: 'value is required' });

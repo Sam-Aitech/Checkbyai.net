@@ -21,6 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`POST /api/feedback` extracted to dedicated route**: Moved from `/api/admin` catch-all to `server/routes/feedback.ts` with its own rate limiter (3 req / 15 min) for better isolation and observability.
 - **Soft-delete for verification logs**: `verification_results` now has a `deleted_at` column. `deleteVerificationLog()` uses `UPDATE ... SET deleted_at = now()` instead of `DELETE`. All 13 read queries filter with `deleted_at IS NULL`.
 
+### Sprint 2 Fixes
+- **SEC-011 — `SESSION_SECRET` null check**: Replaced `process.env.SESSION_SECRET!` with explicit null check that throws at startup if missing.
+- **SEC-013 — HSTS preload**: Changed HSTS header from `max-age=31536000; includeSubDomains` to `max-age=63072000; includeSubDomains; preload` (2-year max-age + preload for HSTS preload list eligibility).
+- **SEC-016 — Redis-backed phone OTP store**: Replaced in-memory `Map` with Redis SET + TTL via `server/utils/phoneOtpStore.ts`. Graceful in-memory fallback when Redis is unavailable. Eliminates OTP loss on server restart and enables horizontal scaling.
+- **SEC-017 — Rate limit on `/api/stripe/publishable-key`**: Added `rateLimit({ windowMs: 60s, max: 10 })` to prevent enumeration abuse.
+- **SEC-018 — System settings allowed-keys validation**: Added `ALLOWED_SYSTEM_SETTINGS = ['defaultDailyLimit', 'notifications_paused']` whitelist to `PATCH /api/admin/system-settings/:key` — rejects unknown keys with 400.
+- **SEC-019 — Full UUID for admin user IDs**: Replaced `crypto.randomUUID().slice(0, 8)` with full `crypto.randomUUID()` to eliminate collision risk.
+
 ### Planned
 - Docker containerization
 - PostgreSQL Row Level Security (RLS) policies
