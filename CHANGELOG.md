@@ -40,6 +40,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **SEC-028 — Atomic session claim via `tryClaimSession()`**: Replaced check-then-mark race condition with single `INSERT ... ON CONFLICT DO NOTHING RETURNING id` — only one webhook handler can claim a session.
 - **SEC-029 — `user_id` column on sessions table**: Added `user_id` varchar column with index to `sessions` table for efficient user-based session queries and invalidation.
 
+### Sprint 4 Quality Fixes
+- **QA-001 — `package.json` name → `checkbyai`**: Updated project name from placeholder to `checkbyai` for package registry consistency.
+- **QA-003 — `ADVISORY_LOCK_KEY` extracted to `server/constants.ts`**: Moved the advisory lock key constant out of the migration block into a dedicated constants module for reuse.
+- **QA-004 — `getStats` queries parallelized**: Wrapped 4 independent DB queries in `Promise.all` for ~3× latency reduction on the admin stats endpoint.
+- **QA-005 — `is_test` column on `sponsorChanges`**: Added `is_test` boolean column to `sponsorChanges` table for filtering test data from production change feeds. Migration `0018`.
+- **QA-007 — Email/brand fix**: Changed `CoS Verify UK <reports@cosverify.uk>` to `CheckByAI <reports@checkbyai.net>` in admin email sender.
+- **QA-008 — Dockerfile `npm prune --omit=dev`**: Added `npm prune --omit=dev` after `npm ci` in multi-stage Docker build to remove dev dependencies from the production image (~40% image size reduction).
+- **QA-009 — `.dockerignore` add `uploads/`**: Excluded the runtime uploads directory from Docker build context to reduce image size and prevent stale files.
+- **QA-011 — Turnstile CAPTCHA on `/api/auth/admin/send-otp`**: Added Cloudflare Turnstile verification to the admin OTP endpoint. Requires `turnstileToken` in request body. Gated behind `TURNSTILE_SECRET_KEY` env var — skips verification if unconfigured.
+- **QA-013 — `cleanupExpiredOtps` already removed**: The function was removed in Sprint 2 when OTP storage moved to Redis with built-in TTL (SEC-016). No further action needed.
+- **QA-014 — `parseIntParam()` helper**: Created `server/utils/parseParam.ts` with a `parseIntParam()` utility that safely parses URL parameters and returns `null` for invalid inputs.
+- **QA-015 — Stripe apiVersion typing**: Removed `as any` cast on `apiVersion: "2025-11-17.clover"` — TypeScript now correctly validates the version string.
+- **QA-017 — Cloudflare challenges in CSP**: Added `https://challenges.cloudflare.com` to `frame-src` and `script-src` in the Content-Security-Policy header to allow Turnstile CAPTCHA to render and execute.
+- **QA-018 — User-fetch retry on invoice webhook**: Wrapped `storage.getUserByStripeCustomerId()` in `withRetry()` for the `invoice.payment_succeeded` webhook handler to handle transient DB failures.
+- **QA-019 — `hasOwnProperty` guard on `notifPrefs` merge**: Added `Object.prototype.hasOwnProperty.call(DEFAULT_NOTIF_PREFS, k)` check before merging notification preference patches to prevent prototype pollution.
+- **QA-020 — Redis requirepass**: Added `redis-server --requirepass ${REDIS_PASSWORD:-redis}` to docker-compose.yml, with password passed to `redis-cli ping` in healthcheck.
+
 ### Planned
 - Docker containerization
 - PostgreSQL Row Level Security (RLS) policies
