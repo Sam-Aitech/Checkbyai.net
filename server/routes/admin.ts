@@ -31,7 +31,6 @@ import { isJobRunning, getLastRunInfo, runSponsorMonitorJob } from "../utils/spo
 import { rebuildSponsorIndex } from "../utils/sponsorSearch";
 import { isQueueAvailable, getSponsorRefreshQueue } from "../services/jobQueue";
 import { getWatchLimit } from "../utils/tierConfig";
-import { sanitizeUploadPath } from "../utils/uploadGuard";
 
 function sanitizeForPrompt(text: string): string {
   return text.replace(/[<>`{}]/g, '');
@@ -103,13 +102,12 @@ export function registerAdminRoutes(app: Express): void {
   });
 
   app.post('/api/admin/trusted-patterns', isAdmin, upload.single('file'), async (req, res) => {
-    let safeFilePath;
+    let safeFilePath: string | undefined;
     try {
       if (!req.file) {
         return res.status(400).json({ message: 'No file uploaded' });
       }
-        // Path-traversal guard: assert req.file.path is inside uploads/
-              const safeFilePath = sanitizeUploadPath((req as any).file.path);
+      safeFilePath = sanitizeUploadPath((req as any).file.path);
       
       const pdfAnalyzer = new PDFAnalyzer();
       const metadata = await pdfAnalyzer.extractMetadata(safeFilePath);
@@ -151,14 +149,13 @@ export function registerAdminRoutes(app: Express): void {
   });
 
   app.post('/api/admin/extract-metadata', isAdmin, upload.single('file'), async (req: any, res) => {
-    let safeFilePath;
+    let safeFilePath: string | undefined;
     try {
       if (!req.file) {
         return res.status(400).json({ message: 'No file uploaded' });
       }
 
-      // SEC-001: safeFilePath was missing here — caused ReferenceError + path-traversal bypass
-      const safeFilePath = sanitizeUploadPath((req as any).file.path);
+      safeFilePath = sanitizeUploadPath((req as any).file.path);
       const pdfAnalyzer = new PDFAnalyzer();
       const metadata = await pdfAnalyzer.extractMetadata(safeFilePath);
 
@@ -1443,14 +1440,14 @@ Format your response in clear, professional markdown.`;
   // SEC-007: added isAuthenticated guard — was fully unauthenticated (spam risk)
   app.post('/api/feedback', isAuthenticated, async (req: any, res) => {
     try {
-      const feedbackData = insertFeedbackSchema.parse(req.body);
+      const { userId: _ignoredUserId, ...feedbackBody } = req.body ?? {};
+      const feedbackData = insertFeedbackSchema.parse(feedbackBody);
+      const createData = req.isAuthenticated()
+        ? { ...feedbackData, userId: req.user.id }
+        : feedbackData;
 
-      if (req.isAuthenticated()) {
-        feedbackData.userId = req.user.id;
-      }
-
-      const newFeedback = await storage.createFeedback(feedbackData);
-      res.json(newFeedback);
+      const newFeedback = await storage.createFeedback(createData);
+      res.status(201).json(newFeedback);
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid feedback data", errors: error.errors });
@@ -1514,7 +1511,7 @@ Format your response in clear, professional markdown.`;
       });
 
       const submission = await storage.createPaidSubmission({
-        userId: req.user.id,
+        userId: (req as any).user?.id,
         email: '',
         packageType,
         paymentStatus: 'pending',
@@ -1572,7 +1569,7 @@ Format your response in clear, professional markdown.`;
         return res.status(404).json({ message: 'Submission not found' });
       }
 
-      if (submission.userId !== req.user.id) {
+      if (submission.userId !== (req as any).user?.id) {
         return res.status(403).json({ message: 'Forbidden' });
       }
 
@@ -1627,7 +1624,7 @@ Format your response in clear, professional markdown.`;
         return res.status(404).json({ message: 'Submission not found' });
       }
 
-      if (submission.userId !== req.user.id) {
+      if (submission.userId !== (req as any).user?.id) {
         return res.status(403).json({ message: 'Forbidden' });
       }
 
@@ -1639,11 +1636,6 @@ Format your response in clear, professional markdown.`;
         reportDelivered: submission.reportDelivered,
         createdAt: submission.createdAt,
       });
-    }
-
-    // SEC-009: IDOR fix — verify caller owns this submission
-    if (submission.userId && submission.userId !== (req as any).user?.id) {
-      return res.status(403).json({ message: 'Forbidden: you do not own this submission' });
     } catch (error: unknown) {
       console.error('Status error:', error);
       res.status(500).json({ message: 'Failed to get status' });

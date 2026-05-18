@@ -238,6 +238,7 @@ export const paidSubmissions = pgTable("paid_submissions", {
   index("idx_paid_submissions_stripe_session_id").on(table.stripeSessionId),
   index("idx_paid_submissions_review_status").on(table.reviewStatus),
   index("idx_paid_submissions_email").on(table.email),
+  index("idx_paid_submissions_user_id").on(table.userId),
 ]);
 
 // Expert requests table for Master Package orders

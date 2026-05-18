@@ -43,7 +43,7 @@ export const upload = multer({
 
 export function registerVerificationRoutes(app: Express): void {
   app.post('/api/verify', verifyLimiter, upload.single('file'), async (req: any, res) => {
-    let safeFilePath;
+    let safeFilePath: string | undefined;
     try {
       // Beta gate: CoS Check is invite-only
       if (!req.isAuthenticated()) {
@@ -126,9 +126,6 @@ export function registerVerificationRoutes(app: Express): void {
         }
       }
 
-        // Path-traversal guard: assert req.file.path is inside uploads/
-              const safeFilePath = sanitizeUploadPath(req.file.path);
-      
       // Generate document hash for audit trail
       const documentHash = await generateDocumentHash(safeFilePath);
       const receiptId = generateReceiptId();

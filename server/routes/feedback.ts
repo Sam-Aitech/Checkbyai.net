@@ -16,14 +16,14 @@ const feedbackLimiter = rateLimit({
 export function registerFeedbackRoutes(app: Express): void {
   app.post('/api/feedback', feedbackLimiter, async (req: any, res) => {
     try {
-      const feedbackData = insertFeedbackSchema.parse(req.body);
+      const { userId: _ignoredUserId, ...feedbackBody } = req.body ?? {};
+      const feedbackData = insertFeedbackSchema.parse(feedbackBody);
+      const createData = req.isAuthenticated()
+        ? { ...feedbackData, userId: req.user.id }
+        : feedbackData;
 
-      if (req.isAuthenticated()) {
-        feedbackData.userId = req.user.id;
-      }
-
-      const newFeedback = await storage.createFeedback(feedbackData);
-      res.json(newFeedback);
+      const newFeedback = await storage.createFeedback(createData);
+      res.status(201).json(newFeedback);
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid feedback data", errors: error.errors });
