@@ -1,5 +1,6 @@
 import { Queue, Worker, Job } from 'bullmq';
 import IORedis from 'ioredis';
+import * as Sentry from '@sentry/node';
 
 export const SPONSOR_REFRESH_JOB = 'sponsor-refresh';
 export const SCRAPING_JOB = 'scraping-job';
@@ -18,6 +19,45 @@ const redisOpts = {
 let redisAvailable  = false;
 let sponsorQueue:  Queue | null = null;
 let notificationQueue: Queue | null = null;
+
+async function runJobWithSentryTrace<T>(
+  job: Job,
+  queueName: string,
+  processor: () => Promise<T>,
+): Promise<T> {
+  return Sentry.startSpan(
+    {
+      name: `BullMQ ${queueName}`,
+      op: 'bullmq.job',
+      forceTransaction: true,
+    },
+    async () => {
+      return Sentry.startSpan(
+        {
+          name: job.name,
+          op: 'bullmq.process',
+        },
+        async () => {
+          try {
+            return await processor();
+          } catch (error) {
+            Sentry.captureException(error, {
+              tags: {
+                queue: queueName,
+                jobName: job.name,
+              },
+              extra: {
+                jobId: job.id ?? 'missing-job-id',
+                attemptsMade: job.attemptsMade,
+              },
+            });
+            throw error;
+          }
+        },
+      );
+    },
+  );
+}
 
 /** True when Redis was reachable at startup and BullMQ queues are active. */
 export function isQueueAvailable(): boolean { return redisAvailable; }
@@ -82,8 +122,10 @@ export function setupWorkers(): void {
   new Worker(
     SPONSOR_REFRESH_JOB,
     async (job: Job) => {
-      const { processSponsorRefreshJob } = await import('../workers/sponsorRefreshWorker');
-      return processSponsorRefreshJob(job);
+      return runJobWithSentryTrace(job, SPONSOR_REFRESH_JOB, async () => {
+        const { processSponsorRefreshJob } = await import('../workers/sponsorRefreshWorker');
+        return processSponsorRefreshJob(job);
+      });
     },
     { connection: redisOpts }
   );
@@ -91,8 +133,10 @@ export function setupWorkers(): void {
   new Worker(
     SCRAPING_JOB,
     async (job: Job) => {
-      const { processScrapingJob } = await import('../workers/scrapingWorker');
-      return processScrapingJob(job);
+      return runJobWithSentryTrace(job, SCRAPING_JOB, async () => {
+        const { processScrapingJob } = await import('../workers/scrapingWorker');
+        return processScrapingJob(job);
+      });
     },
     { connection: redisOpts }
   );
@@ -100,8 +144,10 @@ export function setupWorkers(): void {
   new Worker(
     NOTIFICATION_JOB,
     async (job: Job) => {
-      const { notifyUsersOfEvent } = await import('../services/notificationEngine');
-      return notifyUsersOfEvent(job.data);
+      return runJobWithSentryTrace(job, NOTIFICATION_JOB, async () => {
+        const { notifyUsersOfEvent } = await import('../services/notificationEngine');
+        return notifyUsersOfEvent(job.data);
+      });
     },
     { connection: redisOpts }
   );
