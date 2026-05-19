@@ -157,7 +157,13 @@ export function deriveSponsorRowEnums(input: {
   rating: z.infer<typeof SponsorRatingSchema> | undefined;
   licenceType: z.infer<typeof SponsorLicenceTypeSchema> | undefined;
 } {
-  const licenceStatus = normalizeLicenceStatus(input.statusRaw);
+  const licenceStatus =
+    normalizeLicenceStatus(input.statusRaw) ??
+    normalizeLicenceStatus(input.ratingRaw) ??
+    normalizeLicenceStatus(input.typeRating);
+  // Rating remains strictly rating-derived; licenceStatus is a separate enum
+  // domain (Active/Suspended/Revoked/Surrendered) and is intentionally not used
+  // as a fallback to avoid cross-domain coercion.
   const rating =
     normalizeSponsorRating(input.ratingRaw) ??
     normalizeSponsorRating(input.typeRating);

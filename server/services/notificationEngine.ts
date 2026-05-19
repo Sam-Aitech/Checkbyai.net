@@ -34,7 +34,7 @@ import { getTierConfig } from "../utils/tierConfig";
 import { getAppUrl } from "../utils/appUrl";
 import { logger } from "../utils/logger";
 import { startJobRun, finishJobRun, type TriggerSource } from "../utils/jobTelemetry";
-import { match } from "ts-pattern";
+import { match, P } from "ts-pattern";
 
 const log = logger.child({ module: "NotificationEngine" });
 
@@ -68,6 +68,8 @@ function normalizeSponsorLicenceStatus(value: string | null | undefined): Normal
     .with("ACTIVE", () => "Active" as const)
     .with("SUSPENDED", () => "Suspended" as const)
     .with("REVOKED", () => "Revoked" as const)
+    // Internal state-machine status is intentionally normalized into
+    // user-facing licence-status semantics for transition alert routing.
     .with("REMOVED_REVOKED", () => "Revoked" as const)
     .with("SURRENDERED", () => "Surrendered" as const)
     .otherwise(() => "UNKNOWN" as const);
@@ -86,6 +88,8 @@ function mapStatusTransitionToNotifEvent(
   ])
     .returnType<NotifEventType | null>()
     .with(["Active", "Active"], () => null)
+    // TODO: add dedicated "licence_suspended" preference/event key; until then,
+    // suspension alerts are routed via "licence_revoked".
     .with(["Active", "Suspended"], () => "licence_revoked")
     .with(["Active", "Revoked"], () => "licence_revoked")
     .with(["Active", "Surrendered"], () => "licence_revoked")
@@ -94,44 +98,23 @@ function mapStatusTransitionToNotifEvent(
     .with(["Suspended", "Revoked"], () => "licence_revoked")
     .with(["Suspended", "Surrendered"], () => "licence_revoked")
     .with(["Revoked", "Active"], () => "licence_reinstated")
+    // No alert: already in a removed terminal family.
     .with(["Revoked", "Suspended"], () => null)
     .with(["Revoked", "Revoked"], () => null)
+    // No alert: both statuses represent non-active terminal states.
     .with(["Revoked", "Surrendered"], () => null)
     .with(["Surrendered", "Active"], () => "licence_reinstated")
+    // No alert: non-active terminal-family transitions currently not user-facing.
     .with(["Surrendered", "Suspended"], () => null)
     .with(["Surrendered", "Revoked"], () => null)
     .with(["Surrendered", "Surrendered"], () => null)
     .with(["UNKNOWN", "UNKNOWN"], () => null)
-    .with(["UNKNOWN", "Active"], () => {
-      log.warn({ previousStatusRaw, newStatusRaw }, "Unhandled previous sponsor status value for transition mapping");
+    .with(["UNKNOWN", P.union("Active", "Suspended", "Revoked", "Surrendered")], () => {
+      log.warn({ previousStatusRaw, newStatusRaw }, "Unhandled sponsor status value for transition mapping");
       return null;
     })
-    .with(["UNKNOWN", "Suspended"], () => {
-      log.warn({ previousStatusRaw, newStatusRaw }, "Unhandled previous sponsor status value for transition mapping");
-      return null;
-    })
-    .with(["UNKNOWN", "Revoked"], () => {
-      log.warn({ previousStatusRaw, newStatusRaw }, "Unhandled previous sponsor status value for transition mapping");
-      return null;
-    })
-    .with(["UNKNOWN", "Surrendered"], () => {
-      log.warn({ previousStatusRaw, newStatusRaw }, "Unhandled previous sponsor status value for transition mapping");
-      return null;
-    })
-    .with(["Active", "UNKNOWN"], () => {
-      log.warn({ previousStatusRaw, newStatusRaw }, "Unhandled new sponsor status value for transition mapping");
-      return null;
-    })
-    .with(["Suspended", "UNKNOWN"], () => {
-      log.warn({ previousStatusRaw, newStatusRaw }, "Unhandled new sponsor status value for transition mapping");
-      return null;
-    })
-    .with(["Revoked", "UNKNOWN"], () => {
-      log.warn({ previousStatusRaw, newStatusRaw }, "Unhandled new sponsor status value for transition mapping");
-      return null;
-    })
-    .with(["Surrendered", "UNKNOWN"], () => {
-      log.warn({ previousStatusRaw, newStatusRaw }, "Unhandled new sponsor status value for transition mapping");
+    .with([P.union("Active", "Suspended", "Revoked", "Surrendered"), "UNKNOWN"], () => {
+      log.warn({ previousStatusRaw, newStatusRaw }, "Unhandled sponsor status value for transition mapping");
       return null;
     })
     .exhaustive();

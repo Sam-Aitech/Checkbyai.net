@@ -88,32 +88,31 @@ function classifyRatingChange(prev: string, curr: string): "UPGRADED" | "DOWNGRA
 
   const previous = normalizeRating(prev);
   const current = normalizeRating(curr);
+  const warnUnknownRating = (message: string) => {
+    log.warn({ prev, curr, previousRating: previous, currentRating: current }, message);
+    return null;
+  };
 
   return match<[typeof previous, typeof current]>([previous, current])
     .returnType<"UPGRADED" | "DOWNGRADED" | null>()
     .with(["A-RATING", "A-RATING"], () => null)
     .with(["A-RATING", "B-RATING"], () => "DOWNGRADED")
     .with(["A-RATING", "UNKNOWN"], () => {
-      log.warn({ prev, curr }, "Unrecognized current rating while classifying change");
-      return null;
+      return warnUnknownRating("Unrecognized current rating while classifying change");
     })
     .with(["B-RATING", "A-RATING"], () => "UPGRADED")
     .with(["B-RATING", "B-RATING"], () => null)
     .with(["B-RATING", "UNKNOWN"], () => {
-      log.warn({ prev, curr }, "Unrecognized current rating while classifying change");
-      return null;
+      return warnUnknownRating("Unrecognized current rating while classifying change");
     })
     .with(["UNKNOWN", "A-RATING"], () => {
-      log.warn({ prev, curr }, "Unrecognized previous rating while classifying change");
-      return null;
+      return warnUnknownRating("Unrecognized previous rating while classifying change");
     })
     .with(["UNKNOWN", "B-RATING"], () => {
-      log.warn({ prev, curr }, "Unrecognized previous rating while classifying change");
-      return null;
+      return warnUnknownRating("Unrecognized previous rating while classifying change");
     })
     .with(["UNKNOWN", "UNKNOWN"], () => {
-      log.warn({ prev, curr }, "Unrecognized previous/current ratings while classifying change");
-      return null;
+      return warnUnknownRating("Unrecognized previous/current ratings while classifying change");
     })
     .exhaustive();
 }
@@ -475,9 +474,8 @@ export async function applyStateMachine(
           // Re-appearing after one-day miss = flicker recovery.
           toRecoverFlicker.push(fp);
         })
-        .with("ACTIVE", () => {})
-        .with("NEWLY_GRANTED", () => {})
-        .with("UNKNOWN", () => {})
+        // Existing listed/unknown records require no additional Phase C action.
+        .with("ACTIVE", "NEWLY_GRANTED", "UNKNOWN", () => {})
         .exhaustive();
     }
     // ACTIVE / NEWLY_GRANTED already in today's CSV — handled by modification phase or unchanged
