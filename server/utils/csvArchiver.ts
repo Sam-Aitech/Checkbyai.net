@@ -36,10 +36,10 @@ import { buildFingerprintedCsv, fingerprintedCsvPath } from "./csvFingerprintBui
 import type { SponsorRecord } from "./sponsorListFetcher";
 import {
   SponsorRowSchema,
-  normalizeLicenceStatus,
-  normalizeLicenceType,
+  deriveSponsorRowEnums,
   issueFieldName,
-  SCHEMA_CHANGE_REJECTION_THRESHOLD,
+  shouldTriggerSchemaChangeAlert,
+  buildSchemaChangeAlertHtml,
 } from "./sponsorRowSchema";
 import { logger } from "./logger";
 
@@ -515,12 +515,12 @@ export async function parseCsvFile(filePath: string): Promise<SponsorRecord[]> {
       const ratingRaw = (idx!.ratingIdx >= 0 ? row[idx!.ratingIdx] ?? "" : "").trim() || null;
       const lastUpdatedRaw = (idx!.lastUpdatedIdx >= 0 ? row[idx!.lastUpdatedIdx] ?? "" : "").trim() || null;
 
-      const licenceStatus =
-        normalizeLicenceStatus(statusRaw) ??
-        normalizeLicenceStatus(ratingRaw) ??
-        normalizeLicenceStatus(typeRating);
-      const rating = normalizeLicenceStatus(ratingRaw) ?? normalizeLicenceStatus(typeRating) ?? licenceStatus;
-      const licenceType = normalizeLicenceType(licenceTypeRaw) ?? normalizeLicenceType(typeRating);
+      const { licenceStatus, rating, licenceType } = deriveSponsorRowEnums({
+        statusRaw,
+        ratingRaw,
+        typeRating,
+        licenceTypeRaw,
+      });
 
       const parsed = SponsorRowSchema.safeParse({
         organisationName,
@@ -528,10 +528,10 @@ export async function parseCsvFile(filePath: string): Promise<SponsorRecord[]> {
         county,
         typeRating,
         route,
-        licenceStatus: licenceStatus ?? "",
-        licenceType: licenceType ?? "",
-        rating: rating ?? "",
-        lastUpdated: lastUpdatedRaw,
+        licenceStatus,
+        licenceType,
+        rating,
+        lastUpdated: lastUpdatedRaw ?? undefined,
       });
 
       if (!parsed.success) {
@@ -585,28 +585,19 @@ export async function parseCsvFile(filePath: string): Promise<SponsorRecord[]> {
     "Sponsor CSV validation summary",
   );
 
-  if (totalRowsProcessed > 0 && rowsRejected / totalRowsProcessed > SCHEMA_CHANGE_REJECTION_THRESHOLD) {
-    const rejectionRatePct = ((rowsRejected / totalRowsProcessed) * 100).toFixed(2);
+  const summary = { totalRowsProcessed, rowsAccepted, rowsRejected, rejectionReasons };
+  if (shouldTriggerSchemaChangeAlert(summary)) {
     log.error(
       {
         totalRowsProcessed,
         rowsRejected,
-        rejectionRatePct,
         rejectionReasons,
       },
       "Sponsor CSV schema-change event detected (>20% rejected rows)",
     );
     await sendAdminAlert(
       "🔴 CheckByAI: Sponsor CSV schema-change event detected",
-      `<p>More than 20% of sponsor CSV rows were rejected by Zod validation.</p>
-       <ul>
-         <li><strong>File:</strong> ${filePath}</li>
-         <li><strong>Total rows processed:</strong> ${totalRowsProcessed.toLocaleString()}</li>
-         <li><strong>Rows accepted:</strong> ${rowsAccepted.toLocaleString()}</li>
-         <li><strong>Rows rejected:</strong> ${rowsRejected.toLocaleString()} (${rejectionRatePct}%)</li>
-       </ul>
-       <p><strong>Rejection reasons by field:</strong></p>
-       <pre>${JSON.stringify(rejectionReasons, null, 2)}</pre>`,
+      `${buildSchemaChangeAlertHtml(`CsvArchiver file: ${filePath}`, summary)}`,
     );
   }
 

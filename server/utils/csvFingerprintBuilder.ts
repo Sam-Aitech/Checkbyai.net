@@ -25,10 +25,10 @@ import { sendAdminAlert } from "./adminAlert";
 import { logger } from "./logger";
 import {
   SponsorRowSchema,
-  normalizeLicenceStatus,
-  normalizeLicenceType,
+  deriveSponsorRowEnums,
   issueFieldName,
-  SCHEMA_CHANGE_REJECTION_THRESHOLD,
+  shouldTriggerSchemaChangeAlert,
+  buildSchemaChangeAlertHtml,
 } from "./sponsorRowSchema";
 
 // ── CSV quoting ───────────────────────────────────────────────────────────────
@@ -143,12 +143,12 @@ export async function buildFingerprintedCsv(
       const ratingRaw = (cols!.ratingIdx >= 0 ? row[cols!.ratingIdx] ?? "" : "").trim() || null;
       const lastUpdatedRaw = (cols!.lastUpdatedIdx >= 0 ? row[cols!.lastUpdatedIdx] ?? "" : "").trim() || null;
 
-      const licenceStatus =
-        normalizeLicenceStatus(statusRaw) ??
-        normalizeLicenceStatus(ratingRaw) ??
-        normalizeLicenceStatus(typeRating);
-      const rating = normalizeLicenceStatus(ratingRaw) ?? normalizeLicenceStatus(typeRating) ?? licenceStatus;
-      const licenceType = normalizeLicenceType(licenceTypeRaw) ?? normalizeLicenceType(typeRating);
+      const { licenceStatus, rating, licenceType } = deriveSponsorRowEnums({
+        statusRaw,
+        ratingRaw,
+        typeRating,
+        licenceTypeRaw,
+      });
 
       const parsed = SponsorRowSchema.safeParse({
         organisationName,
@@ -156,10 +156,10 @@ export async function buildFingerprintedCsv(
         county,
         typeRating,
         route,
-        licenceStatus: licenceStatus ?? "",
-        licenceType: licenceType ?? "",
-        rating: rating ?? "",
-        lastUpdated: lastUpdatedRaw,
+        licenceStatus,
+        licenceType,
+        rating,
+        lastUpdated: lastUpdatedRaw ?? undefined,
       });
 
       if (!parsed.success) {
@@ -185,6 +185,8 @@ export async function buildFingerprintedCsv(
 
       const fingerprint = generateFingerprint(
         parsed.data.organisationName,
+        // Fingerprint generator expects normalized string components, so null
+        // optional values are intentionally coerced to empty strings.
         parsed.data.townCity ?? "",
         parsed.data.route ?? "",
       );
@@ -216,28 +218,19 @@ export async function buildFingerprintedCsv(
     "Sponsor CSV validation summary (fingerprint builder)",
   );
 
-  if (totalRowsProcessed > 0 && rowsRejected / totalRowsProcessed > SCHEMA_CHANGE_REJECTION_THRESHOLD) {
-    const rejectionRatePct = ((rowsRejected / totalRowsProcessed) * 100).toFixed(2);
+  const summary = { totalRowsProcessed, rowsAccepted, rowsRejected, rejectionReasons };
+  if (shouldTriggerSchemaChangeAlert(summary)) {
     log.error(
       {
         totalRowsProcessed,
         rowsRejected,
-        rejectionRatePct,
         rejectionReasons,
       },
       "Sponsor CSV schema-change event detected in fingerprint builder (>20% rejected rows)",
     );
     await sendAdminAlert(
       "🔴 CheckByAI: Sponsor CSV schema-change event detected",
-      `<p>More than 20% of sponsor CSV rows were rejected while building the fingerprinted CSV.</p>
-       <ul>
-         <li><strong>Source file:</strong> ${rawPath}</li>
-         <li><strong>Total rows processed:</strong> ${totalRowsProcessed.toLocaleString()}</li>
-         <li><strong>Rows accepted:</strong> ${rowsAccepted.toLocaleString()}</li>
-         <li><strong>Rows rejected:</strong> ${rowsRejected.toLocaleString()} (${rejectionRatePct}%)</li>
-       </ul>
-       <p><strong>Rejection reasons by field:</strong></p>
-       <pre>${JSON.stringify(rejectionReasons, null, 2)}</pre>`,
+      `${buildSchemaChangeAlertHtml(`FingerprintBuilder source: ${rawPath}`, summary)}`,
     );
   }
 
