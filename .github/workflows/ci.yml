@@ -119,6 +119,21 @@ jobs:
       - name: Run tests
         run: npm run test:run
 
+      - name: Install Playwright Chromium
+        if: ${{ github.event_name == 'pull_request' && github.base_ref == 'main' }}
+        run: npm run playwright:install
+
+      - name: Run Playwright E2E tests
+        if: ${{ github.event_name == 'pull_request' && github.base_ref == 'main' }}
+        env:
+          TEST_BASE_URL: ${{ vars.TEST_BASE_URL || secrets.TEST_BASE_URL }}
+        run: |
+          if [ -z "$TEST_BASE_URL" ]; then
+            echo "TEST_BASE_URL (repo variable or secret) is required for Playwright E2E in CI."
+            exit 1
+          fi
+          npm run test:e2e
+
   build:
     name: Build
     runs-on: ubuntu-latest

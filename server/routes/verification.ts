@@ -12,7 +12,7 @@ import { verifyLimiter } from "../middleware/rateLimiter";
 import { PDFAnalyzer } from "../services/pdfAnalyzer";
 import { COSAuthenticityChecker } from "../services/cosAuthenticityChecker";
 import { getClientIp, hashIpAddress } from "../ipRateLimit";
-import { sanitizeUploadPath } from "../utils/uploadGuard";
+import { assertSafeUploadFilename, sanitizeUploadPath } from "../utils/uploadGuard";
 
 function generateReceiptId(): string {
   const random1 = crypto.randomBytes(4).toString('hex').toUpperCase();
@@ -76,6 +76,7 @@ export function registerVerificationRoutes(app: Express): void {
         return res.status(400).json({ message: 'No file uploaded' });
       }
 
+      assertSafeUploadFilename(req.file.originalname);
       safeFilePath = sanitizeUploadPath(req.file.path);
       const safePath = safeFilePath;
 
@@ -301,9 +302,21 @@ export function registerVerificationRoutes(app: Express): void {
         timestamp: new Date().toISOString()
       });
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Verification error:', error);
-      res.status(500).json({ message: 'Verification failed' });
+      const statusCode = Number.isInteger(error?.statusCode) ? error.statusCode : 500;
+      let safeMessage = 'Verification failed';
+      if (statusCode === 400) {
+        const errorText = typeof error?.message === 'string' ? error.message : '';
+        if (errorText.includes('INVALID_UPLOAD_FILENAME')) {
+          safeMessage = 'Invalid filename format';
+        } else if (errorText.includes('INVALID_UPLOAD_PATH') || errorText.includes('PATH_TRAVERSAL_BLOCKED')) {
+          safeMessage = 'Invalid upload path';
+        } else {
+          safeMessage = 'Invalid upload input';
+        }
+      }
+      res.status(statusCode).json({ message: safeMessage });
     } finally {
       // Delete uploaded file immediately after processing (security measure)
       if (req.file && safeFilePath) {
