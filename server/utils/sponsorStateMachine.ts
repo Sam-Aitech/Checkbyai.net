@@ -90,6 +90,7 @@ function classifyRatingChange(prev: string, curr: string): "UPGRADED" | "DOWNGRA
   const current = normalizeRating(curr);
 
   return match<[typeof previous, typeof current]>([previous, current])
+    .returnType<"UPGRADED" | "DOWNGRADED" | null>()
     .with(["A-RATING", "A-RATING"], () => null)
     .with(["A-RATING", "B-RATING"], () => "DOWNGRADED")
     .with(["A-RATING", "UNKNOWN"], () => {

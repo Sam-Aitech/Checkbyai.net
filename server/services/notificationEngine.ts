@@ -84,6 +84,7 @@ function mapStatusTransitionToNotifEvent(
     previousStatus,
     newStatus,
   ])
+    .returnType<NotifEventType | null>()
     .with(["Active", "Active"], () => null)
     .with(["Active", "Suspended"], () => "licence_revoked")
     .with(["Active", "Revoked"], () => "licence_revoked")
