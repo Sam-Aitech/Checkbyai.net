@@ -166,6 +166,7 @@
     "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.59.4",
     "@typescript-eslint/parser": "^8.59.4",
+    "@vitest/coverage-v8": "^4.1.6",
     "audit-ci": "^7.1.0",
     "dotenv": "^17.4.2",
     "eslint": "^10.4.0",

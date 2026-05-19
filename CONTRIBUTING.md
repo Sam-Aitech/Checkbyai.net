@@ -82,6 +82,10 @@ git checkout -b docs/deployment-guide
 ### 3. Make Changes
 See [DEVELOPMENT.md](DEVELOPMENT.md) for local setup.
 
+**Required GitHub repository secrets for CI-enabled forks:**
+- `SONAR_TOKEN` — required for `.github/workflows/sonarcloud.yml` so SonarCloud can analyze pull requests and publish the Quality Gate status; create a token from your SonarCloud account settings and add it to your fork's Actions secrets if you want the workflow to run there
+- `TEST_BASE_URL` — required if you want pull-request E2E workflows to run against a deployed environment
+
 **Code style:**
 - **Formatting:** Prettier (run `npm run format` or enable in your editor)
 - **Linting:** ESLint (run `npm run lint`)

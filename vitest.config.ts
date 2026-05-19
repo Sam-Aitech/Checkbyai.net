@@ -9,6 +9,11 @@ export default defineConfig({
     include: ["server/**/__tests__/**/*.test.ts"],
     // Each file gets its own isolated module context (important for env-var tests)
     isolate: true,
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "lcov"],
+      reportsDirectory: "coverage",
+    },
   },
   resolve: {
     alias: {
