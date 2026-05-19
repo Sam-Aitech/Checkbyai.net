@@ -43,7 +43,7 @@ jobs:
       - name: Run Vitest with coverage
         run: npm run test:run -- --coverage
 
-      - name: SonarQube Cloud Scan
+      - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@v5.0.0
         with:
           args: >

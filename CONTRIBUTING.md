@@ -83,7 +83,7 @@ git checkout -b docs/deployment-guide
 See [DEVELOPMENT.md](DEVELOPMENT.md) for local setup.
 
 **Required GitHub repository secrets for CI-enabled forks:**
-- `SONAR_TOKEN` — required for `.github/workflows/sonarcloud.yml` so SonarQube Cloud can analyze pull requests and publish the Quality Gate status
+- `SONAR_TOKEN` — required for `.github/workflows/sonarcloud.yml` so SonarCloud can analyze pull requests and publish the Quality Gate status
 - `TEST_BASE_URL` — required if you want pull-request E2E workflows to run against a deployed environment
 
 **Code style:**
