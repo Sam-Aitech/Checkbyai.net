@@ -15,8 +15,12 @@ import { withRetry } from "./dbRetry";
 import { sendAdminAlert } from "./adminAlert";
 import { logger } from "./logger";
 import { startJobRun, finishJobRun, type TriggerSource } from "./jobTelemetry";
+import { match } from "ts-pattern";
 
 const log = logger.child({ module: "SponsorMonitorJob" });
+// Why ts-pattern: ETL status branching must stay explicit/exhaustive so upstream
+// data-format drifts are surfaced instead of silently swallowed.
+// Priority 5 enum source of truth: shared/schema.ts sponsor_licence_timeline.licenceStatus.
 
 // Distributed advisory lock key — must be a unique integer per job.
 // Prevents duplicate execution across multiple server instances (horizontal scaling).
@@ -294,45 +298,59 @@ async function buildGapDayDiff(rawFilePath: string): Promise<CsvDiffResult> {
         "Type & Rating":     r.typeRating,
         "Route":             r.route,
       });
-    } else if (canonical.status === "REMOVED_REVOKED") {
-      // Re-appearing after removal — Phase C will RE_ACTIVATE
-      additions.push({
-        fingerprint:         fp,
-        "Organisation Name": r.organisationName,
-        "Town/City":         r.townCity,
-        "County":            r.county,
-        "Type & Rating":     r.typeRating,
-        "Route":             r.route,
-      });
     } else {
-      // Company exists and is active — check for typeRating change
-      const prevRating = canonical.typeRating ?? "";
-      if (prevRating !== r.typeRating) {
-        modifications.push({
-          prev: {
-            fingerprint:         fp,
-            "Organisation Name": canonical.currentName,
-            "Town/City":         canonical.townCity ?? "",
-            "County":            canonical.county ?? "",
-            "Type & Rating":     prevRating,
-            "Route":             canonical.route ?? "",
-          },
-          curr: {
+      match((canonical.status ?? "").toUpperCase())
+        .with("REMOVED_REVOKED", () => {
+          // Re-appearing after removal — Phase C will RE_ACTIVATE
+          additions.push({
             fingerprint:         fp,
             "Organisation Name": r.organisationName,
             "Town/City":         r.townCity,
             "County":            r.county,
             "Type & Rating":     r.typeRating,
             "Route":             r.route,
-          },
+          });
+        })
+        .with("ACTIVE", "NEWLY_GRANTED", "GRACE_PERIOD", () => {
+          // Company exists — check for typeRating change
+          const prevRating = canonical.typeRating ?? "";
+          if (prevRating !== r.typeRating) {
+            modifications.push({
+              prev: {
+                fingerprint:         fp,
+                "Organisation Name": canonical.currentName,
+                "Town/City":         canonical.townCity ?? "",
+                "County":            canonical.county ?? "",
+                "Type & Rating":     prevRating,
+                "Route":             canonical.route ?? "",
+              },
+              curr: {
+                fingerprint:         fp,
+                "Organisation Name": r.organisationName,
+                "Town/City":         r.townCity,
+                "County":            r.county,
+                "Type & Rating":     r.typeRating,
+                "Route":             r.route,
+              },
+            });
+          }
+        })
+        .otherwise((unknownStatus) => {
+          log.warn({ unknownStatus, fingerprint: fp }, "Unhandled canonical status in gap-day diff scan");
         });
-      }
     }
   }
 
   // Scan canonical: detect companies that left the register
   for (const [fp, canonical] of canonicalByFp) {
-    if (canonical.status === "REMOVED_REVOKED") continue; // already removed — skip
+    const shouldSkip = match((canonical.status ?? "").toUpperCase())
+      .with("REMOVED_REVOKED", () => true)
+      .with("ACTIVE", "NEWLY_GRANTED", "GRACE_PERIOD", () => false)
+      .otherwise((unknownStatus) => {
+        log.warn({ unknownStatus, fingerprint: fp }, "Unhandled canonical status while scanning deletions");
+        return false;
+      });
+    if (shouldSkip) continue; // already removed — skip
     if (!todayByFp.has(fp)) {
       // Missing from today's CSV — Phase D will move to GRACE_PERIOD
       deletions.push({
