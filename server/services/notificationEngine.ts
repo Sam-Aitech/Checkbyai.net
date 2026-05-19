@@ -9,6 +9,10 @@
  * Deferred delivery (starter plan, same-day window):
  *   - Entries are written with status='queued' and a deliverAfter timestamp.
  *   - processQueuedEngineEvents() is called hourly by the cron scheduler to deliver them.
+ *
+ * Why ts-pattern: change-event and status-transition routing must be explicit,
+ * exhaustive, and drift-resistant as upstream status enums evolve.
+ * Priority 5 enum source of truth: shared/schema.ts sponsor_licence_timeline.licenceStatus.
  */
 
 import { db } from "../db";
@@ -30,6 +34,7 @@ import { getTierConfig } from "../utils/tierConfig";
 import { getAppUrl } from "../utils/appUrl";
 import { logger } from "../utils/logger";
 import { startJobRun, finishJobRun, type TriggerSource } from "../utils/jobTelemetry";
+import { match, P } from "ts-pattern";
 
 const log = logger.child({ module: "NotificationEngine" });
 
@@ -54,6 +59,66 @@ const CHANGE_TYPE_MAP: Partial<Record<string, NotifEventType>> = {
   DOWNGRADED:      "rating_downgraded",
   ROUTE_CHANGE:    "route_added",
 };
+
+type SponsorLicenceStatus = "Active" | "Suspended" | "Revoked" | "Surrendered";
+type NormalizedSponsorLicenceStatus = SponsorLicenceStatus | "UNKNOWN";
+
+function normalizeSponsorLicenceStatus(value: string | null | undefined): NormalizedSponsorLicenceStatus {
+  return match((value ?? "").trim().toUpperCase())
+    .with("ACTIVE", () => "Active" as const)
+    .with("SUSPENDED", () => "Suspended" as const)
+    .with("REVOKED", () => "Revoked" as const)
+    // Internal state-machine status is intentionally normalized into
+    // user-facing licence-status semantics for transition alert routing.
+    .with("REMOVED_REVOKED", () => "Revoked" as const)
+    .with("SURRENDERED", () => "Surrendered" as const)
+    .otherwise(() => "UNKNOWN" as const);
+}
+
+function mapStatusTransitionToNotifEvent(
+  previousStatusRaw: string | null | undefined,
+  newStatusRaw: string | null | undefined,
+): NotifEventType | null {
+  const previousStatus = normalizeSponsorLicenceStatus(previousStatusRaw);
+  const newStatus = normalizeSponsorLicenceStatus(newStatusRaw);
+
+  return match<[NormalizedSponsorLicenceStatus, NormalizedSponsorLicenceStatus]>([
+    previousStatus,
+    newStatus,
+  ])
+    .returnType<NotifEventType | null>()
+    .with(["Active", "Active"], () => null)
+    // TODO: add dedicated "licence_suspended" preference/event key; until then,
+    // suspension alerts are routed via "licence_revoked".
+    .with(["Active", "Suspended"], () => "licence_revoked")
+    .with(["Active", "Revoked"], () => "licence_revoked")
+    .with(["Active", "Surrendered"], () => "licence_revoked")
+    .with(["Suspended", "Active"], () => "licence_reinstated")
+    .with(["Suspended", "Suspended"], () => null)
+    .with(["Suspended", "Revoked"], () => "licence_revoked")
+    .with(["Suspended", "Surrendered"], () => "licence_revoked")
+    .with(["Revoked", "Active"], () => "licence_reinstated")
+    // No alert: already in a removed terminal family.
+    .with(["Revoked", "Suspended"], () => null)
+    .with(["Revoked", "Revoked"], () => null)
+    // No alert: both statuses represent non-active terminal states.
+    .with(["Revoked", "Surrendered"], () => null)
+    .with(["Surrendered", "Active"], () => "licence_reinstated")
+    // No alert: non-active terminal-family transitions currently not user-facing.
+    .with(["Surrendered", "Suspended"], () => null)
+    .with(["Surrendered", "Revoked"], () => null)
+    .with(["Surrendered", "Surrendered"], () => null)
+    .with(["UNKNOWN", "UNKNOWN"], () => null)
+    .with(["UNKNOWN", P.union("Active", "Suspended", "Revoked", "Surrendered")], () => {
+      log.warn({ previousStatusRaw, newStatusRaw }, "Unhandled sponsor status value for transition mapping");
+      return null;
+    })
+    .with([P.union("Active", "Suspended", "Revoked", "Surrendered"), "UNKNOWN"], () => {
+      log.warn({ previousStatusRaw, newStatusRaw }, "Unhandled sponsor status value for transition mapping");
+      return null;
+    })
+    .exhaustive();
+}
 
 // ── Rate limiter ──────────────────────────────────────────────────────────────
 // Keyed by `${userId}:${companyName}` — 3 sends per user per company per hour.
@@ -293,7 +358,12 @@ export async function notifyUsersOfEvent(change: SponsorChange): Promise<{ sent:
 
   // Resolve snake_case prefs key from DB changeType (ALL_CAPS).
   // Unmapped types (e.g. NEW_LICENCE) pass through isEventEnabled as unknown → enabled.
-  const prefsKey: string = CHANGE_TYPE_MAP[change.changeType] ?? change.changeType;
+  const transitionEventType = match(change.changeType)
+    .with("REMOVED_REVOKED", "RE_ACTIVATED", () =>
+      mapStatusTransitionToNotifEvent(change.previousValue, change.newValue),
+    )
+    .otherwise(() => null);
+  const prefsKey: string = transitionEventType ?? CHANGE_TYPE_MAP[change.changeType] ?? change.changeType;
   const companyName = change.organisationName;
   const normalizedOrg = normalizeName(companyName);
 

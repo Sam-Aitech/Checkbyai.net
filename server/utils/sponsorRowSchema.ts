@@ -1,5 +1,13 @@
 import { z } from "zod";
+import { match } from "ts-pattern";
 import { insertSponsorListSchema } from "@shared/schema";
+import { logger } from "./logger";
+
+// Why ts-pattern: ETL enum normalization must fail loudly when GOV.UK enum values
+// drift; exhaustive pattern matching keeps branch handling explicit and safer.
+// Priority 5 enum source of truth: shared/schema.ts sponsor_licence_timeline.licenceStatus.
+
+const log = logger.child({ module: "SponsorRowSchema" });
 
 const MAX_ORGANISATION_NAME_LENGTH = 255;
 const MAX_LOCATION_LENGTH = 128;
@@ -15,9 +23,13 @@ const SponsorBaseFromDbSchema = insertSponsorListSchema.pick({
   route: true,
 });
 
-// Gov.uk sponsor feed status/rating values for Worker sponsorship.
-export const SponsorLicenceStatusSchema = z.enum(["A-RATING", "B-RATING"], {
+// Priority 5 canonical licence status values (timeline domain).
+export const SponsorLicenceStatusSchema = z.enum(["Active", "Suspended", "Revoked", "Surrendered"], {
   required_error: "licenceStatus is required",
+});
+// Gov.uk sponsor feed rating values.
+export const SponsorRatingSchema = z.enum(["A-RATING", "B-RATING"], {
+  required_error: "rating is required",
 });
 // Gov.uk sponsor feed licence-type values for this ETL domain.
 export const SponsorLicenceTypeSchema = z.enum(["WORKER", "TEMPORARY_WORKER"], {
@@ -70,7 +82,7 @@ export const SponsorRowSchema = z
     licenceStatus: SponsorLicenceStatusSchema,
     licenceType: SponsorLicenceTypeSchema,
     // Kept as a separate field to support explicit rating-level analytics/tests.
-    rating: SponsorLicenceStatusSchema,
+    rating: SponsorRatingSchema,
   })
   .merge(SponsorRowPartialSchema)
   .strict();
@@ -82,9 +94,47 @@ export function normalizeLicenceStatus(
 ): z.infer<typeof SponsorLicenceStatusSchema> | null {
   const source = (value ?? "").trim().toLowerCase();
   if (!source) return null;
-  if (source.includes("a-rating") || source.includes("a rating")) return "A-RATING";
-  if (source.includes("b-rating") || source.includes("b rating")) return "B-RATING";
-  return null;
+  return match(source)
+    .when(
+      (s) => s.includes("active"),
+      () => "Active" as const,
+    )
+    .when(
+      (s) => s.includes("suspended"),
+      () => "Suspended" as const,
+    )
+    .when(
+      (s) => s.includes("revoked"),
+      () => "Revoked" as const,
+    )
+    .when(
+      (s) => s.includes("surrendered"),
+      () => "Surrendered" as const,
+    )
+    .otherwise((unknownStatus) => {
+      log.warn({ unknownStatus }, "Unrecognized sponsor licence status value during ETL normalization");
+      return null;
+    });
+}
+
+export function normalizeSponsorRating(
+  value: string | null | undefined,
+): z.infer<typeof SponsorRatingSchema> | null {
+  const source = (value ?? "").trim().toLowerCase();
+  if (!source) return null;
+  return match(source)
+    .when(
+      (s) => s.includes("a-rating") || s.includes("a rating"),
+      () => "A-RATING" as const,
+    )
+    .when(
+      (s) => s.includes("b-rating") || s.includes("b rating"),
+      () => "B-RATING" as const,
+    )
+    .otherwise((unknownRating) => {
+      log.warn({ unknownRating }, "Unrecognized sponsor rating value during ETL normalization");
+      return null;
+    });
 }
 
 export function normalizeLicenceType(
@@ -104,17 +154,19 @@ export function deriveSponsorRowEnums(input: {
   licenceTypeRaw?: string | null;
 }): {
   licenceStatus: z.infer<typeof SponsorLicenceStatusSchema> | undefined;
-  rating: z.infer<typeof SponsorLicenceStatusSchema> | undefined;
+  rating: z.infer<typeof SponsorRatingSchema> | undefined;
   licenceType: z.infer<typeof SponsorLicenceTypeSchema> | undefined;
 } {
   const licenceStatus =
     normalizeLicenceStatus(input.statusRaw) ??
     normalizeLicenceStatus(input.ratingRaw) ??
     normalizeLicenceStatus(input.typeRating);
+  // Rating remains strictly rating-derived; licenceStatus is a separate enum
+  // domain (Active/Suspended/Revoked/Surrendered) and is intentionally not used
+  // as a fallback to avoid cross-domain coercion.
   const rating =
-    normalizeLicenceStatus(input.ratingRaw) ??
-    normalizeLicenceStatus(input.typeRating) ??
-    licenceStatus;
+    normalizeSponsorRating(input.ratingRaw) ??
+    normalizeSponsorRating(input.typeRating);
   const licenceType =
     normalizeLicenceType(input.licenceTypeRaw) ??
     normalizeLicenceType(input.typeRating);
