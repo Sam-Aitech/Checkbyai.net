@@ -31,7 +31,8 @@ test.describe("Journey 3 — PDF upload and metadata extraction", () => {
     const payload = await uploadResponse.json();
     expect(typeof payload.documentHash).toBe("string");
     expect(payload.documentHash.length).toBeGreaterThan(0);
-    expect(payload.metadata?.pageCount).not.toBeNull();
+    expect(payload.metadata?.pageCount).toBeDefined();
+    expect(Number(payload.metadata.pageCount)).toBeGreaterThan(0);
 
     const traversalResponse = await page.request.post("/api/verify", {
       multipart: {

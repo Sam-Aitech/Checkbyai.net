@@ -2,7 +2,7 @@ import path from "path";
 import fs from "fs";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { sanitizeUploadPath, UPLOADS_DIR } from "../uploadGuard";
+import { assertSafeUploadFilename, sanitizeUploadPath, UPLOADS_DIR } from "../uploadGuard";
 
 describe("sanitizeUploadPath", () => {
   beforeEach(() => {
@@ -39,5 +39,31 @@ describe("sanitizeUploadPath", () => {
     const bypassPath = `${UPLOADS_DIR}_evil/document.pdf`;
 
     expect(() => sanitizeUploadPath(bypassPath)).toThrow(/PATH_TRAVERSAL_BLOCKED/);
+  });
+});
+
+describe("assertSafeUploadFilename", () => {
+  it("allows normal filenames", () => {
+    expect(() => assertSafeUploadFilename("document.pdf")).not.toThrow();
+    expect(() => assertSafeUploadFilename("my-cos_2026.pdf")).not.toThrow();
+  });
+
+  it("rejects empty or whitespace filenames", () => {
+    expect(() => assertSafeUploadFilename("")).toThrow(/INVALID_UPLOAD_FILENAME/);
+    expect(() => assertSafeUploadFilename("   ")).toThrow(/INVALID_UPLOAD_FILENAME/);
+  });
+
+  it("rejects path separator characters", () => {
+    expect(() => assertSafeUploadFilename("folder/file.pdf")).toThrow(/INVALID_UPLOAD_FILENAME/);
+    expect(() => assertSafeUploadFilename("folder\\file.pdf")).toThrow(/INVALID_UPLOAD_FILENAME/);
+  });
+
+  it("rejects traversal sequences", () => {
+    expect(() => assertSafeUploadFilename("../file.pdf")).toThrow(/INVALID_UPLOAD_FILENAME/);
+    expect(() => assertSafeUploadFilename("..\\file.pdf")).toThrow(/INVALID_UPLOAD_FILENAME/);
+  });
+
+  it("rejects control characters", () => {
+    expect(() => assertSafeUploadFilename("evil\u0000.pdf")).toThrow(/INVALID_UPLOAD_FILENAME/);
   });
 });
