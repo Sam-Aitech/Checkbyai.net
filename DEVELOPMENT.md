@@ -262,7 +262,7 @@ npm run check    # TypeScript strict check, no emit
 ```bash
 npm run test          # Watch mode (re-runs on file change)
 npm run test:run      # Single run, CI-friendly
-npm run test:run -- --coverage  # Generate coverage/lcov.info for SonarQube Cloud
+npm run test:run -- --coverage  # Generate coverage/lcov.info for SonarCloud
 ```
 
 Tests use [Vitest](https://vitest.dev/). Configuration is in `vitest.config.ts`.
