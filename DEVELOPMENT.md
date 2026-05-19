@@ -302,7 +302,7 @@ describe('myFunction', () => {
 ### SonarCloud Pull Requests
 
 - Every pull request to `main` runs `.github/workflows/sonarcloud.yml` after Vitest coverage is generated.
-- Treat SonarCloud comments as merge-blocking feedback when they report new blocker, critical, or other Quality Gate failures on changed code.
+- Treat SonarCloud comments as merge-blocking feedback when they report new blocker or critical issues, security hotspot review coverage below 100%, or new code coverage below 80%.
 - Fix confirmed findings in the same pull request whenever possible so the `SonarCloud Scan` status check turns green before merge.
 - If you believe a finding is a false positive, reply in the pull request with the rule key, affected file, and your justification, then escalate to a maintainer or the security contact at `security@checkbyai.net`.
 - Only maintainers should mark issues or hotspots as `False Positive` / `Accepted Risk` in SonarCloud, and the PR should link to that disposition for auditability.
