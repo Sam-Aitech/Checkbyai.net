@@ -7,8 +7,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-
-const logoImg = "/checkbyai-logo.png";
+import logoImg from "@assets/logo_material.png";
 
 interface PageLayoutProps {
   children: React.ReactNode;
