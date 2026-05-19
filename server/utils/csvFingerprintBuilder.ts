@@ -28,6 +28,7 @@ import {
   normalizeLicenceStatus,
   normalizeLicenceType,
   issueFieldName,
+  SCHEMA_CHANGE_REJECTION_THRESHOLD,
 } from "./sponsorRowSchema";
 
 // ── CSV quoting ───────────────────────────────────────────────────────────────
@@ -215,7 +216,7 @@ export async function buildFingerprintedCsv(
     "Sponsor CSV validation summary (fingerprint builder)",
   );
 
-  if (totalRowsProcessed > 0 && rowsRejected / totalRowsProcessed > 0.2) {
+  if (totalRowsProcessed > 0 && rowsRejected / totalRowsProcessed > SCHEMA_CHANGE_REJECTION_THRESHOLD) {
     const rejectionRatePct = ((rowsRejected / totalRowsProcessed) * 100).toFixed(2);
     log.error(
       {

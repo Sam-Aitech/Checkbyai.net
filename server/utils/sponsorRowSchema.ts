@@ -5,6 +5,7 @@ const MAX_ORGANISATION_NAME_LENGTH = 255;
 const MAX_LOCATION_LENGTH = 128;
 const MAX_TYPE_RATING_LENGTH = 128;
 const MAX_ROUTE_LENGTH = 160;
+export const SCHEMA_CHANGE_REJECTION_THRESHOLD = 0.2;
 
 const SponsorBaseFromDbSchema = insertSponsorListSchema.pick({
   organisationName: true,
