@@ -305,7 +305,17 @@ export function registerVerificationRoutes(app: Express): void {
     } catch (error: any) {
       console.error('Verification error:', error);
       const statusCode = Number.isInteger(error?.statusCode) ? error.statusCode : 500;
-      const safeMessage = statusCode === 400 ? 'Invalid upload input' : 'Verification failed';
+      let safeMessage = 'Verification failed';
+      if (statusCode === 400) {
+        const errorText = typeof error?.message === 'string' ? error.message : '';
+        if (errorText.includes('INVALID_UPLOAD_FILENAME')) {
+          safeMessage = 'Invalid filename format';
+        } else if (errorText.includes('INVALID_UPLOAD_PATH') || errorText.includes('PATH_TRAVERSAL_BLOCKED')) {
+          safeMessage = 'Invalid upload path';
+        } else {
+          safeMessage = 'Invalid upload input';
+        }
+      }
       res.status(statusCode).json({ message: safeMessage });
     } finally {
       // Delete uploaded file immediately after processing (security measure)

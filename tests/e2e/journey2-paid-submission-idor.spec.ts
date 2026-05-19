@@ -2,6 +2,10 @@ import { expect, test } from "@playwright/test";
 import { loginWithPassword } from "./support/auth";
 import { cleanupE2EData, E2E_USERS, seedE2EData } from "./support/db-seed";
 
+function isAccessDeniedStatus(status: number): boolean {
+  return status === 403 || [301, 302, 303, 307, 308].includes(status);
+}
+
 test.describe("Journey 2 — Paid submission IDOR protection", () => {
   let submissionId = 0;
 
@@ -27,8 +31,7 @@ test.describe("Journey 2 — Paid submission IDOR protection", () => {
     await loginWithPassword(pageB, E2E_USERS.userB.email, E2E_USERS.userB.password);
 
     const forbiddenResponse = await pageB.request.get(`/api/paid/status/${submissionId}`, { maxRedirects: 0 });
-    const blocked = forbiddenResponse.status() === 403 || [301, 302, 303, 307, 308].includes(forbiddenResponse.status());
-    expect(blocked).toBeTruthy();
+    expect(isAccessDeniedStatus(forbiddenResponse.status())).toBeTruthy();
 
     await contextA.close();
     await contextB.close();

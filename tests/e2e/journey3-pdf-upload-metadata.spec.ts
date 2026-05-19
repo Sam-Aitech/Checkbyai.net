@@ -14,7 +14,7 @@ test.describe("Journey 3 — PDF upload and metadata extraction", () => {
     await cleanupE2EData();
   });
 
-  test("authenticated user can upload PDF and traversal filename is rejected", async ({ page }) => {
+  test("authenticated user can upload PDF and extract metadata", async ({ page }) => {
     await loginWithPassword(page, E2E_USERS.uploadUser.email, E2E_USERS.uploadUser.password);
 
     const uploadResponse = await page.request.post("/api/verify", {
@@ -33,6 +33,10 @@ test.describe("Journey 3 — PDF upload and metadata extraction", () => {
     expect(payload.documentHash.length).toBeGreaterThan(0);
     expect(payload.metadata?.pageCount).toBeDefined();
     expect(Number(payload.metadata.pageCount)).toBeGreaterThan(0);
+  });
+
+  test("upload endpoint rejects traversal filenames", async ({ page }) => {
+    await loginWithPassword(page, E2E_USERS.uploadUser.email, E2E_USERS.uploadUser.password);
 
     const traversalResponse = await page.request.post("/api/verify", {
       multipart: {
