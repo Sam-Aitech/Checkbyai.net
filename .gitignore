@@ -54,3 +54,6 @@ logs/
 build/
 .next/
 out/
+
+# Security audit gate configuration (must stay tracked)
+!audit-ci.jsonc

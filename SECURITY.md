@@ -126,6 +126,21 @@ We will not take legal action against researchers who:
 - High/critical CVEs are patched within 48 hours of disclosure
 - Security-related updates are applied independently of feature releases
 
+### CI Dependency Audit Gate (`audit-ci`)
+
+- CI runs `npm run audit` (backed by `audit-ci`) as a required job before test/build jobs.
+- The gate fails on **high** and **critical** npm vulnerabilities.
+- Low/moderate findings are visible in audit output but do not fail the workflow.
+- Temporary exceptions must be tracked in `audit-ci.jsonc` allowlist entries with:
+  - CVE reference
+  - explicit business/risk acceptance reason
+  - review date within 90 days
+- When a new CVE alert appears:
+  1. Validate whether a fixed package version is available and patch immediately.
+  2. If no immediate patch is possible, add a temporary allowlist entry in `audit-ci.jsonc` with a short expiry review date and mitigation notes.
+  3. Open/track remediation work and remove the allowlist entry as soon as a safe upgrade is available.
+  4. Never leave expired allowlist entries unresolved — either remediate or formally renew risk acceptance with a new review date.
+
 ---
 
 ## Known Security Limitations & Accepted Risks

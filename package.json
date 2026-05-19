@@ -16,7 +16,8 @@
     "db:migrate": "drizzle-kit migrate",
     "setup:binaries": "bash scripts/setup-binaries.sh",
     "check:binaries": "tsx -e \"import('./server/utils/binaryRunner.ts').then(m => m.checkBinaryHealth()).then(r => console.log(JSON.stringify(r, null, 2)))\"",
-    "start:with-migrate": "npm run db:migrate && NODE_ENV=production node dist/index.js"
+    "start:with-migrate": "npm run db:migrate && NODE_ENV=production node dist/index.js",
+    "audit": "audit-ci --config audit-ci.jsonc"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -162,6 +163,7 @@
     "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.59.4",
     "@typescript-eslint/parser": "^8.59.4",
+    "audit-ci": "^7.1.0",
     "dotenv": "^17.4.2",
     "eslint": "^10.4.0",
     "eslint-plugin-security": "^4.0.0",
