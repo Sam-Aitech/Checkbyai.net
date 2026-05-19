@@ -63,3 +63,26 @@ export function sanitizeUploadPath(rawPath: string): string {
 
   return realCandidate;
 }
+
+/**
+ * Validates a user-supplied upload filename and blocks traversal/control chars.
+ * Throws Error with statusCode=400 when invalid.
+ */
+export function assertSafeUploadFilename(rawFilename: string): void {
+  if (typeof rawFilename !== "string" || rawFilename.trim() === "") {
+    const err = new Error("INVALID_UPLOAD_FILENAME: filename is missing.");
+    (err as any).statusCode = 400;
+    throw err;
+  }
+
+  const filename = rawFilename.trim();
+  const hasPathChars = filename.includes("/") || filename.includes("\\");
+  const hasTraversal = filename.includes("..");
+  const hasControlChars = /[\u0000-\u001F\u007F]/.test(filename);
+
+  if (hasPathChars || hasTraversal || hasControlChars) {
+    const err = new Error("INVALID_UPLOAD_FILENAME: path traversal characters are not allowed.");
+    (err as any).statusCode = 400;
+    throw err;
+  }
+}

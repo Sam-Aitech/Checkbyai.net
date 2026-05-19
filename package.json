@@ -17,7 +17,9 @@
     "setup:binaries": "bash scripts/setup-binaries.sh",
     "check:binaries": "tsx -e \"import('./server/utils/binaryRunner.ts').then(m => m.checkBinaryHealth()).then(r => console.log(JSON.stringify(r, null, 2)))\"",
     "start:with-migrate": "npm run db:migrate && NODE_ENV=production node dist/index.js",
-    "audit": "audit-ci --config audit-ci.jsonc"
+    "audit": "audit-ci --config audit-ci.jsonc",
+    "test:e2e": "playwright test",
+    "playwright:install": "playwright install chromium"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -150,6 +152,7 @@
     "zod-validation-error": "^3.5.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.54.2",
     "@types/connect-pg-simple": "^7.0.3",
     "@types/express": "^4.17.25",
     "@types/express-session": "^1.18.2",
