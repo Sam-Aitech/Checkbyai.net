@@ -262,6 +262,7 @@ npm run check    # TypeScript strict check, no emit
 ```bash
 npm run test          # Watch mode (re-runs on file change)
 npm run test:run      # Single run, CI-friendly
+npm run test:run -- --coverage  # Generate coverage/lcov.info for SonarQube Cloud
 ```
 
 Tests use [Vitest](https://vitest.dev/). Configuration is in `vitest.config.ts`.
@@ -297,6 +298,15 @@ describe('myFunction', () => {
 - Auth middleware behaviour
 - Tier config access gates
 - COS scoring logic
+
+### SonarQube Cloud Pull Requests
+
+- Every pull request to `main` runs `.github/workflows/sonarcloud.yml` after Vitest coverage is generated.
+- Treat SonarQube Cloud comments as merge-blocking feedback when they report new blocker, critical, or other Quality Gate failures on changed code.
+- Fix confirmed findings in the same pull request whenever possible so the `SonarCloud Scan` status check turns green before merge.
+- If you believe a finding is a false positive, reply in the pull request with the rule key, affected file, and your justification, then escalate to a maintainer or the security contact at `security@checkbyai.net`.
+- Only maintainers should mark issues or hotspots as `False Positive` / `Accepted Risk` in SonarQube Cloud, and the PR should link to that disposition for auditability.
+- Accepted false positives still require a written rationale in the PR discussion so future reviewers understand why the Quality Gate was overridden or the issue was reclassified.
 
 ---
 

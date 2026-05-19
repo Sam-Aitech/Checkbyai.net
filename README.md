@@ -3,6 +3,7 @@
 > **AI-powered UK immigration compliance monitoring & document verification**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=Sam-Aitech_Checkbyai.net&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=Sam-Aitech_Checkbyai.net)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.5-blue)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-20+-green)](https://nodejs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14+-blue)](https://www.postgresql.org/)
