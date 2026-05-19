@@ -8,7 +8,7 @@ import { Loader2, Mail, ArrowLeft, CheckCircle } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
 import SEOHead from "@/components/SEOHead";
 import { motion, AnimatePresence } from "framer-motion";
-import logoImg from "@assets/logo_material.png";
+const logoImg = "/checkbyai-logo.png";
 import { queryClient } from "@/lib/queryClient";
 import BrandLogo from "@/components/BrandLogo";
 import { Turnstile } from "@marsidev/react-turnstile";

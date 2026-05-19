@@ -16,7 +16,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Link, useLocation } from 'wouter'
-import logoImg from "@assets/logo_material.png";
+const logoImg = "/checkbyai-logo.png";
 import Footer from '@/components/Footer'
 import LandingDigest from '@/components/LandingDigest'
 

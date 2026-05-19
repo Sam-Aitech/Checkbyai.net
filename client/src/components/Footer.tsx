@@ -1,6 +1,6 @@
 import { SiYoutube } from 'react-icons/si';
 import { Link } from 'wouter';
-import logoImg from "@assets/logo_material.png";
+const logoImg = "/checkbyai-logo.png";
 
 export default function Footer() {
   return (

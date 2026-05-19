@@ -5,9 +5,10 @@ import Footer from "./Footer";
 import BrandLogo from "./BrandLogo";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import logoImg from "@assets/logo_material.png";
 import { useAuth } from "@/hooks/useAuth";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+
+const logoImg = "/checkbyai-logo.png";
 
 interface PageLayoutProps {
   children: React.ReactNode;

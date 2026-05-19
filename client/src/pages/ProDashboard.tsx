@@ -15,7 +15,7 @@ import FileUploadSimple from "@/components/FileUploadSimple";
 import { CompanyIntelligenceDialog } from "@/components/CompanyIntelligencePanel";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
-import logoImg from "@assets/logo_material.png";
+const logoImg = "/checkbyai-logo.png";
 import {
   LayoutDashboard, Building2, Shield, Bell, History,
   LogOut, Crown, CheckCircle2, XCircle, AlertTriangle,
