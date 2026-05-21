@@ -18,6 +18,7 @@ export function log(message: string, source = "express") {
 
   const safeMessage = message.replace(/[\r\n]/g, " ");
   const safeSource = source.replace(/[\r\n]/g, " ");
+  // codeql[js/log-injection] - safeSource and safeMessage are sanitized to prevent log injection
   console.log(`${formattedTime} [${safeSource}] ${safeMessage}`);
 }
 

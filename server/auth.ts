@@ -426,6 +426,7 @@ export async function setupAuth(app: Express) {
     try {
       const { email, code } = req.body;
       
+      // codeql[js/user-controlled-bypass] - Simple presence check on verification parameters, not bypass logic.
       if (typeof email !== "string" || typeof code !== "string" || !email || !code) {
         return res.status(400).json({ message: "Email and code required" });
       }
@@ -549,6 +550,7 @@ export async function setupAuth(app: Express) {
     try {
       const { email, code } = req.body;
       
+      // codeql[js/user-controlled-bypass] - Simple presence check on admin verification parameters, not bypass logic.
       if (typeof email !== "string" || typeof code !== "string" || !email || !code) {
         return res.status(400).json({ message: "Email and code required" });
       }

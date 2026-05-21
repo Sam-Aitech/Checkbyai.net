@@ -1,7 +1,7 @@
 import OpenAI, { toFile } from "openai";
 import { Buffer } from "node:buffer";
 import { spawn } from "child_process";
-import { writeFile, unlink, readFile, mkdtemp, rm } from "fs/promises";
+import { writeFile, readFile, mkdtemp, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 

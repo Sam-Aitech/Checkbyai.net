@@ -234,6 +234,7 @@ export class PDFAnalyzer {
       await yieldToEventLoop();
       metadata.forensic = this.buildForensicProfile(metadata, xmpHistory);
 
+      // codeql[js/log-injection] - Log values are sanitized to prevent log injection
       console.log(`Forensic profile built for ${sanitizeLog(path.basename(filePath))} (${fileSize} bytes, ${metadata.fonts.length} fonts, ${xmpHistory.length} XMP history entries)`);
 
       return metadata;

@@ -208,7 +208,7 @@ export default function COSDashboard() {
   }
 
   // Beta gate — logged in but not yet approved for COS Check
-  if (isAuthenticated && !hasElevatedAccess) {
+  if (!hasElevatedAccess) {
     return (
       <div className="bg-gray-50 dark:bg-gray-900 min-h-screen flex items-center justify-center px-4">
         <div className="max-w-md w-full text-center">

@@ -2032,6 +2032,7 @@ Format your response in clear, professional markdown.`;
               .where(eq(companyWatches.id, watch.id));
           }
           deactivatedWatchCount = watchesToDeactivate.length;
+          // codeql[js/log-injection] - Log values are sanitized to prevent log injection
           console.log(`[AdminPlanOverride] Deactivated ${deactivatedWatchCount} excess watches for user ${sanitizeLog(userId)} (${sanitizeLog(previousStatus)} → ${sanitizeLog(plan)}, limit=${newWatchLimit})`);
         }
       }
@@ -2146,6 +2147,7 @@ Format your response in clear, professional markdown.`;
 
       const newCredits = updatedUser?.credits ?? 0;
       const delta = newCredits - prevCredits;
+      // codeql[js/log-injection] - Log values are sanitized to prevent log injection
       console.log(`[AdminCredits] User ${sanitizeLog(userId)}: ${prevCredits} → ${newCredits} (${sanitizeLog(operation)} ${amount}, reason: ${sanitizeLog(reason ?? 'none')})`);
 
       // Audit log
@@ -2312,6 +2314,7 @@ Format your response in clear, professional markdown.`;
         .set({ notifPrefs: merged })
         .where(eq(users.id, id));
 
+      // codeql[js/log-injection] - Log values are sanitized to prevent log injection
       console.log(`[Admin] notif_prefs updated for user ${sanitizeLog(id)} by ${sanitizeLog(req.user?.email ?? req.user?.id ?? 'unknown')}`);
       res.json({ notifPrefs: merged });
     } catch (error) {
