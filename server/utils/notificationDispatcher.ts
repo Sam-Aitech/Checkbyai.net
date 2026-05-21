@@ -7,7 +7,7 @@ import { normalizeName } from "./sponsorListFetcher";
 import { getAppUrl } from "./appUrl";
 import { sendSMS, sendWhatsApp } from "../services/messaging";
 import { decryptPhone } from "./phoneCrypto";
-import { getTierConfig, getDeliverAfter, isChannelAllowed } from "./tierConfig";
+import { getTierConfig, getDeliverAfter } from "./tierConfig";
 import { logger } from "./logger";
 import { match } from "ts-pattern";
 

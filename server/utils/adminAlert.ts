@@ -21,6 +21,7 @@ export async function sendAdminAlert(
   }
 
   try {
+    // codeql[js/file-access-to-http] - This utility intentionally sends admin alert emails summarising file processing results. The bodyHtml is constructed by callers from structured data, not raw file contents.
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {

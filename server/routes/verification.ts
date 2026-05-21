@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import * as crypto from "crypto";
 import * as fs from "fs";
+import * as path from "path";
 import multer from "multer";
 import { storage } from "../storage";
 import { db } from "../db";
@@ -12,7 +13,11 @@ import { verifyLimiter } from "../middleware/rateLimiter";
 import { PDFAnalyzer } from "../services/pdfAnalyzer";
 import { COSAuthenticityChecker } from "../services/cosAuthenticityChecker";
 import { getClientIp, hashIpAddress } from "../ipRateLimit";
-import { assertSafeUploadFilename, sanitizeUploadPath } from "../utils/uploadGuard";
+import { assertSafeUploadFilename, sanitizeUploadPath, UPLOADS_DIR } from "../utils/uploadGuard";
+
+function sanitizeLog(value: string): string {
+  return value.replace(/[\r\n]/g, ' ');
+}
 
 function generateReceiptId(): string {
   const random1 = crypto.randomBytes(4).toString('hex').toUpperCase();
@@ -78,7 +83,7 @@ export function registerVerificationRoutes(app: Express): void {
 
       assertSafeUploadFilename(req.file.originalname);
       safeFilePath = sanitizeUploadPath(req.file.path);
-      const safePath = safeFilePath;
+      const safePath = path.join(UPLOADS_DIR, path.basename(safeFilePath));
 
       let userId: string | undefined = betaUserId;
 
@@ -207,7 +212,7 @@ export function registerVerificationRoutes(app: Express): void {
         // If it clears the document as GENUINE, trust it over the general pattern analyser
         // which can false-positive on Apache FOP version string differences.
         if (cosCheckResult.verdict === 'GENUINE' && analysisResult.result !== 'genuine') {
-          console.log(`[COS] cosCheck GENUINE overrides pattern analysis '${analysisResult.result}' — treating as genuine`);
+          console.log(`[COS] cosCheck GENUINE overrides pattern analysis '${sanitizeLog(analysisResult.result)}' — treating as genuine`);
           result = 'genuine';
           analysis.result = 'genuine';
           analysis.confidence = Math.max(analysis.confidence as number, 85);
@@ -322,7 +327,7 @@ export function registerVerificationRoutes(app: Express): void {
       if (req.file && safeFilePath) {
         try {
           const fsModule = await import('fs');
-          fsModule.promises.unlink(safeFilePath).catch(() => {
+          fsModule.promises.unlink(path.join(UPLOADS_DIR, path.basename(safeFilePath))).catch(() => {
             // Silently fail if file already deleted
           });
         } catch (err) {
