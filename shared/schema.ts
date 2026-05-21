@@ -888,6 +888,44 @@ export const insertMonitorJobRunSchema = createInsertSchema(monitorJobRuns).omit
 export type InsertMonitorJobRun = z.infer<typeof insertMonitorJobRunSchema>;
 export type MonitorJobRun = typeof monitorJobRuns.$inferSelect;
 
+// Staging table for ETL ingestion — rows written page-by-page from the Python ETL
+// microservice before reconciliation runs. Cleaned up after each successful run.
+export const sponsorStaging = pgTable(
+  "sponsor_staging",
+  {
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+    snapshotId: text("snapshot_id").notNull(),
+    rowNum: integer("row_num").notNull(),
+    organisationName: text("organisation_name").notNull(),
+    townCity: text("town_city"),
+    county: text("county"),
+    typeRating: text("type_rating"),
+    route: text("route"),
+    fingerprint: text("fingerprint").notNull(),
+    snapshotDate: date("snapshot_date").notNull(),
+  },
+  (table) => [
+    uniqueIndex("idx_sponsor_staging_snapshot_row").on(table.snapshotId, table.rowNum),
+    index("idx_sponsor_staging_snapshot_id").on(table.snapshotId),
+    index("idx_sponsor_staging_fingerprint").on(table.fingerprint),
+  ]
+);
+
+// Single control row per snapshot used for the FOR UPDATE SKIP LOCKED row-level mutex.
+// Prevents duplicate ingestion runs even when the advisory lock is lost on pool reconnect.
+export const ingestionJobs = pgTable(
+  "ingestion_jobs",
+  {
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+    snapshotId: text("snapshot_id").notNull().unique(),
+    lockedAt: timestamp("locked_at", { withTimezone: true }),
+    status: text("status").notNull().default("pending"),
+  }
+);
+
+export type SponsorStagingEntry = typeof sponsorStaging.$inferSelect;
+export type IngestionJob = typeof ingestionJobs.$inferSelect;
+
 // System-wide settings (admin-configurable key-value store)
 export const systemSettings = pgTable("system_settings", {
   key: varchar("key").primaryKey().notNull(),
