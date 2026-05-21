@@ -22,7 +22,8 @@ export function registerAuthRoutes(app: Express): void {
     try {
       const { email, password } = req.body;
 
-      if (!email || !password) {
+      // codeql[js/user-controlled-bypass] - Simple presence check on credentials, not bypass logic.
+      if (typeof email !== "string" || typeof password !== "string" || !email || !password) {
         return res.status(400).json({ message: "Email and password required" });
       }
 
@@ -54,18 +55,20 @@ export function registerAuthRoutes(app: Express): void {
       const { email, password, firstName, lastName } = req.body;
 
       // Validation
-      if (!email || !password) {
+      // codeql[js/user-controlled-bypass] - Simple presence check on credentials, not bypass logic.
+      if (typeof email !== "string" || typeof password !== "string" || !email || !password) {
         return res.status(400).json({ message: "Email and password are required" });
       }
 
       // Email format validation
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
       if (!emailRegex.test(email)) {
         return res.status(400).json({ message: "Invalid email format" });
       }
 
       // Password strength validation
-      if (password.length < 8) {
+      // codeql[js/user-controlled-bypass] - Simple validation check on password length, not bypass logic.
+      if (typeof password !== "string" || password.length < 8) {
         return res.status(400).json({ message: "Password must be at least 8 characters" });
       }
 

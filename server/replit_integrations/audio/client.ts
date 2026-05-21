@@ -57,6 +57,7 @@ export async function convertToWav(audioBuffer: Buffer): Promise<Buffer> {
 
   try {
     // Write input to temp file (required for video containers that need seeking)
+    // codeql[js/http-to-file-access] - File write of the audio buffer is necessary to perform conversion using ffmpeg.
     await writeFile(inputPath, audioBuffer);
 
     // Run ffmpeg with file paths

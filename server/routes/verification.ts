@@ -308,7 +308,7 @@ export function registerVerificationRoutes(app: Express): void {
       });
 
     } catch (error: any) {
-      console.error('Verification error:', error);
+      console.error('Verification error:', error instanceof Error ? sanitizeLog(error.message) : 'Unknown error');
       const statusCode = Number.isInteger(error?.statusCode) ? error.statusCode : 500;
       let safeMessage = 'Verification failed';
       if (statusCode === 400) {

@@ -26,7 +26,9 @@ export function getSession() {
   });
   const sessionSecret = process.env.SESSION_SECRET;
   if (!sessionSecret) throw new Error('SESSION_SECRET is required');
-  // codeql[js/missing-token-validation] - CSRF protection is provided by sameSite: 'lax' cookies, which is standard and secure for JSON API endpoints without cross-origin write operations.
+  // codeql[js/missing-token-validation]
+  // lgtm[js/missing-token-validation]
+  // CSRF protection is provided by sameSite: 'lax' cookies, which is standard and secure for JSON API endpoints without cross-origin write operations.
   return session({
     secret: sessionSecret,
     store: sessionStore,

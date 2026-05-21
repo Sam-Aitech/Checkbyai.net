@@ -238,7 +238,7 @@ export class PDFAnalyzer {
 
       return metadata;
     } catch (error) {
-      console.error('Error extracting PDF metadata:', error);
+      console.error('Error extracting PDF metadata:', error instanceof Error ? sanitizeLog(error.message) : 'Unknown error');
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return {
         fileSize: 0,
