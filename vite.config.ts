@@ -29,6 +29,11 @@ export default defineConfig({
     emptyOutDir: true,
     target: "esnext",
   },
+  optimizeDeps: {
+    esbuildOptions: {
+      target: "esnext",
+    },
+  },
   server: {
     fs: {
       strict: true,
