@@ -2297,10 +2297,13 @@ Format your response in clear, professional markdown.`;
       const base = (existing.notifPrefs as NotifPrefs | null) ?? DEFAULT_NOTIF_PREFS;
       const merged: NotifPrefs = { ...base };
       for (const key of Object.keys(DEFAULT_NOTIF_PREFS) as Array<keyof NotifPrefs>) {
-        const v = (patch as Partial<NotifPrefs>)[key];
+        const v = patch[key];
         if (v === undefined) continue;
         if (merged[key]) {
-          merged[key] = { ...merged[key], ...v, channels: { ...merged[key].channels, ...(v as any).channels } };
+          merged[key] = {
+            enabled: v.enabled ?? merged[key].enabled,
+            channels: { ...merged[key].channels, ...v.channels },
+          };
         }
       }
 
