@@ -741,7 +741,15 @@ export async function runSponsorMonitorJob(
       const headlineResult = await generateHeadline(digestData);
       const selectedVariantIndex = Math.floor(Math.random() * 3);
 
-      await db.update(dailyDigest).set({ displayedOnLanding: false });
+      // Only set displayedOnLanding: true when there are actual changes.
+      // If no changes today, keep the previous active digest as the landing display
+      // so the homepage shows meaningful data instead of all-zero counts.
+      const hasChanges = addedCount > 0 || removedCount > 0 || updatedCount > 0;
+
+      if (hasChanges) {
+        await db.update(dailyDigest).set({ displayedOnLanding: false });
+      }
+
       await db.insert(dailyDigest).values({
         snapshotDate: today,
         addedCount,
@@ -749,7 +757,7 @@ export async function runSponsorMonitorJob(
         removedCount,
         headlineGenerated: headlineResult.headline,
         headlineVariants: headlineResult.variants,
-        displayedOnLanding: true,
+        displayedOnLanding: hasChanges,
         selectedVariantIndex,
         aiModel: headlineResult.model,
       }).onConflictDoUpdate({
@@ -760,7 +768,7 @@ export async function runSponsorMonitorJob(
           removedCount,
           headlineGenerated: headlineResult.headline,
           headlineVariants: headlineResult.variants,
-          displayedOnLanding: true,
+          displayedOnLanding: hasChanges,
           selectedVariantIndex,
           aiModel: headlineResult.model,
           generatedAt: new Date(),

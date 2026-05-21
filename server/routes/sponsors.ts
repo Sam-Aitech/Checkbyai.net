@@ -305,6 +305,8 @@ export function registerSponsorRoutes(app: Express): void {
 
   app.post('/api/admin/daily-digest/refresh', isAdmin, async (req: any, res) => {
     try {
+      const today = new Date().toISOString().split("T")[0];
+      // Filter to today's changes only — prevents aggregating all historical records.
       const latestChanges = await db
         .select({
           changeType: sponsorChanges.changeType,
@@ -312,11 +314,11 @@ export function registerSponsorRoutes(app: Express): void {
           count: sql<number>`count(*)::int`,
         })
         .from(sponsorChanges)
+        .where(eq(sponsorChanges.snapshotDate, today))
         .groupBy(sponsorChanges.changeType, sponsorChanges.organisationName)
         .orderBy(desc(sql`count(*)`))
         .limit(50);
 
-      const today = new Date().toISOString().split("T")[0];
       let addedCount = 0, updatedCount = 0, removedCount = 0;
       const removedCompanies: string[] = [];
       const addedCompanies: string[] = [];
@@ -333,16 +335,9 @@ export function registerSponsorRoutes(app: Express): void {
             updatedCount += c.count;
           }
         }
-      } else {
-        const stats = await db
-          .select({
-            active: sql<number>`count(*) filter (where ${sponsorCanonical.status} = 'ACTIVE')::int`,
-            revoked: sql<number>`count(*) filter (where ${sponsorCanonical.status} = 'REMOVED_REVOKED')::int`,
-          })
-          .from(sponsorCanonical);
-        addedCount = stats[0]?.active || 0;
-        removedCount = stats[0]?.revoked || 0;
       }
+      // If today has 0 changes, do not fall back to all-time canonical counts —
+      // the display strategy keeps the last non-zero digest as the active landing row.
 
       const headlineResult = await generateHeadline({
         snapshotDate: today,
@@ -353,7 +348,10 @@ export function registerSponsorRoutes(app: Express): void {
         addedCompanies,
       });
 
-      await db.update(dailyDigest).set({ displayedOnLanding: false });
+      const hasChanges = addedCount > 0 || removedCount > 0 || updatedCount > 0;
+      if (hasChanges) {
+        await db.update(dailyDigest).set({ displayedOnLanding: false });
+      }
       await db.insert(dailyDigest).values({
         snapshotDate: today,
         addedCount,
@@ -361,7 +359,7 @@ export function registerSponsorRoutes(app: Express): void {
         removedCount,
         headlineGenerated: headlineResult.headline,
         headlineVariants: headlineResult.variants,
-        displayedOnLanding: true,
+        displayedOnLanding: hasChanges,
         selectedVariantIndex: 0,
         aiModel: headlineResult.model,
       }).onConflictDoUpdate({
@@ -369,14 +367,17 @@ export function registerSponsorRoutes(app: Express): void {
         set: {
           headlineGenerated: headlineResult.headline,
           headlineVariants: headlineResult.variants,
-          displayedOnLanding: true,
+          displayedOnLanding: hasChanges,
           selectedVariantIndex: 0,
           aiModel: headlineResult.model,
           generatedAt: new Date(),
         },
       });
 
-      res.json({ success: true, headline: headlineResult.headline, model: headlineResult.model });
+      // Flush Redis so the frontend gets fresh data immediately after admin refresh.
+      await cacheFlushPattern("sponsors:*");
+
+      res.json({ success: true, headline: headlineResult.headline, model: headlineResult.model, hasChanges });
     } catch (error: unknown) {
       console.error("Error refreshing daily digest:", error);
       res.status(500).json({ message: "Failed to refresh digest.", error: error instanceof Error ? error.message : String(error) });
