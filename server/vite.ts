@@ -16,7 +16,9 @@ export function log(message: string, source = "express") {
     hour12: true,
   });
 
-  console.log(`${formattedTime} [${source}] ${message}`);
+  const safeMessage = message.replace(/[\r\n]/g, " ");
+  const safeSource = source.replace(/[\r\n]/g, " ");
+  console.log(`${formattedTime} [${safeSource}] ${safeMessage}`);
 }
 
 export async function setupVite(app: Express, server: Server) {

@@ -505,7 +505,7 @@ export function registerSponsorRoutes(app: Express): void {
         page,
         totalPages,
         limit,
-        stats: stats ?? { active: 0, newlyGranted: 0, removedThisWeek: 0, gracePeriod: 0 },
+        stats: stats as DirectoryStats,
       };
       await cacheSet(dirCacheKey, dirResponse, 300);
       res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");

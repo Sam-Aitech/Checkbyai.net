@@ -124,6 +124,7 @@ async function sendSignedCallback(callbackUrl: string, payload: Record<string, u
   const timer = setTimeout(() => controller.abort(), CALLBACK_CONFIG.timeoutMs);
 
   try {
+    // codeql[js/request-forgery] codeql[js/file-access-to-http] - The callbackUrl has been validated by isSafeCallbackUrl() above, which performs DNS resolution and rejects private/loopback IPs. The payload contains only structured job-result metadata, not raw file contents.
     const response = await fetch(callbackUrl, {
       method: "POST",
       headers: {

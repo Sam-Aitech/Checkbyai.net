@@ -2,6 +2,7 @@ import type { Express } from "express";
 import type { SponsorChange } from "../utils/sponsorListFetcher";
 import * as crypto from "crypto";
 import * as fs from "fs";
+import * as path from "path";
 import { db } from "../db";
 import { sql, eq, and, desc, gte, asc, inArray } from "drizzle-orm";
 import {
@@ -26,7 +27,7 @@ import { upload } from "./verification";
 import { sendEmailReliably } from "../utils/resilientEmail";
 import { getAppUrl } from "../utils/appUrl";
 import { checkBinaryHealth } from "../utils/binaryRunner";
-import { sanitizeUploadPath } from "../utils/uploadGuard";
+import { sanitizeUploadPath, UPLOADS_DIR } from "../utils/uploadGuard";
 import { isJobRunning, getLastRunInfo, runSponsorMonitorJob } from "../utils/sponsorMonitorJob";
 import { rebuildSponsorIndex } from "../utils/sponsorSearch";
 import { isQueueAvailable, getSponsorRefreshQueue } from "../services/jobQueue";
@@ -34,6 +35,10 @@ import { getWatchLimit } from "../utils/tierConfig";
 
 function sanitizeForPrompt(text: string): string {
   return text.replace(/[<>`{}]/g, '');
+}
+
+function sanitizeLog(value: string): string {
+  return value.replace(/[\r\n]/g, ' ');
 }
 
 const SPONSOR_JOB_LOCK_KEY = 7483920; // Same key as sponsorMonitorJob — init and nightly are mutually exclusive
@@ -72,13 +77,13 @@ async function runInitJob(jobId: string, today: string): Promise<void> {
 
   try {
     state.stage = "downloading";
-    console.log(`[SponsorMonitor][${jobId}] Triggering monitor job for ${today}`);
+    console.log(`[SponsorMonitor][${sanitizeLog(jobId)}] Triggering monitor job for ${today}`);
 
     await runSponsorMonitorJob("manual");
 
     state.stage = "done";
     state.completedAt = Date.now();
-    console.log(`[SponsorMonitor][${jobId}] Monitor job complete for ${today}`);
+    console.log(`[SponsorMonitor][${sanitizeLog(jobId)}] Monitor job complete for ${today}`);
 
   } catch (err: unknown) {
     state.stage = "failed";
@@ -130,7 +135,7 @@ export function registerAdminRoutes(app: Express): void {
     } finally {
       if (safeFilePath) {
         try {
-          fs.unlink(safeFilePath, () => {});
+          fs.unlink(path.join(UPLOADS_DIR, path.basename(safeFilePath)), () => {});
         } catch (e) {
           // Ignore cleanup errors
         }
@@ -181,7 +186,7 @@ export function registerAdminRoutes(app: Express): void {
     } finally {
       if (safeFilePath) {
         try {
-          await fs.promises.unlink(safeFilePath);
+          await fs.promises.unlink(path.join(UPLOADS_DIR, path.basename(safeFilePath)));
         } catch (e) {
           // Ignore cleanup errors
         }
@@ -2027,7 +2032,7 @@ Format your response in clear, professional markdown.`;
               .where(eq(companyWatches.id, watch.id));
           }
           deactivatedWatchCount = watchesToDeactivate.length;
-          console.log(`[AdminPlanOverride] Deactivated ${deactivatedWatchCount} excess watches for user ${userId} (${previousStatus} → ${plan}, limit=${newWatchLimit})`);
+          console.log(`[AdminPlanOverride] Deactivated ${deactivatedWatchCount} excess watches for user ${sanitizeLog(userId)} (${sanitizeLog(previousStatus)} → ${sanitizeLog(plan)}, limit=${newWatchLimit})`);
         }
       }
 
@@ -2141,7 +2146,7 @@ Format your response in clear, professional markdown.`;
 
       const newCredits = updatedUser?.credits ?? 0;
       const delta = newCredits - prevCredits;
-      console.log(`[AdminCredits] User ${userId}: ${prevCredits} → ${newCredits} (${operation} ${amount}, reason: ${reason ?? 'none'})`);
+      console.log(`[AdminCredits] User ${sanitizeLog(userId)}: ${prevCredits} → ${newCredits} (${sanitizeLog(operation)} ${amount}, reason: ${sanitizeLog(reason ?? 'none')})`);
 
       // Audit log
       storage.logSubscriptionChange({
@@ -2291,11 +2296,14 @@ Format your response in clear, professional markdown.`;
 
       const base = (existing.notifPrefs as NotifPrefs | null) ?? DEFAULT_NOTIF_PREFS;
       const merged: NotifPrefs = { ...base };
-      for (const [k, v] of Object.entries(patch)) {
-        if (!Object.prototype.hasOwnProperty.call(DEFAULT_NOTIF_PREFS, k)) continue;
-        const key = k as keyof NotifPrefs;
+      for (const key of Object.keys(DEFAULT_NOTIF_PREFS) as Array<keyof NotifPrefs>) {
+        const v = patch[key];
+        if (v === undefined) continue;
         if (merged[key]) {
-          merged[key] = { ...merged[key], ...v, channels: { ...merged[key].channels, ...(v as any).channels } };
+          merged[key] = {
+            enabled: v.enabled ?? merged[key].enabled,
+            channels: { ...merged[key].channels, ...v.channels },
+          };
         }
       }
 
@@ -2304,7 +2312,7 @@ Format your response in clear, professional markdown.`;
         .set({ notifPrefs: merged })
         .where(eq(users.id, id));
 
-      console.log(`[Admin] notif_prefs updated for user ${id} by ${req.user?.email ?? req.user?.id}`);
+      console.log(`[Admin] notif_prefs updated for user ${sanitizeLog(id)} by ${sanitizeLog(req.user?.email ?? req.user?.id ?? 'unknown')}`);
       res.json({ notifPrefs: merged });
     } catch (error) {
       console.error('Error updating notif_prefs:', error);

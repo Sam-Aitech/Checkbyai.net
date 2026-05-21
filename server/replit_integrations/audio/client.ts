@@ -1,8 +1,7 @@
 import OpenAI, { toFile } from "openai";
 import { Buffer } from "node:buffer";
 import { spawn } from "child_process";
-import { writeFile, unlink, readFile } from "fs/promises";
-import { randomUUID } from "crypto";
+import { writeFile, unlink, readFile, mkdtemp, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 
@@ -52,8 +51,9 @@ export function detectAudioFormat(buffer: Buffer): AudioFormat {
  * require seeking to find the audio track.
  */
 export async function convertToWav(audioBuffer: Buffer): Promise<Buffer> {
-  const inputPath = join(tmpdir(), `input-${randomUUID()}`);
-  const outputPath = join(tmpdir(), `output-${randomUUID()}.wav`);
+  const tempDir = await mkdtemp(join(tmpdir(), "checkbyai-audio-"));
+  const inputPath = join(tempDir, "input");
+  const outputPath = join(tempDir, "output.wav");
 
   try {
     // Write input to temp file (required for video containers that need seeking)
@@ -83,9 +83,8 @@ export async function convertToWav(audioBuffer: Buffer): Promise<Buffer> {
     // Read converted audio
     return await readFile(outputPath);
   } finally {
-    // Clean up temp files
-    await unlink(inputPath).catch(() => {});
-    await unlink(outputPath).catch(() => {});
+    // Clean up temp directory and all files within it
+    await rm(tempDir, { recursive: true, force: true }).catch(() => {});
   }
 }
 

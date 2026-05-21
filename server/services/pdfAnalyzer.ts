@@ -1,7 +1,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { XMLParser } from 'fast-xml-parser';
-import { sanitizeUploadPath } from '../utils/uploadGuard';
+import { sanitizeUploadPath, UPLOADS_DIR } from '../utils/uploadGuard';
+
+function sanitizeLog(value: string): string {
+  return value.replace(/[\r\n]/g, ' ');
+}
 
 /**
  * Yields control back to the Node.js event loop, preventing CPU-intensive
@@ -142,7 +146,7 @@ export class PDFAnalyzer {
   async extractMetadata(filePath: string): Promise<PDFMetadata> {
     try {
             // Path-traversal guard: assert filePath is inside the uploads directory
-            const safePath = sanitizeUploadPath(filePath);
+            const safePath = path.join(UPLOADS_DIR, path.basename(sanitizeUploadPath(filePath)));
       const [buffer, stats] = await Promise.all([
           fs.promises.readFile(safePath),
           fs.promises.stat(safePath),
@@ -230,7 +234,7 @@ export class PDFAnalyzer {
       await yieldToEventLoop();
       metadata.forensic = this.buildForensicProfile(metadata, xmpHistory);
 
-      console.log(`Forensic profile built for ${filePath} (${fileSize} bytes, ${metadata.fonts.length} fonts, ${xmpHistory.length} XMP history entries)`);
+      console.log(`Forensic profile built for ${sanitizeLog(path.basename(filePath))} (${fileSize} bytes, ${metadata.fonts.length} fonts, ${xmpHistory.length} XMP history entries)`);
 
       return metadata;
     } catch (error) {

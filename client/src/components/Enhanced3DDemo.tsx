@@ -375,7 +375,7 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
                 <div 
                   className="h-full rounded-full transition-all duration-2000 ease-out"
                   style={{ 
-                    width: demoStep >= 4 ? `${scenarioResults[selectedScenario].confidence}%` : '0%',
+                    width: `${scenarioResults[selectedScenario].confidence}%`,
                     backgroundColor: scenarioResults[selectedScenario].color
                   }}
                 />

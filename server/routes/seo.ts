@@ -385,7 +385,7 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
       }
       if (!html) return next();
       const { title, description } = routeMeta;
-      const canonical = `${getAppUrl()}${req.path === '/' ? '/' : req.path}`;
+      const canonical = escapeAttr(`${getAppUrl()}${req.path === '/' ? '/' : req.path}`);
 
       html = html.replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`);
       html = html.replace(/<meta name="title" content="[^"]*"/, `<meta name="title" content="${title}"`);
