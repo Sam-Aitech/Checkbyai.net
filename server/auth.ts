@@ -7,6 +7,8 @@ import { storage } from "./storage";
 import crypto from "crypto";
 import { otpLimiter } from "./middleware/rateLimiter";
 import { getAppUrl } from "./utils/appUrl";
+import { validateBody } from "./lib/validate";
+import { sendOtpSchema, verifyOtpSchema } from "./validation/auth";
 
 
 if (process.env.NODE_ENV === "production" && !process.env.REPLIT_DOMAINS) {
@@ -345,13 +347,9 @@ export async function setupAuth(app: Express) {
   }
 
   // Email OTP: Send verification code
-  app.post("/api/auth/email/send-otp", otpLimiter, async (req, res) => {
+  app.post("/api/auth/email/send-otp", otpLimiter, validateBody(sendOtpSchema), async (req, res) => {
     try {
       const { email, turnstileToken } = req.body;
-      
-      if (!email || !email.includes("@")) {
-        return res.status(400).json({ message: "Valid email required" });
-      }
 
       // Cloudflare Turnstile CAPTCHA verification
       // If TURNSTILE_SECRET_KEY is set, verify the token; skip in dev if key absent
@@ -416,13 +414,9 @@ export async function setupAuth(app: Express) {
   });
 
   // Email OTP: Verify code
-  app.post("/api/auth/email/verify-otp", otpLimiter, async (req, res) => {
+  app.post("/api/auth/email/verify-otp", otpLimiter, validateBody(verifyOtpSchema), async (req, res) => {
     try {
       const { email, code } = req.body;
-      
-      if (!email || !code) {
-        return res.status(400).json({ message: "Email and code required" });
-      }
 
       const user = await storage.getUserByEmail(email);
       
@@ -470,13 +464,9 @@ export async function setupAuth(app: Express) {
   });
 
   // Admin OTP: Send verification code via Resend
-  app.post("/api/auth/admin/send-otp", otpLimiter, async (req, res) => {
+  app.post("/api/auth/admin/send-otp", otpLimiter, validateBody(sendOtpSchema), async (req, res) => {
     try {
       const { email, turnstileToken } = req.body;
-      
-      if (!email || !email.includes("@")) {
-        return res.status(400).json({ message: "Valid email required" });
-      }
 
       if (process.env.TURNSTILE_SECRET_KEY && !turnstileToken) {
         return res.status(400).json({ message: "CAPTCHA verification required" });
@@ -539,13 +529,9 @@ export async function setupAuth(app: Express) {
   });
 
   // Admin OTP: Verify code and login
-  app.post("/api/auth/admin/verify-otp", otpLimiter, async (req, res) => {
+  app.post("/api/auth/admin/verify-otp", otpLimiter, validateBody(verifyOtpSchema), async (req, res) => {
     try {
       const { email, code } = req.body;
-      
-      if (!email || !code) {
-        return res.status(400).json({ message: "Email and code required" });
-      }
 
       // Check if email matches ADMIN_EMAIL
       const envAdminEmail = process.env.ADMIN_EMAIL;
