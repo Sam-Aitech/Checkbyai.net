@@ -16,41 +16,32 @@ import { sendAdminAlert } from "./adminAlert";
 import { logger } from "./logger";
 import { startJobRun, finishJobRun, type TriggerSource } from "./jobTelemetry";
 import { match } from "ts-pattern";
+import crypto from "crypto";
+import { tryAcquireLock, releaseLock, isLockActive } from "./lockManager";
 
 const log = logger.child({ module: "SponsorMonitorJob" });
 // Why ts-pattern: ETL status branching must stay explicit/exhaustive so upstream
 // data-format drifts are surfaced instead of silently swallowed.
 // Priority 5 enum source of truth: shared/schema.ts sponsor_licence_timeline.licenceStatus.
 
-// Distributed advisory lock key — must be a unique integer per job.
+// Distributed lock configuration
 // Prevents duplicate execution across multiple server instances (horizontal scaling).
-// REPLACES: module-level `isRunning = false` which only prevented single-instance
-// races and made horizontal deployment impossible (2 pods = 2 jobs = duplicate data).
-const SPONSOR_MONITOR_LOCK_KEY = 7483920; // Unique magic int for this job
+let lockHolderId: string | null = null;
+const LOCK_LEASE_MS = 60 * 60 * 1000; // 60 minutes lease duration
 
 let lastRequestCheckTime = 0;
 const REQUEST_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 
 /**
- * Attempts to acquire a PostgreSQL session-level advisory lock.
+ * Attempts to acquire a table-backed lock.
  * Returns true if the lock was acquired, false if another instance holds it.
- * The lock is automatically released if the DB connection drops (crash-safe).
- *
- * Uses pg_try_advisory_lock() — atomic, non-blocking. A single SQL call that
- * both checks and acquires in one step, eliminating the TOCTOU race that
- * existed when using a separate pg_locks SELECT + pg_advisory_lock() pair.
  */
 async function tryAcquireJobLock(): Promise<boolean> {
   try {
-    // ── STUCK LOCK DETECTION (Phase 1b) ──
-    // pg_advisory_lock is session-level, so it survives app crashes until the
-    // DB connection is terminated by Neon. If we can't get the lock, check if
-    // the job has been "running" for more than 2 hours. If so, it's likely a
-    // ghost lock from a zombie connection.
-    const result = await db.execute(
-      sql`SELECT pg_try_advisory_lock(${SPONSOR_MONITOR_LOCK_KEY}) AS acquired`
-    );
-    const acquired = (result.rows[0] as any)?.acquired === true;
+    if (!lockHolderId) {
+      lockHolderId = crypto.randomUUID();
+    }
+    const acquired = await tryAcquireLock("sponsorMonitorJob", LOCK_LEASE_MS, lockHolderId);
 
     if (!acquired) {
       const today = new Date().toISOString().split("T")[0];
@@ -66,15 +57,12 @@ async function tryAcquireJobLock(): Promise<boolean> {
         if (runtimeMs > MAX_RUNTIME_MS) {
           log.error(
             { runtimeMs, runId: activeRun[0].id },
-            `[SponsorMonitorJob] LOCK CONTENTION: Job has been in 'running' state for ${Math.round(runtimeMs/60000)} mins. Possible ghost lock.`
+            `[SponsorMonitorJob] LOCK CONTENTION: Job has been in 'running' state for ${Math.round(runtimeMs/60000)} mins.`
           );
-          // We don't force-release here (risky if job is slow but alive),
-          // but we alert so admin can manually kill the DB session.
           await sendAdminAlert(
             "ALERT: Sponsor Monitor Ghost Lock Detected",
             `<p>Job for today has been 'running' for ${Math.round(runtimeMs/60000)} mins without completion.</p>
-             <p>The advisory lock (ID: ${SPONSOR_MONITOR_LOCK_KEY}) is likely held by a zombie session.</p>
-             <p>Check Neon dashboard and terminate stuck backend if necessary.</p>`
+             <p>The lock is likely held by a zombie session. Check Neon dashboard and terminate stuck backend if necessary.</p>`
           );
         }
       }
@@ -82,15 +70,16 @@ async function tryAcquireJobLock(): Promise<boolean> {
 
     return acquired;
   } catch (err) {
-    console.error('[SponsorMonitorJob] Failed to acquire advisory lock:', err);
+    console.error('[SponsorMonitorJob] Failed to acquire lock:', err);
     return false;
   }
 }
 
 async function releaseJobLock(): Promise<void> {
-  await db.execute(sql`SELECT pg_advisory_unlock(${SPONSOR_MONITOR_LOCK_KEY})`).catch(err => {
-    console.error('[SponsorMonitorJob] Failed to release advisory lock:', err);
-  });
+  if (lockHolderId) {
+    await releaseLock("sponsorMonitorJob", lockHolderId);
+    lockHolderId = null;
+  }
 }
 
 // Export lock functions for use in routes and the BullMQ worker
@@ -452,11 +441,11 @@ export async function runSponsorMonitorJob(
   // ── Watchdog + lock-release wrapper ──────────────────────────────────────
   // Promise.race ensures that if runJobCore() stalls (e.g. a DB insert hangs),
   // the timeout rejects after 25 min. The finally block ALWAYS runs, releasing
-  // the advisory lock even on timeout.
+  // the table-backed lock even on timeout.
   try {
     const watchdog = new Promise<never>((_, reject) => {
       watchdogTimer = setTimeout(
-        () => reject(new Error(`Job timed out after ${JOB_TIMEOUT_MS / 60000} minutes. Advisory lock released.`)),
+        () => reject(new Error(`Job timed out after ${JOB_TIMEOUT_MS / 60000} minutes. Table-backed lock released.`)),
         JOB_TIMEOUT_MS
       );
     });
@@ -1072,21 +1061,7 @@ export function startSponsorMonitorCron(): void {
 }
 
 export async function isJobRunning(): Promise<boolean> {
-  // Use DB-level advisory lock query to check if job is truly active across any node.
-  // pg_locks table tracks all active locks by PID.
-  try {
-    const result = await db.execute(sql`
-      SELECT count(*) > 0 AS locked 
-      FROM pg_locks 
-      WHERE locktype = 'advisory' 
-        AND classid  = (${SPONSOR_MONITOR_LOCK_KEY}::bigint >> 32)::int
-        AND objid    = (${SPONSOR_MONITOR_LOCK_KEY}::bigint & x'ffffffff'::bigint)::int
-    `);
-    return (result.rows[0] as any)?.locked === true;
-  } catch (err) {
-    console.error('[SponsorMonitorJob] Failed to check advisory lock:', err);
-    return false;
-  }
+  return await isLockActive("sponsorMonitorJob");
 }
 
 export async function checkAndTriggerIfNeeded(startup = false): Promise<void> {
@@ -1113,7 +1088,7 @@ export async function checkAndTriggerIfNeeded(startup = false): Promise<void> {
       if (utcHour < 1) return;
     } else {
       // Startup catchup: skip only the exact cron execution window (00:20–00:45 UTC)
-      // to avoid racing with a cron that is actively running. The advisory lock inside
+      // to avoid racing with a cron that is actively running. The table-backed lock inside
       // runSponsorMonitorJob would block a duplicate run anyway, but this avoids noise.
       if (utcHour === 0 && utcMinute >= 20 && utcMinute < 45) {
         console.log("[SponsorMonitorJob] Startup catchup: cron window active (00:20–00:45 UTC), deferring.");

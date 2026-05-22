@@ -467,21 +467,20 @@ Format your response in clear, professional markdown.`;
 
   app.post('/api/admin/sponsor-monitor/release-lock', isAdmin, async (req: any, res) => {
     try {
-      const unlockResult = await db.execute(
-        sql`SELECT pg_advisory_unlock(${SPONSOR_JOB_LOCK_KEY}) AS released`
+      // Force release by deleting the job lock record from the job_locks table
+      const deleteResult = await db.execute(
+        sql`DELETE FROM job_locks WHERE job_name = 'sponsorMonitorJob'`
       );
-      const released = (unlockResult.rows[0] as any)?.released === true;
-
-      await db.execute(sql`SELECT pg_advisory_unlock_all()`);
+      const released = deleteResult.rowCount !== null && deleteResult.rowCount > 0;
 
       const message = released
-        ? "Advisory lock was held and has been released. You can now trigger a new run."
-        : "No lock was held by this connection (may have been on a different pooled connection). All locks on this connection cleared.";
+        ? "Job lock was held in job_locks table and has been force-released. You can now trigger a new run."
+        : "No active lock for 'sponsorMonitorJob' was found in the job_locks table.";
 
       console.warn(`[SponsorMonitorJob] Admin force-release: ${message}`);
       res.json({ released, message });
     } catch (error: unknown) {
-      console.error("Error releasing advisory lock:", error);
+      console.error("Error releasing job lock:", error);
       res.status(500).json({ message: "Failed to release lock: " + (error instanceof Error ? error.message : "") });
     }
   });
@@ -513,36 +512,18 @@ Format your response in clear, professional markdown.`;
       }
 
       try {
-        const lockHolder = await db.execute(sql`
-          SELECT pl.pid, pa.state,
-                 EXTRACT(EPOCH FROM (now() - pa.state_change))::int AS idle_seconds
-          FROM   pg_locks pl
-          LEFT JOIN pg_stat_activity pa ON pa.pid = pl.pid
-          WHERE  pl.locktype  = 'advisory'
-            AND  pl.classid   = (${SPONSOR_JOB_LOCK_KEY}::bigint >> 32)::int
-            AND  pl.objid     = (${SPONSOR_JOB_LOCK_KEY}::bigint & x'ffffffff'::bigint)::int
-            AND  pl.granted   = true
+        // Pre-flight check on job_locks table for active locks
+        const activeLock = await db.execute(sql`
+          SELECT locked_at, locked_by, expires_at
+          FROM job_locks
+          WHERE job_name = 'sponsorMonitorJob' AND expires_at > NOW()
         `);
-        const holder = lockHolder.rows[0] as any;
-        const ZOMBIE_IDLE_THRESHOLD_SECONDS = 600;
-        if (
-          holder &&
-          (holder.state === 'idle' || holder.state === 'idle in transaction') &&
-          holder.idle_seconds > ZOMBIE_IDLE_THRESHOLD_SECONDS
-        ) {
-          console.warn(
-            `[SponsorMonitor] Advisory lock held by idle backend PID ${holder.pid} ` +
-            `(idle ${holder.idle_seconds}s > ${ZOMBIE_IDLE_THRESHOLD_SECONDS}s threshold) — terminating zombie to release lock.`
-          );
-          await db.execute(sql`SELECT pg_terminate_backend(${holder.pid})`);
-        } else if (holder && (holder.state === 'idle' || holder.state === 'idle in transaction')) {
-          console.log(
-            `[SponsorMonitor] Advisory lock held by idle backend PID ${holder.pid} ` +
-            `(idle ${holder.idle_seconds}s) — within active-job window, not terminating.`
-          );
+        if (activeLock.rows.length > 0) {
+          const lock = activeLock.rows[0] as { locked_at: Date, locked_by: string, expires_at: Date };
+          console.log(`[SponsorMonitor] Active lock found for sponsorMonitorJob: locked_by ${lock.locked_by}, expires_at ${lock.expires_at}`);
         }
       } catch (lockCheckErr: any) {
-        console.warn('[SponsorMonitor] Pre-flight zombie-lock check failed (non-fatal):', lockCheckErr.message);
+        console.warn('[SponsorMonitor] Pre-flight lock check failed (non-fatal):', lockCheckErr.message);
       }
 
       const jobId = crypto.randomUUID();

@@ -14,22 +14,28 @@ import { getOrFetchEnrichment } from "./companyEnricher";
 import { scrapeJobsForCompany, type ScrapedJob } from "./jobScraper";
 import { sql } from "drizzle-orm";
 import { startJobRun, finishJobRun, type TriggerSource } from "./jobTelemetry";
+import crypto from "crypto";
+import { tryAcquireLock, releaseLock } from "./lockManager";
 
-const ADVISORY_LOCK_KEY = 7483921; // Distinct from sponsor monitor (7483920)
+let lockHolderId: string | null = null;
+const LOCK_LEASE_MS = 30 * 60 * 1000; // 30 minutes lease duration
 const PRO_BOARDS = ["company", "linkedin", "indeed", "cvlibrary", "google"];
 const FROM_ADDRESS = "Sponsor Monitor <alerts@checkbyai.net>";
 
-// ─── Advisory lock ────────────────────────────────────────────────────────────
+// ─── Table-backed lock ────────────────────────────────────────────────────────
 
 async function tryAcquireJobLock(): Promise<boolean> {
-  const result = await db.execute(
-    sql`SELECT pg_try_advisory_lock(${ADVISORY_LOCK_KEY}) AS acquired`,
-  );
-  return (result.rows[0] as { acquired: boolean }).acquired;
+  if (!lockHolderId) {
+    lockHolderId = crypto.randomUUID();
+  }
+  return await tryAcquireLock("jobAlertJob", LOCK_LEASE_MS, lockHolderId);
 }
 
 async function releaseJobLock(): Promise<void> {
-  await db.execute(sql`SELECT pg_advisory_unlock(${ADVISORY_LOCK_KEY})`);
+  if (lockHolderId) {
+    await releaseLock("jobAlertJob", lockHolderId);
+    lockHolderId = null;
+  }
 }
 
 // ─── Email builder ────────────────────────────────────────────────────────────

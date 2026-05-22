@@ -297,6 +297,20 @@ app.use((req, res, next) => {
 async function applyDataFixbacks() {
   const client = await pool.connect();
   try {
+    // ── Table-backed locks initialization ──
+    try {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS "job_locks" (
+          "job_name" VARCHAR(100) PRIMARY KEY,
+          "locked_at" TIMESTAMP WITH TIME ZONE NOT NULL,
+          "locked_by" VARCHAR(255) NOT NULL,
+          "expires_at" TIMESTAMP WITH TIME ZONE NOT NULL
+        )
+      `);
+    } catch (err) {
+      logger.error({ err }, "Failed to ensure job_locks table exists at startup");
+    }
+
     // ── One-time backfill: retire the legacy "NOT_LISTED" status value ──────
     // The current schema enum is ACTIVE | NEWLY_GRANTED | GRACE_PERIOD | REMOVED_REVOKED.
     // Earlier ingestion code wrote NOT_LISTED rows that were never migrated,

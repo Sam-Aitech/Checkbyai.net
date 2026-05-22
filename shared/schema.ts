@@ -1023,3 +1023,15 @@ export const insertSupportTicketSchema = createInsertSchema(supportTickets).omit
   status: true, adminReply: true, repliedAt: true, createdAt: true, userId: true,
 });
 export type InsertSupportTicket = z.infer<typeof insertSupportTicketSchema>;
+
+// ─── Job Locks (Table-backed lease mechanism) ──────────────────────────────────
+export const jobLocks = pgTable("job_locks", {
+  jobName: varchar("job_name", { length: 100 }).primaryKey(),
+  lockedAt: timestamp("locked_at", { withTimezone: true }).notNull(),
+  lockedBy: varchar("locked_by", { length: 255 }).notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+});
+
+export type JobLock = typeof jobLocks.$inferSelect;
+export type InsertJobLock = typeof jobLocks.$inferInsert;
+
