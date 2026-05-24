@@ -20,6 +20,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - All routes use `asyncHandler` for automatic error forwarding to Express error middleware
   - `fail()`/`success()` response helpers replace inline `res.status().json()` patterns
 
+- **Backend Patterns Audit — Logging migration**: All `console.log`/`console.error`/`console.warn` calls (~369 across 47 files) migrated to the structured Pino logger (`server/utils/logger.ts`). Error objects passed as `{ err }` context for structured log aggregation.
+- **Backend Patterns Audit — Column projections**: Added explicit column projections to hot-path Drizzle ORM queries:
+  - `settingsRepository.getSystemSetting()` — projects only `{ value }` (called on every verification)
+  - `sponsors.ts` full-scan watch creation query — projects 4 of 13 `sponsorCanonical` columns
+  - `sponsors.ts` watch ownership/status checks — projects only `id`, `userId`, `isActive`
+  - `sponsors.ts` history/changes enrichment — projects only display columns
+- **Backend Patterns Audit — RBAC unification**: Legacy `isAdmin` guard (hard-coded `role === 'admin'` check in `auth.ts`) replaced with `requireRole("admin")` from the 6-level `roleGuard.ts` hierarchy. Applied across `admin.ts` (62 usages), `sponsors.ts`, `support.ts`, and `monitoringService.ts`.
+
 ### Fixed
 - **SEC-001 (Critical) — Path traversal on file upload endpoints**: Three endpoints (`/api/admin/extract-metadata`, `/api/admin/trusted-patterns`, `/api/verify`) used `req.file.path` directly without sanitization, allowing path traversal via crafted filenames. Created `server/utils/uploadGuard.ts` with `sanitizeUploadPath()` that resolves paths relative to the uploads directory and rejects traversal attempts.
 - **SEC-002 — HMAC secret fallback chain**: `hmacSecret` in billing.ts fell back through multiple env vars (`CHECKOUT_HMAC_SECRET` → `STRIPE_WEBHOOK_SECRET` → `secret`), leaking which env vars are set to an attacker who can provoke an error. Now requires `CHECKOUT_HMAC_SECRET` unconditionally.
