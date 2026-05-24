@@ -1,6 +1,7 @@
 import { db } from "../db";
 import { sponsorEnrichment } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import { logger } from "../utils/logger";
 
 const PYTHON_BACKEND_URL = process.env.PYTHON_BACKEND_URL || "http://localhost:8000";
 const CACHE_TTL_DAYS = 7;
@@ -86,7 +87,7 @@ export async function getOrFetchEnrichment(
     if (!result) return null;
     return { fingerprint, ...result };
   } catch (err) {
-    console.error(`[CompanyEnricher] Failed for "${companyName}":`, err);
+    logger.error({ err }, `[CompanyEnricher] Failed for "${companyName}":`);
     return null;
   }
 }
@@ -120,7 +121,7 @@ async function scrapeCompaniesHouse(companyName: string): Promise<{
       websiteUrl: data.website_url ?? null,
     };
   } catch (err) {
-    console.warn(`[CompanyEnricher] Python scrape call failed:`, err);
+    logger.warn({ err }, `[CompanyEnricher] Python scrape call failed:`);
     return null;
   }
 }

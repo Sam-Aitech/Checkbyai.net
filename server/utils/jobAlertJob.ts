@@ -1,5 +1,8 @@
 import * as cron from "node-cron";
 import { getAppUrl } from "./appUrl";
+import { logger } from "./logger";
+
+const log = logger.child({ module: "JobAlertJob" });
 import { db } from "../db";
 import {
   companyWatches,
@@ -110,7 +113,7 @@ async function sendJobDigestEmail(
       body: JSON.stringify({ from: FROM_ADDRESS, to: [to], subject, html }),
     });
   } catch (err) {
-    console.error("[JobAlertJob] Email send failed:", err);
+    log.error({ err }, "[JobAlertJob] Email send failed");
   }
 }
 
@@ -119,7 +122,7 @@ async function sendJobDigestEmail(
 export async function runJobAlertJob(orchestration?: { correlationId?: string; triggerSource?: TriggerSource }): Promise<void> {
   const lockAcquired = await tryAcquireJobLock();
   if (!lockAcquired) {
-    console.log("[JobAlertJob] Another instance is running. Skipping.");
+    log.info("[JobAlertJob] Another instance is running. Skipping.");
     return;
   }
 
@@ -128,7 +131,7 @@ export async function runJobAlertJob(orchestration?: { correlationId?: string; t
   let outcome: "success" | "failed" = "success";
   let failureReason: string | null = null;
   try {
-    console.log("[JobAlertJob] Starting nightly job alert scan...");
+    log.info("[JobAlertJob] Starting nightly job alert scan...");
     const today = new Date().toISOString().split("T")[0];
 
     // 1. Find all distinct fingerprints where any Pro user has job alerts enabled
@@ -141,7 +144,7 @@ export async function runJobAlertJob(orchestration?: { correlationId?: string; t
       .where(eq(jobAlertPreferences.enabled, true));
 
     if (prefs.length === 0) {
-      console.log("[JobAlertJob] No active job alert preferences found.");
+      log.info("[JobAlertJob] No active job alert preferences found.");
       return;
     }
 
@@ -163,7 +166,7 @@ export async function runJobAlertJob(orchestration?: { correlationId?: string; t
     });
 
     if (eligiblePrefs.length === 0) {
-      console.log("[JobAlertJob] No Pro users with job alerts enabled.");
+      log.info("[JobAlertJob] No Pro users with job alerts enabled.");
       return;
     }
 
@@ -214,7 +217,7 @@ export async function runJobAlertJob(orchestration?: { correlationId?: string; t
       const newJobs = result.jobs.filter((j) => !existingHashes.has(j.content_hash));
 
       if (newJobs.length === 0) {
-        console.log(`[JobAlertJob] No new jobs for "${canonical.currentName}".`);
+        log.info(`[JobAlertJob] No new jobs for "${canonical.currentName}".`);
         continue;
       }
 
@@ -235,11 +238,11 @@ export async function runJobAlertJob(orchestration?: { correlationId?: string; t
           })),
         ).onConflictDoNothing();
       } catch (err) {
-        console.error(`[JobAlertJob] DB insert failed for "${canonical.currentName}":`, err);
+        log.error({ err }, `[JobAlertJob] DB insert failed for "${canonical.currentName}"`);
       }
 
       newJobsByFingerprint.set(fp, newJobs as any);
-      console.log(`[JobAlertJob] "${canonical.currentName}" → ${newJobs.length} new jobs.`);
+      log.info(`[JobAlertJob] "${canonical.currentName}" → ${newJobs.length} new jobs.`);
     }
 
     // 6. Send one digest email per user (group all their watched companies)
@@ -267,9 +270,9 @@ export async function runJobAlertJob(orchestration?: { correlationId?: string; t
       }
     }
 
-    console.log(`[JobAlertJob] Complete. Emails sent: ${emailsSent}`);
+    log.info(`[JobAlertJob] Complete. Emails sent: ${emailsSent}`);
   } catch (err) {
-    console.error("[JobAlertJob] Fatal error:", err);
+    log.error({ err }, "[JobAlertJob] Fatal error");
     outcome = "failed";
     failureReason = err instanceof Error ? err.message : String(err);
   } finally {
@@ -283,7 +286,7 @@ export async function runJobAlertJob(orchestration?: { correlationId?: string; t
 export function startJobAlertScheduler(): void {
   const cutover = (process.env.CUTOVER_JOB_ALERT ?? "false").trim().toLowerCase();
   if (cutover === "true" || cutover === "1") {
-    console.log("[JobAlertJob] Inline cron suppressed — owned by central scheduler.");
+    log.info("[JobAlertJob] Inline cron suppressed — owned by central scheduler.");
     return;
   }
 
@@ -291,13 +294,13 @@ export function startJobAlertScheduler(): void {
   cron.schedule(
     "0 2 * * 1-5",
     async () => {
-      console.log("[JobAlertJob] Cron triggered.");
+      log.info("[JobAlertJob] Cron triggered.");
       await runJobAlertJob().catch((err) =>
-        console.error("[JobAlertJob] Unhandled cron error:", err),
+        log.error({ err }, "[JobAlertJob] Unhandled cron error"),
       );
     },
     { timezone: "UTC" },
   );
 
-  console.log("[JobAlertJob] Inline cron registered (CUTOVER_JOB_ALERT not set).");
+  log.info("[JobAlertJob] Inline cron registered (CUTOVER_JOB_ALERT not set).");
 }

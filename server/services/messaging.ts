@@ -1,4 +1,5 @@
 import Twilio from "twilio";
+import { logger } from "../utils/logger";
 
 interface SendResult {
   success: boolean;
@@ -23,7 +24,7 @@ function getTwilioClient(): ReturnType<typeof Twilio> | null {
 export async function sendSMS(phoneNumber: string, message: string): Promise<SendResult> {
   const apiKey = process.env.BREVO_API_KEY;
   if (!apiKey) {
-    console.warn("[Messaging] BREVO_API_KEY not configured, SMS will not be sent");
+    logger.warn("[Messaging] BREVO_API_KEY not configured, SMS will not be sent");
     return { success: false, error: "BREVO_API_KEY not configured" };
   }
 
@@ -45,7 +46,7 @@ export async function sendSMS(phoneNumber: string, message: string): Promise<Sen
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`[Messaging] Brevo SMS API ${response.status}: ${errorText}`);
+      logger.error(`[Messaging] Brevo SMS API ${response.status}: ${errorText}`);
       return { success: false, error: `Brevo SMS API ${response.status}: ${errorText}` };
     }
 
@@ -53,7 +54,7 @@ export async function sendSMS(phoneNumber: string, message: string): Promise<Sen
     return { success: true, providerMessageId: data.messageId || data.reference || String(data.messageId) };
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err);
-    console.error("[Messaging] SMS send error:", errMsg);
+    logger.error({ err: errMsg }, "[Messaging] SMS send error:");
     return { success: false, error: errMsg || "Unknown SMS send error" };
   }
 }
@@ -62,13 +63,13 @@ export async function sendWhatsApp(phoneNumber: string, message: string): Promis
   const fromNumber = process.env.TWILIO_WHATSAPP_NUMBER;
 
   if (!fromNumber) {
-    console.warn("[Messaging] TWILIO_WHATSAPP_NUMBER not configured, WhatsApp will not be sent");
+    logger.warn("[Messaging] TWILIO_WHATSAPP_NUMBER not configured, WhatsApp will not be sent");
     return { success: false, error: "TWILIO_WHATSAPP_NUMBER not configured" };
   }
 
   const client = getTwilioClient();
   if (!client) {
-    console.warn("[Messaging] TWILIO_ACCOUNT_SID or TWILIO_AUTH_TOKEN not configured, WhatsApp will not be sent");
+    logger.warn("[Messaging] TWILIO_ACCOUNT_SID or TWILIO_AUTH_TOKEN not configured, WhatsApp will not be sent");
     return { success: false, error: "Twilio credentials not configured" };
   }
 
@@ -82,7 +83,7 @@ export async function sendWhatsApp(phoneNumber: string, message: string): Promis
     return { success: true, providerMessageId: result.sid };
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err);
-    console.error("[Messaging] WhatsApp send error:", errMsg);
+    logger.error({ err: errMsg }, "[Messaging] WhatsApp send error:");
     return { success: false, error: errMsg || "Unknown WhatsApp send error" };
   }
 }

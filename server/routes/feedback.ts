@@ -3,6 +3,7 @@ import { z } from "zod";
 import { insertFeedbackSchema } from "@shared/schema";
 import { storage } from "../storage";
 import rateLimit from "express-rate-limit";
+import { logger } from "../utils/logger";
 
 const feedbackLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -28,7 +29,7 @@ export function registerFeedbackRoutes(app: Express): void {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid feedback data", errors: error.errors });
       }
-      console.error("Error creating feedback:", error);
+      logger.error({ err: error }, "Error creating feedback:");
       res.status(500).json({ message: "Failed to submit feedback" });
     }
   });

@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { logger } from "../utils/logger";
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
@@ -40,7 +41,7 @@ export function decryptPhone(encryptedPhone: string): string {
     const payload = encryptedPhone.slice(ENC_PREFIX.length);
     const data = Buffer.from(payload, "base64");
     if (data.length < IV_LENGTH + AUTH_TAG_LENGTH + 1) {
-      console.error("[PhoneCrypto] Encrypted payload too short");
+      logger.error("[PhoneCrypto] Encrypted payload too short");
       return encryptedPhone;
     }
 
@@ -53,7 +54,7 @@ export function decryptPhone(encryptedPhone: string): string {
     const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
     return decrypted.toString("utf8");
   } catch (err: unknown) {
-    console.error("[PhoneCrypto] Decryption failed:", err instanceof Error ? err.message : err);
+    logger.error({ err: err instanceof Error ? err.message : err }, "[PhoneCrypto] Decryption failed:");
     return encryptedPhone;
   }
 }

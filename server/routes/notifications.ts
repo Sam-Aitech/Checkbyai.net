@@ -13,6 +13,7 @@ import * as phoneOtpStore from "../utils/phoneOtpStore";
 import { success, fail } from "../lib/response";
 import { asyncHandler } from "../lib/errorHandler";
 import { ApiError } from "../lib/apiError";
+import { logger } from "../utils/logger";
 
 const MAX_OTP_ATTEMPTS = 5;
 const MAX_OTP_REQUESTS = 3;
@@ -261,18 +262,18 @@ export function registerNotificationRoutes(app: Express): void {
         deliveryResult = await sendWhatsApp(phone_number, otpMessage);
       }
     } catch (sendErr: any) {
-      console.error(`[NotificationOTP] Error sending OTP via ${channel}:`, sendErr.message);
+      logger.error({ err: sendErr.message }, `[NotificationOTP] Error sending OTP via ${channel}:`);
       await phoneOtpStore.deleteOtp(req.user.id, channel, phone_number);
       throw new ApiError(502, `Failed to deliver verification code via ${channel}. Please check the number and try again.`);
     }
 
     if (!deliveryResult.success) {
-      console.error(`[NotificationOTP] ${channel} delivery failed for ${phone_number}: ${deliveryResult.error}`);
+      logger.error(`[NotificationOTP] ${channel} delivery failed for ${phone_number}: ${deliveryResult.error}`);
       await phoneOtpStore.deleteOtp(req.user.id, channel, phone_number);
       throw new ApiError(502, `Failed to deliver verification code via ${channel}. Please check the number and try again.`);
     }
 
-    console.log(`[NotificationOTP] Code sent via ${channel} to ${phone_number} (user ${req.user.id})`);
+    logger.info(`[NotificationOTP] Code sent via ${channel} to ${phone_number} (user ${req.user.id})`);
 
     success(res, { message: `Verification code sent to ${phone_number} via ${channel}.` });
   }));

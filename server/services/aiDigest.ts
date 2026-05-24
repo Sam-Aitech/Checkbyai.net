@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { db } from "../db";
 import { aiGenerationLogs } from "@shared/schema";
+import { logger } from "../utils/logger";
 import { createChatCompletion, hasAnyProvider } from "./aiService";
 
 interface HeadlineVariant {
@@ -82,7 +83,7 @@ function validateHeadline(variant: HeadlineVariant, data: RawDigestData): boolea
 
 export async function generateHeadline(data: RawDigestData): Promise<GenerateResult> {
   if (!hasAnyProvider()) {
-    console.log("[AIDigest] No AI providers configured, using deterministic headline");
+    logger.info("[AIDigest] No AI providers configured, using deterministic headline");
     const result = deterministicHeadline(data);
     await logGeneration(data.snapshotDate, result.headline, true, "deterministic");
     return result;
@@ -134,14 +135,14 @@ Return ONLY valid JSON (no markdown):
     const allValid = validVariants.every((v) => validateHeadline(v, data));
 
     if (!allValid) {
-      console.warn(`[AIDigest] Validation failed for ${provider} variants, using deterministic fallback`);
+      logger.warn(`[AIDigest] Validation failed for ${provider} variants, using deterministic fallback`);
       const fallback = deterministicHeadline(data);
       await logGeneration(data.snapshotDate, fallback.headline, false, provider, "Validation failed");
       return fallback;
     }
 
     const headline = validVariants[0].headline;
-    console.log(`[AIDigest] Successfully generated headline via ${provider}`);
+    logger.info(`[AIDigest] Successfully generated headline via ${provider}`);
     await logGeneration(data.snapshotDate, headline, true, provider);
 
     return {
@@ -152,7 +153,7 @@ Return ONLY valid JSON (no markdown):
     };
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err);
-    console.error("[AIDigest] AI headline generation failed:", errMsg);
+    logger.error({ err: errMsg }, "[AIDigest] AI headline generation failed:");
     const fallback = deterministicHeadline(data);
     await logGeneration(data.snapshotDate, fallback.headline, false, "fallback", errMsg);
     return fallback;
@@ -175,7 +176,7 @@ async function logGeneration(
       errorDetails: errorDetails || null,
     });
   } catch (err) {
-    console.error("[AIDigest] Failed to log generation:", err);
+    logger.error({ err }, "[AIDigest] Failed to log generation:");
   }
 }
 

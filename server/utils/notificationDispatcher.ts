@@ -1,4 +1,7 @@
+import { logger } from "./logger";
 import { db } from "../db";
+
+const log = logger.child({ module: "NotificationDispatcher" });
 import { storage } from "../storage";
 import { eq, and, gte, lte, sql, inArray } from "drizzle-orm";
 import { companyWatches, notificationPreferences, notificationLog, users, sponsorChanges } from "@shared/schema";
@@ -223,7 +226,7 @@ async function logNotification(
       errorDetails: errorDetails || null,
     });
   } catch (err) {
-    console.error(`[NotificationDispatcher] Failed to log notification for user ${userId}, change ${changeId}:`, err);
+    log.error({ err }, `[NotificationDispatcher] Failed to log notification for user ${userId}, change ${changeId}`);
   }
 }
 
@@ -247,11 +250,11 @@ async function sendNotificationViaChannel(
     }
     const result = await sendViaResend(email, subject, html);
     if (result.success) {
-      console.log(`[NotificationDispatcher] Email sent to ${email}`);
+      log.info(`[NotificationDispatcher] Email sent to ${email}`);
       await logNotification(userId, changeId, "email", "sent", result.providerMessageId);
       stats.sent++;
     } else {
-      console.error(`[NotificationDispatcher] Email failed to ${email}: ${result.error}`);
+      log.error(`[NotificationDispatcher] Email failed to ${email}: ${result.error}`);
       await logNotification(userId, changeId, "email", "failed", undefined, result.error);
       stats.failed++;
     }
@@ -260,11 +263,11 @@ async function sendNotificationViaChannel(
     const phone = decryptPhone(smsNumber);
     const result = await sendSMS(phone, plainText);
     if (result.success) {
-      console.log(`[NotificationDispatcher] SMS sent to ${phone}`);
+      log.info(`[NotificationDispatcher] SMS sent to ${phone}`);
       await logNotification(userId, changeId, "sms", "sent", result.providerMessageId);
       stats.sent++;
     } else {
-      console.error(`[NotificationDispatcher] SMS failed to ${phone}: ${result.error}`);
+      log.error(`[NotificationDispatcher] SMS failed to ${phone}: ${result.error}`);
       await logNotification(userId, changeId, "sms", "failed", undefined, result.error);
       stats.failed++;
     }
@@ -273,11 +276,11 @@ async function sendNotificationViaChannel(
     const phone = decryptPhone(whatsappNumber);
     const result = await sendWhatsApp(phone, plainText);
     if (result.success) {
-      console.log(`[NotificationDispatcher] WhatsApp sent to ${phone}`);
+      log.info(`[NotificationDispatcher] WhatsApp sent to ${phone}`);
       await logNotification(userId, changeId, "whatsapp", "sent", result.providerMessageId);
       stats.sent++;
     } else {
-      console.error(`[NotificationDispatcher] WhatsApp failed to ${phone}: ${result.error}`);
+      log.error(`[NotificationDispatcher] WhatsApp failed to ${phone}: ${result.error}`);
       await logNotification(userId, changeId, "whatsapp", "failed", undefined, result.error);
       stats.failed++;
     }
@@ -290,7 +293,7 @@ export async function notifyAffectedUsers(change: SponsorChange): Promise<{ sent
   // Global kill switch — admin can pause all notifications via /api/admin/notifications/pause
   const pausedFlag = await storage.getSystemSetting('notifications_paused');
   if (pausedFlag === 'true') {
-    console.log(`[NotificationDispatcher] Notifications paused by admin — skipping dispatch for "${change.organisationName}"`);
+    log.info(`[NotificationDispatcher] Notifications paused by admin — skipping dispatch for "${change.organisationName}"`);
     return stats;
   }
 
@@ -298,7 +301,7 @@ export async function notifyAffectedUsers(change: SponsorChange): Promise<{ sent
   // this function is called. Guard defensively in case of unexpected flow.
   const changeId = change.id;
   if (changeId === undefined) {
-    console.warn(
+    log.warn(
       `[NotificationDispatcher] Skipping notifications for "${change.organisationName}" (${change.changeType}) — ` +
       "changeId not set. This change was not persisted to sponsorChanges before dispatch.",
     );
@@ -323,13 +326,13 @@ export async function notifyAffectedUsers(change: SponsorChange): Promise<{ sent
       );
 
     if (activeWatches.length === 0) {
-      console.log(`[NotificationDispatcher] No active watches for "${change.organisationName}"`);
+      log.info(`[NotificationDispatcher] No active watches for "${change.organisationName}"`);
       return stats;
     }
 
     // Deduplicate users — one user may watch the same company multiple times
     const uniqueUserIds = Array.from(new Set(activeWatches.map(w => w.userId)));
-    console.log(`[NotificationDispatcher] Found ${activeWatches.length} watch(es) for "${change.organisationName}" across ${uniqueUserIds.length} unique user(s) (change: ${change.changeType})`);
+    log.info(`[NotificationDispatcher] Found ${activeWatches.length} watch(es) for "${change.organisationName}" across ${uniqueUserIds.length} unique user(s) (change: ${change.changeType})`);
 
     // ── Step 2: BATCH all 3 lookups into one parallel Promise.all() ─────────
     // BEFORE (N+1 antipattern): for each watcher → await rateLimitCount,
@@ -403,7 +406,7 @@ export async function notifyAffectedUsers(change: SponsorChange): Promise<{ sent
         // O(1) Map lookups instead of sequential awaits
         const recentCount = rateLimitMap.get(watch.userId) ?? 0;
         if (recentCount >= MAX_NOTIFICATIONS_PER_DAY) {
-          console.log(`[NotificationDispatcher] Rate limit reached for user ${watch.userId} (${recentCount}/${MAX_NOTIFICATIONS_PER_DAY} in 24h)`);
+          log.info(`[NotificationDispatcher] Rate limit reached for user ${watch.userId} (${recentCount}/${MAX_NOTIFICATIONS_PER_DAY} in 24h)`);
           await logNotification(watch.userId, changeId, "email", "skipped", undefined, "Rate limit: exceeded 10 notifications in 24 hours");
           stats.skipped++;
           continue;
@@ -436,7 +439,7 @@ export async function notifyAffectedUsers(change: SponsorChange): Promise<{ sent
               stats.queued++;
             }
           }
-          console.log(`[NotificationDispatcher] Queued notifications for ${userPlan} user ${watch.userId} (deliver after ${deliverAfter.toISOString()})`);
+          log.info(`[NotificationDispatcher] Queued notifications for ${userPlan} user ${watch.userId} (deliver after ${deliverAfter.toISOString()})`);
           continue;
         } else {
           // Dispatch all channels in parallel — email/SMS/WhatsApp are independent I/O
@@ -453,12 +456,12 @@ export async function notifyAffectedUsers(change: SponsorChange): Promise<{ sent
           await Promise.all(channelPromises);
         }
       } catch (err) {
-        console.error(`[NotificationDispatcher] Error processing user ${watch.userId}:`, err);
+        log.error({ err }, `[NotificationDispatcher] Error processing user ${watch.userId}`);
         stats.failed++;
       }
     }
   } catch (err) {
-    console.error(`[NotificationDispatcher] Error dispatching notifications for "${change.organisationName}" (${change.changeType}):`, err);
+    log.error({ err }, `[NotificationDispatcher] Error dispatching notifications for "${change.organisationName}" (${change.changeType})`);
   }
 
   return stats;

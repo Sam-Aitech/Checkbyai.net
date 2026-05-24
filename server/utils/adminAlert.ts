@@ -1,3 +1,5 @@
+import { logger } from "../utils/logger";
+
 /**
  * Shared admin email alert utility.
  *
@@ -16,7 +18,7 @@ export async function sendAdminAlert(
   const adminEmail = process.env.ADMIN_EMAIL;
 
   if (!apiKey || !adminEmail) {
-    console.warn("[adminAlert] RESEND_API_KEY or ADMIN_EMAIL not configured — alert skipped:", subject);
+    logger.warn({ err: subject }, "[adminAlert] RESEND_API_KEY or ADMIN_EMAIL not configured — alert skipped:");
     return;
   }
 
@@ -31,9 +33,9 @@ export async function sendAdminAlert(
     });
 
     if (!response.ok) {
-      console.error("[adminAlert] Resend API returned error:", await response.text());
+      logger.error({ err: await response.text() }, "[adminAlert] Resend API returned error:");
     }
   } catch (err) {
-    console.error("[adminAlert] Failed to send alert:", err);
+    logger.error({ err }, "[adminAlert] Failed to send alert:");
   }
 }

@@ -78,14 +78,14 @@ async function tryAcquireJobLock(): Promise<boolean> {
 
     return acquired;
   } catch (err) {
-    console.error('[SponsorMonitorJob] Failed to acquire advisory lock:', err);
+    log.error({ err }, '[SponsorMonitorJob] Failed to acquire advisory lock');
     return false;
   }
 }
 
 async function releaseJobLock(): Promise<void> {
   await db.execute(sql`SELECT pg_advisory_unlock(${SPONSOR_MONITOR_LOCK_KEY})`).catch(err => {
-    console.error('[SponsorMonitorJob] Failed to release advisory lock:', err);
+    log.error({ err }, '[SponsorMonitorJob] Failed to release advisory lock');
   });
 }
 
@@ -121,7 +121,7 @@ async function sendAdminFailureAlert(errorMessage: string): Promise<void> {
     </div>
   `;
   await sendAdminAlert("ALERT: Daily sponsor monitor job failed", html);
-  console.log("[SponsorMonitorJob] Admin failure alert sent.");
+  log.info("[SponsorMonitorJob] Admin failure alert sent.");
 }
 
 async function sendAdminJobCompleteEmail(result: {
@@ -202,9 +202,9 @@ async function sendAdminJobCompleteEmail(result: {
 
   try {
     await sendAdminAlert(subject, html);
-    console.log(`[SponsorMonitorJob] Job ${isSuccess ? "success" : "failure"} email sent.`);
+    log.info(`[SponsorMonitorJob] Job ${isSuccess ? "success" : "failure"} email sent.`);
   } catch (err) {
-    console.error("[SponsorMonitorJob] Error sending job completion email:", err);
+    log.error({ err }, "[SponsorMonitorJob] Error sending job completion email");
   }
 }
 
@@ -385,7 +385,7 @@ async function saveDiffResult(runDate: string, diff: CsvDiffResult): Promise<voi
       diffJson:             diffPayload,
     }).onConflictDoNothing();
   } catch (err: unknown) {
-    console.warn("[SponsorMonitorJob] Failed to save diff result (non-fatal):", err instanceof Error ? err.message : String(err));
+    log.warn({ err }, "[SponsorMonitorJob] Failed to save diff result (non-fatal)");
   }
 }
 
@@ -421,7 +421,7 @@ export async function runSponsorMonitorJob(
   const lockAcquired = await tryAcquireJobLock();
   if (!lockAcquired) {
     const msg = "Another instance is already running the sponsor monitor job. Skipping.";
-    console.warn(`[SponsorMonitorJob] ${msg}`);
+    log.warn(`[SponsorMonitorJob] ${msg}`);
     return { ...result, error: msg };
   }
 
@@ -477,14 +477,14 @@ export async function runSponsorMonitorJob(
         });
       }, "Log job failure");
     } catch (logErr) {
-      console.error("[SponsorMonitorJob] Failed to log job failure:", logErr);
+      log.error({ err: logErr }, "[SponsorMonitorJob] Failed to log job failure");
     }
     if (notifyOnFailure) {
       sendAdminJobCompleteEmail(
         { success: false, recordsProcessed: result.recordsProcessed, notificationsQueued: result.notificationsQueued, notificationsSent: result.notificationsSent, notificationsSkipped: result.notificationsSkipped, notificationsFailed: result.notificationsFailed, error: errorMsg },
         failDuration,
         source
-      ).catch((e) => console.error('[SponsorMonitorJob] Failed to send admin failure alert email:', e));
+      ).catch((e) => log.error({ err: e }, '[SponsorMonitorJob] Failed to send admin failure alert email'));
     }
     Object.assign(result, { error: errorMsg });
     finishJobRun({ ...telemetry, jobName: "sponsorMonitorJob", triggerSource, runMode: "inline", result: "failed", failureReason: errorMsg });
@@ -512,7 +512,7 @@ export async function runSponsorMonitorJob(
     const today     = new Date().toISOString().split("T")[0];
     const yesterday = new Date(Date.now() - 86_400_000).toISOString().split("T")[0];
 
-    console.log(`[SponsorMonitorJob] === Daily sponsor monitor check starting (triggered by: ${source}) ===`);
+    log.info(`[SponsorMonitorJob] === Daily sponsor monitor check starting (triggered by: ${source}) ===`);
 
     // ── ETL integrity check (migration 0014) ───────────────────────────────────
     // Detect archives that were downloaded in a prior run but whose state machine
@@ -541,7 +541,7 @@ export async function runSponsorMonitorJob(
 
     if (existingRun.length > 0 && existingRun[0].status === "success" && source === "cron") {
       const msg = `Reconciliation already completed successfully for ${today}. Skipping duplicate cron run.`;
-      console.log(`[SponsorMonitorJob] ${msg}`);
+      log.info(`[SponsorMonitorJob] ${msg}`);
       result.success = true;
       Object.assign(result, { error: msg });
       return;
@@ -551,7 +551,7 @@ export async function runSponsorMonitorJob(
     // ensureTodaysArchive: download → qsv validate → count guard (≥100k) → DB register
     // Hard-throws on HTTP failure, truncated file, or zero bytes.
     const csvUrl = await discoverCsvUrl();
-    console.log(`[SponsorMonitorJob] CSV URL discovered.`);
+    log.info(`[SponsorMonitorJob] CSV URL discovered.`);
     const todayArchive = await ensureTodaysArchive(today, csvUrl);
     result.recordsProcessed = todayArchive.recordCount;
 
@@ -575,7 +575,7 @@ export async function runSponsorMonitorJob(
         diff = await buildGapDayDiff(todayArchive.filePath);
       } else {
         // True first run — canonical is empty. Seed it with all today's records.
-        console.log(
+        log.info(
           `[SponsorMonitorJob] No archive for ${yesterday} and canonical is empty — ` +
           `first run detected. Treating all ${todayArchive.recordCount.toLocaleString()} records as NEW_LICENCE.`,
         );
@@ -583,7 +583,7 @@ export async function runSponsorMonitorJob(
       }
     } else {
       // Standard night: diff yesterday vs today using the Go csvdiff binary.
-      console.log(
+      log.info(
         `[SponsorMonitorJob] Diffing ${yesterday} (${yesterdayArchive.recordCount.toLocaleString()}) ` +
         `vs ${today} (${todayArchive.recordCount.toLocaleString()}) …`,
       );
@@ -592,7 +592,7 @@ export async function runSponsorMonitorJob(
         todayArchive.fingerprintedFilePath,
         ["fingerprint"],
       );
-      console.log(
+      log.info(
         `[SponsorMonitorJob] csvdiff: +${diff.Additions.length} added, ` +
         `-${diff.Deletions.length} removed, ~${diff.Modifications.length} modified ` +
         `(${diff.durationMs}ms)`,
@@ -606,7 +606,7 @@ export async function runSponsorMonitorJob(
     // applyStateMachine handles all DB writes (canonical + sponsorChanges) internally.
     // syncStatus is updated to SYNCED on success or FAILED on error so that the
     // ETL integrity check on the next run can detect incomplete state machine runs.
-    console.log("[SponsorMonitorJob] Applying state machine…");
+    log.info("[SponsorMonitorJob] Applying state machine…");
     let smResult: Awaited<ReturnType<typeof applyStateMachine>>;
     try {
       smResult = await applyStateMachine(diff, today, todayArchive.fingerprintedFilePath);
@@ -616,7 +616,7 @@ export async function runSponsorMonitorJob(
         .set({ syncStatus: "SYNCED" })
         .where(eq(csvArchive.snapshotDate, today))
         .catch((err: unknown) =>
-          console.warn("[SponsorMonitorJob] Failed to mark archive SYNCED (non-fatal):", err instanceof Error ? err.message : String(err))
+          log.warn({ err }, "[SponsorMonitorJob] Failed to mark archive SYNCED (non-fatal)")
         );
     } catch (smErr: unknown) {
       // Mark the archive as FAILED so the integrity check surfaces it clearly.
@@ -625,7 +625,7 @@ export async function runSponsorMonitorJob(
         .set({ syncStatus: "FAILED" })
         .where(eq(csvArchive.snapshotDate, today))
         .catch((err: unknown) =>
-          console.warn("[SponsorMonitorJob] Failed to mark archive FAILED (non-fatal):", err instanceof Error ? err.message : String(err))
+          log.warn({ err }, "[SponsorMonitorJob] Failed to mark archive FAILED (non-fatal)")
         );
       throw smErr; // re-throw so the outer catch logs + sends admin alert
     }
@@ -636,7 +636,7 @@ export async function runSponsorMonitorJob(
     // Non-fatal: if Redis is down, cacheFlushPattern returns 0 silently.
     const flushed = await cacheFlushPattern("sponsors:*");
     if (flushed > 0) {
-      console.log(`[SponsorMonitorJob] Flushed ${flushed} Redis cache keys after nightly rebuild.`);
+      log.info(`[SponsorMonitorJob] Flushed ${flushed} Redis cache keys after nightly rebuild.`);
     }
 
     const changeCounts: Record<string, number> = {};
@@ -655,9 +655,9 @@ export async function runSponsorMonitorJob(
      // database seed or a massive structural change. We should not attempt to dispatch 
      // notifications for every single one of them.
      if (alertableChanges.length > 10000) {
-       console.log(`[SponsorMonitorJob] Skipping notifications for ${alertableChanges.length} alertable changes (first-run / mass update).`);
+       log.info(`[SponsorMonitorJob] Skipping notifications for ${alertableChanges.length} alertable changes (first-run / mass update).`);
      } else if (alertableChanges.length > 0) {
-       console.log(`[SponsorMonitorJob] Queueing notifications for ${alertableChanges.length} alertable changes…`);
+       log.info(`[SponsorMonitorJob] Queueing notifications for ${alertableChanges.length} alertable changes…`);
        const notifQueue = getNotificationQueue();
        if (notifQueue) {
       const jobs = alertableChanges.map(change => ({
@@ -674,13 +674,12 @@ export async function runSponsorMonitorJob(
          await notifQueue.addBulk(jobs);
          result.notificationsQueued = jobs.length;
        } else {
-          console.log('[SponsorMonitorJob] Notification queue not available (Redis down); falling back to inline processing');
+          log.info('[SponsorMonitorJob] Notification queue not available (Redis down); falling back to inline processing');
           // Fallback: process inline but with limits
           for (const change of alertableChanges.slice(0, 50)) { // Limit fallback to prevent overload
             const notifResult = await notifyUsersOfEvent(change).catch((err: any) => {
-              console.error(
-                `[SponsorMonitorJob] Notification engine error for "${change.organisationName}":`,
-                err?.message ?? String(err),
+              log.error({ err },
+                `[SponsorMonitorJob] Notification engine error for "${change.organisationName}"`,
               );
               return { sent: 0, skipped: 0, failed: 1 }; // Count failures
             });
@@ -692,7 +691,7 @@ export async function runSponsorMonitorJob(
           }
        }
      } else {
-       console.log("[SponsorMonitorJob] No alertable changes today.");
+       log.info("[SponsorMonitorJob] No alertable changes today.");
      }
 
     // ── Daily digest ────────────────────────────────────────────────────────────
@@ -749,9 +748,9 @@ export async function runSponsorMonitorJob(
         },
       });
 
-      console.log(`[SponsorMonitorJob] Daily digest generated: "${headlineResult.headline}" (model: ${headlineResult.model})`);
+      log.info(`[SponsorMonitorJob] Daily digest generated: "${headlineResult.headline}" (model: ${headlineResult.model})`);
     } catch (digestErr: any) {
-      console.error("[SponsorMonitorJob] Failed to generate daily digest:", digestErr?.message ?? String(digestErr));
+      log.error({ err: digestErr }, "[SponsorMonitorJob] Failed to generate daily digest");
     }
 
     // ── Audit log ────────────────────────────────────────────────────────────────
@@ -793,7 +792,7 @@ export async function runSponsorMonitorJob(
     result.success = true;
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.log(
+    log.info(
       `[SponsorMonitorJob] === Job complete (${elapsed}s) ===\n` +
       `  Records processed: ${result.recordsProcessed.toLocaleString()}\n` +
       `  Changes detected: ${smResult.changes.length} total` +
@@ -816,7 +815,7 @@ export async function runSponsorMonitorJob(
       },
       Date.now() - startTime,
       source,
-    ).catch((e) => console.error("[SponsorMonitorJob] Failed to send admin job completion email:", e));
+    ).catch((e) => log.error({ err: e }, "[SponsorMonitorJob] Failed to send admin job completion email"));
   } // end runJobCore
 }
 
@@ -828,7 +827,7 @@ async function seedInitialDigest(): Promise<void> {
   try {
     const existing = await db.select({ id: dailyDigest.id }).from(dailyDigest).limit(1);
     if (existing.length > 0) {
-      console.log("[SponsorMonitorJob] Daily digest already has data, skipping seed.");
+      log.info("[SponsorMonitorJob] Daily digest already has data, skipping seed.");
       return;
     }
 
@@ -842,7 +841,7 @@ async function seedInitialDigest(): Promise<void> {
 
     const { total, active, revoked } = stats[0] || { total: 0, active: 0, revoked: 0 };
     if (total === 0) {
-      console.log("[SponsorMonitorJob] No sponsor data found, cannot seed digest.");
+      log.info("[SponsorMonitorJob] No sponsor data found, cannot seed digest.");
       return;
     }
 
@@ -889,9 +888,9 @@ async function seedInitialDigest(): Promise<void> {
       },
     });
 
-    console.log(`[SponsorMonitorJob] Initial digest seeded: "${headline}" (${active} active, ${revoked} revoked sponsors)`);
+    log.info(`[SponsorMonitorJob] Initial digest seeded: "${headline}" (${active} active, ${revoked} revoked sponsors)`);
   } catch (err: unknown) {
-    console.error("[SponsorMonitorJob] Failed to seed initial digest:", err instanceof Error ? err.message : String(err));
+    log.error({ err }, "[SponsorMonitorJob] Failed to seed initial digest");
   }
 }
 
@@ -910,7 +909,7 @@ async function hasTodayJobSucceeded(): Promise<boolean | null> {
       .limit(1);
     return existing.length > 0;
   } catch (err) {
-    console.error("[SponsorMonitorJob] Error checking today's job status:", err);
+    log.error({ err }, "[SponsorMonitorJob] Error checking today's job status");
     return null;
   }
 }
@@ -1001,38 +1000,38 @@ async function checkMissedJobsAndCatchUp(): Promise<void> {
 
 export function startSponsorMonitorCron(): void {
   seedInitialDigest().catch((err) => {
-    console.error("[SponsorMonitorJob] Error in initial digest seed:", err);
+    log.error({ err }, "[SponsorMonitorJob] Error in initial digest seed");
   });
 
   const sponsorCutover = (process.env.CUTOVER_SPONSOR_MONITOR ?? "false").trim().toLowerCase();
   if (sponsorCutover !== "true" && sponsorCutover !== "1") {
     cron.schedule("30 0 * * 1-5", () => {
-      console.log("[SponsorMonitorJob] Cron trigger fired at", new Date().toISOString());
+      log.info(`[SponsorMonitorJob] Cron trigger fired at ${new Date().toISOString()}`);
       runSponsorMonitorJob("cron", true).catch((err) => {
-        console.error("[SponsorMonitorJob] Unhandled error in cron execution:", err);
+        log.error({ err }, "[SponsorMonitorJob] Unhandled error in cron execution");
       });
     }, {
       timezone: "UTC",
     });
   } else {
-    console.log("[SponsorMonitorJob] Skipping inline cron initialization; scheduler owns this job.");
+    log.info("[SponsorMonitorJob] Skipping inline cron initialization; scheduler owns this job.");
   }
 
   const drainCutover = (process.env.CUTOVER_NOTIFICATION_DRAIN ?? "false").trim().toLowerCase();
   if (drainCutover !== "true" && drainCutover !== "1") {
     cron.schedule("0 * * * *", () => {
       processQueuedEngineEvents().catch((err: any) => {
-        console.error("[NotificationEngine] Error processing queued engine events:", err);
+        log.error({ err }, "[NotificationEngine] Error processing queued engine events");
       });
     }, {
       timezone: "UTC",
     });
-    console.log("[SponsorMonitorJob] Notification drain inline cron registered (CUTOVER_NOTIFICATION_DRAIN not set).");
+    log.info("[SponsorMonitorJob] Notification drain inline cron registered (CUTOVER_NOTIFICATION_DRAIN not set).");
   } else {
-    console.log("[SponsorMonitorJob] Notification drain inline cron suppressed — owned by central scheduler.");
+    log.info("[SponsorMonitorJob] Notification drain inline cron suppressed — owned by central scheduler.");
   }
 
-  console.log("[SponsorMonitorJob] Cron setup complete.");
+  log.info("[SponsorMonitorJob] Cron setup complete.");
 
   // Startup catch-up: 2 minutes after boot, check for missed weekday jobs.
   // On Autoscale deployments the in-process cron fires into a dead server —
@@ -1058,7 +1057,7 @@ export async function isJobRunning(): Promise<boolean> {
     `);
     return (result.rows[0] as any)?.locked === true;
   } catch (err) {
-    console.error('[SponsorMonitorJob] Failed to check advisory lock:', err);
+    log.error({ err }, '[SponsorMonitorJob] Failed to check advisory lock');
     return false;
   }
 }
@@ -1090,17 +1089,17 @@ export async function checkAndTriggerIfNeeded(startup = false): Promise<void> {
       // to avoid racing with a cron that is actively running. The advisory lock inside
       // runSponsorMonitorJob would block a duplicate run anyway, but this avoids noise.
       if (utcHour === 0 && utcMinute >= 20 && utcMinute < 45) {
-        console.log("[SponsorMonitorJob] Startup catchup: cron window active (00:20–00:45 UTC), deferring.");
+        log.info("[SponsorMonitorJob] Startup catchup: cron window active (00:20–00:45 UTC), deferring.");
         return;
       }
     }
 
     const source = startup ? "startup-catchup" : "request-trigger";
-    console.log(`[SponsorMonitorJob] ${startup ? "Startup-catchup" : "Request"}-triggered check: today's job has not run. Triggering now (source: ${source})...`);
+    log.info(`[SponsorMonitorJob] ${startup ? "Startup-catchup" : "Request"}-triggered check: today's job has not run. Triggering now (source: ${source})...`);
     runSponsorMonitorJob(source).catch((err) => {
-      console.error(`[SponsorMonitorJob] ${startup ? "Startup-catchup" : "Request"}-triggered job error:`, err);
+      log.error({ err }, `[SponsorMonitorJob] ${startup ? "Startup-catchup" : "Request"}-triggered job error`);
     });
   } catch (err) {
-    console.error("[SponsorMonitorJob] Trigger check error:", err);
+    log.error({ err }, "[SponsorMonitorJob] Trigger check error");
   }
 }

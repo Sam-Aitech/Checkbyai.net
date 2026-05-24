@@ -376,7 +376,7 @@ async function applyDataFixbacks() {
    // hits a warm index rather than triggering an on-demand full-table scan.
    // Fire-and-forget: a failed warm-up degrades to the normal lazy-build path.
    rebuildSponsorIndex().catch((err: unknown) =>
-     console.warn("[Startup] Sponsor index warm-up failed (non-fatal):", err instanceof Error ? err.message : String(err))
+     logger.warn({ err: err instanceof Error ? err.message : String(err) }, "[Startup] Sponsor index warm-up failed (non-fatal)")
    );
 
    // ALWAYS serve the app on port 5000

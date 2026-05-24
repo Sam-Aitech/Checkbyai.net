@@ -27,6 +27,9 @@ import type { CsvDiffResult } from "./binaryRunner";
 import type { SponsorChange } from "./sponsorListFetcher";
 import { loadFingerprintSet } from "./csvFingerprintBuilder";
 import { storage } from "../storage";
+import { logger } from "./logger";
+
+const log = logger.child({ module: "SponsorStateMachine" });
 import { buildEmail, sendViaResend } from "../services/notificationEngine";
 import { 
   areCompaniesFuzzyMatch, 
@@ -122,12 +125,12 @@ async function sendReactivationEmail(toEmail: string, companyName: string): Prom
     const { subject, html } = buildEmail("RE_ACTIVATED", companyName, "REMOVED_REVOKED", "NEWLY_GRANTED");
     const result = await sendViaResend(toEmail, subject, html);
     if (!result.success) {
-      console.error("[ReactivationWatch] Resend error:", result.error);
+      log.error({ err: result.error }, "[ReactivationWatch] Resend error");
       return false;
     }
     return true;
   } catch (err) {
-    console.error("[ReactivationWatch] Email send failed:", err);
+    log.error({ err }, "[ReactivationWatch] Email send failed");
     return false;
   }
 }
@@ -139,7 +142,7 @@ async function notifyReactivationWatchers(companyNames: string[]): Promise<void>
     // this is likely the first ETL run (140k+ records). We can skip reactivation emails
     // since no user could possibly have pending watches for 140k newly imported companies.
     if (companyNames.length > 10000) {
-      console.log(`[ReactivationWatch] Skipping individual checks for ${companyNames.length} candidates (likely first-run).`);
+      log.info(`[ReactivationWatch] Skipping individual checks for ${companyNames.length} candidates (likely first-run).`);
       return;
     }
 
@@ -150,13 +153,13 @@ async function notifyReactivationWatchers(companyNames: string[]): Promise<void>
         const sent = await sendReactivationEmail(watch.userEmail, watch.companyName);
         if (sent) {
           await storage.markSponsorWatchNotified(watch.id);
-          console.log(`[ReactivationWatch] Notified ${watch.userEmail} → "${watch.companyName}"`);
+          log.info(`[ReactivationWatch] Notified ${watch.userEmail} → "${watch.companyName}"`);
         }
       }
     }
   } catch (err) {
     // Never let notification errors abort the pipeline
-    console.error("[ReactivationWatch] notifyReactivationWatchers failed (non-fatal):", err);
+    log.error({ err }, "[ReactivationWatch] notifyReactivationWatchers failed (non-fatal)");
   }
 }
 
@@ -209,7 +212,7 @@ export async function applyStateMachine(
     }
   }
 
-  console.log(`[StateMachine] Loaded ${canonicalMap.size} affected canonical records.`);
+  log.info(`[StateMachine] Loaded ${canonicalMap.size} affected canonical records.`);
 
    // ── Phase A½: Fuzzy Reconciliation of Additions/Deletions ────────
    const modUpdates: Array<{
@@ -245,12 +248,12 @@ export async function applyStateMachine(
    });
 
    // Log reconciliation results
-   if (reconciliation.matches.length > 0) {
-     console.log(`[StateMachine] Fuzzy reconciliation: ${reconciliation.matches.length} likely renames/relocations detected`);
-     for (const match of reconciliation.matches) {
-       console.log(`[StateMachine]   "${match.previous.organisationName}" → "${match.current.organisationName}" (similarity: ${match.similarity.toFixed(3)})`);
-     }
-   }
+    if (reconciliation.matches.length > 0) {
+      log.info(`[StateMachine] Fuzzy reconciliation: ${reconciliation.matches.length} likely renames/relocations detected`);
+      for (const match of reconciliation.matches) {
+        log.info(`[StateMachine]   "${match.previous.organisationName}" → "${match.current.organisationName}" (similarity: ${match.similarity.toFixed(3)})`);
+      }
+    }
 
    for (const match of reconciliation.matches) {
      const { previous, current } = match;
@@ -361,7 +364,7 @@ export async function applyStateMachine(
       .where(eq(sponsorCanonical.fingerprint, upd.fingerprint));
   }
 
-  console.log(`[StateMachine] Phase B: ${modUpdates.length} modifications processed.`);
+  log.info(`[StateMachine] Phase B: ${modUpdates.length} modifications processed.`);
 
   // ── Phase C: Additions (new / re-activated / flicker) ────────────────────
   const toInsertNew: typeof sponsorCanonical.$inferInsert[] = [];
@@ -451,7 +454,7 @@ export async function applyStateMachine(
     }
   }
 
-  console.log(
+  log.info(
     `[StateMachine] Phase C: +${toInsertNew.length} new, ${toReactivate.length} reactivated, ${toRecoverFlicker.length} flicker recovered.`,
   );
 
@@ -519,7 +522,7 @@ export async function applyStateMachine(
     }
   }
 
-  console.log(
+  log.info(
     `[StateMachine] Phase D: ${toGracePeriod.length} → GRACE_PERIOD, ${toRemove.length} → REMOVED_REVOKED.`,
   );
 
@@ -566,7 +569,7 @@ export async function applyStateMachine(
         removedCount++;
       }
     }
-    console.log(`[StateMachine] Phase D2: ${toRemoveD2.length} second-miss removals confirmed.`);
+    log.info(`[StateMachine] Phase D2: ${toRemoveD2.length} second-miss removals confirmed.`);
   }
 
   // ── Phase E: Rename detection ─────────────────────────────────────────────
@@ -590,7 +593,7 @@ export async function applyStateMachine(
     )
     .returning({ fingerprint: sponsorCanonical.fingerprint });
 
-  console.log(`[StateMachine] Phase F: ${promoted.length} NEWLY_GRANTED → ACTIVE promoted.`);
+  log.info(`[StateMachine] Phase F: ${promoted.length} NEWLY_GRANTED → ACTIVE promoted.`);
 
   // ── Phase G: Update lastSeen for all ACTIVE records ───────────────────────
   // By now, GRACE_PERIOD and REMOVED_REVOKED records have been moved.
@@ -601,14 +604,14 @@ export async function applyStateMachine(
     .where(eq(sponsorCanonical.status, "ACTIVE"))
     .returning({ fingerprint: sponsorCanonical.fingerprint });
 
-  console.log(`[StateMachine] Phase G: ${updated.length} ACTIVE records updated lastSeen.`);
+  log.info(`[StateMachine] Phase G: ${updated.length} ACTIVE records updated lastSeen.`);
 
   // ── Persist change events ─────────────────────────────────────────────────
   if (changes.length > 0) {
     await batchedInsertChanges(changes, today);
   }
 
-  console.log(
+  log.info(
     `[StateMachine] Complete: +${addedCount} new, -${removedCount} removed, ` +
     `~${updatedCount} updated, ${reactivatedCount} reactivated, ${gracePeriodCount} pending.`,
   );
@@ -703,13 +706,13 @@ async function detectRenames(
 
         renamedNewFPs.add(candidate.fp);
         cancelGracePeriod.add(oldFP);
-        console.log(`[StateMachine] Rename detected: "${existing.currentName}" → "${candidate.name}" (sim=${sim.toFixed(2)})`);
+        log.info(`[StateMachine] Rename detected: "${existing.currentName}" → "${candidate.name}" (sim=${sim.toFixed(2)})`);
         break;
       }
     }
   }
 
   if (cancelGracePeriod.size > 0) {
-    console.log(`[StateMachine] Phase E: ${cancelGracePeriod.size} renames resolved.`);
+    log.info(`[StateMachine] Phase E: ${cancelGracePeriod.size} renames resolved.`);
   }
 }

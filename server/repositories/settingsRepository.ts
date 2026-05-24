@@ -1,11 +1,11 @@
 import { systemSettings, type SystemSetting } from "@shared/schema";
 import { db } from "../db";
-import { eq } from "drizzle-orm";
+import { eq, getTableColumns } from "drizzle-orm";
 
 export class SettingsRepository {
   async getSystemSetting(key: string): Promise<string | null> {
     const [record] = await db
-      .select()
+      .select({ value: systemSettings.value })
       .from(systemSettings)
       .where(eq(systemSettings.key, key));
     return record?.value ?? null;
@@ -22,7 +22,7 @@ export class SettingsRepository {
   }
 
   async getAllSystemSettings(): Promise<SystemSetting[]> {
-    return db.select().from(systemSettings);
+    return db.select(getTableColumns(systemSettings)).from(systemSettings);
   }
 }
 

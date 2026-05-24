@@ -7,6 +7,7 @@
  */
 
 import { sendAdminAlert } from "./adminAlert";
+import { logger } from "../utils/logger";
 
 const MAX_RETRIES = 2;
 const BACKOFF_MS = [1000, 3000]; // delays between retries
@@ -24,7 +25,7 @@ export async function sendEmailReliably(
 ): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
-    console.warn(`${context} RESEND_API_KEY not set — email skipped: ${payload.subject}`);
+    logger.warn(`${context} RESEND_API_KEY not set — email skipped: ${payload.subject}`);
     return false;
   }
 
@@ -45,10 +46,10 @@ export async function sendEmailReliably(
 
       const body = await res.text();
       lastError = `Resend API ${res.status}: ${body}`;
-      console.error(`${context} Attempt ${attempt + 1}/${MAX_RETRIES + 1} failed:`, lastError);
+      logger.error({ err: lastError }, `${context} Attempt ${attempt + 1}/${MAX_RETRIES + 1} failed:`);
     } catch (err) {
       lastError = err;
-      console.error(`${context} Attempt ${attempt + 1}/${MAX_RETRIES + 1} threw:`, err);
+      logger.error({ err: err }, `${context} Attempt ${attempt + 1}/${MAX_RETRIES + 1} threw:`);
     }
 
     // Wait before retrying (skip delay after last attempt)

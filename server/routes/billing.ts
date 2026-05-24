@@ -185,7 +185,7 @@ async function sendSubscriptionNotifications(
       const user = await storage.getUser(userId);
       userEmail = user?.email ?? undefined;
     } catch (err) {
-      console.error('[Subscription] Failed to fetch user email for notifications:', err);
+      logger.error({ err }, '[Subscription] Failed to fetch user email for notifications');
     }
   }
 
@@ -255,7 +255,7 @@ async function sendSubscriptionNotifications(
 
   const results = await Promise.all(sends);
   const allSent = results.every(Boolean);
-  console.log(`[Subscription] Emails for ${packageType} — user: ${userEmail || userId} — ${allSent ? "all sent" : "some failed"}`);
+  logger.info({ packageType, user: userEmail || userId, allSent }, `[Subscription] Emails for ${packageType} — user: ${userEmail || userId} — ${allSent ? "all sent" : "some failed"}`);
 }
 
 export function registerBillingRoutes(app: Express): void {
@@ -324,11 +324,11 @@ export function registerBillingRoutes(app: Express): void {
     try {
       const rawBody = (req as any).rawBody;
       if (!rawBody) {
-        console.error('Webhook error: rawBody not available — ensure express.json verify callback is configured');
+        logger.error('Webhook error: rawBody not available — ensure express.json verify callback is configured');
         return res.status(400).send('Webhook raw body unavailable');
       }
       if (!process.env.STRIPE_WEBHOOK_SECRET) {
-        console.error(
+        logger.error(
           'Webhook error: STRIPE_WEBHOOK_SECRET is not set. ' +
           'All plan activations via webhook are failing. ' +
           'Set STRIPE_WEBHOOK_SECRET to the whsec_... value from Stripe dashboard → Webhooks.'
@@ -337,7 +337,7 @@ export function registerBillingRoutes(app: Express): void {
       }
       event = stripe.webhooks.constructEvent(rawBody, sig!, process.env.STRIPE_WEBHOOK_SECRET);
     } catch (err: unknown) {
-      console.error('Webhook signature verification failed:', err instanceof Error ? err.message : err);
+      logger.error({ err: err instanceof Error ? err.message : err }, 'Webhook signature verification failed');
       return res.status(400).send('Webhook signature verification failed');
     }
 
@@ -428,7 +428,7 @@ export function registerBillingRoutes(app: Express): void {
                   reason: 'Monthly notification_pro credit top-up (+5 credits)',
                   metadata: { stripeEventId: event.id, invoiceId: invoice.id, creditsAdded: 5 },
                 }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
-                console.log(`[Billing] Added 5 monthly credits to notification_pro user ${user.id}`);
+                logger.info({ userId: user.id }, '[Billing] Added 5 monthly credits to notification_pro user');
               }
             }
           }
@@ -471,7 +471,7 @@ export function registerBillingRoutes(app: Express): void {
             packageType = verified.packageType;
             companyName = verified.companyName;
           } else {
-            console.error('Invalid client_reference_id signature:', session.client_reference_id);
+            logger.error({ clientRefId: session.client_reference_id }, 'Invalid client_reference_id signature');
           }
         }
 
@@ -489,7 +489,7 @@ export function registerBillingRoutes(app: Express): void {
                 updatedAt: new Date(),
               }).where(eq(users.id, userId));
             }), 'webhook-checkout-starter');
-            sendSubscriptionNotifications(userId, 'CoS Check Starter', 'starter', sessionEmail).catch((err) => console.error('[Subscription] Notification failed:', err));
+            sendSubscriptionNotifications(userId, 'CoS Check Starter', 'starter', sessionEmail).catch((err) => logger.error({ err }, '[Subscription] Notification failed'));
             storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'starter', reason: 'Checkout: CoS Check Starter', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
           } else if (packageType === 'pro') {
             await withRetry(() => db.transaction(async (tx) => {
@@ -501,7 +501,7 @@ export function registerBillingRoutes(app: Express): void {
                 updatedAt: new Date(),
               }).where(eq(users.id, userId));
             }), 'webhook-checkout-pro');
-            sendSubscriptionNotifications(userId, 'CoS Check Pro', 'pro', sessionEmail).catch((err) => console.error('[Subscription] Notification failed:', err));
+            sendSubscriptionNotifications(userId, 'CoS Check Pro', 'pro', sessionEmail).catch((err) => logger.error({ err }, '[Subscription] Notification failed'));
             storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'pro', reason: 'Checkout: CoS Check Pro', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
           } else if (packageType === 'unlimited') {
             await withRetry(() => db.transaction(async (tx) => {
@@ -512,7 +512,7 @@ export function registerBillingRoutes(app: Express): void {
                 updatedAt: new Date(),
               }).where(eq(users.id, userId));
             }), 'webhook-checkout-unlimited');
-            sendSubscriptionNotifications(userId, 'CoS Check Unlimited', 'unlimited', sessionEmail).catch((err) => console.error('[Subscription] Notification failed:', err));
+            sendSubscriptionNotifications(userId, 'CoS Check Unlimited', 'unlimited', sessionEmail).catch((err) => logger.error({ err }, '[Subscription] Notification failed'));
             storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'unlimited', reason: 'Checkout: CoS Check Unlimited', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
           } else if (packageType === 'master') {
             await storage.createPaidSubmission({
@@ -533,7 +533,7 @@ export function registerBillingRoutes(app: Express): void {
                 updatedAt: new Date(),
               }).where(eq(users.id, userId));
             }), 'webhook-checkout-notification-starter');
-            sendSubscriptionNotifications(userId, 'Notification Engine Starter', 'notification_starter', sessionEmail).catch((err) => console.error('[Subscription] Notification failed:', err));
+            sendSubscriptionNotifications(userId, 'Notification Engine Starter', 'notification_starter', sessionEmail).catch((err) => logger.error({ err }, '[Subscription] Notification failed'));
             storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'starter', reason: 'Checkout: Sponsor Monitor Starter', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
             if (companyName) {
               autoCreateWatchFromPayment(userId, companyName).catch((err) => logger.error({ err }, '[AutoWatch] webhook starter failed'));
@@ -549,7 +549,7 @@ export function registerBillingRoutes(app: Express): void {
                 updatedAt: new Date(),
               }).where(eq(users.id, userId));
             }), 'webhook-checkout-notification-pro');
-            sendSubscriptionNotifications(userId, 'Notification Engine Pro', 'notification_pro', sessionEmail).catch((err) => console.error('[Subscription] Notification failed:', err));
+            sendSubscriptionNotifications(userId, 'Notification Engine Pro', 'notification_pro', sessionEmail).catch((err) => logger.error({ err }, '[Subscription] Notification failed'));
             storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'pro', reason: 'Checkout: Sponsor Monitor Pro', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
             if (companyName) {
               autoCreateWatchFromPayment(userId, companyName).catch((err) => logger.error({ err }, '[AutoWatch] webhook pro failed'));
@@ -564,7 +564,7 @@ export function registerBillingRoutes(app: Express): void {
                 updatedAt: new Date(),
               }).where(eq(users.id, userId));
             }), 'webhook-checkout-cos-check');
-            sendSubscriptionNotifications(userId, 'COS Check Subscription', 'cos_check', sessionEmail).catch((err) => console.error('[Subscription] Notification failed:', err));
+            sendSubscriptionNotifications(userId, 'COS Check Subscription', 'cos_check', sessionEmail).catch((err) => logger.error({ err }, '[Subscription] Notification failed'));
           }
         }
         break;

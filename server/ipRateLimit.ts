@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import crypto from "crypto";
+import { logger } from "./utils/logger";
 import { storage } from "./storage";
 
 // Hash IP address for privacy (GDPR compliance)
@@ -50,7 +51,7 @@ export async function checkIpRateLimit(
     
     next();
   } catch (error) {
-    console.error("IP rate limit check error:", error);
+    logger.error({ err: error }, "IP rate limit check error:");
     // On error, allow the request to proceed (fail open)
     next();
   }

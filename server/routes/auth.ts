@@ -8,6 +8,7 @@ import { asyncHandler } from "../lib/errorHandler";
 import { validateBody } from "../lib/validate";
 import { loginSchema, registerSchema } from "../validation/auth";
 import { recordRegistrationAttempt } from "../services/monitoringService";
+import { logger } from "../utils/logger";
 
 export function registerAuthRoutes(app: Express): void {
   app.get('/api/auth/user', isAuthenticated, asyncHandler(async (req: any, res) => {
@@ -43,7 +44,7 @@ export function registerAuthRoutes(app: Express): void {
 
     req.login(newUser, (err: any) => {
       if (err) {
-        console.error("Auto-login after registration failed:", err);
+        logger.error({ err }, "Auto-login after registration failed:");
         success(res, {
           message: "Registration successful. Please check your email to verify your account.",
           userId: newUser.id,

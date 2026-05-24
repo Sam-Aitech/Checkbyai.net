@@ -3,7 +3,8 @@ import { db } from "../db";
 import { sql, eq, and, desc, inArray, gte } from "drizzle-orm";
 import { sponsorCanonical, sponsorChanges, companyWatches, sponsorWatches, dailyDigest } from "@shared/schema";
 import { z } from "zod";
-import { isAuthenticated, isAdmin } from "../auth";
+import { isAuthenticated } from "../auth";
+import { requireRole } from "../middleware/roleGuard";
 import { getWatchLimit as getWatchLimitFromTier, getTierConfig } from "../utils/tierConfig";
 import { normalizeName, generateFingerprint } from "../utils/sponsorListFetcher";
 import { ensureIndexReady, isIndexReady, searchSponsors, searchSponsorsFallback, searchRevokedSponsors, getIndexHealth, type PagedSearchResult } from "../utils/sponsorSearch";
@@ -16,6 +17,7 @@ import { makeRateLimitStore } from "../utils/redisRateLimitStore";
 import { success, fail } from "../lib/response";
 import { asyncHandler } from "../lib/errorHandler";
 import { ApiError } from "../lib/apiError";
+import { logger } from "../utils/logger";
 
 // ── Tiered Rate Limiters for Search ──────────────────────────────────────────
 // Authenticated users get higher limits, anonymous get reasonable limits.
@@ -110,7 +112,7 @@ async function ensureReactivationWatch(userId: string, companyName: string): Pro
     }
   } catch (err) {
     // Non-fatal — log and continue
-    console.error("[ReactivationWatch] ensureReactivationWatch failed:", err instanceof Error ? err.message : err);
+    logger.error({ err: err instanceof Error ? err.message : err }, "[ReactivationWatch] ensureReactivationWatch failed:");
   }
 }
 
@@ -138,7 +140,7 @@ export function registerSponsorRoutes(app: Express): void {
     if (isIndexReady()) {
       paged = searchSponsors(q, opts);
     } else {
-      console.log("[Search] Index not ready, using database fallback");
+      logger.info("[Search] Index not ready, using database fallback");
       paged = await searchSponsorsFallback(q, opts);
     }
 
@@ -262,7 +264,7 @@ export function registerSponsorRoutes(app: Express): void {
     success(res, response);
   }));
 
-  app.post('/api/admin/daily-digest/refresh', isAdmin, asyncHandler(async (req: any, res) => {
+  app.post('/api/admin/daily-digest/refresh', requireRole("admin"), asyncHandler(async (req: any, res) => {
     const latestChanges = await db
       .select({
         changeType: sponsorChanges.changeType,
@@ -466,7 +468,17 @@ export function registerSponsorRoutes(app: Express): void {
     }
 
     const canonical = await db
-      .select()
+      .select({
+        currentName: sponsorCanonical.currentName,
+        historicalNames: sponsorCanonical.historicalNames,
+        fingerprint: sponsorCanonical.fingerprint,
+        townCity: sponsorCanonical.townCity,
+        typeRating: sponsorCanonical.typeRating,
+        route: sponsorCanonical.route,
+        status: sponsorCanonical.status,
+        firstSeen: sponsorCanonical.firstSeen,
+        lastSeen: sponsorCanonical.lastSeen,
+      })
       .from(sponsorCanonical)
       .where(eq(sponsorCanonical.fingerprint, fingerprint))
       .limit(1);
@@ -479,7 +491,15 @@ export function registerSponsorRoutes(app: Express): void {
     const allNames = [record.currentName, ...(record.historicalNames || [])];
 
     const changes = await db
-      .select()
+      .select({
+        id: sponsorChanges.id,
+        detectedAt: sponsorChanges.detectedAt,
+        changeType: sponsorChanges.changeType,
+        organisationName: sponsorChanges.organisationName,
+        previousValue: sponsorChanges.previousValue,
+        newValue: sponsorChanges.newValue,
+        snapshotDate: sponsorChanges.snapshotDate,
+      })
       .from(sponsorChanges)
       .where(inArray(sponsorChanges.organisationName, allNames))
       .orderBy(desc(sponsorChanges.detectedAt))
@@ -532,7 +552,12 @@ export function registerSponsorRoutes(app: Express): void {
     let canonicalMatch;
     if (fpParam) {
       const match = await db
-        .select()
+        .select({
+          fingerprint: sponsorCanonical.fingerprint,
+          currentName: sponsorCanonical.currentName,
+          townCity: sponsorCanonical.townCity,
+          status: sponsorCanonical.status,
+        })
         .from(sponsorCanonical)
         .where(eq(sponsorCanonical.fingerprint, fpParam))
         .limit(1);
@@ -542,7 +567,12 @@ export function registerSponsorRoutes(app: Express): void {
     if (!canonicalMatch) {
       const fp = generateFingerprint(organisation_name.trim(), town_city || "", "");
       const fpMatch = await db
-        .select()
+        .select({
+          fingerprint: sponsorCanonical.fingerprint,
+          currentName: sponsorCanonical.currentName,
+          townCity: sponsorCanonical.townCity,
+          status: sponsorCanonical.status,
+        })
         .from(sponsorCanonical)
         .where(eq(sponsorCanonical.fingerprint, fp))
         .limit(1);
@@ -552,9 +582,16 @@ export function registerSponsorRoutes(app: Express): void {
     if (!canonicalMatch) {
       const normalizedCity = town_city ? normalizeName(town_city.trim()) : null;
       const candidateRecords = await db
-        .select()
+        .select({
+          fingerprint: sponsorCanonical.fingerprint,
+          currentName: sponsorCanonical.currentName,
+          townCity: sponsorCanonical.townCity,
+          status: sponsorCanonical.status,
+        })
         .from(sponsorCanonical)
-        .where(inArray(sponsorCanonical.status, ["ACTIVE", "NEWLY_GRANTED", "REMOVED_REVOKED", "GRACE_PERIOD"]));
+        .where(
+          inArray(sponsorCanonical.status, ['ACTIVE', 'GRACE_PERIOD', 'NEWLY_GRANTED'])
+        );
 
       canonicalMatch = candidateRecords.find(m => {
         const mNorm = normalizeName(m.currentName);
@@ -571,7 +608,10 @@ export function registerSponsorRoutes(app: Express): void {
     }
 
     const existingWatch = await db
-      .select()
+      .select({
+        id: companyWatches.id,
+        isActive: companyWatches.isActive,
+      })
       .from(companyWatches)
       .where(and(
         eq(companyWatches.userId, userId),
@@ -642,7 +682,16 @@ export function registerSponsorRoutes(app: Express): void {
     }
 
     const watches = await db
-      .select()
+      .select({
+        id: companyWatches.id,
+        userId: companyWatches.userId,
+        organisationName: companyWatches.organisationName,
+        organisationNameNormalized: companyWatches.organisationNameNormalized,
+        townCity: companyWatches.townCity,
+        fingerprint: companyWatches.fingerprint,
+        isActive: companyWatches.isActive,
+        createdAt: companyWatches.createdAt,
+      })
       .from(companyWatches)
       .where(eq(companyWatches.userId, userId))
       .orderBy(desc(companyWatches.createdAt));
@@ -684,7 +733,15 @@ export function registerSponsorRoutes(app: Express): void {
     const orgNames = [...new Set(watches.map((w) => w.organisationName).filter(Boolean))];
     const allRecentChanges = orgNames.length > 0
       ? await db
-        .select()
+        .select({
+          id: sponsorChanges.id,
+          detectedAt: sponsorChanges.detectedAt,
+          changeType: sponsorChanges.changeType,
+          organisationName: sponsorChanges.organisationName,
+          previousValue: sponsorChanges.previousValue,
+          newValue: sponsorChanges.newValue,
+          snapshotDate: sponsorChanges.snapshotDate,
+        })
         .from(sponsorChanges)
         .where(inArray(sponsorChanges.organisationName, orgNames))
         .orderBy(desc(sponsorChanges.detectedAt))
@@ -725,7 +782,7 @@ export function registerSponsorRoutes(app: Express): void {
           db.update(companyWatches)
             .set({ fingerprint: match.fingerprint })
             .where(eq(companyWatches.id, watch.id))
-            .catch((err) => console.error("[CompanyWatch] Failed to update fingerprint for watch id", watch.id, err));
+            .catch((err) => logger.error({ err, watchId: watch.id }, "[CompanyWatch] Failed to update fingerprint for watch id"));
         }
       }
 
@@ -745,7 +802,10 @@ export function registerSponsorRoutes(app: Express): void {
     }
 
     const existing = await db
-      .select()
+      .select({
+        id: companyWatches.id,
+        userId: companyWatches.userId,
+      })
       .from(companyWatches)
       .where(eq(companyWatches.id, watchId))
       .limit(1);
@@ -774,7 +834,11 @@ export function registerSponsorRoutes(app: Express): void {
     }
 
     const existing = await db
-      .select()
+      .select({
+        id: companyWatches.id,
+        userId: companyWatches.userId,
+        isActive: companyWatches.isActive,
+      })
       .from(companyWatches)
       .where(eq(companyWatches.id, watchId))
       .limit(1);

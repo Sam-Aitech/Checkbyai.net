@@ -16,6 +16,7 @@ import { sanitizeUploadPath } from "../utils/uploadGuard";
 import { success, fail } from "../lib/response";
 import { asyncHandler } from "../lib/errorHandler";
 import { ApiError } from "../lib/apiError";
+import { logger } from "../utils/logger";
 
 function generateReceiptId(): string {
   const random1 = crypto.randomBytes(4).toString('hex').toUpperCase();
@@ -179,7 +180,7 @@ export function registerVerificationRoutes(app: Express): void {
       analysis.cosCheck = cosCheckResult;
 
       if (cosCheckResult.verdict === 'GENUINE' && analysisResult.result !== 'genuine') {
-        console.log(`[COS] cosCheck GENUINE overrides pattern analysis '${analysisResult.result}' — treating as genuine`);
+        logger.info(`[COS] cosCheck GENUINE overrides pattern analysis '${analysisResult.result}' — treating as genuine`);
         result = 'genuine';
         analysis.result = 'genuine';
         analysis.confidence = Math.max(analysis.confidence as number, 85);

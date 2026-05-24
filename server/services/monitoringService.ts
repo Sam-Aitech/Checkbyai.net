@@ -1,6 +1,6 @@
 import { logger } from "../utils/logger";
 import { sendViaResend } from "./notificationEngine";
-import { isAdmin } from "../auth";
+import { requireRole } from "../middleware/roleGuard";
 
 // ---------------------------------------------------------------------------
 // In-memory metrics store.
@@ -8,7 +8,7 @@ import { isAdmin } from "../auth";
 // shared across multiple instances (Kubernetes pods, PM2 clusters, etc.).
 // For production multi-instance deployments, replace with a Redis-backed
 // counter or a time-series service (e.g. Prometheus + pushgateway, Datadog).
-// The /metrics routes below are gated behind isAdmin and are intentionally
+// The /metrics routes below are gated behind requireRole("admin") and are intentionally
 // only registered in non-production environments until a durable store is
 // wired up — see registerMonitoringRoutes() for details.
 // ---------------------------------------------------------------------------
@@ -203,7 +203,7 @@ export function resetMetrics(): void {
 /**
  * Register internal monitoring routes.
  *
- * SECURITY: Both routes are protected by isAdmin middleware.
+ * SECURITY: Both routes are protected by requireRole("admin") middleware.
  *
  * PRODUCTION NOTE: These routes expose in-memory counters that are
  * per-process and non-durable. In production they are disabled by default.
@@ -223,7 +223,7 @@ export function registerMonitoringRoutes(app: any): void {
   }
 
    // GET /metrics — admin-only, returns current in-memory counters.
-   app.get("/metrics", isAdmin, (_req: any, res: any) => {
+   app.get("/metrics", requireRole("admin"), (_req: any, res: any) => {
          res.json({
                  metrics: getMetrics(),
                  timestamp: new Date().toISOString(),
@@ -233,7 +233,7 @@ export function registerMonitoringRoutes(app: any): void {
    });
 
    // POST /metrics/reset — admin-only, resets all counters.
-   app.post("/metrics/reset", isAdmin, (_req: any, res: any) => {
+   app.post("/metrics/reset", requireRole("admin"), (_req: any, res: any) => {
          resetMetrics();
          res.json({ message: "Metrics reset successfully", timestamp: new Date().toISOString() });
    });

@@ -6,6 +6,7 @@ import { db } from "../db";
 import { eq } from "drizzle-orm";
 import { sponsorCanonical } from "@shared/schema";
 import { toSlug } from "./sponsorPages";
+import { logger } from "../utils/logger";
 
 function escapeAttr(str: string): string {
   return str.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -303,7 +304,7 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
       res.set('Cache-Control', 'public, max-age=3600, stale-while-revalidate=7200');
       res.send(html);
     } catch (err) {
-      console.error('Sponsor page meta injection error:', err);
+      logger.error({ err }, 'Sponsor page meta injection error:');
       next();
     }
   });
@@ -401,7 +402,7 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
       res.set('Content-Type', 'text/html');
       res.send(html);
     } catch (err) {
-      console.error('Bot meta injection error:', err);
+      logger.error({ err }, 'Bot meta injection error:');
       next();
     }
   });

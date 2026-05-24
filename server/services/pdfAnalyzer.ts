@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { logger } from '../utils/logger';
 import { XMLParser } from 'fast-xml-parser';
 
 /**
@@ -147,7 +148,7 @@ export class PDFAnalyzer {
       const pdfString = buffer.toString('binary');
       const fileSize = stats.size;
 
-      console.log(`File size: ${fileSize} bytes`);
+      logger.info(`File size: ${fileSize} bytes`);
 
       // ── Phase 1: Cheap synchronous checks (fast, no yield needed) ──────────
       const metadata: PDFMetadata = {
@@ -227,11 +228,11 @@ export class PDFAnalyzer {
       await yieldToEventLoop();
       metadata.forensic = this.buildForensicProfile(metadata, xmpHistory);
 
-      console.log(`Forensic profile built for ${filePath} (${fileSize} bytes, ${metadata.fonts.length} fonts, ${xmpHistory.length} XMP history entries)`);
+      logger.info(`Forensic profile built for ${filePath} (${fileSize} bytes, ${metadata.fonts.length} fonts, ${xmpHistory.length} XMP history entries)`);
 
       return metadata;
     } catch (error) {
-      console.error('Error extracting PDF metadata:', error);
+      logger.error({ err: error }, 'Error extracting PDF metadata:');
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return {
         fileSize: 0,
@@ -361,7 +362,7 @@ export class PDFAnalyzer {
         }
       }
     } catch (error) {
-      console.error('Error extracting XMP history:', error);
+      logger.error({ err: error }, 'Error extracting XMP history:');
     }
     
     return history;

@@ -17,6 +17,7 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import path from "path";
 import fs from "fs";
+import { logger } from "../utils/logger";
 
 const execFileAsync = promisify(execFile);
 
@@ -56,9 +57,9 @@ export function getQsvPath(): string | null {
   if (_qsvPath === undefined) {
     _qsvPath = findBinary(QSV_BIN_NAME);
     if (_qsvPath) {
-      console.log(`[BinaryRunner] qsv found at: ${_qsvPath}`);
+      logger.info(`[BinaryRunner] qsv found at: ${_qsvPath}`);
     } else {
-      console.warn("[BinaryRunner] qsv not found. Run: npm run setup:binaries");
+      logger.warn("[BinaryRunner] qsv not found. Run: npm run setup:binaries");
     }
   }
   return _qsvPath;
@@ -68,9 +69,9 @@ export function getCsvdiffPath(): string | null {
   if (_csvdiffPath === undefined) {
     _csvdiffPath = findBinary(CSVDIFF_BIN_NAME);
     if (_csvdiffPath) {
-      console.log(`[BinaryRunner] csvdiff found at: ${_csvdiffPath}`);
+      logger.info(`[BinaryRunner] csvdiff found at: ${_csvdiffPath}`);
     } else {
-      console.warn("[BinaryRunner] csvdiff not found. Run: npm run setup:binaries");
+      logger.warn("[BinaryRunner] csvdiff not found. Run: npm run setup:binaries");
     }
   }
   return _csvdiffPath;
@@ -235,7 +236,7 @@ export async function runCsvDiff(
     }
   }
 
-  console.log(
+  logger.info(
     `[BinaryRunner] csvdiff complete in ${durationMs}ms: ` +
     `+${trueAdditions.length} added, -${trueDeletions.length} removed, ` +
     `~${modifications.length} modified`,

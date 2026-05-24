@@ -1,4 +1,5 @@
 import { pool } from "../db";
+import { logger } from "../utils/logger";
 
 const RETRYABLE_ERRORS = [
   "terminating connection due to administrator command",
@@ -45,11 +46,11 @@ export async function withRetry<T>(
           const baseDelay = delayMs * Math.pow(2, attempt - 1);
           const jitter = baseDelay * 0.25 * (Math.random() * 2 - 1);
           const wait = baseDelay + jitter;
-          console.warn(`[DBRetry] ${label} failed (attempt ${attempt}/${maxRetries}): ${lastError.message}. Warming connection and retrying in ${wait}ms...`);
+          logger.warn(`[DBRetry] ${label} failed (attempt ${attempt}/${maxRetries}): ${lastError.message}. Warming connection and retrying in ${wait}ms...`);
           await new Promise(resolve => setTimeout(resolve, wait));
           await warmConnection();
         } else {
-          console.error(`[DBRetry] ${label} failed on final attempt ${attempt}/${maxRetries}: ${lastError.message}`);
+          logger.error(`[DBRetry] ${label} failed on final attempt ${attempt}/${maxRetries}: ${lastError.message}`);
         }
       } else {
         throw err;

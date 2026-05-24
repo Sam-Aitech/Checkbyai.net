@@ -21,6 +21,7 @@ import fs from "fs";
 import path from "path";
 import { parse as parseStream } from "csv-parse";
 import { normalizeName, generateFingerprint } from "./sponsorListFetcher";
+import { logger } from "../utils/logger";
 
 // ── CSV quoting ───────────────────────────────────────────────────────────────
 
@@ -68,11 +69,11 @@ export async function buildFingerprintedCsv(
 ): Promise<string> {
   // Skip if already built
   if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 0) {
-    console.log(`[FingerprintBuilder] Already exists: ${path.basename(outputPath)}`);
+    logger.info(`[FingerprintBuilder] Already exists: ${path.basename(outputPath)}`);
     return outputPath;
   }
 
-  console.log(`[FingerprintBuilder] Building fingerprinted CSV → ${path.basename(outputPath)}`);
+  logger.info(`[FingerprintBuilder] Building fingerprinted CSV → ${path.basename(outputPath)}`);
 
   const readStream = fs.createReadStream(rawPath);
   const writeStream = fs.createWriteStream(outputPath);
@@ -131,7 +132,7 @@ export async function buildFingerprintedCsv(
     writeStream.end((err: Error | null | undefined) => (err ? reject(err) : resolve()));
   });
 
-  console.log(
+  logger.info(
     `[FingerprintBuilder] Done: ${rowsWritten.toLocaleString()} rows → ${path.basename(outputPath)}`,
   );
 
