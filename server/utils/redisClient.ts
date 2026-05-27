@@ -1,4 +1,5 @@
 import IORedis from "ioredis";
+import { logger } from "../utils/logger";
 
 let _redis: IORedis | null = null;
 
@@ -27,10 +28,10 @@ export async function initRedisCache(): Promise<void> {
   try {
     await client.ping();
     _redis = client;
-    console.log("[RedisCache] Connected and ready.");
+    logger.info("[RedisCache] Connected and ready.");
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.warn(`[RedisCache] Unavailable (${msg}) — search/stats caching disabled.`);
+    logger.warn(`[RedisCache] Unavailable (${msg}) — search/stats caching disabled.`);
     client.disconnect();
   }
 }

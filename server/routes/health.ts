@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { isJobRunning, getLastRunInfo } from "../utils/sponsorMonitorJob";
 import { getJobHealthSnapshot } from "../utils/jobTelemetry";
+import { success } from "../lib/response";
 
 const CRITICAL_JOBS = [
   "sponsorMonitorJob",
@@ -19,11 +20,10 @@ export function registerHealthRoutes(app: Express): void {
       CRITICAL_JOBS.map((name) => [name, getJobHealthSnapshot(name)]),
     );
 
-    res.json({
+    success(res, {
       status: 'ok',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
-      // Legacy sponsor monitor block — kept for backwards compatibility
       sponsorMonitor: {
         running: jobRunning,
         lastRun: lastRun ? {
@@ -33,12 +33,10 @@ export function registerHealthRoutes(app: Express): void {
           changesDetected: lastRun.changesDetected,
         } : null,
       },
-      // Phase 1: per-job freshness and state
       jobs,
     });
   });
 
-  // Dedicated sponsor monitor health endpoint — useful for uptime monitors and admin dashboards.
   app.get('/api/health/sponsor-monitor', async (req, res) => {
     const lastRun = getLastRunInfo();
     const jobRunning = await isJobRunning();
@@ -58,7 +56,7 @@ export function registerHealthRoutes(app: Express): void {
       }
     }
 
-    res.json({
+    success(res, {
       status,
       running: jobRunning,
       lastRun: lastRun

@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 import OpenAI from 'openai';
 
 interface AIProvider {
@@ -49,7 +50,7 @@ if (process.env.AI_INTEGRATIONS_OPENROUTER_API_KEY) {
   });
 }
 
-console.log(`[AI Service] Initialized with ${providers.length} provider(s): ${providers.map(p => p.name).join(', ') || 'none'}`);
+logger.info(`[AI Service] Initialized with ${providers.length} provider(s): ${providers.map(p => p.name).join(', ') || 'none'}`);
 
 export async function createChatCompletionWithFallback(
   messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
@@ -65,7 +66,7 @@ export async function createChatCompletionWithFallback(
 
   for (const provider of providers) {
     try {
-      console.log(`[AI Service] Attempting ${provider.name}...`);
+      logger.info(`[AI Service] Attempting ${provider.name}...`);
       
       const response = await provider.client.chat.completions.create({
         model: provider.model,
@@ -74,12 +75,12 @@ export async function createChatCompletionWithFallback(
         max_tokens: maxTokens,
       });
 
-      console.log(`[AI Service] Successfully connected to ${provider.name}`);
+      logger.info(`[AI Service] Successfully connected to ${provider.name}`);
       return { stream: response, provider: provider.name };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       errors.push(`${provider.name}: ${errorMsg}`);
-      console.error(`[AI Service] ${provider.name} failed:`, errorMsg);
+      logger.error({ err: errorMsg }, `[AI Service] ${provider.name} failed:`);
       continue;
     }
   }
@@ -101,7 +102,7 @@ export async function createChatCompletion(
 
   for (const provider of providers) {
     try {
-      console.log(`[AI Service] Attempting ${provider.name}...`);
+      logger.info(`[AI Service] Attempting ${provider.name}...`);
       
       const response = await provider.client.chat.completions.create({
         model: provider.model,
@@ -110,12 +111,12 @@ export async function createChatCompletion(
       });
 
       const content = response.choices[0]?.message?.content || '';
-      console.log(`[AI Service] Successfully got response from ${provider.name}`);
+      logger.info(`[AI Service] Successfully got response from ${provider.name}`);
       return { content, provider: provider.name };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       errors.push(`${provider.name}: ${errorMsg}`);
-      console.error(`[AI Service] ${provider.name} failed:`, errorMsg);
+      logger.error({ err: errorMsg }, `[AI Service] ${provider.name} failed:`);
       continue;
     }
   }

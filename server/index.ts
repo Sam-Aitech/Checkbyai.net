@@ -1,4 +1,4 @@
-import express, { type Request, Response, NextFunction } from "express";
+import express from "express";
 import compression from "compression";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
@@ -9,6 +9,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { storage } from "./storage";
 import { pool } from "./db";
 import { logger } from "./utils/logger";
+import { errorHandler } from "./lib/errorHandler";
 
 // Import the job queue setup
 import { initJobQueue, setupWorkers } from "./services/jobQueue";
@@ -205,6 +206,7 @@ app.use((req, res, next) => {
     'camera=(), microphone=(), geolocation=(), payment=(self "https://js.stripe.com")'
   );
 
+
   // Performance headers for static assets
   if (req.url.match(/\.(jpg|jpeg|png|gif|ico|css|js|svg|woff|woff2|ttf|eot)$/)) {
     res.header('Cache-Control', 'public, max-age=31536000, immutable'); // 1 year
@@ -311,6 +313,7 @@ async function applyDataFixbacks() {
       logger.error({ err }, "Failed to ensure job_locks table exists at startup");
     }
 
+
     // ── One-time backfill: retire the legacy "NOT_LISTED" status value ──────
     // The current schema enum is ACTIVE | NEWLY_GRANTED | GRACE_PERIOD | REMOVED_REVOKED.
     // Earlier ingestion code wrote NOT_LISTED rows that were never migrated,
@@ -404,20 +407,7 @@ async function applyDataFixbacks() {
     
     const server = await registerRoutes(app);
 
-    if (isSentryEnabled) {
-      app.use(Sentry.Handlers.errorHandler());
-    }
-
-    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-     const status = err.status || err.statusCode || 500;
-     const message = err.message || "Internal Server Error";
-
-     if (!res.headersSent) {
-       res.status(status).json({ message });
-     }
-     
-     logger.error({ err, status }, "Unhandled server error");
-   });
+   app.use(errorHandler);
 
    // importantly only setup vite in development and after
    // setting up all the other routes so the catch-all route
@@ -432,7 +422,7 @@ async function applyDataFixbacks() {
    // hits a warm index rather than triggering an on-demand full-table scan.
    // Fire-and-forget: a failed warm-up degrades to the normal lazy-build path.
    rebuildSponsorIndex().catch((err: unknown) =>
-     console.warn("[Startup] Sponsor index warm-up failed (non-fatal):", err instanceof Error ? err.message : String(err))
+     logger.warn({ err: err instanceof Error ? err.message : String(err) }, "[Startup] Sponsor index warm-up failed (non-fatal)")
    );
 
    // ALWAYS serve the app on port 5000

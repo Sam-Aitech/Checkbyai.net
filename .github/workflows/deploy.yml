@@ -24,11 +24,3 @@ jobs:
         
     - name: Install dependencies
       run: npm ci
-      
-    - name: Deploy Sponsor ETL Agent
-      if: github.ref == 'refs/heads/main'
-      run: |
-        cd sponsor-etl-agent
-        pip install -r requirements.txt
-        # Add health check
-        python -c "import main; assert main.health_check()"

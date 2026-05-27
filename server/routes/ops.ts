@@ -6,6 +6,7 @@ import { db } from "../db";
 import { jobTriggerAudit, shadowParityReports, shadowRunResults, incidentTickets, monitorJobRuns } from "@shared/schema";
 import { requireRole } from "../middleware/roleGuard";
 import { opsTriggerLimiter } from "../middleware/rateLimiter";
+if (!opsTriggerLimiter) throw new Error('opsTriggerLimiter failed to import — check ../middleware/rateLimiter exports');
 import { isSafeCallbackUrl, signPayload } from "../utils/callbackSigner";
 import { isUuidV4 } from "../utils/idempotency";
 import { generateCorrelationId, startJobRun, finishJobRun } from "../utils/jobTelemetry";

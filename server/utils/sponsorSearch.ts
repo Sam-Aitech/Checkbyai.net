@@ -2,6 +2,7 @@ import Fuse, { type IFuseOptions } from "fuse.js";
 import { db } from "../db";
 import { sponsorCanonical } from "@shared/schema";
 import { inArray, sql } from "drizzle-orm";
+import { logger } from "../utils/logger";
 
 interface SponsorSearchRecord {
   id:              number;
@@ -121,7 +122,7 @@ export async function rebuildSponsorIndex(): Promise<void> {
   rawRecords = searchRecords;  // store for getIndexData()
   indexRecordCount = searchRecords.length;
   indexBuiltAt = Date.now();
-  console.log(
+  logger.info(
     `[SponsorSearch] Index rebuilt: ${indexRecordCount} records ` +
     `(ACTIVE + NEWLY_GRANTED only) in ${Date.now() - buildStart}ms`,
   );
@@ -343,7 +344,7 @@ export async function searchSponsorsFallback(
   } catch (err: unknown) {
     // pg_trgm extension not installed yet (migration pending) — return empty
     // rather than crashing the request handler.
-    console.error("[SponsorSearch] pg_trgm fallback failed:", err instanceof Error ? err.message : err);
+    logger.error({ err: err instanceof Error ? err.message : err }, "[SponsorSearch] pg_trgm fallback failed:");
     return { results: [], total: 0, page: 1, totalPages: 1 };
   }
 }
@@ -412,7 +413,7 @@ export async function searchRevokedSponsors(
       source:           "db" as const,
     }));
    } catch (err: unknown) {
-    console.error("[SponsorSearch] searchRevokedSponsors failed:", err instanceof Error ? err.message : err);
+    logger.error({ err: err instanceof Error ? err.message : err }, "[SponsorSearch] searchRevokedSponsors failed:");
     return [];
   }
 }
@@ -420,11 +421,11 @@ export async function searchRevokedSponsors(
 // Performance optimization: Index warmup strategy (Long-term)
 export async function warmupIndex(): Promise<void> {
   try {
-    console.log('[SponsorSearch] Starting index warmup...');
+    logger.info('[SponsorSearch] Starting index warmup...');
     await ensureIndexReady();
-    console.log('[SponsorSearch] Index warmup complete');
+    logger.info('[SponsorSearch] Index warmup complete');
   } catch (error) {
-    console.error('[SponsorSearch] Index warmup failed:', error);
+    logger.error({ err: error }, '[SponsorSearch] Index warmup failed:');
     // Don't throw - allow app to start even if warmup fails
   }
 }

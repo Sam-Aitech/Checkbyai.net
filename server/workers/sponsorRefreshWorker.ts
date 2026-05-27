@@ -1,5 +1,6 @@
 import { Job } from 'bullmq';
 import { runSponsorMonitorJob } from '../utils/sponsorMonitorJob';
+import { logger } from "../utils/logger";
 
 /**
  * BullMQ worker handler for the sponsor-refresh job.
@@ -20,7 +21,7 @@ import { runSponsorMonitorJob } from '../utils/sponsorMonitorJob';
  *   - Admin email on failure
  */
 export async function processSponsorRefreshJob(job: Job) {
-  console.log(`[SponsorRefreshWorker] Job ${job.id} received — delegating to runSponsorMonitorJob().`);
+  logger.info(`[SponsorRefreshWorker] Job ${job.id} received — delegating to runSponsorMonitorJob().`);
 
   const result = await runSponsorMonitorJob('background-job', true);
 
@@ -29,7 +30,7 @@ export async function processSponsorRefreshJob(job: Job) {
     throw new Error(result.error ?? 'Sponsor monitor job failed without a specific error message.');
   }
 
-  console.log(
+  logger.info(
     `[SponsorRefreshWorker] Job ${job.id} complete. ` +
     `Records: ${result.recordsProcessed}, Changes: ${JSON.stringify(result.changes)}`
   );

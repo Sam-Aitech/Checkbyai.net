@@ -183,7 +183,7 @@ export async function ensureTodaysArchive(
 
   if (existing.length > 0 && fs.existsSync(filePath)) {
     const entry = existing[0];
-    console.log(
+    logger.info(
       `[CsvArchiver] Cache hit for ${date}: ${entry.recordCount.toLocaleString()} records at ${filePath}`,
     );
     // Ensure fingerprinted CSV exists (may have been skipped on a prior partial run)
@@ -200,7 +200,7 @@ export async function ensureTodaysArchive(
   }
 
   // ── Download to disk ────────────────────────────────────────────────────────
-  console.log(`[CsvArchiver] Downloading CSV for ${date} → ${filePath}`);
+  logger.info(`[CsvArchiver] Downloading CSV for ${date} → ${filePath}`);
 
   // Phase A: connect + receive headers (30 s hard cap).
   // The AbortController signal is cleared as soon as headers arrive — before
@@ -230,7 +230,7 @@ export async function ensureTodaysArchive(
   if (response.status === 429 || response.status === 503) {
     const retryAfterSec = parseInt(response.headers.get("retry-after") ?? "10", 10);
     const delayMs = Math.min((isNaN(retryAfterSec) ? 10 : retryAfterSec) * 1_000, 30_000);
-    console.warn(
+    logger.warn(
       `[CsvArchiver] HTTP ${response.status} from CDN — waiting ${delayMs / 1000}s then retrying once`,
     );
     await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
@@ -311,7 +311,7 @@ export async function ensureTodaysArchive(
     throw new Error("[CsvArchiver] Downloaded CSV file is zero bytes. Gov.uk may have an issue.");
   }
 
-  console.log(`[CsvArchiver] Saved ${(stat.size / 1024 / 1024).toFixed(1)} MB to disk.`);
+  logger.info(`[CsvArchiver] Saved ${(stat.size / 1024 / 1024).toFixed(1)} MB to disk.`);
 
   // ── HTML content guard (magic-byte check) ──────────────────────────────────
   // Catches CDNs that serve a Cloudflare interstitial with a misleading
@@ -334,7 +334,7 @@ export async function ensureTodaysArchive(
   const validationResult = await qsvValidate(filePath);
   if (!validationResult.valid) {
     const errMsg = validationResult.errors.slice(0, 5).join("\n");
-    console.error(`[CsvArchiver] qsv validation FAILED for ${date}:\n${errMsg}`);
+    logger.error(`[CsvArchiver] qsv validation FAILED for ${date}:\n${errMsg}`);
 
     // Send admin alert but do NOT hard-abort here — qsv may have false positives
     // on encoding edge cases. The record count guard below is the hard gate.
@@ -351,11 +351,11 @@ export async function ensureTodaysArchive(
 
   if (recordCount === -1) {
     // qsv not installed — fall back to streaming count
-    console.warn("[CsvArchiver] qsv not available for count — counting rows via csv-parse.");
+    logger.warn("[CsvArchiver] qsv not available for count — counting rows via csv-parse.");
     recordCount = await countCsvRows(filePath);
   }
 
-  console.log(`[CsvArchiver] Record count for ${date}: ${recordCount.toLocaleString()}`);
+  logger.info(`[CsvArchiver] Record count for ${date}: ${recordCount.toLocaleString()}`);
 
   if (recordCount < MIN_SPONSOR_COUNT) {
     const errorMsg =
@@ -363,7 +363,7 @@ export async function ensureTodaysArchive(
       `(minimum expected: ${MIN_SPONSOR_COUNT.toLocaleString()}). ` +
       `This indicates a corrupted, truncated, or unexpected file from Gov.uk.`;
 
-    console.error(errorMsg);
+    logger.error(errorMsg);
 
     // Register the invalid file so we know it was attempted
     await db
@@ -414,7 +414,7 @@ export async function ensureTodaysArchive(
     })
     .onConflictDoNothing(); // idempotent on re-run
 
-  console.log(
+  logger.info(
     `[CsvArchiver] Archive registered: ${date} | ${recordCount.toLocaleString()} records | SHA-256: ${checksumSha256.slice(0, 12)}...`,
   );
 

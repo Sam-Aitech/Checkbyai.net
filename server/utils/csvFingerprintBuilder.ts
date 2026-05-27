@@ -90,11 +90,11 @@ export async function buildFingerprintedCsv(
   const log = logger.child({ module: "FingerprintBuilder", rawPath, outputPath });
   // Skip if already built
   if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 0) {
-    console.log(`[FingerprintBuilder] Already exists: ${path.basename(outputPath)}`);
+    logger.info(`[FingerprintBuilder] Already exists: ${path.basename(outputPath)}`);
     return outputPath;
   }
 
-  console.log(`[FingerprintBuilder] Building fingerprinted CSV → ${path.basename(outputPath)}`);
+  logger.info(`[FingerprintBuilder] Building fingerprinted CSV → ${path.basename(outputPath)}`);
 
   const readStream = fs.createReadStream(rawPath);
   const writeStream = fs.createWriteStream(outputPath);
@@ -234,7 +234,7 @@ export async function buildFingerprintedCsv(
     );
   }
 
-  console.log(
+  logger.info(
     `[FingerprintBuilder] Done: ${rowsWritten.toLocaleString()} rows → ${path.basename(outputPath)}`,
   );
 

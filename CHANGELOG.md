@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Route Layer Refactoring (Phases 1-7)**: All route files migrated from inline Express handler pattern to a modular architecture with separation of concerns:
+  - `server/lib/` — Shared utilities: `errorHandler.ts` (`asyncHandler`), `response.ts` (`success`/`fail`), `validate.ts` (`validateBody`), `apiError.ts`
+  - `server/validation/` — Zod schemas per route domain: `auth.ts`, `billing.ts`, `verification.ts`
+  - `server/services/` — Business logic services: `authService.ts` (register, login, password reset), `subscriptionService.ts` (plan management), `verificationService.ts` (file analysis pipeline)
+  - `server/repositories/` — Data access layer (reserved for future use)
+  - `server/storage.ts` — Consolidated storage layer extracting inline DB queries from routes: added `createPaidSubmission()`, `getPaidSubmission()`, `updateVerificationFeedback()`, `getUser()`, `getUserByEmail()`, `checkDailyLimit()`, `getUserNotifPrefs()`, `updateUserNotifPrefs()`
+  - All 10 route files refactored: `auth.ts`, `billing.ts`, `enrichment.ts`, `health.ts`, `notifications.ts`, `sponsorPages.ts`, `sponsors.ts`, `stats.ts`, `verification.ts`, `admin.ts`
+  - All routes use `asyncHandler` for automatic error forwarding to Express error middleware
+  - `fail()`/`success()` response helpers replace inline `res.status().json()` patterns
+
+- **Backend Patterns Audit — Logging migration**: All `console.log`/`console.error`/`console.warn` calls (~369 across 47 files) migrated to the structured Pino logger (`server/utils/logger.ts`). Error objects passed as `{ err }` context for structured log aggregation.
+- **Backend Patterns Audit — Column projections**: Added explicit column projections to hot-path Drizzle ORM queries:
+  - `settingsRepository.getSystemSetting()` — projects only `{ value }` (called on every verification)
+  - `sponsors.ts` full-scan watch creation query — projects 4 of 13 `sponsorCanonical` columns
+  - `sponsors.ts` watch ownership/status checks — projects only `id`, `userId`, `isActive`
+  - `sponsors.ts` history/changes enrichment — projects only display columns
+- **Backend Patterns Audit — RBAC unification**: Legacy `isAdmin` guard (hard-coded `role === 'admin'` check in `auth.ts`) replaced with `requireRole("admin")` from the 6-level `roleGuard.ts` hierarchy. Applied across `admin.ts` (62 usages), `sponsors.ts`, `support.ts`, and `monitoringService.ts`.
+
+
 ### Fixed
 - **SEC-001 (Critical) — Path traversal on file upload endpoints**: Three endpoints (`/api/admin/extract-metadata`, `/api/admin/trusted-patterns`, `/api/verify`) used `req.file.path` directly without sanitization, allowing path traversal via crafted filenames. Created `server/utils/uploadGuard.ts` with `sanitizeUploadPath()` that resolves paths relative to the uploads directory and rejects traversal attempts.
 - **SEC-002 — HMAC secret fallback chain**: `hmacSecret` in billing.ts fell back through multiple env vars (`CHECKOUT_HMAC_SECRET` → `STRIPE_WEBHOOK_SECRET` → `secret`), leaking which env vars are set to an attacker who can provoke an error. Now requires `CHECKOUT_HMAC_SECRET` unconditionally.

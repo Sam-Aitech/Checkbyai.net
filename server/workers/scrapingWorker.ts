@@ -1,8 +1,9 @@
 import { Job } from 'bullmq';
+import { logger } from "../utils/logger";
 
 export async function processScrapingJob(job: Job) {
   try {
-    console.log(`[ScrapingWorker] Starting scraping job: ${job.name} (ID: ${job.id})`);
+    logger.info(`[ScrapingWorker] Starting scraping job: ${job.name} (ID: ${job.id})`);
     
     // For now, just return success
     // Actual scraping implementation will be done in the Python script
@@ -12,7 +13,7 @@ export async function processScrapingJob(job: Job) {
       timestamp: new Date().toISOString()
     };
   } catch (error) {
-    console.error(`[ScrapingWorker] Error processing scraping job:`, error);
+    logger.error({ err: error }, `[ScrapingWorker] Error processing scraping job:`);
     throw error;
   }
 }

@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 import { getUncachableStripeClient } from '../stripeClient';
 
 interface Product {
@@ -57,7 +58,7 @@ const products: Product[] = [
 ];
 
 async function seedProducts() {
-  console.log('Starting Stripe product seeding...');
+  logger.info('Starting Stripe product seeding...');
   
   try {
     const stripe = await getUncachableStripeClient();
@@ -68,7 +69,7 @@ async function seedProducts() {
       });
 
       if (existingProducts.data.length > 0) {
-        console.log(`Product "${productData.name}" already exists, skipping...`);
+        logger.info(`Product "${productData.name}" already exists, skipping...`);
         continue;
       }
 
@@ -78,7 +79,7 @@ async function seedProducts() {
         metadata: productData.metadata,
       });
 
-      console.log(`Created product: ${product.id} - ${product.name}`);
+      logger.info(`Created product: ${product.id} - ${product.name}`);
 
       const priceData: any = {
         product: product.id,
@@ -92,15 +93,15 @@ async function seedProducts() {
       }
 
       const price = await stripe.prices.create(priceData);
-      console.log(`Created price: ${price.id} - £${(productData.priceAmount / 100).toFixed(2)}`);
+      logger.info(`Created price: ${price.id} - £${(productData.priceAmount / 100).toFixed(2)}`);
     }
 
-    console.log('\nProduct seeding completed!');
-    console.log('\nTo use these in your app, query the stripe.products and stripe.prices tables.');
+    logger.info('Product seeding completed!');
+    logger.info('To use these in your app, query the stripe.products and stripe.prices tables.');
   } catch (error) {
-    console.error('Error seeding products:', error);
+    logger.error({ err: error }, 'Error seeding products:');
     throw error;
   }
 }
 
-seedProducts().catch(console.error);
+seedProducts().catch((err) => logger.error({ err }, 'seedProducts failed'));

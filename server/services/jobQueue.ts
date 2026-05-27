@@ -1,4 +1,5 @@
 import { Queue, Worker, Job } from 'bullmq';
+import { logger } from '../utils/logger';
 import IORedis from 'ioredis';
 import * as Sentry from '@sentry/node';
 
@@ -95,9 +96,9 @@ export async function initJobQueue(): Promise<void> {
     await probe.connect();
     await probe.ping();
     redisAvailable = true;
-    console.log('[JobQueue] Redis connected — BullMQ queues active.');
+    logger.info('[JobQueue] Redis connected — BullMQ queues active.');
   } catch (err: unknown) {
-    console.warn(
+    logger.warn(
       `[JobQueue] Redis unavailable (${err instanceof Error ? err.message : String(err)}). ` +
       `BullMQ disabled — sponsor sync will run inline.`
     );
@@ -115,7 +116,7 @@ notificationQueue = new Queue(NOTIFICATION_JOB, { connection: redisOpts });
 /** Registers BullMQ workers. No-op if Redis was unavailable at startup. */
 export function setupWorkers(): void {
   if (!redisAvailable) {
-    console.log('[JobQueue] Skipping worker setup — Redis not available.');
+    logger.info('[JobQueue] Skipping worker setup — Redis not available.');
     return;
   }
 
@@ -152,5 +153,5 @@ export function setupWorkers(): void {
     { connection: redisOpts }
   );
 
-  console.log('[JobQueue] BullMQ workers registered.');
+  logger.info('[JobQueue] BullMQ workers registered.');
 }

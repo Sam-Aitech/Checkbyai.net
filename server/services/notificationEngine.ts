@@ -314,7 +314,7 @@ async function logEvent(
       errorDetails: opts?.errorDetails ?? null,
     });
   } catch (err) {
-    console.error("[NotificationEngine] Failed to write log entry:", err);
+    log.error({ err }, "[NotificationEngine] Failed to write log entry");
   }
 }
 
@@ -352,7 +352,7 @@ export async function notifyUsersOfEvent(change: SponsorChange): Promise<{ sent:
 
   const changeId = change.id;
   if (changeId === undefined) {
-    console.warn("[NotificationEngine] changeId not set, skipping:", change.organisationName);
+    log.warn({ changeId: change.id, organisationName: change.organisationName }, "[NotificationEngine] changeId not set, skipping");
     return { sent, skipped, failed };
   }
 
@@ -469,7 +469,7 @@ export async function notifyUsersOfEvent(change: SponsorChange): Promise<{ sent:
           failed++;
         }
 
-        console.log(
+        log.info(
           `[NotificationEngine] ${sendResult.success ? "Sent" : "Failed"} ${prefsKey} to ${recipientEmail} (user ${userId})`,
         );
        } catch (err: unknown) {
@@ -513,7 +513,7 @@ export async function processQueuedEngineEvents(orchestration?: { correlationId?
 
     if (queued.length === 0) return;
 
-    console.log(`[NotificationEngine] Processing ${queued.length} queued engine event(s)...`);
+    log.info(`[NotificationEngine] Processing ${queued.length} queued engine event(s)...`);
 
     const uniqueUserIds = [...new Set(queued.map(q => q.userId))];
     const uniqueChangeIds = [...new Set(queued.map(q => q.changeId))];
@@ -580,13 +580,12 @@ export async function processQueuedEngineEvents(orchestration?: { correlationId?
           })
           .where(eq(notifEngineLog.id, entry.id));
 
-        console.log(
+        log.info(
           `[NotificationEngine] Deferred ${entry.eventType}: ${sendResult.success ? "sent" : "failed"} to ${recipientEmail}`,
         );
       } catch (err: unknown) {
-        console.error(
-          `[NotificationEngine] Error delivering queued entry ${entry.id}:`,
-          err instanceof Error ? err.message : String(err),
+        log.error({ err },
+          `[NotificationEngine] Error delivering queued entry ${entry.id}`,
         );
         await db
           .update(notifEngineLog)
@@ -595,9 +594,9 @@ export async function processQueuedEngineEvents(orchestration?: { correlationId?
       }
     }
 
-    console.log("[NotificationEngine] Queued event processing complete.");
+    log.info("[NotificationEngine] Queued event processing complete.");
   } catch (err) {
-    console.error("[NotificationEngine] Fatal error in processQueuedEngineEvents:", err);
+    log.error({ err }, "[NotificationEngine] Fatal error in processQueuedEngineEvents");
     outcome = "failed";
     failureReason = err instanceof Error ? err.message : String(err);
   } finally {

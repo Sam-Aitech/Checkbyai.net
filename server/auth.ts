@@ -7,12 +7,15 @@ import { storage } from "./storage";
 import crypto from "crypto";
 import { otpLimiter } from "./middleware/rateLimiter";
 import { getAppUrl } from "./utils/appUrl";
+import { validateBody } from "./lib/validate";
+import { sendOtpSchema, verifyOtpSchema } from "./validation/auth";
+import { logger } from "./utils/logger";
 
 
 if (process.env.NODE_ENV === "production" && !process.env.REPLIT_DOMAINS) {
   // If we're on Replit but forgot domains, we cannot handle OAuth callbacks.
   // We only throw in production to allow local dev to work without these.
-  console.warn("REPLIT_DOMAINS not provided; Google OAuth callback redirects may fail.");
+  logger.warn("REPLIT_DOMAINS not provided; Google OAuth callback redirects may fail.");
 }
 
 export function getSession() {
@@ -26,10 +29,8 @@ export function getSession() {
   });
   const sessionSecret = process.env.SESSION_SECRET;
   if (!sessionSecret) throw new Error('SESSION_SECRET is required');
-  // codeql[js/missing-token-validation]
-  // lgtm[js/missing-token-validation]
-  // CSRF protection is provided by sameSite: 'lax' cookies, which is standard and secure for JSON API endpoints without cross-origin write operations.
-  return session({
+  // CSRF protection: sameSite: 'lax' cookies are standard and secure for JSON API endpoints without cross-origin write operations.
+  return session({ // codeql[js/missing-token-validation] lgtm[js/missing-token-validation]
     secret: sessionSecret,
     store: sessionStore,
     resave: false,
@@ -56,7 +57,7 @@ export function generateOTP(): string {
 export async function sendEmailOTP(email: string, code: string): Promise<boolean> {
   try {
     if (!process.env.RESEND_API_KEY) {
-      console.error("RESEND_API_KEY not configured");
+      logger.error("RESEND_API_KEY not configured");
       return false;
     }
 
@@ -94,13 +95,13 @@ export async function sendEmailOTP(email: string, code: string): Promise<boolean
 
     if (!response.ok) {
       const error = await response.text();
-      console.error("Resend API error:", error);
+      logger.error({ err: error }, "Resend API error");
       return false;
     }
 
     return true;
   } catch (error) {
-    console.error("Error sending email OTP:", error);
+    logger.error({ err: error }, "Error sending email OTP");
     return false;
   }
 }
@@ -109,7 +110,7 @@ export async function sendEmailOTP(email: string, code: string): Promise<boolean
 export async function sendAdminOTPViaResend(email: string, code: string): Promise<boolean> {
   try {
     if (!process.env.RESEND_API_KEY) {
-      console.error("RESEND_API_KEY not configured");
+      logger.error("RESEND_API_KEY not configured");
       return false;
     }
 
@@ -147,13 +148,13 @@ export async function sendAdminOTPViaResend(email: string, code: string): Promis
 
     if (!response.ok) {
       const error = await response.text();
-      console.error("Resend API error:", error);
+      logger.error({ err: error }, "Resend API error");
       return false;
     }
 
     return true;
   } catch (error) {
-    console.error("Error sending admin OTP via Resend:", error);
+    logger.error({ err: error }, "Error sending admin OTP via Resend");
     return false;
   }
 }
@@ -161,7 +162,7 @@ export async function sendAdminOTPViaResend(email: string, code: string): Promis
 export async function sendMasterPackageNotification(userEmail: string, userId: string): Promise<boolean> {
   try {
     if (!process.env.RESEND_API_KEY) {
-      console.error("RESEND_API_KEY not configured");
+      logger.error("RESEND_API_KEY not configured");
       return false;
     }
 
@@ -206,7 +207,7 @@ export async function sendMasterPackageNotification(userEmail: string, userId: s
     });
 
     if (!adminResponse.ok) {
-      console.error("Failed to send admin notification:", await adminResponse.text());
+      logger.error({ err: await adminResponse.text() }, "Failed to send admin notification");
     }
 
     const userResponse = await fetch("https://api.resend.com/emails", {
@@ -251,14 +252,14 @@ export async function sendMasterPackageNotification(userEmail: string, userId: s
     });
 
     if (!userResponse.ok) {
-      console.error("Failed to send user confirmation:", await userResponse.text());
+      logger.error({ err: await userResponse.text() }, "Failed to send user confirmation");
       return false;
     }
 
-    console.log(`Master Package notification emails sent for user ${userId}`);
+    logger.info(`Master Package notification emails sent for user ${userId}`);
     return true;
   } catch (error) {
-    console.error("Error sending Master Package notifications:", error);
+    logger.error({ err: error }, "Error sending Master Package notifications");
     return false;
   }
 }
@@ -273,7 +274,7 @@ export async function setupAuth(app: Express) {
   if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
     const appUrl = process.env.APP_URL || (process.env.REPLIT_DOMAINS?.split(',')[0] ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}` : null);
     if (!appUrl) {
-      console.warn('[Auth] APP_URL and REPLIT_DOMAINS are both missing — Google OAuth callback may not work correctly');
+      logger.warn('[Auth] APP_URL and REPLIT_DOMAINS are both missing — Google OAuth callback may not work correctly');
     }
     const currentDomain = appUrl || 'localhost:5000';
     const fullCallbackURL = currentDomain.includes('localhost') 
@@ -351,13 +352,9 @@ export async function setupAuth(app: Express) {
   }
 
   // Email OTP: Send verification code
-  app.post("/api/auth/email/send-otp", otpLimiter, async (req, res) => {
+  app.post("/api/auth/email/send-otp", otpLimiter, validateBody(sendOtpSchema), async (req, res) => {
     try {
       const { email, turnstileToken } = req.body;
-      
-      if (typeof email !== "string" || !email || !emailRegex.test(email)) {
-        return res.status(400).json({ message: "Valid email required" });
-      }
 
       // Cloudflare Turnstile CAPTCHA verification
       // If TURNSTILE_SECRET_KEY is set, verify the token; skip in dev if key absent
@@ -381,7 +378,7 @@ export async function setupAuth(app: Express) {
             return res.status(400).json({ message: "CAPTCHA verification failed. Please try again." });
           }
         } catch (cfError) {
-          console.error("Turnstile verification error:", cfError);
+          logger.error({ err: cfError }, "Turnstile verification error");
           return res.status(500).json({ message: "CAPTCHA verification unavailable. Please try again." });
         }
       }
@@ -416,20 +413,15 @@ export async function setupAuth(app: Express) {
 
       res.json({ message: "Verification code sent to your email" });
     } catch (error) {
-      console.error("Error sending OTP:", error);
+      logger.error({ err: error }, "Error sending OTP");
       res.status(500).json({ message: "Failed to send verification code" });
     }
   });
 
   // Email OTP: Verify code
-  app.post("/api/auth/email/verify-otp", otpLimiter, async (req, res) => {
+  app.post("/api/auth/email/verify-otp", otpLimiter, validateBody(verifyOtpSchema), async (req, res) => {
     try {
       const { email, code } = req.body;
-      
-      // codeql[js/user-controlled-bypass] - Simple presence check on verification parameters, not bypass logic.
-      if (typeof email !== "string" || typeof code !== "string" || !email || !code) {
-        return res.status(400).json({ message: "Email and code required" });
-      }
 
       const user = await storage.getUserByEmail(email);
       
@@ -471,19 +463,15 @@ export async function setupAuth(app: Express) {
         res.json({ message: "Login successful", user: sessionUser });
       });
     } catch (error) {
-      console.error("Error verifying OTP:", error);
+      logger.error({ err: error }, "Error verifying OTP");
       res.status(500).json({ message: "Failed to verify code" });
     }
   });
 
   // Admin OTP: Send verification code via Resend
-  app.post("/api/auth/admin/send-otp", otpLimiter, async (req, res) => {
+  app.post("/api/auth/admin/send-otp", otpLimiter, validateBody(sendOtpSchema), async (req, res) => {
     try {
       const { email, turnstileToken } = req.body;
-      
-      if (typeof email !== "string" || !email || !emailRegex.test(email)) {
-        return res.status(400).json({ message: "Valid email required" });
-      }
 
       if (process.env.TURNSTILE_SECRET_KEY && !turnstileToken) {
         return res.status(400).json({ message: "CAPTCHA verification required" });
@@ -517,7 +505,7 @@ export async function setupAuth(app: Express) {
 
       // Get or create admin user
       const existingAdminUser = await storage.getUserByEmail(email);
-      
+
       if (!existingAdminUser) {
         await storage.upsertUser({
           id: "admin_" + crypto.randomUUID(),
@@ -540,20 +528,15 @@ export async function setupAuth(app: Express) {
 
       res.json({ message: "Verification code sent to your email" });
     } catch (error) {
-      console.error("Error sending admin OTP:", error);
+      logger.error({ err: error }, "Error sending admin OTP");
       res.status(500).json({ message: "Failed to send verification code" });
     }
   });
 
   // Admin OTP: Verify code and login
-  app.post("/api/auth/admin/verify-otp", otpLimiter, async (req, res) => {
+  app.post("/api/auth/admin/verify-otp", otpLimiter, validateBody(verifyOtpSchema), async (req, res) => {
     try {
       const { email, code } = req.body;
-      
-      // codeql[js/user-controlled-bypass] - Simple presence check on admin verification parameters, not bypass logic.
-      if (typeof email !== "string" || typeof code !== "string" || !email || !code) {
-        return res.status(400).json({ message: "Email and code required" });
-      }
 
       // Check if email matches ADMIN_EMAIL
       const envAdminEmail = process.env.ADMIN_EMAIL;
@@ -604,7 +587,7 @@ export async function setupAuth(app: Express) {
         res.json({ message: "Login successful", user: sessionUser });
       });
     } catch (error) {
-      console.error("Error verifying admin OTP:", error);
+      logger.error({ err: error }, "Error verifying admin OTP");
       res.status(500).json({ message: "Failed to verify code" });
     }
   });

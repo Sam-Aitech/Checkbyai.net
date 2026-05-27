@@ -4,6 +4,7 @@ import path from "path";
 import { createServer as createViteServer, createLogger } from "vite";
 import { type Server } from "http";
 import viteConfig from "../vite.config";
+import { logger } from "./utils/logger";
 import { nanoid } from "nanoid";
 
 const viteLogger = createLogger();
@@ -16,10 +17,7 @@ export function log(message: string, source = "express") {
     hour12: true,
   });
 
-  const safeMessage = message.replace(/[\r\n]/g, " ");
-  const safeSource = source.replace(/[\r\n]/g, " ");
-  // codeql[js/log-injection] - safeSource and safeMessage are sanitized to prevent log injection
-  console.log(`${formattedTime} [${safeSource}] ${safeMessage}`);
+  logger.info({ source, message, time: formattedTime }, 'vite');
 }
 
 export async function setupVite(app: Express, server: Server) {

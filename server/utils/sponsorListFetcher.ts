@@ -209,7 +209,7 @@ async function runScraplingScript(): Promise<ScraplingResponse> {
   );
 
   if (stderr) {
-    console.warn("[SponsorListFetcher] Scrapling stderr:", stderr.trim());
+    logger.warn({ err: stderr.trim() }, "[SponsorListFetcher] Scrapling stderr:");
   }
 
   let result: ScraplingResponse;
@@ -243,9 +243,9 @@ async function findCsvUrl(): Promise<string | ScraplingResponse> {
   try {
     return await findCsvUrlPrimary();
   } catch (primaryErr: any) {
-    console.warn(
+    logger.warn(
+      { err: primaryErr.message },
       "[SponsorListFetcher] Cheerio scraper failed, trying Scrapling fallback:",
-      primaryErr.message,
     );
 
     // Non-blocking admin alert — cheerio failure may indicate gov.uk page structure change.
@@ -277,7 +277,7 @@ export async function discoverCsvUrl(): Promise<string> {
   try {
     result = await findCsvUrl();
   } catch (err: any) {
-    console.warn("[SponsorListFetcher] Both Scrapers failed. Attempting Direct URL Fallback.");
+    logger.warn("[SponsorListFetcher] Both Scrapers failed. Attempting Direct URL Fallback.");
     // Try to construct today's URL or fallback
     const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
     const fallbackUrl = `https://assets.publishing.service.gov.uk/media/register-of-licensed-sponsors-workers/${today}_Worker_and_Temporary_Worker.csv`;
@@ -340,7 +340,7 @@ function rowToRecord(row: string[], idx: ColumnIndexes): SponsorRecord | null {
  */
 function validateAndProcessHtmlRecords(records: SponsorRecord[], warning?: string): SponsorRecord[] {
   if (warning) {
-    console.warn("[SponsorListFetcher] CRITICAL HTML FALLBACK WARNING:", warning);
+    logger.warn({ err: warning }, "[SponsorListFetcher] CRITICAL HTML FALLBACK WARNING:");
     sendAdminAlert(
       "🔴 CRITICAL: Sponsor Monitor using HTML fallback",
       `<p>The Scrapling CSV URL discovery failed across all phases.</p>
@@ -397,7 +397,7 @@ export async function downloadAndStreamToArray(): Promise<SponsorRecord[]> {
   // Idempotent: returns cached file path if already downloaded today.
   const archive = await ensureTodaysArchive(today, csvUrl);
 
-  console.log(
+  logger.info(
     `[SponsorListFetcher] Archive ready for ${today}: ` +
     `${archive.recordCount.toLocaleString()} records (cached=${archive.wasAlreadyCached})`,
   );

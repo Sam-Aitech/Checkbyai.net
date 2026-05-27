@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { logger } from '../utils/logger';
 import { XMLParser } from 'fast-xml-parser';
 import { sanitizeUploadPath, UPLOADS_DIR } from '../utils/uploadGuard';
 
@@ -154,7 +155,7 @@ export class PDFAnalyzer {
       const pdfString = buffer.toString('binary');
       const fileSize = stats.size;
 
-      console.log(`File size: ${fileSize} bytes`);
+      logger.info(`File size: ${fileSize} bytes`);
 
       // ── Phase 1: Cheap synchronous checks (fast, no yield needed) ──────────
       const metadata: PDFMetadata = {
@@ -234,12 +235,11 @@ export class PDFAnalyzer {
       await yieldToEventLoop();
       metadata.forensic = this.buildForensicProfile(metadata, xmpHistory);
 
-      // codeql[js/log-injection] - Log values are sanitized to prevent log injection
-      console.log(`Forensic profile built for ${sanitizeLog(path.basename(filePath))} (${fileSize} bytes, ${metadata.fonts.length} fonts, ${xmpHistory.length} XMP history entries)`);
+      logger.info({ fileSize, fontCount: metadata.fonts.length, xmpHistoryCount: xmpHistory.length }, 'Forensic profile built');
 
       return metadata;
     } catch (error) {
-      console.error('Error extracting PDF metadata:', error instanceof Error ? sanitizeLog(error.message) : 'Unknown error');
+      logger.error({ err: error }, 'Error extracting PDF metadata:');
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return {
         fileSize: 0,
@@ -369,7 +369,7 @@ export class PDFAnalyzer {
         }
       }
     } catch (error) {
-      console.error('Error extracting XMP history:', error);
+      logger.error({ err: error }, 'Error extracting XMP history:');
     }
     
     return history;

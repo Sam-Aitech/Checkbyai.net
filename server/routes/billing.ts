@@ -13,6 +13,9 @@ import { storage } from "../storage";
 import { logger } from "../utils/logger";
 import { getWatchLimit } from "../utils/tierConfig";
 import { normalizeName, generateFingerprint } from "../utils/sponsorListFetcher";
+import { success } from "../lib/response";
+import { asyncHandler } from "../lib/errorHandler";
+import { ApiError } from "../lib/apiError";
 
 /**
  * Best-effort: after a successful Notification Engine checkout, auto-create
@@ -95,13 +98,7 @@ const CHECKOUT_HMAC_SECRET = process.env.CHECKOUT_HMAC_SECRET;
 if (!CHECKOUT_HMAC_SECRET) {
   throw new Error("CHECKOUT_HMAC_SECRET is required");
 }
-// Fallback for development/testing only - use empty string as last resort
-// SEC-002: removed insecure fallback chain — CHECKOUT_HMAC_SECRET is required in all environments
-// Falling back to SESSION_SECRET or STRIPE_SECRET_KEY mixed security domains and empty string = forgeable signatures.
 const hmacSecret = CHECKOUT_HMAC_SECRET;
-if (!hmacSecret) {
-  throw new Error("CHECKOUT_HMAC_SECRET is required — set it in your environment variables (generate with: openssl rand -hex 32)");
-}
 
 function signClientReferenceId(userId: string, packageType: string, companyName?: string): string {
   const encodedCompany = companyName ? encodeURIComponent(companyName) : '';
@@ -146,7 +143,7 @@ function verifyClientReferenceId(clientRefId: string): { userId: string; package
 
 async function tryClaimSession(sessionId: string): Promise<boolean> {
   const result = await db.execute(
-    sql`INSERT INTO processed_checkouts (session_id) VALUES (${sessionId}) ON CONFLICT (session_id) DO NOTHING RETURNING session_id`
+    sql`INSERT INTO processed_checkouts (session_id) VALUES (${sessionId}) ON CONFLICT (session_id) DO NOTHING RETURNING id`
   );
   return (result as any).rowCount > 0;
 }
@@ -188,7 +185,7 @@ async function sendSubscriptionNotifications(
       const user = await storage.getUser(userId);
       userEmail = user?.email ?? undefined;
     } catch (err) {
-      console.error('[Subscription] Failed to fetch user email for notifications:', err);
+      logger.error({ err }, '[Subscription] Failed to fetch user email for notifications');
     }
   }
 
@@ -258,73 +255,67 @@ async function sendSubscriptionNotifications(
 
   const results = await Promise.all(sends);
   const allSent = results.every(Boolean);
-  console.log(`[Subscription] Emails for ${packageType} — user: ${userEmail || userId} — ${allSent ? "all sent" : "some failed"}`);
+  logger.info({ packageType, user: userEmail || userId, allSent }, `[Subscription] Emails for ${packageType} — user: ${userEmail || userId} — ${allSent ? "all sent" : "some failed"}`);
 }
 
 export function registerBillingRoutes(app: Express): void {
-  app.post('/api/create-subscription', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.id;
-      const user = await storage.getUser(userId);
+  app.post('/api/create-subscription', isAuthenticated, asyncHandler(async (req: any, res) => {
+    const userId = req.user.id;
+    const user = await storage.getUser(userId);
 
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      if (user.stripeSubscriptionId) {
-        const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
-        if (subscription.status === 'active') {
-          return res.json({
-            subscriptionId: subscription.id,
-            status: 'active'
-          });
-        }
-      }
-
-      if (!user.email) {
-        return res.status(400).json({ message: 'No user email on file' });
-      }
-
-      let customerId = user.stripeCustomerId;
-      if (!customerId) {
-        const customer = await stripe.customers.create({
-          email: user.email,
-          name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
-        });
-        await storage.updateUserStripeInfo(userId, customer.id);
-        customerId = customer.id;
-      }
-
-      const allPrices = await stripe.prices.list({ active: true, limit: 50, expand: ['data.product'] });
-      const unlimitedPrice = allPrices.data.find(p => {
-        const prod = p.product as any;
-        return prod?.metadata?.packageType === 'unlimited' && p.recurring;
-      });
-
-      if (!unlimitedPrice) {
-        return res.status(400).json({
-          message: 'Unlimited subscription plan not configured in Stripe. Please use the checkout flow instead.',
-          redirect: '/pricing'
-        });
-      }
-
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
-      const session = await stripe.checkout.sessions.create({
-        customer: customerId,
-        payment_method_types: ['card'],
-        line_items: [{ price: unlimitedPrice.id, quantity: 1 }],
-        mode: 'subscription',
-        success_url: `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${baseUrl}/pricing`,
-        metadata: { userId, packageType: 'unlimited' },
-      });
-
-      res.json({ url: session.url, status: 'redirect' });
-    } catch (error: unknown) {
-      console.error("Subscription creation error:", error);
-      res.status(500).json({ message: 'Failed to create subscription' });
+    if (!user) {
+      throw new ApiError(404, "User not found");
     }
-  });
+
+    if (user.stripeSubscriptionId) {
+      const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
+      if (subscription.status === 'active') {
+        success(res, { subscriptionId: subscription.id, status: 'active' });
+        return;
+      }
+    }
+
+    if (!user.email) {
+      throw new ApiError(400, 'No user email on file');
+    }
+
+    let customerId = user.stripeCustomerId;
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: user.email,
+        name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+      });
+      await storage.updateUserStripeInfo(userId, customer.id);
+      customerId = customer.id;
+    }
+
+    const allPrices = await stripe.prices.list({ active: true, limit: 50, expand: ['data.product'] });
+    const unlimitedPrice = allPrices.data.find(p => {
+      const prod = p.product as any;
+      return prod?.metadata?.packageType === 'unlimited' && p.recurring;
+    });
+
+    if (!unlimitedPrice) {
+      success(res, {
+        message: 'Unlimited subscription plan not configured in Stripe. Please use the checkout flow instead.',
+        redirect: '/pricing'
+      });
+      return;
+    }
+
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const session = await stripe.checkout.sessions.create({
+      customer: customerId,
+      payment_method_types: ['card'],
+      line_items: [{ price: unlimitedPrice.id, quantity: 1 }],
+      mode: 'subscription',
+      success_url: `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/pricing`,
+      metadata: { userId, packageType: 'unlimited' },
+    });
+
+    success(res, { url: session.url, status: 'redirect' });
+  }));
 
   app.post('/api/stripe-webhook', async (req, res) => {
     const sig = req.headers['stripe-signature'];
@@ -333,11 +324,11 @@ export function registerBillingRoutes(app: Express): void {
     try {
       const rawBody = (req as any).rawBody;
       if (!rawBody) {
-        console.error('Webhook error: rawBody not available — ensure express.json verify callback is configured');
+        logger.error('Webhook error: rawBody not available — ensure express.json verify callback is configured');
         return res.status(400).send('Webhook raw body unavailable');
       }
       if (!process.env.STRIPE_WEBHOOK_SECRET) {
-        console.error(
+        logger.error(
           'Webhook error: STRIPE_WEBHOOK_SECRET is not set. ' +
           'All plan activations via webhook are failing. ' +
           'Set STRIPE_WEBHOOK_SECRET to the whsec_... value from Stripe dashboard → Webhooks.'
@@ -346,7 +337,7 @@ export function registerBillingRoutes(app: Express): void {
       }
       event = stripe.webhooks.constructEvent(rawBody, sig!, process.env.STRIPE_WEBHOOK_SECRET);
     } catch (err: unknown) {
-      console.error('Webhook signature verification failed:', err instanceof Error ? err.message : err);
+      logger.error({ err: err instanceof Error ? err.message : err }, 'Webhook signature verification failed');
       return res.status(400).send('Webhook signature verification failed');
     }
 
@@ -437,7 +428,7 @@ export function registerBillingRoutes(app: Express): void {
                   reason: 'Monthly notification_pro credit top-up (+5 credits)',
                   metadata: { stripeEventId: event.id, invoiceId: invoice.id, creditsAdded: 5 },
                 }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
-                console.log(`[Billing] Added 5 monthly credits to notification_pro user ${user.id}`);
+                logger.info({ userId: user.id }, '[Billing] Added 5 monthly credits to notification_pro user');
               }
             }
           }
@@ -480,7 +471,7 @@ export function registerBillingRoutes(app: Express): void {
             packageType = verified.packageType;
             companyName = verified.companyName;
           } else {
-            console.error('Invalid client_reference_id signature:', session.client_reference_id);
+            logger.error({ clientRefId: session.client_reference_id }, 'Invalid client_reference_id signature');
           }
         }
 
@@ -498,7 +489,7 @@ export function registerBillingRoutes(app: Express): void {
                 updatedAt: new Date(),
               }).where(eq(users.id, userId));
             }), 'webhook-checkout-starter');
-            sendSubscriptionNotifications(userId, 'CoS Check Starter', 'starter', sessionEmail).catch((err) => console.error('[Subscription] Notification failed:', err));
+            sendSubscriptionNotifications(userId, 'CoS Check Starter', 'starter', sessionEmail).catch((err) => logger.error({ err }, '[Subscription] Notification failed'));
             storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'starter', reason: 'Checkout: CoS Check Starter', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
           } else if (packageType === 'pro') {
             await withRetry(() => db.transaction(async (tx) => {
@@ -510,7 +501,7 @@ export function registerBillingRoutes(app: Express): void {
                 updatedAt: new Date(),
               }).where(eq(users.id, userId));
             }), 'webhook-checkout-pro');
-            sendSubscriptionNotifications(userId, 'CoS Check Pro', 'pro', sessionEmail).catch((err) => console.error('[Subscription] Notification failed:', err));
+            sendSubscriptionNotifications(userId, 'CoS Check Pro', 'pro', sessionEmail).catch((err) => logger.error({ err }, '[Subscription] Notification failed'));
             storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'pro', reason: 'Checkout: CoS Check Pro', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
           } else if (packageType === 'unlimited') {
             await withRetry(() => db.transaction(async (tx) => {
@@ -521,7 +512,7 @@ export function registerBillingRoutes(app: Express): void {
                 updatedAt: new Date(),
               }).where(eq(users.id, userId));
             }), 'webhook-checkout-unlimited');
-            sendSubscriptionNotifications(userId, 'CoS Check Unlimited', 'unlimited', sessionEmail).catch((err) => console.error('[Subscription] Notification failed:', err));
+            sendSubscriptionNotifications(userId, 'CoS Check Unlimited', 'unlimited', sessionEmail).catch((err) => logger.error({ err }, '[Subscription] Notification failed'));
             storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'unlimited', reason: 'Checkout: CoS Check Unlimited', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
           } else if (packageType === 'master') {
             await storage.createPaidSubmission({
@@ -542,7 +533,7 @@ export function registerBillingRoutes(app: Express): void {
                 updatedAt: new Date(),
               }).where(eq(users.id, userId));
             }), 'webhook-checkout-notification-starter');
-            sendSubscriptionNotifications(userId, 'Notification Engine Starter', 'notification_starter', sessionEmail).catch((err) => console.error('[Subscription] Notification failed:', err));
+            sendSubscriptionNotifications(userId, 'Notification Engine Starter', 'notification_starter', sessionEmail).catch((err) => logger.error({ err }, '[Subscription] Notification failed'));
             storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'starter', reason: 'Checkout: Sponsor Monitor Starter', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
             if (companyName) {
               autoCreateWatchFromPayment(userId, companyName).catch((err) => logger.error({ err }, '[AutoWatch] webhook starter failed'));
@@ -558,7 +549,7 @@ export function registerBillingRoutes(app: Express): void {
                 updatedAt: new Date(),
               }).where(eq(users.id, userId));
             }), 'webhook-checkout-notification-pro');
-            sendSubscriptionNotifications(userId, 'Notification Engine Pro', 'notification_pro', sessionEmail).catch((err) => console.error('[Subscription] Notification failed:', err));
+            sendSubscriptionNotifications(userId, 'Notification Engine Pro', 'notification_pro', sessionEmail).catch((err) => logger.error({ err }, '[Subscription] Notification failed'));
             storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'pro', reason: 'Checkout: Sponsor Monitor Pro', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
             if (companyName) {
               autoCreateWatchFromPayment(userId, companyName).catch((err) => logger.error({ err }, '[AutoWatch] webhook pro failed'));
@@ -573,7 +564,7 @@ export function registerBillingRoutes(app: Express): void {
                 updatedAt: new Date(),
               }).where(eq(users.id, userId));
             }), 'webhook-checkout-cos-check');
-            sendSubscriptionNotifications(userId, 'COS Check Subscription', 'cos_check', sessionEmail).catch((err) => console.error('[Subscription] Notification failed:', err));
+            sendSubscriptionNotifications(userId, 'COS Check Subscription', 'cos_check', sessionEmail).catch((err) => logger.error({ err }, '[Subscription] Notification failed'));
           }
         }
         break;
@@ -583,256 +574,222 @@ export function registerBillingRoutes(app: Express): void {
     res.json({ received: true });
   });
 
-  app.get('/api/packages', async (req, res) => {
-    try {
-      const products = await stripe.products.list({ active: true, limit: 20 });
-      const prices = await stripe.prices.list({ active: true, limit: 50 });
+  app.get('/api/packages', asyncHandler(async (req, res) => {
+    const products = await stripe.products.list({ active: true, limit: 20 });
+    const prices = await stripe.prices.list({ active: true, limit: 50 });
 
-      const productsMap = new Map();
-      for (const product of products.data) {
-        const productPrices = prices.data
-          .filter(p => p.product === product.id)
-          .map(p => ({
-            id: p.id,
-            unit_amount: p.unit_amount,
-            currency: p.currency,
-            recurring: p.recurring,
-            metadata: p.metadata,
-          }));
+    const productsMap = new Map();
+    for (const product of products.data) {
+      const productPrices = prices.data
+        .filter(p => p.product === product.id)
+        .map(p => ({
+          id: p.id,
+          unit_amount: p.unit_amount,
+          currency: p.currency,
+          recurring: p.recurring,
+          metadata: p.metadata,
+        }));
 
-        if (productPrices.length > 0) {
-          productsMap.set(product.id, {
-            id: product.id,
-            name: product.name,
-            description: product.description,
-            metadata: product.metadata,
-            prices: productPrices,
-          });
-        }
+      if (productPrices.length > 0) {
+        productsMap.set(product.id, {
+          id: product.id,
+          name: product.name,
+          description: product.description,
+          metadata: product.metadata,
+          prices: productPrices,
+        });
       }
-
-      res.json({ packages: Array.from(productsMap.values()) });
-    } catch (error: unknown) {
-      console.error('Error fetching packages:', error);
-      res.status(500).json({ message: 'Failed to fetch packages' });
     }
-  });
+
+    success(res, { packages: Array.from(productsMap.values()) });
+  }));
 
   // Stripe Customer Portal — lets paid users self-serve: update card, view
   // invoices, cancel subscription. Returns a short-lived portal URL.
-  app.post('/api/billing/portal', isAuthenticated, async (req: any, res) => {
-    try {
-      const user = await storage.getUser(req.user.id);
-      if (!user?.stripeCustomerId) {
-        return res.status(400).json({ message: 'No active subscription found. Subscribe to a plan first.' });
-      }
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
-      const portalSession = await stripe.billingPortal.sessions.create({
-        customer: user.stripeCustomerId,
-        return_url: `${baseUrl}/pro-dashboard`,
+  app.post('/api/billing/portal', isAuthenticated, asyncHandler(async (req: any, res) => {
+    const user = await storage.getUser(req.user.id);
+    if (!user?.stripeCustomerId) {
+      throw new ApiError(400, 'No active subscription found. Subscribe to a plan first.');
+    }
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const portalSession = await stripe.billingPortal.sessions.create({
+      customer: user.stripeCustomerId,
+      return_url: `${baseUrl}/pro-dashboard`,
+    });
+    success(res, { url: portalSession.url });
+  }));
+
+  app.post('/api/checkout/sign', isAuthenticated, asyncHandler(async (req: any, res) => {
+    const userId = req.user.id;
+    const { packageType, companyName } = req.body;
+    const validTypes = ['starter', 'pro', 'unlimited', 'master', 'notification_starter', 'notification_pro'];
+    if (!packageType || !validTypes.includes(packageType)) {
+      throw new ApiError(400, 'Invalid package type');
+    }
+    const clientReferenceId = signClientReferenceId(userId, packageType, companyName || undefined);
+    success(res, { clientReferenceId });
+  }));
+
+  app.post('/api/checkout/credits', isAuthenticated, asyncHandler(async (req: any, res) => {
+    const userId = req.user.id;
+    const { priceId, packageType } = req.body;
+
+    if (!priceId || !packageType) {
+      throw new ApiError(400, 'Missing priceId or packageType');
+    }
+
+    const user = await storage.getUser(userId);
+    if (!user) {
+      throw new ApiError(404, 'User not found');
+    }
+
+    if (!user.email) {
+      throw new ApiError(400, 'Email required for checkout');
+    }
+
+    let customerId = user.stripeCustomerId;
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: user.email,
+        name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || undefined,
+        metadata: { userId },
       });
-      res.json({ url: portalSession.url });
-    } catch (error: unknown) {
-      console.error('Billing portal error:', error);
-      res.status(500).json({ message: 'Failed to open billing portal. Please try again.' });
+      await storage.updateUserStripeCustomer(userId, customer.id);
+      customerId = customer.id;
     }
-  });
 
-  app.post('/api/checkout/sign', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.id;
-      const { packageType, companyName } = req.body;
-      const validTypes = ['starter', 'pro', 'unlimited', 'master', 'notification_starter', 'notification_pro'];
-      if (!packageType || !validTypes.includes(packageType)) {
-        return res.status(400).json({ message: 'Invalid package type' });
-      }
-      const clientReferenceId = signClientReferenceId(userId, packageType, companyName || undefined);
-      res.json({ clientReferenceId });
-    } catch (error: unknown) {
-      console.error('Sign checkout error:', error);
-      res.status(500).json({ message: 'Failed to prepare checkout' });
-    }
-  });
+    const isSubscription = packageType === 'unlimited';
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
 
-  app.post('/api/checkout/credits', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.id;
-      const { priceId, packageType } = req.body;
+    const session = await stripe.checkout.sessions.create({
+      customer: customerId,
+      payment_method_types: ['card'],
+      line_items: [{ price: priceId, quantity: 1 }],
+      mode: isSubscription ? 'subscription' : 'payment',
+      success_url: `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/pricing`,
+      metadata: { userId, packageType },
+    });
 
-      if (!priceId || !packageType) {
-        return res.status(400).json({ message: 'Missing priceId or packageType' });
-      }
+    success(res, { url: session.url, sessionId: session.id });
+  }));
 
-      const user = await storage.getUser(userId);
-      if (!user) {
-        return res.status(404).json({ message: 'User not found' });
-      }
+  app.get('/api/credits', isAuthenticated, asyncHandler(async (req: any, res) => {
+    const userId = req.user.id;
+    const credits = await storage.getCredits(userId);
+    const user = await storage.getUser(userId);
 
-      if (!user.email) {
-        return res.status(400).json({ message: 'Email required for checkout' });
-      }
+    success(res, {
+      credits,
+      subscriptionStatus: user?.subscriptionStatus || 'free',
+      isUnlimited: user?.subscriptionStatus === 'unlimited' || user?.subscriptionStatus === 'enterprise' || user?.verificationLimit === -1
+    });
+  }));
 
-      let customerId = user.stripeCustomerId;
-      if (!customerId) {
-        const customer = await stripe.customers.create({
-          email: user.email,
-          name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || undefined,
-          metadata: { userId },
-        });
-        await storage.updateUserStripeCustomer(userId, customer.id);
-        customerId = customer.id;
-      }
+  app.get('/api/checkout/verify/:sessionId', isAuthenticated, asyncHandler(async (req: any, res) => {
+    const { sessionId } = req.params;
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
 
-      const isSubscription = packageType === 'unlimited';
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
+    if (session.payment_status === 'paid') {
+      let packageType = session.metadata?.packageType;
+      let sessionUserId = session.metadata?.userId;
+      let companyName: string | undefined;
 
-      const session = await stripe.checkout.sessions.create({
-        customer: customerId,
-        payment_method_types: ['card'],
-        line_items: [{ price: priceId, quantity: 1 }],
-        mode: isSubscription ? 'subscription' : 'payment',
-        success_url: `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${baseUrl}/pricing`,
-        metadata: {
-          userId,
-          packageType,
-        },
-      });
-
-      res.json({ url: session.url, sessionId: session.id });
-    } catch (error: unknown) {
-      console.error('Checkout error:', error);
-      res.status(500).json({ message: 'Failed to create checkout session' });
-    }
-  });
-
-  app.get('/api/credits', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.id;
-      const credits = await storage.getCredits(userId);
-      const user = await storage.getUser(userId);
-
-      res.json({
-        credits,
-        subscriptionStatus: user?.subscriptionStatus || 'free',
-        isUnlimited: user?.subscriptionStatus === 'unlimited' || user?.subscriptionStatus === 'enterprise' || user?.verificationLimit === -1
-      });
-    } catch (error: unknown) {
-      console.error('Error fetching credits:', error);
-      res.status(500).json({ message: 'Failed to fetch credits' });
-    }
-  });
-
-  app.get('/api/checkout/verify/:sessionId', isAuthenticated, async (req: any, res) => {
-    try {
-      const { sessionId } = req.params;
-      const session = await stripe.checkout.sessions.retrieve(sessionId);
-
-      if (session.payment_status === 'paid') {
-        let packageType = session.metadata?.packageType;
-        let sessionUserId = session.metadata?.userId;
-        let companyName: string | undefined;
-
-        if (!sessionUserId && session.client_reference_id) {
-          const verified = verifyClientReferenceId(session.client_reference_id);
-          if (verified && verified.userId === req.user.id) {
-            sessionUserId = verified.userId;
-            packageType = verified.packageType;
-            companyName = verified.companyName;
-          }
+      if (!sessionUserId && session.client_reference_id) {
+        const verified = verifyClientReferenceId(session.client_reference_id);
+        if (verified && verified.userId === req.user.id) {
+          sessionUserId = verified.userId;
+          packageType = verified.packageType;
+          companyName = verified.companyName;
         }
+      }
 
-        if (sessionUserId && sessionUserId === req.user.id) {
-          if (await tryClaimSession(sessionId)) {
-            if (packageType === 'starter') {
-              await withRetry(() => db.transaction(async (tx) => {
-                await tx.update(users).set({
-                  credits: sql`COALESCE(${users.credits}, 0) + 50`,
-                  subscriptionStatus: 'starter',
-                  stripeSubscriptionId: session.subscription as string,
-                  stripeCustomerId: session.customer as string,
-                  updatedAt: new Date(),
-                }).where(eq(users.id, sessionUserId));
-              }), 'checkout-verify-starter');
-            } else if (packageType === 'pro') {
-              await withRetry(() => db.transaction(async (tx) => {
-                await tx.update(users).set({
-                  credits: sql`COALESCE(${users.credits}, 0) + 100`,
-                  subscriptionStatus: 'pro',
-                  stripeSubscriptionId: session.subscription as string,
-                  stripeCustomerId: session.customer as string,
-                  updatedAt: new Date(),
-                }).where(eq(users.id, sessionUserId));
-              }), 'checkout-verify-pro');
-            } else if (packageType === 'unlimited') {
-              await withRetry(() => db.transaction(async (tx) => {
-                await tx.update(users).set({
-                  subscriptionStatus: 'unlimited',
-                  stripeSubscriptionId: session.subscription as string,
-                  stripeCustomerId: session.customer as string,
-                  updatedAt: new Date(),
-                }).where(eq(users.id, sessionUserId));
-              }), 'checkout-verify-unlimited');
-            } else if (packageType === 'master') {
-              await storage.createPaidSubmission({
-                email: session.customer_details?.email || req.user.email || '',
-                packageType: 'full',
-                paymentStatus: 'paid',
-                stripeSessionId: session.id,
-                priority: true,
-                phoneConsultationRequested: true,
-              });
-            } else if (packageType === 'notification_starter') {
-              await withRetry(() => db.transaction(async (tx) => {
-                await tx.update(users).set({
-                  subscriptionStatus: 'starter',
-                  stripeSubscriptionId: session.subscription as string,
-                  stripeCustomerId: session.customer as string,
-                  notifPrefs: sql`COALESCE(${users.notifPrefs}, ${JSON.stringify(DEFAULT_NOTIF_PREFS)}::jsonb)`,
-                  updatedAt: new Date(),
-                }).where(eq(users.id, sessionUserId));
-              }), 'checkout-verify-notification-starter');
-              if (companyName) {
-                await autoCreateWatchFromPayment(sessionUserId, companyName);
-              }
-            } else if (packageType === 'notification_pro') {
-              await withRetry(() => db.transaction(async (tx) => {
-                await tx.update(users).set({
-                  credits: sql`COALESCE(${users.credits}, 0) + 5`,
-                  subscriptionStatus: 'pro',
-                  stripeSubscriptionId: session.subscription as string,
-                  stripeCustomerId: session.customer as string,
-                  notifPrefs: sql`COALESCE(${users.notifPrefs}, ${JSON.stringify(DEFAULT_NOTIF_PREFS)}::jsonb)`,
-                  updatedAt: new Date(),
-                }).where(eq(users.id, sessionUserId));
-              }), 'checkout-verify-notification-pro');
-              if (companyName) {
-                await autoCreateWatchFromPayment(sessionUserId, companyName);
-              }
+      if (sessionUserId && sessionUserId === req.user.id) {
+        if (await tryClaimSession(sessionId)) {
+          if (packageType === 'starter') {
+            await withRetry(() => db.transaction(async (tx) => {
+              await tx.update(users).set({
+                credits: sql`COALESCE(${users.credits}, 0) + 50`,
+                subscriptionStatus: 'starter',
+                stripeSubscriptionId: session.subscription as string,
+                stripeCustomerId: session.customer as string,
+                updatedAt: new Date(),
+              }).where(eq(users.id, sessionUserId));
+            }), 'checkout-verify-starter');
+          } else if (packageType === 'pro') {
+            await withRetry(() => db.transaction(async (tx) => {
+              await tx.update(users).set({
+                credits: sql`COALESCE(${users.credits}, 0) + 100`,
+                subscriptionStatus: 'pro',
+                stripeSubscriptionId: session.subscription as string,
+                stripeCustomerId: session.customer as string,
+                updatedAt: new Date(),
+              }).where(eq(users.id, sessionUserId));
+            }), 'checkout-verify-pro');
+          } else if (packageType === 'unlimited') {
+            await withRetry(() => db.transaction(async (tx) => {
+              await tx.update(users).set({
+                subscriptionStatus: 'unlimited',
+                stripeSubscriptionId: session.subscription as string,
+                stripeCustomerId: session.customer as string,
+                updatedAt: new Date(),
+              }).where(eq(users.id, sessionUserId));
+            }), 'checkout-verify-unlimited');
+          } else if (packageType === 'master') {
+            await storage.createPaidSubmission({
+              email: session.customer_details?.email || req.user.email || '',
+              packageType: 'full',
+              paymentStatus: 'paid',
+              stripeSessionId: session.id,
+              priority: true,
+              phoneConsultationRequested: true,
+            });
+          } else if (packageType === 'notification_starter') {
+            await withRetry(() => db.transaction(async (tx) => {
+              await tx.update(users).set({
+                subscriptionStatus: 'starter',
+                stripeSubscriptionId: session.subscription as string,
+                stripeCustomerId: session.customer as string,
+                notifPrefs: sql`COALESCE(${users.notifPrefs}, ${JSON.stringify(DEFAULT_NOTIF_PREFS)}::jsonb)`,
+                updatedAt: new Date(),
+              }).where(eq(users.id, sessionUserId));
+            }), 'checkout-verify-notification-starter');
+            if (companyName) {
+              await autoCreateWatchFromPayment(sessionUserId, companyName);
+            }
+          } else if (packageType === 'notification_pro') {
+            await withRetry(() => db.transaction(async (tx) => {
+              await tx.update(users).set({
+                credits: sql`COALESCE(${users.credits}, 0) + 5`,
+                subscriptionStatus: 'pro',
+                stripeSubscriptionId: session.subscription as string,
+                stripeCustomerId: session.customer as string,
+                notifPrefs: sql`COALESCE(${users.notifPrefs}, ${JSON.stringify(DEFAULT_NOTIF_PREFS)}::jsonb)`,
+                updatedAt: new Date(),
+              }).where(eq(users.id, sessionUserId));
+            }), 'checkout-verify-notification-pro');
+            if (companyName) {
+              await autoCreateWatchFromPayment(sessionUserId, companyName);
             }
           }
-
-          const credits = await storage.getCredits(sessionUserId);
-          const user = await storage.getUser(sessionUserId);
-
-          res.json({
-            success: true,
-            packageType,
-            credits,
-            subscriptionStatus: user?.subscriptionStatus,
-            ...(companyName ? { companyName } : {}),
-          });
-        } else {
-          res.status(403).json({ message: 'Session does not belong to this user' });
         }
+
+        const credits = await storage.getCredits(sessionUserId);
+        const user = await storage.getUser(sessionUserId);
+
+        success(res, {
+          packageType,
+          credits,
+          subscriptionStatus: user?.subscriptionStatus,
+          ...(companyName ? { companyName } : {}),
+        });
       } else {
-        res.json({ success: false, status: session.payment_status });
+        throw new ApiError(403, 'Session does not belong to this user');
       }
-    } catch (error: unknown) {
-      console.error('Verify checkout error:', error);
-      res.status(500).json({ message: 'Failed to verify checkout' });
+    } else {
+      success(res, { success: false, status: session.payment_status });
     }
-  });
+  }));
 
   const stripeKeyLimiter = rateLimit({
     windowMs: 60 * 1000,
@@ -842,14 +799,9 @@ export function registerBillingRoutes(app: Express): void {
     message: { message: "Too many requests. Please try again later." },
   });
 
-  app.get('/api/stripe/publishable-key', stripeKeyLimiter, async (req, res) => {
-    try {
-      const { getStripePublishableKey } = await import('../stripeClient');
-      const key = await getStripePublishableKey();
-      res.json({ publishableKey: key });
-    } catch (error: unknown) {
-      console.error('Error getting publishable key:', error);
-      res.status(500).json({ message: 'Failed to get Stripe key' });
-    }
-  });
+  app.get('/api/stripe/publishable-key', stripeKeyLimiter, asyncHandler(async (req, res) => {
+    const { getStripePublishableKey } = await import('../stripeClient');
+    const key = await getStripePublishableKey();
+    success(res, { publishableKey: key });
+  }));
 }

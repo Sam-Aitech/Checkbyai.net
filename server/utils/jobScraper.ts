@@ -1,4 +1,5 @@
 import type { EnrichmentResult } from "./companyEnricher";
+import { logger } from "../utils/logger";
 
 const PYTHON_BACKEND_URL = process.env.PYTHON_BACKEND_URL || "http://localhost:8000";
 
@@ -51,18 +52,17 @@ export async function scrapeJobsForCompany(
     clearTimeout(timer);
 
     if (!res.ok) {
-      console.error(`[JobScraper] Python backend returned ${res.status} for "${companyName}"`);
+      logger.error(`[JobScraper] Python backend returned ${res.status} for "${companyName}"`);
       return empty;
     }
 
     const data: ScrapeJobsResult = await res.json();
-    console.log(
-      `[JobScraper] "${companyName}" → ${data.jobs.length} jobs from boards: ${data.boards_attempted.join(", ")}`,
-      data.boards_failed.length ? `(failed: ${data.boards_failed.join(", ")})` : "",
+    logger.info(
+      `[JobScraper] "${companyName}" → ${data.jobs.length} jobs from boards: ${data.boards_attempted.join(", ")}${data.boards_failed.length ? ` (failed: ${data.boards_failed.join(", ")})` : ""}`,
     );
     return data;
   } catch (err: unknown) {
-    console.error(`[JobScraper] Scrape failed for "${companyName}":`, err instanceof Error ? err.message : err);
+    logger.error({ err: err instanceof Error ? err.message : err }, `[JobScraper] Scrape failed for "${companyName}":`);
     return empty;
   }
 }

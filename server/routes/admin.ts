@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../utils/logger";
 import type { SponsorChange } from "../utils/sponsorListFetcher";
 import * as crypto from "crypto";
 import * as fs from "fs";
@@ -20,14 +21,15 @@ import {
   type NotifPrefs,
 } from "@shared/schema";
 import { z } from "zod";
-import { isAdmin, isAuthenticated } from "../auth";
+import { requireRole } from "../middleware/roleGuard";
+import { isAuthenticated } from "../auth";
 import { storage } from "../storage";
 import { PDFAnalyzer } from "../services/pdfAnalyzer";
 import { upload } from "./verification";
 import { sendEmailReliably } from "../utils/resilientEmail";
 import { getAppUrl } from "../utils/appUrl";
 import { checkBinaryHealth } from "../utils/binaryRunner";
-import { sanitizeUploadPath, UPLOADS_DIR } from "../utils/uploadGuard";
+import { sanitizeUploadPath, assertSafeUploadFilename } from "../utils/uploadGuard";
 import { isJobRunning, getLastRunInfo, runSponsorMonitorJob } from "../utils/sponsorMonitorJob";
 import { rebuildSponsorIndex } from "../utils/sponsorSearch";
 import { isQueueAvailable, getSponsorRefreshQueue } from "../services/jobQueue";
@@ -37,9 +39,7 @@ function sanitizeForPrompt(text: string): string {
   return text.replace(/[<>`{}]/g, '');
 }
 
-function sanitizeLog(value: string): string {
-  return value.replace(/[\r\n]/g, ' ');
-}
+
 
 const SPONSOR_JOB_LOCK_KEY = 7483920; // Same key as sponsorMonitorJob — init and nightly are mutually exclusive
 
@@ -77,52 +77,53 @@ async function runInitJob(jobId: string, today: string): Promise<void> {
 
   try {
     state.stage = "downloading";
-    console.log(`[SponsorMonitor][${sanitizeLog(jobId)}] Triggering monitor job for ${today}`);
+    logger.info(`[SponsorMonitor][${jobId}] Triggering monitor job for ${today}`);
 
     await runSponsorMonitorJob("manual");
 
     state.stage = "done";
     state.completedAt = Date.now();
-    console.log(`[SponsorMonitor][${sanitizeLog(jobId)}] Monitor job complete for ${today}`);
+    logger.info(`[SponsorMonitor][${jobId}] Monitor job complete for ${today}`);
 
   } catch (err: unknown) {
     state.stage = "failed";
     state.error = (err instanceof Error ? err.message : String(err)) || "Unknown error during initialization";
     state.completedAt = Date.now();
-    console.error(`[SponsorMonitor][${jobId}] Initialization failed:`, err);
+    logger.error({ err }, `[SponsorMonitor][${jobId}] Initialization failed:`);
   } finally {
     scheduleInitJobCleanup(jobId);
   }
 }
 
 export function registerAdminRoutes(app: Express): void {
-  app.get('/api/admin/trusted-patterns', isAdmin, async (req, res) => {
+  app.get('/api/admin/trusted-patterns', requireRole("admin"), async (req, res) => {
     try {
       const patterns = await storage.getTrustedPatterns();
       res.json(patterns);
     } catch (error) {
-      console.error("Error fetching trusted patterns:", error);
+      logger.error({ err: error }, "Error fetching trusted patterns:");
       res.status(500).json({ message: "Failed to fetch trusted patterns" });
     }
   });
 
-  app.post('/api/admin/trusted-patterns', isAdmin, upload.single('file'), async (req, res) => {
+  app.post('/api/admin/trusted-patterns', requireRole("admin"), upload.single('file'), async (req, res) => {
     let safeFilePath: string | undefined;
     try {
       if (!req.file) {
         return res.status(400).json({ message: 'No file uploaded' });
       }
-      safeFilePath = sanitizeUploadPath((req as any).file.path);
-      const safePath = safeFilePath;
-      
+
+      safeFilePath = sanitizeUploadPath(req.file.path);
+      assertSafeUploadFilename(req.file.originalname);
       const pdfAnalyzer = new PDFAnalyzer();
-      const metadata = await pdfAnalyzer.extractMetadata(safePath);
+      // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
+      const metadata = await pdfAnalyzer.extractMetadata(safeFilePath);
       const patterns = { metadata, documentType: 'trusted_cos' };
 
       const aiInstructions = req.body?.aiInstructions || null;
 
       const patternId = await storage.createTrustedPattern(
-        req.file.originalname,
+        path.basename(req.file.originalname),
         metadata,
         patterns,
         aiInstructions
@@ -130,12 +131,12 @@ export function registerAdminRoutes(app: Express): void {
 
       res.json({ id: patternId, message: 'Trusted pattern created successfully', aiInstructions: !!aiInstructions });
     } catch (error) {
-      console.error("Error creating trusted pattern:", error instanceof Error ? sanitizeLog(error.message) : 'Unknown error');
+      logger.error({ err: error }, "Error creating trusted pattern:");
       res.status(500).json({ message: "Failed to create trusted pattern" });
     } finally {
       if (safeFilePath) {
         try {
-          fs.unlink(path.join(UPLOADS_DIR, path.basename(safeFilePath)), () => {});
+          fs.unlink(safeFilePath, () => {}); // codeql[js/path-injection] - safeFilePath validated by sanitizeUploadPath
         } catch (e) {
           // Ignore cleanup errors
         }
@@ -143,28 +144,28 @@ export function registerAdminRoutes(app: Express): void {
     }
   });
 
-  app.delete('/api/admin/trusted-patterns/:id', isAdmin, async (req, res) => {
+  app.delete('/api/admin/trusted-patterns/:id', requireRole("admin"), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteTrustedPattern(id);
       res.json({ message: 'Trusted pattern deleted successfully' });
     } catch (error) {
-      console.error("Error deleting trusted pattern:", error);
+      logger.error({ err: error }, "Error deleting trusted pattern:");
       res.status(500).json({ message: "Failed to delete trusted pattern" });
     }
   });
 
-  app.post('/api/admin/extract-metadata', isAdmin, upload.single('file'), async (req: any, res) => {
+  app.post('/api/admin/extract-metadata', requireRole("admin"), upload.single('file'), async (req: any, res) => {
     let safeFilePath: string | undefined;
     try {
       if (!req.file) {
         return res.status(400).json({ message: 'No file uploaded' });
       }
 
-      safeFilePath = sanitizeUploadPath((req as any).file.path);
-      const safePath = safeFilePath;
+      safeFilePath = sanitizeUploadPath(req.file.path);
       const pdfAnalyzer = new PDFAnalyzer();
-      const metadata = await pdfAnalyzer.extractMetadata(safePath);
+      // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
+      const metadata = await pdfAnalyzer.extractMetadata(safeFilePath);
 
       res.json({
         metadata: {
@@ -181,12 +182,12 @@ export function registerAdminRoutes(app: Express): void {
         forensic: metadata.forensic,
       });
     } catch (error) {
-      console.error("Error extracting metadata:", error instanceof Error ? sanitizeLog(error.message) : 'Unknown error');
+      logger.error({ err: error }, "Error extracting metadata:");
       res.status(500).json({ message: "Failed to extract metadata" });
     } finally {
       if (safeFilePath) {
         try {
-          await fs.promises.unlink(path.join(UPLOADS_DIR, path.basename(safeFilePath)));
+          await fs.promises.unlink(safeFilePath); // codeql[js/path-injection] - safeFilePath validated by sanitizeUploadPath
         } catch (e) {
           // Ignore cleanup errors
         }
@@ -194,17 +195,17 @@ export function registerAdminRoutes(app: Express): void {
     }
   });
 
-  app.get('/api/admin/recent-activity', isAdmin, async (req, res) => {
+  app.get('/api/admin/recent-activity', requireRole("admin"), async (req, res) => {
     try {
       const activity = await storage.getRecentActivity(20);
       res.json(activity);
     } catch (error) {
-      console.error("Error fetching recent activity:", error);
+      logger.error({ err: error }, "Error fetching recent activity:");
       res.status(500).json({ message: "Failed to fetch recent activity" });
     }
   });
 
-  app.get('/api/admin/verification-logs', isAdmin, async (req, res) => {
+  app.get('/api/admin/verification-logs', requireRole("admin"), async (req, res) => {
     try {
       const page = parseInt(req.query.page as string) || 1;
       const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
@@ -226,12 +227,12 @@ export function registerAdminRoutes(app: Express): void {
 
       res.json(result);
     } catch (error) {
-      console.error("Error fetching verification logs:", error);
+      logger.error({ err: error }, "Error fetching verification logs:");
       res.status(500).json({ message: "Failed to fetch verification logs" });
     }
   });
 
-  app.post('/api/admin/analyze-reasoning/:id', isAdmin, async (req: any, res) => {
+  app.post('/api/admin/analyze-reasoning/:id', requireRole("admin"), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const verification = await storage.getVerificationById(id);
@@ -350,7 +351,7 @@ Format your response in clear, professional markdown.`;
       res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
       res.end();
     } catch (error) {
-      console.error("Error in AI analysis:", error);
+      logger.error({ err: error }, "Error in AI analysis:");
       if (!res.headersSent) {
         res.status(500).json({ message: "Failed to analyze verification" });
       } else {
@@ -360,7 +361,7 @@ Format your response in clear, professional markdown.`;
     }
   });
 
-  app.get('/api/admin/system-health', isAdmin, async (req, res) => {
+  app.get('/api/admin/system-health', requireRole("admin"), async (req, res) => {
     try {
       const memUsage = process.memoryUsage();
       const uptime = process.uptime();
@@ -391,12 +392,12 @@ Format your response in clear, professional markdown.`;
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
-      console.error("Error fetching system health:", error);
+      logger.error({ err: error }, "Error fetching system health:");
       res.status(500).json({ message: "Failed to fetch system health" });
     }
   });
 
-  app.post('/api/admin/sponsor-monitor/run', isAdmin, async (req: any, res) => {
+  app.post('/api/admin/sponsor-monitor/run', requireRole("admin"), async (req: any, res) => {
     try {
       if (await isJobRunning()) {
         return res.status(409).json({ message: "Sponsor monitor job is already running. Please wait for it to finish." });
@@ -423,9 +424,9 @@ Format your response in clear, professional markdown.`;
         });
       }
 
-      console.warn("[SponsorMonitor] Redis unavailable — running sponsor sync inline.");
+      logger.warn("[SponsorMonitor] Redis unavailable — running sponsor sync inline.");
       runSponsorMonitorJob("admin-manual", true).catch((err) =>
-        console.error("[SponsorMonitor] Inline run error:", err)
+        logger.error({ err }, "[SponsorMonitor] Inline run error:")
       );
 
       return res.status(202).json({
@@ -435,12 +436,12 @@ Format your response in clear, professional markdown.`;
       });
 
     } catch (error) {
-      console.error("Error triggering sponsor monitor job:", error);
+      logger.error({ err: error }, "Error triggering sponsor monitor job:");
       res.status(500).json({ message: "Failed to trigger sponsor monitor job." });
     }
   });
 
-  app.get('/api/admin/jobs/:jobId/progress', isAdmin, async (req: any, res) => {
+  app.get('/api/admin/jobs/:jobId/progress', requireRole("admin"), async (req: any, res) => {
     try {
       const { jobId } = req.params;
       const queue = getSponsorRefreshQueue();
@@ -460,12 +461,12 @@ Format your response in clear, professional markdown.`;
 
       res.json({ jobId: job.id, progress, status: state, data: job.data });
     } catch (error) {
-      console.error("Error getting job progress:", error);
+      logger.error({ err: error }, "Error getting job progress:");
       res.status(500).json({ message: "Failed to get job progress." });
     }
   });
 
-  app.post('/api/admin/sponsor-monitor/release-lock', isAdmin, async (req: any, res) => {
+  app.post('/api/admin/sponsor-monitor/release-lock', requireRole("admin"), async (req: any, res) => {
     try {
       // Force release by deleting the job lock record from the job_locks table
       const deleteResult = await db.execute(
@@ -477,15 +478,15 @@ Format your response in clear, professional markdown.`;
         ? "Job lock was held in job_locks table and has been force-released. You can now trigger a new run."
         : "No active lock for 'sponsorMonitorJob' was found in the job_locks table.";
 
-      console.warn(`[SponsorMonitorJob] Admin force-release: ${message}`);
+      logger.warn(`[SponsorMonitorJob] Admin force-release: ${message}`);
       res.json({ released, message });
     } catch (error: unknown) {
-      console.error("Error releasing job lock:", error);
+      logger.error({ err: error }, "Error releasing advisory lock:");
       res.status(500).json({ message: "Failed to release lock: " + (error instanceof Error ? error.message : "") });
     }
   });
 
-  app.get('/api/admin/sponsor-monitor/binary-health', isAdmin, async (_req, res) => {
+  app.get('/api/admin/sponsor-monitor/binary-health', requireRole("admin"), async (_req, res) => {
     try {
       const health = await checkBinaryHealth();
       const allInstalled = health.qsv.installed && health.csvdiff.installed;
@@ -500,7 +501,7 @@ Format your response in clear, professional markdown.`;
     }
   });
 
-  app.post('/api/admin/sponsor-monitor/initialize', isAdmin, async (req: any, res) => {
+  app.post('/api/admin/sponsor-monitor/initialize', requireRole("admin"), async (req: any, res) => {
     try {
       for (const [, job] of activeInitJobs) {
         if (job.stage !== "done" && job.stage !== "failed") {
@@ -520,10 +521,10 @@ Format your response in clear, professional markdown.`;
         `);
         if (activeLock.rows.length > 0) {
           const lock = activeLock.rows[0] as { locked_at: Date, locked_by: string, expires_at: Date };
-          console.log(`[SponsorMonitor] Active lock found for sponsorMonitorJob: locked_by ${lock.locked_by}, expires_at ${lock.expires_at}`);
+          logger.info(`[SponsorMonitor] Active lock found for sponsorMonitorJob: locked_by ${lock.locked_by}, expires_at ${lock.expires_at}`);
         }
       } catch (lockCheckErr: any) {
-        console.warn('[SponsorMonitor] Pre-flight lock check failed (non-fatal):', lockCheckErr.message);
+        logger.warn({ errMsg: lockCheckErr.message }, '[SponsorMonitor] Pre-flight lock check failed (non-fatal):');
       }
 
       const jobId = crypto.randomUUID();
@@ -543,7 +544,7 @@ Format your response in clear, professional markdown.`;
       activeInitJobs.set(jobId, state);
 
       runInitJob(jobId, today).catch((err) => {
-        console.error(`[SponsorMonitor] runInitJob uncaught error for ${jobId}:`, err);
+        logger.error({ err }, `[SponsorMonitor] runInitJob uncaught error for ${jobId}:`);
       });
 
       return res.status(202).json({
@@ -553,12 +554,12 @@ Format your response in clear, professional markdown.`;
       });
 
     } catch (error: unknown) {
-      console.error("[SponsorMonitor] Failed to start initialization:", error);
+      logger.error({ err: error }, "[SponsorMonitor] Failed to start initialization:");
       return res.status(500).json({ message: "Failed to start initialization: " + (error instanceof Error ? error.message : "") });
     }
   });
 
-  app.get('/api/admin/sponsor-monitor/init-progress/:jobId', isAdmin, (req: any, res) => {
+  app.get('/api/admin/sponsor-monitor/init-progress/:jobId', requireRole("admin"), (req: any, res) => {
     const { jobId } = req.params;
     const state = activeInitJobs.get(jobId);
 
@@ -596,7 +597,7 @@ Format your response in clear, professional markdown.`;
     });
   });
 
-  app.get('/api/admin/sponsor-monitor/status', isAdmin, async (req: any, res) => {
+  app.get('/api/admin/sponsor-monitor/status', requireRole("admin"), async (req: any, res) => {
     try {
       const countResult = await db
         .select({ count: sql<number>`count(*)::int` })
@@ -677,12 +678,12 @@ Format your response in clear, professional markdown.`;
         jobRunning: await isJobRunning(),
       });
     } catch (error) {
-      console.error("Error fetching sponsor monitor status:", error);
+      logger.error({ err: error }, "Error fetching sponsor monitor status:");
       res.status(500).json({ message: "Failed to fetch sponsor monitor status." });
     }
   });
 
-  app.get('/api/admin/sponsor-monitor/job-history', isAdmin, async (_req: any, res) => {
+  app.get('/api/admin/sponsor-monitor/job-history', requireRole("admin"), async (_req: any, res) => {
     try {
       const history = await db
         .select()
@@ -695,7 +696,7 @@ Format your response in clear, professional markdown.`;
     }
   });
 
-  app.get('/api/admin/sponsor-monitor/recent-changes', isAdmin, async (req: any, res) => {
+  app.get('/api/admin/sponsor-monitor/recent-changes', requireRole("admin"), async (req: any, res) => {
     try {
       const changes = await db
         .select({
@@ -712,12 +713,12 @@ Format your response in clear, professional markdown.`;
         .limit(50);
       res.json(changes);
     } catch (error) {
-      console.error("Error fetching recent changes:", error);
+      logger.error({ err: error }, "Error fetching recent changes:");
       res.status(500).json({ message: "Failed to fetch recent changes." });
     }
   });
 
-  app.get('/api/admin/sponsor-monitor/top-watched', isAdmin, async (req: any, res) => {
+  app.get('/api/admin/sponsor-monitor/top-watched', requireRole("admin"), async (req: any, res) => {
     try {
       const topWatched = await db
         .select({
@@ -731,12 +732,12 @@ Format your response in clear, professional markdown.`;
         .limit(20);
       res.json(topWatched);
     } catch (error) {
-      console.error("Error fetching top watched:", error);
+      logger.error({ err: error }, "Error fetching top watched:");
       res.status(500).json({ message: "Failed to fetch top watched companies." });
     }
   });
 
-  app.get('/api/admin/sponsor-monitor/notification-stats', isAdmin, async (req: any, res) => {
+  app.get('/api/admin/sponsor-monitor/notification-stats', requireRole("admin"), async (req: any, res) => {
     try {
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
       const stats = await db
@@ -752,12 +753,12 @@ Format your response in clear, professional markdown.`;
         .orderBy(desc(sql`date_trunc('day', ${notificationLog.sentAt})`));
       res.json(stats);
     } catch (error) {
-      console.error("Error fetching notification stats:", error);
+      logger.error({ err: error }, "Error fetching notification stats:");
       res.status(500).json({ message: "Failed to fetch notification stats." });
     }
   });
 
-  app.get('/api/admin/sponsor-monitor/storage', isAdmin, async (req: any, res) => {
+  app.get('/api/admin/sponsor-monitor/storage', requireRole("admin"), async (req: any, res) => {
     try {
       const [canonicalCount, archiveStats] = await Promise.all([
         db.select({ count: sql<number>`count(*)::int` }).from(sponsorCanonical),
@@ -775,26 +776,26 @@ Format your response in clear, professional markdown.`;
         snapshotCount:     archiveStats[0]?.count ?? 0,
       });
     } catch (error) {
-      console.error("Error fetching sponsor storage stats:", error);
+      logger.error({ err: error }, "Error fetching sponsor storage stats:");
       res.status(500).json({ message: "Failed to fetch storage stats." });
     }
   });
 
-  app.post('/api/admin/sponsor-monitor/cleanup', isAdmin, (_req: any, res) => {
+  app.post('/api/admin/sponsor-monitor/cleanup', requireRole("admin"), (_req: any, res) => {
     res.status(410).json({
       message: "This endpoint is deprecated. The sponsor_list table is being retired. " +
                "Data is now stored in sponsorCanonical (per-company state) and csv_archive (daily CSV files on disk).",
     });
   });
 
-  app.post('/api/admin/migrate-canonical', isAdmin, (_req: any, res) => {
+  app.post('/api/admin/migrate-canonical', requireRole("admin"), (_req: any, res) => {
     res.status(410).json({
       message: "This migration route is no longer needed. The nightly monitor job (or the Initialize button) " +
                "automatically seeds sponsorCanonical on its first run via the state machine.",
     });
   });
 
-  app.post('/api/admin/sponsor-monitor/rebuild-index', isAdmin, async (_req: any, res) => {
+  app.post('/api/admin/sponsor-monitor/rebuild-index', requireRole("admin"), async (_req: any, res) => {
     try {
       await rebuildSponsorIndex();
       const count = (await db
@@ -808,7 +809,7 @@ Format your response in clear, professional markdown.`;
     }
   });
 
-  app.post('/api/admin/sponsor-monitor/test', isAdmin, async (req: any, res) => {
+  app.post('/api/admin/sponsor-monitor/test', requireRole("admin"), async (req: any, res) => {
     try {
       const { organisationName, changeType, previousValue, newValue } = req.body;
 
@@ -842,12 +843,12 @@ Format your response in clear, professional markdown.`;
         notifications: notifResult,
       });
     } catch (error) {
-      console.error("Error running sponsor monitor test:", error);
+      logger.error({ err: error }, "Error running sponsor monitor test:");
       res.status(500).json({ message: "Failed to run test detection cycle." });
     }
   });
 
-  app.post('/api/admin/trust-producer', isAdmin, async (req: any, res) => {
+  app.post('/api/admin/trust-producer', requireRole("admin"), async (req: any, res) => {
     try {
       const trustProducerSchema = z.object({
         producer: z.string().trim().min(1, "Producer name is required").max(500),
@@ -877,12 +878,12 @@ Format your response in clear, professional markdown.`;
         patternId
       });
     } catch (error) {
-      console.error("Error trusting producer:", error);
+      logger.error({ err: error }, "Error trusting producer:");
       res.status(500).json({ message: "Failed to trust producer" });
     }
   });
 
-  app.get('/api/admin/users', isAdmin, async (req, res) => {
+  app.get('/api/admin/users', requireRole("admin"), async (req, res) => {
     try {
       const page = parseInt(req.query.page as string) || 1;
       const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
@@ -892,12 +893,12 @@ Format your response in clear, professional markdown.`;
       const result = await storage.getPaginatedUsers({ page, limit, search, paidOnly });
       res.json(result);
     } catch (error) {
-      console.error("Error fetching users:", error);
+      logger.error({ err: error }, "Error fetching users:");
       res.status(500).json({ message: "Failed to fetch users" });
     }
   });
 
-  app.post('/api/admin/users/:id/restrict', isAdmin, async (req: any, res) => {
+  app.post('/api/admin/users/:id/restrict', requireRole("admin"), async (req: any, res) => {
     try {
       const userId = req.params.id;
       const { restricted, reason } = req.body;
@@ -946,12 +947,12 @@ Format your response in clear, professional markdown.`;
         restricted
       });
     } catch (error) {
-      console.error("Error updating user restriction:", error);
+      logger.error({ err: error }, "Error updating user restriction:");
       res.status(500).json({ message: "Failed to update user restriction" });
     }
   });
 
-  app.patch('/api/admin/users/:id/limit', isAdmin, async (req: any, res) => {
+  app.patch('/api/admin/users/:id/limit', requireRole("admin"), async (req: any, res) => {
     try {
       const userId = req.params.id;
       const limitSchema = z.object({
@@ -1007,12 +1008,12 @@ Format your response in clear, professional markdown.`;
         verificationLimit: limit
       });
     } catch (error) {
-      console.error("Error updating user verification limit:", error);
+      logger.error({ err: error }, "Error updating user verification limit:");
       res.status(500).json({ message: "Failed to update verification limit" });
     }
   });
 
-  app.patch('/api/admin/users/:id/cos-approval', isAdmin, async (req: any, res) => {
+  app.patch('/api/admin/users/:id/cos-approval', requireRole("admin"), async (req: any, res) => {
     try {
       const userId = req.params.id;
       const { approved } = req.body;
@@ -1072,24 +1073,24 @@ Format your response in clear, professional markdown.`;
         cosCheckApproved: approved,
       });
     } catch (error) {
-      console.error("Error updating CoS Check approval:", error);
+      logger.error({ err: error }, "Error updating CoS Check approval:");
       res.status(500).json({ message: "Failed to update beta approval" });
     }
   });
 
-  app.get('/api/admin/system-settings', isAdmin, async (_req, res) => {
+  app.get('/api/admin/system-settings', requireRole("admin"), async (_req, res) => {
     try {
       const settings = await storage.getAllSystemSettings();
       res.json(settings);
     } catch (error) {
-      console.error("Error fetching system settings:", error);
+      logger.error({ err: error }, "Error fetching system settings:");
       res.status(500).json({ message: "Failed to fetch system settings" });
     }
   });
 
   const ALLOWED_SYSTEM_SETTINGS = ['defaultDailyLimit', 'notifications_paused'] as const;
 
-  app.patch('/api/admin/system-settings/:key', isAdmin, async (req: any, res) => {
+  app.patch('/api/admin/system-settings/:key', requireRole("admin"), async (req: any, res) => {
     try {
       const { key } = req.params;
       if (!ALLOWED_SYSTEM_SETTINGS.includes(key as typeof ALLOWED_SYSTEM_SETTINGS[number])) {
@@ -1102,12 +1103,12 @@ Format your response in clear, professional markdown.`;
       await storage.setSystemSetting(key, String(value));
       res.json({ message: `Setting '${key}' updated`, key, value: String(value) });
     } catch (error) {
-      console.error("Error updating system setting:", error);
+      logger.error({ err: error }, "Error updating system setting:");
       res.status(500).json({ message: "Failed to update system setting" });
     }
   });
 
-  app.patch('/api/admin/users/:id/ip-exempt', isAdmin, async (req: any, res) => {
+  app.patch('/api/admin/users/:id/ip-exempt', requireRole("admin"), async (req: any, res) => {
     try {
       const userId = req.params.id;
       const { exempt } = req.body;
@@ -1117,12 +1118,12 @@ Format your response in clear, professional markdown.`;
       await storage.updateIpExempt(userId, exempt);
       res.json({ message: exempt ? 'IP rate limit exemption granted' : 'IP rate limit exemption removed', userId, ipExempt: exempt });
     } catch (error) {
-      console.error("Error updating IP exemption:", error);
+      logger.error({ err: error }, "Error updating IP exemption:");
       res.status(500).json({ message: "Failed to update IP exemption" });
     }
   });
 
-  app.patch('/api/admin/users/:id/cos-subscription', isAdmin, async (req: any, res) => {
+  app.patch('/api/admin/users/:id/cos-subscription', requireRole("admin"), async (req: any, res) => {
     try {
       const userId = req.params.id;
       const { active } = req.body;
@@ -1169,12 +1170,12 @@ Format your response in clear, professional markdown.`;
 
       res.json({ message: active ? 'COS check subscription activated' : 'COS check subscription deactivated', userId, cosCheckSubscription: active });
     } catch (error) {
-      console.error("Error updating COS check subscription:", error);
+      logger.error({ err: error }, "Error updating COS check subscription:");
       res.status(500).json({ message: "Failed to update COS check subscription" });
     }
   });
 
-  app.patch('/api/admin/users/:id/cos-beta', isAdmin, async (req: any, res) => {
+  app.patch('/api/admin/users/:id/cos-beta', requireRole("admin"), async (req: any, res) => {
     try {
       const userId = req.params.id;
       const { enabled, limit } = req.body;
@@ -1225,12 +1226,12 @@ Format your response in clear, professional markdown.`;
 
       res.json({ message: enabled ? 'COS Beta access enabled' : 'COS Beta access disabled', userId, cosBetaEnabled: enabled, cosBetaLimit: limit ?? null });
     } catch (error) {
-      console.error("Error updating COS Beta access:", error);
+      logger.error({ err: error }, "Error updating COS Beta access:");
       res.status(500).json({ message: "Failed to update COS Beta access" });
     }
   });
 
-  app.delete('/api/admin/users/:id', isAdmin, async (req: any, res) => {
+  app.delete('/api/admin/users/:id', requireRole("admin"), async (req: any, res) => {
     try {
       const userId = req.params.id;
 
@@ -1254,12 +1255,12 @@ Format your response in clear, professional markdown.`;
 
       res.json({ message: 'User deleted successfully', userId });
     } catch (error) {
-      console.error("Error deleting user:", error);
+      logger.error({ err: error }, "Error deleting user:");
       res.status(500).json({ message: "Failed to delete user" });
     }
   });
 
-  app.get('/api/admin/export-report/:id', isAdmin, async (req: any, res) => {
+  app.get('/api/admin/export-report/:id', requireRole("admin"), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const verification = await storage.getVerificationById(id);
@@ -1284,17 +1285,17 @@ Format your response in clear, professional markdown.`;
 
       res.json(report);
     } catch (error) {
-      console.error("Error exporting report:", error);
+      logger.error({ err: error }, "Error exporting report:");
       res.status(500).json({ message: "Failed to export report" });
     }
   });
 
-  app.get('/api/admin/global-rules', isAdmin, async (req, res) => {
+  app.get('/api/admin/global-rules', requireRole("admin"), async (req, res) => {
     try {
       const rules = await storage.getGlobalAiRules();
       res.json(rules);
     } catch (error) {
-      console.error("Error fetching global rules:", error);
+      logger.error({ err: error }, "Error fetching global rules:");
       res.status(500).json({ message: "Failed to fetch global rules" });
     }
   });
@@ -1305,7 +1306,7 @@ Format your response in clear, professional markdown.`;
     priority: z.number().min(0).max(100).optional().default(0),
   });
 
-  app.post('/api/admin/global-rules', isAdmin, async (req: any, res) => {
+  app.post('/api/admin/global-rules', requireRole("admin"), async (req: any, res) => {
     try {
       const parsed = globalRuleSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -1323,12 +1324,12 @@ Format your response in clear, professional markdown.`;
 
       res.json(rule);
     } catch (error) {
-      console.error("Error creating global rule:", error);
+      logger.error({ err: error }, "Error creating global rule:");
       res.status(500).json({ message: "Failed to create global rule" });
     }
   });
 
-  app.patch('/api/admin/global-rules/:id', isAdmin, async (req: any, res) => {
+  app.patch('/api/admin/global-rules/:id', requireRole("admin"), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const { category, ruleText, priority, isActive } = req.body;
@@ -1342,23 +1343,23 @@ Format your response in clear, professional markdown.`;
 
       res.json(rule);
     } catch (error) {
-      console.error("Error updating global rule:", error);
+      logger.error({ err: error }, "Error updating global rule:");
       res.status(500).json({ message: "Failed to update global rule" });
     }
   });
 
-  app.delete('/api/admin/global-rules/:id', isAdmin, async (req: any, res) => {
+  app.delete('/api/admin/global-rules/:id', requireRole("admin"), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteGlobalAiRule(id);
       res.json({ message: 'Rule deleted successfully' });
     } catch (error) {
-      console.error("Error deleting global rule:", error);
+      logger.error({ err: error }, "Error deleting global rule:");
       res.status(500).json({ message: "Failed to delete global rule" });
     }
   });
 
-  app.post('/api/admin/global-rules/:id/toggle', isAdmin, async (req: any, res) => {
+  app.post('/api/admin/global-rules/:id/toggle', requireRole("admin"), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const { isActive } = req.body;
@@ -1366,7 +1367,7 @@ Format your response in clear, professional markdown.`;
       await storage.toggleGlobalAiRule(id, isActive);
       res.json({ message: `Rule ${isActive ? 'activated' : 'deactivated'}` });
     } catch (error) {
-      console.error("Error toggling global rule:", error);
+      logger.error({ err: error }, "Error toggling global rule:");
       res.status(500).json({ message: "Failed to toggle global rule" });
     }
   });
@@ -1378,7 +1379,7 @@ Format your response in clear, professional markdown.`;
     priority: z.number().min(0).max(100).default(10),
   });
 
-  app.post('/api/admin/teach-ai', isAdmin, async (req: any, res) => {
+  app.post('/api/admin/teach-ai', requireRole("admin"), async (req: any, res) => {
     try {
       const parsed = teachAiSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -1407,12 +1408,12 @@ Format your response in clear, professional markdown.`;
         rule
       });
     } catch (error) {
-      console.error("Error teaching AI:", error);
+      logger.error({ err: error }, "Error teaching AI:");
       res.status(500).json({ message: "Failed to teach AI" });
     }
   });
 
-  app.patch('/api/admin/trusted-patterns/:id/instructions', isAdmin, async (req: any, res) => {
+  app.patch('/api/admin/trusted-patterns/:id/instructions', requireRole("admin"), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const { aiInstructions } = req.body;
@@ -1420,37 +1421,17 @@ Format your response in clear, professional markdown.`;
       await storage.updateTrustedPatternInstructions(id, aiInstructions);
       res.json({ message: 'Pattern instructions updated' });
     } catch (error) {
-      console.error("Error updating pattern instructions:", error);
+      logger.error({ err: error }, "Error updating pattern instructions:");
       res.status(500).json({ message: "Failed to update pattern instructions" });
     }
   });
 
-  // SEC-007: added isAuthenticated guard — was fully unauthenticated (spam risk)
-  app.post('/api/feedback', isAuthenticated, async (req: any, res) => {
-    try {
-      const { userId: _ignoredUserId, ...feedbackBody } = req.body ?? {};
-      const feedbackData = insertFeedbackSchema.parse(feedbackBody);
-      const createData = req.isAuthenticated()
-        ? { ...feedbackData, userId: req.user.id }
-        : feedbackData;
-
-      const newFeedback = await storage.createFeedback(createData);
-      res.status(201).json(newFeedback);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid feedback data", errors: error.errors });
-      }
-      console.error("Error creating feedback:", error);
-      res.status(500).json({ message: "Failed to submit feedback" });
-    }
-  });
-
-  app.get('/api/feedback/stats', isAdmin, async (req, res) => {
+  app.get('/api/feedback/stats', requireRole("admin"), async (req, res) => {
     try {
       const stats = await storage.getFeedbackStats();
       res.json(stats);
     } catch (error) {
-      console.error("Error fetching feedback stats:", error);
+      logger.error({ err: error }, "Error fetching feedback stats:");
       res.status(500).json({ message: "Failed to fetch feedback stats" });
     }
   });
@@ -1515,7 +1496,7 @@ Format your response in clear, professional markdown.`;
 
       res.json({ url: session.url, sessionId: session.id, submissionId: submission.id });
     } catch (error: unknown) {
-      console.error('Checkout creation error:', error);
+      logger.error({ err: error }, 'Checkout creation error:');
       res.status(500).json({ message: 'Failed to create checkout session' });
     }
   });
@@ -1545,7 +1526,7 @@ Format your response in clear, professional markdown.`;
       const updatedSubmission = await storage.getPaidSubmissionBySessionId(sessionId);
       res.json(updatedSubmission);
     } catch (error: unknown) {
-      console.error('Get submission error:', error);
+      logger.error({ err: error }, 'Get submission error:');
       res.status(500).json({ message: 'Failed to get submission' });
     }
   });
@@ -1603,7 +1584,7 @@ Format your response in clear, professional markdown.`;
 
       res.json({ message: 'Submission received successfully', submissionId });
     } catch (error: unknown) {
-      console.error('Submit error:', error);
+      logger.error({ err: error }, 'Submit error:');
       res.status(500).json({ message: 'Failed to submit' });
     }
   });
@@ -1635,22 +1616,22 @@ Format your response in clear, professional markdown.`;
         createdAt: submission.createdAt,
       });
     } catch (error: unknown) {
-      console.error('Status error:', error);
+      logger.error({ err: error }, 'Status error:');
       res.status(500).json({ message: 'Failed to get status' });
     }
   });
 
-  app.get('/api/admin/paid-submissions', isAdmin, async (req, res) => {
+  app.get('/api/admin/paid-submissions', requireRole("admin"), async (req, res) => {
     try {
       const submissions = await storage.getAllPaidSubmissions();
       res.json(submissions);
     } catch (error: unknown) {
-      console.error('Get submissions error:', error);
+      logger.error({ err: error }, 'Get submissions error:');
       res.status(500).json({ message: 'Failed to get submissions' });
     }
   });
 
-  app.patch('/api/admin/paid-submissions/:id', isAdmin, async (req: any, res) => {
+  app.patch('/api/admin/paid-submissions/:id', requireRole("admin"), async (req: any, res) => {
     try {
       const submissionId = parseInt(req.params.id);
       const {
@@ -1676,12 +1657,12 @@ Format your response in clear, professional markdown.`;
 
       res.json(submission);
     } catch (error: unknown) {
-      console.error('Update submission error:', error);
+      logger.error({ err: error }, 'Update submission error:');
       res.status(500).json({ message: 'Failed to update submission' });
     }
   });
 
-  app.post('/api/admin/paid-submissions/:id/verify-employer', isAdmin, async (req: any, res) => {
+  app.post('/api/admin/paid-submissions/:id/verify-employer', requireRole("admin"), async (req: any, res) => {
     try {
       const submissionId = parseInt(req.params.id);
       const submission = await storage.getPaidSubmission(submissionId);
@@ -1726,12 +1707,12 @@ Format your response in clear, professional markdown.`;
         verificationResult
       });
     } catch (error: unknown) {
-      console.error('Employer verification error:', error);
+      logger.error({ err: error }, 'Employer verification error:');
       res.status(500).json({ message: 'Failed to verify employer' });
     }
   });
 
-  app.post('/api/admin/paid-submissions/:id/send-report', isAdmin, async (req: any, res) => {
+  app.post('/api/admin/paid-submissions/:id/send-report', requireRole("admin"), async (req: any, res) => {
     try {
       const submissionId = parseInt(req.params.id);
       const submission = await storage.getPaidSubmission(submissionId);
@@ -1841,7 +1822,7 @@ Format your response in clear, professional markdown.`;
 
       if (!emailResponse.ok) {
         const errorData = await emailResponse.json();
-        console.error('Resend error:', errorData);
+        logger.error({ err: errorData }, 'Resend error:');
         return res.status(500).json({ message: 'Failed to send email' });
       }
 
@@ -1852,12 +1833,12 @@ Format your response in clear, professional markdown.`;
 
       res.json({ message: 'Report sent successfully' });
     } catch (error: unknown) {
-      console.error('Send report error:', error);
+      logger.error({ err: error }, 'Send report error:');
       res.status(500).json({ message: 'Failed to send report' });
     }
   });
 
-  app.patch('/api/logs/:id/feedback', isAdmin, async (req: any, res) => {
+  app.patch('/api/logs/:id/feedback', requireRole("admin"), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const { adminStatus, adminFeedback, accuracyScore } = req.body;
@@ -1877,7 +1858,6 @@ Format your response in clear, professional markdown.`;
         adminReviewedBy: req.user.id,
         adminReviewedAt: new Date(),
         accuracyScore: adminStatus === 'fake' ? 0 : (accuracyScore || null),
-        overrideResult: adminStatus === 'fake' ? 'fake' : undefined,
       });
 
       if (adminStatus === 'fake' && adminFeedback?.trim()) {
@@ -1899,7 +1879,7 @@ Format your response in clear, professional markdown.`;
             isActive: true,
           });
         } catch (ruleError) {
-          console.error('Failed to create AI rule from admin override (non-fatal):', ruleError);
+          logger.error({ err: ruleError }, 'Failed to create AI rule from admin override (non-fatal):');
         }
       }
 
@@ -1909,12 +1889,12 @@ Format your response in clear, professional markdown.`;
         ruleAdded: adminStatus === 'fake' && !!adminFeedback?.trim(),
       });
     } catch (error) {
-      console.error('Error updating verification feedback:', error);
+      logger.error({ err: error }, 'Error updating verification feedback:');
       res.status(500).json({ message: 'Failed to update feedback' });
     }
   });
 
-  app.delete('/api/logs/:id', isAdmin, async (req: any, res) => {
+  app.delete('/api/logs/:id', requireRole("admin"), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ message: 'Invalid ID' });
@@ -1923,12 +1903,12 @@ Format your response in clear, professional markdown.`;
       await storage.deleteVerificationLog(id);
       res.json({ message: 'Log deleted' });
     } catch (error) {
-      console.error('Error deleting verification log:', error);
+      logger.error({ err: error }, 'Error deleting verification log:');
       res.status(500).json({ message: 'Failed to delete log' });
     }
   });
 
-  app.get('/api/knowledge-base', isAdmin, async (req: any, res) => {
+  app.get('/api/knowledge-base', requireRole("admin"), async (req: any, res) => {
     try {
       const limit = parseInt(req.query.limit as string) || 15;
       const knowledge = await storage.getAdminFakeKnowledge(limit);
@@ -1957,13 +1937,13 @@ Format your response in clear, professional markdown.`;
         knowledgeContext,
       });
     } catch (error) {
-      console.error('Error fetching knowledge base:', error);
+      logger.error({ err: error }, 'Error fetching knowledge base:');
       res.status(500).json({ message: 'Failed to fetch knowledge base' });
     }
   });
 
   // ── Sponsor Monitor Plan Override ─────────────────────────────────────────
-  app.patch('/api/admin/users/:id/sponsor-monitor-plan', isAdmin, async (req: any, res) => {
+  app.patch('/api/admin/users/:id/sponsor-monitor-plan', requireRole("admin"), async (req: any, res) => {
     try {
       const userId = req.params.id;
       const planSchema = z.object({
@@ -2013,8 +1993,7 @@ Format your response in clear, professional markdown.`;
               .where(eq(companyWatches.id, watch.id));
           }
           deactivatedWatchCount = watchesToDeactivate.length;
-          // codeql[js/log-injection] - Log values are sanitized to prevent log injection
-          console.log(`[AdminPlanOverride] Deactivated ${deactivatedWatchCount} excess watches for user ${sanitizeLog(userId)} (${sanitizeLog(previousStatus)} → ${sanitizeLog(plan)}, limit=${newWatchLimit})`);
+          logger.info({ userId, previousStatus, plan, newWatchLimit, deactivatedWatchCount }, '[AdminPlanOverride] Deactivated excess watches for user');
         }
       }
 
@@ -2027,7 +2006,7 @@ Format your response in clear, professional markdown.`;
         newStatus: plan,
         reason: 'Admin plan override via admin panel',
         metadata: { deactivatedWatches: deactivatedWatchCount },
-      }).catch((err) => console.error('[AdminPlanOverride] Audit log write failed:', err));
+      }).catch((err) => logger.error({ err }, '[AdminPlanOverride] Audit log write failed:'));
 
       const planLabels: Record<string, string> = {
         free: 'Free',
@@ -2085,13 +2064,13 @@ Format your response in clear, professional markdown.`;
         deactivatedWatches: deactivatedWatchCount,
       });
     } catch (error) {
-      console.error('Error updating sponsor monitor plan:', error);
+      logger.error({ err: error }, 'Error updating sponsor monitor plan:');
       res.status(500).json({ message: 'Failed to update sponsor monitor plan' });
     }
   });
 
   // ── Manual Credit Management ───────────────────────────────────────────────
-  app.patch('/api/admin/users/:id/credits', isAdmin, async (req: any, res) => {
+  app.patch('/api/admin/users/:id/credits', requireRole("admin"), async (req: any, res) => {
     try {
       const userId = req.params.id;
       const creditSchema = z.object({
@@ -2128,8 +2107,7 @@ Format your response in clear, professional markdown.`;
 
       const newCredits = updatedUser?.credits ?? 0;
       const delta = newCredits - prevCredits;
-      // codeql[js/log-injection] - Log values are sanitized to prevent log injection
-      console.log(`[AdminCredits] User ${sanitizeLog(userId)}: ${prevCredits} → ${newCredits} (${sanitizeLog(operation)} ${amount}, reason: ${sanitizeLog(reason ?? 'none')})`);
+      logger.info({ userId, prevCredits, newCredits, delta, operation, amount, reason: reason ?? 'none' }, '[AdminCredits] User credits updated');
 
       // Audit log
       storage.logSubscriptionChange({
@@ -2149,24 +2127,24 @@ Format your response in clear, professional markdown.`;
         creditsAfter: newCredits,
       });
     } catch (error) {
-      console.error('Error updating credits:', error);
+      logger.error({ err: error }, 'Error updating credits:');
       res.status(500).json({ message: 'Failed to update credits' });
     }
   });
 
-  app.get('/api/admin/users/:id/subscription-audit', isAdmin, async (req, res) => {
+  app.get('/api/admin/users/:id/subscription-audit', requireRole("admin"), async (req, res) => {
     try {
       const userId = req.params.id;
       const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
       const log = await storage.getSubscriptionAuditLog(userId, limit);
       res.json(log);
     } catch (error) {
-      console.error('Error fetching subscription audit log:', error);
+      logger.error({ err: error }, 'Error fetching subscription audit log:');
       res.status(500).json({ message: 'Failed to fetch subscription audit log' });
     }
   });
 
-  app.get('/api/admin/verification-logs-hitl', isAdmin, async (req: any, res) => {
+  app.get('/api/admin/verification-logs-hitl', requireRole("admin"), async (req: any, res) => {
     try {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
@@ -2175,7 +2153,7 @@ Format your response in clear, professional markdown.`;
       const logs = await storage.getVerificationLogsWithHITL(page, limit, adminStatus);
       res.json(logs);
     } catch (error) {
-      console.error('Error fetching HITL logs:', error);
+      logger.error({ err: error }, 'Error fetching HITL logs:');
       res.status(500).json({ message: 'Failed to fetch logs' });
     }
   });
@@ -2183,43 +2161,43 @@ Format your response in clear, professional markdown.`;
   // ── Notification Portal ───────────────────────────────────────────────────
 
   // GET /api/admin/notifications/status — kill switch state
-  app.get('/api/admin/notifications/status', isAdmin, async (_req, res) => {
+  app.get('/api/admin/notifications/status', requireRole("admin"), async (_req, res) => {
     try {
       const value = await storage.getSystemSetting('notifications_paused');
       const paused = value === 'true';
       res.json({ paused });
     } catch (error) {
-      console.error('Error fetching notification status:', error);
+      logger.error({ err: error }, 'Error fetching notification status:');
       res.status(500).json({ message: 'Failed to fetch notification status' });
     }
   });
 
   // POST /api/admin/notifications/pause — activate kill switch
-  app.post('/api/admin/notifications/pause', isAdmin, async (req: any, res) => {
+  app.post('/api/admin/notifications/pause', requireRole("admin"), async (req: any, res) => {
     try {
       await storage.setSystemSetting('notifications_paused', 'true');
-      console.log(`[Admin] Notifications PAUSED by ${req.user?.email ?? req.user?.id}`);
+      logger.info(`[Admin] Notifications PAUSED by ${req.user?.email ?? req.user?.id}`);
       res.json({ paused: true });
     } catch (error) {
-      console.error('Error pausing notifications:', error);
+      logger.error({ err: error }, 'Error pausing notifications:');
       res.status(500).json({ message: 'Failed to pause notifications' });
     }
   });
 
   // POST /api/admin/notifications/resume — deactivate kill switch
-  app.post('/api/admin/notifications/resume', isAdmin, async (req: any, res) => {
+  app.post('/api/admin/notifications/resume', requireRole("admin"), async (req: any, res) => {
     try {
       await storage.setSystemSetting('notifications_paused', 'false');
-      console.log(`[Admin] Notifications RESUMED by ${req.user?.email ?? req.user?.id}`);
+      logger.info(`[Admin] Notifications RESUMED by ${req.user?.email ?? req.user?.id}`);
       res.json({ paused: false });
     } catch (error) {
-      console.error('Error resuming notifications:', error);
+      logger.error({ err: error }, 'Error resuming notifications:');
       res.status(500).json({ message: 'Failed to resume notifications' });
     }
   });
 
   // GET /api/admin/notifications/users — paginated user notif_prefs
-  app.get('/api/admin/notifications/users', isAdmin, async (req, res) => {
+  app.get('/api/admin/notifications/users', requireRole("admin"), async (req, res) => {
     try {
       const page = Math.max(1, parseInt(req.query.page as string) || 1);
       const limit = Math.min(50, parseInt(req.query.limit as string) || 20);
@@ -2257,13 +2235,13 @@ Format your response in clear, professional markdown.`;
         totalPages: Math.ceil(total / limit),
       });
     } catch (error) {
-      console.error('Error fetching notification user list:', error);
+      logger.error({ err: error }, 'Error fetching notification user list:');
       res.status(500).json({ message: 'Failed to fetch users' });
     }
   });
 
   // PATCH /api/admin/notifications/users/:id/prefs — deep-merge override a user's notif_prefs
-  app.patch('/api/admin/notifications/users/:id/prefs', isAdmin, async (req: any, res) => {
+  app.patch('/api/admin/notifications/users/:id/prefs', requireRole("admin"), async (req: any, res) => {
     try {
       const { id } = req.params;
       const patch = req.body as Partial<NotifPrefs>;
@@ -2279,9 +2257,9 @@ Format your response in clear, professional markdown.`;
 
       const base = (existing.notifPrefs as NotifPrefs | null) ?? DEFAULT_NOTIF_PREFS;
       const merged: NotifPrefs = { ...base };
-      for (const key of Object.keys(DEFAULT_NOTIF_PREFS) as Array<keyof NotifPrefs>) {
-        const v = patch[key];
-        if (v === undefined) continue;
+      for (const [k, v] of Object.entries(patch)) {
+        if (!Object.prototype.hasOwnProperty.call(DEFAULT_NOTIF_PREFS, k)) continue;
+        const key = k as keyof NotifPrefs;
         if (merged[key]) {
           merged[key] = {
             enabled: v.enabled ?? merged[key].enabled,
@@ -2295,17 +2273,16 @@ Format your response in clear, professional markdown.`;
         .set({ notifPrefs: merged })
         .where(eq(users.id, id));
 
-      // codeql[js/log-injection] - Log values are sanitized to prevent log injection
-      console.log(`[Admin] notif_prefs updated for user ${sanitizeLog(id)} by ${sanitizeLog(req.user?.email ?? req.user?.id ?? 'unknown')}`);
+      logger.info({ userId: id, adminId: req.user?.id }, '[Admin] notif_prefs updated for user');
       res.json({ notifPrefs: merged });
     } catch (error) {
-      console.error('Error updating notif_prefs:', error);
+      logger.error({ err: error }, 'Error updating notif_prefs:');
       res.status(500).json({ message: 'Failed to update preferences' });
     }
   });
 
   // GET /api/admin/notifications/log — paginated notif_log entries with user email join
-  app.get('/api/admin/notifications/log', isAdmin, async (req, res) => {
+  app.get('/api/admin/notifications/log', requireRole("admin"), async (req, res) => {
     try {
       const page = Math.max(1, parseInt(req.query.page as string) || 1);
       const limit = Math.min(100, parseInt(req.query.limit as string) || 25);
@@ -2343,7 +2320,7 @@ Format your response in clear, professional markdown.`;
 
       res.json({ data: rows, total, page, limit, totalPages: Math.ceil(total / limit) });
     } catch (error) {
-      console.error('Error fetching notif_log:', error);
+      logger.error({ err: error }, 'Error fetching notif_log:');
       res.status(500).json({ message: 'Failed to fetch notification log' });
     }
   });
@@ -2351,7 +2328,7 @@ Format your response in clear, professional markdown.`;
   // ── GET /api/admin/enrichment-queue ──────────────────────────────────────────
   // Returns queue health stats: status counts, job-type breakdown, recent failures,
   // and stalled in-progress items (locked > 30 min).
-  app.get('/api/admin/enrichment-queue', isAdmin, async (_req, res) => {
+  app.get('/api/admin/enrichment-queue', requireRole("admin"), async (_req, res) => {
     try {
       const [statusRows, typeRows, recentFailures, stalled, totals] = await Promise.all([
         // Status counts
@@ -2403,7 +2380,7 @@ Format your response in clear, professional markdown.`;
         completed:      (totals.rows[0] as any)?.completed ?? 0,
       });
     } catch (error) {
-      console.error('[Admin] enrichment-queue error:', error);
+      logger.error({ err: error }, '[Admin] enrichment-queue error:');
       res.status(500).json({ message: 'Failed to fetch enrichment queue stats' });
     }
   });
