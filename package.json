@@ -7,6 +7,7 @@
     "dev": "NODE_ENV=development tsx server/index.ts",
     "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "NODE_ENV=production node dist/index.js",
+    "lint": "eslint .",
     "check": "tsc",
     "test": "vitest",
     "test:run": "vitest run",
@@ -15,7 +16,10 @@
     "db:migrate": "drizzle-kit migrate",
     "setup:binaries": "bash scripts/setup-binaries.sh",
     "check:binaries": "tsx -e \"import('./server/utils/binaryRunner.ts').then(m => m.checkBinaryHealth()).then(r => console.log(JSON.stringify(r, null, 2)))\"",
-    "start:with-migrate": "npm run db:migrate && NODE_ENV=production node dist/index.js"
+    "start:with-migrate": "npm run db:migrate && NODE_ENV=production node dist/index.js",
+    "audit": "audit-ci --config audit-ci.jsonc",
+    "test:e2e": "playwright test",
+    "playwright:install": "playwright install chromium"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -54,6 +58,8 @@
     "@react-three/fiber": "^8.18.0",
     "@replit/vite-plugin-cartographer": "^0.4.11",
     "@replit/vite-plugin-runtime-error-modal": "^0.0.3",
+    "@sentry/node": "^7.120.4",
+    "@sentry/react": "^7.120.4",
     "@stripe/react-stripe-js": "^3.10.0",
     "@stripe/stripe-js": "^7.9.0",
     "@tailwindcss/typography": "^0.5.19",
@@ -91,6 +97,7 @@
     "fast-xml-parser": "^5.7.2",
     "framer-motion": "^11.18.2",
     "fuse.js": "^7.1.0",
+    "helmet": "^8.1.0",
     "input-otp": "^1.4.2",
     "ioredis": "^5.4.2",
     "lucide-react": "^0.453.0",
@@ -132,6 +139,7 @@
     "tailwindcss": "^3.4.19",
     "tailwindcss-animate": "^1.0.7",
     "three": "^0.167.1",
+    "ts-pattern": "^5.9.0",
     "tsx": "^4.21.0",
     "twilio": "^5.12.1",
     "typescript": "^5.9.3",
@@ -145,6 +153,7 @@
     "zod-validation-error": "^3.5.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.54.2",
     "@types/connect-pg-simple": "^7.0.3",
     "@types/express": "^4.17.25",
     "@types/express-session": "^1.18.2",
@@ -156,7 +165,13 @@
     "@types/react-dom": "^19.2.3",
     "@types/supertest": "^7.2.0",
     "@types/ws": "^8.18.1",
+    "@typescript-eslint/eslint-plugin": "^8.59.4",
+    "@typescript-eslint/parser": "^8.59.4",
+    "@vitest/coverage-v8": "^4.1.6",
+    "audit-ci": "^7.1.0",
     "dotenv": "^17.4.2",
+    "eslint": "^10.4.0",
+    "eslint-plugin-security": "^4.0.0",
     "supertest": "^7.2.2",
     "vitest": "^4.1.1"
   },
@@ -169,6 +184,7 @@
     "uuid": ">=12.0.0",
     "@esbuild-kit/core-utils": {
       "esbuild": ">=0.25.0"
-    }
+    },
+    "esbuild": "$esbuild"
   }
 }

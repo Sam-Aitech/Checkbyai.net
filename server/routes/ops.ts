@@ -25,6 +25,8 @@ import {
   type IncidentSeverity,
 } from "../utils/incidentManager";
 
+if (!opsTriggerLimiter) throw new Error('opsTriggerLimiter failed to import — check ../middleware/rateLimiter exports');
+
 const log = logger.child({ module: "OpsRoutes" });
 
 const IDEMPOTENCY_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -104,6 +106,13 @@ async function markAuditCompleted(params: {
 }
 
 async function sendSignedCallback(callbackUrl: string, payload: Record<string, unknown>): Promise<void> {
+    // ── SSRF guard: validate on every call including retries ─────────────
+    const safe = await isSafeCallbackUrl(callbackUrl);
+    if (!safe) {
+          throw new Error(`SSRF_BLOCKED: callbackUrl failed safety check — only external HTTPS URLs resolving to public IPs are permitted.`
+                              );
+    }
+    // ──────────────────────────────────────────────────────────────────────
   const secret = process.env.CALLBACK_SIGNING_SECRET;
   if (!secret) {
     throw new Error("CALLBACK_SIGNING_SECRET is not configured");
@@ -116,6 +125,7 @@ async function sendSignedCallback(callbackUrl: string, payload: Record<string, u
   const timer = setTimeout(() => controller.abort(), CALLBACK_CONFIG.timeoutMs);
 
   try {
+    // codeql[js/request-forgery, js/file-access-to-http] - The callbackUrl has been validated by isSafeCallbackUrl() above, which performs DNS resolution and rejects private/loopback IPs. The payload contains only structured job-result metadata, not raw file contents.
     const response = await fetch(callbackUrl, {
       method: "POST",
       headers: {

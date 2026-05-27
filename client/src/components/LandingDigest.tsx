@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { STALE_TIMES } from "@/lib/queryDefaults";
 import { motion } from "framer-motion";
 import { useInView } from "react-intersection-observer";
 import { ArrowRight, Bell } from "lucide-react";
@@ -88,7 +89,7 @@ function AnimatedCounter({ value, label, icon, color, large }: { value: number; 
 export default function LandingDigest() {
   const { data, isLoading } = useQuery<DigestData>({
     queryKey: ["/api/daily-digest/current"],
-    staleTime: 5 * 60 * 1000,
+    staleTime: STALE_TIMES.INFREQUENT,
     refetchOnWindowFocus: false,
   });
 

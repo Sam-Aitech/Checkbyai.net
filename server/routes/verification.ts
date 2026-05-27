@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import * as crypto from "crypto";
 import * as fs from "fs";
+import * as path from "path";
 import multer from "multer";
 import { storage } from "../storage";
 import { db } from "../db";

@@ -51,9 +51,19 @@ export async function checkIpRateLimit(
     
     next();
   } catch (error) {
-    logger.error({ err: error }, "IP rate limit check error:");
-    // On error, allow the request to proceed (fail open)
-    next();
+    // FAIL CLOSED: On any error (e.g. Redis outage), BLOCK the request.
+    // Failing open on a fraud-protection platform would allow unlimited
+    // document submissions during any storage or Redis downtime.
+    logger.error(
+      { err: error },
+      "IP rate-limit check failed \u2014 blocking request to prevent abuse during outage",
+    );
+    return res.status(503).json({
+      message:
+        "Verification service temporarily unavailable. " +
+        "Please try again in a few minutes.",
+      code: "rate_limit_unavailable",
+    });
   }
 }
 

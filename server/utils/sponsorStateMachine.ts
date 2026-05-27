@@ -16,6 +16,10 @@
  *   E  — Rename detection: fingerprint-changing renames (GRACE_PERIOD + NEW entry)
  *   F  — Promote NEWLY_GRANTED → ACTIVE (grantedAt < today)
  *   G  — Update lastSeen for all ACTIVE records (single bulk UPDATE)
+ *
+ * Why ts-pattern: sponsor status/rating branching must remain explicit and
+ * compile-time-checked as enums evolve; exhaustive matches prevent silent drift.
+ * Priority 5 enum source of truth: shared/schema.ts sponsor_licence_timeline.licenceStatus.
  */
 
 import stringSimilarity from "string-similarity";
@@ -37,6 +41,8 @@ import {
   DEFAULT_FUZZY_CONFIG,
   type CompanyRecord
 } from "./fuzzyMatcher";
+import { match } from "ts-pattern";
+import { logger } from "./logger";
 
 const RENAME_SIMILARITY_THRESHOLD = 0.85;
 const BATCH_SIZE = 500; // for bulk DB operations
@@ -56,6 +62,13 @@ interface CanonicalRow {
   historicalNames: string[] | null;
 }
 
+type SponsorCanonicalStatus =
+  | "ACTIVE"
+  | "NEWLY_GRANTED"
+  | "GRACE_PERIOD"
+  | "REMOVED_REVOKED"
+  | "UNKNOWN";
+
 export interface StateMachineResult {
   changes: SponsorChange[];
   addedCount: number;
@@ -68,16 +81,54 @@ export interface StateMachineResult {
 // ── Rating classification ─────────────────────────────────────────────────────
 
 function classifyRatingChange(prev: string, curr: string): "UPGRADED" | "DOWNGRADED" | null {
-  const p = prev.toLowerCase();
-  const c = curr.toLowerCase();
-  if (p === c) return null;
-  const prevIsA = p.includes("a-rating") || p.includes("a rating");
-  const prevIsB = p.includes("b-rating") || p.includes("b rating");
-  const currIsA = c.includes("a-rating") || c.includes("a rating");
-  const currIsB = c.includes("b-rating") || c.includes("b rating");
-  if (prevIsA && currIsB) return "DOWNGRADED";
-  if (prevIsB && currIsA) return "UPGRADED";
-  return null;
+  const normalizeRating = (value: string): "A-RATING" | "B-RATING" | "UNKNOWN" => {
+    const normalized = value.toLowerCase();
+    if (normalized.includes("a-rating") || normalized.includes("a rating")) return "A-RATING";
+    if (normalized.includes("b-rating") || normalized.includes("b rating")) return "B-RATING";
+    return "UNKNOWN";
+  };
+
+  const previous = normalizeRating(prev);
+  const current = normalizeRating(curr);
+  const warnUnknownRating = (message: string) => {
+    log.warn({ prev, curr, previousRating: previous, currentRating: current }, message);
+    return null;
+  };
+
+  return match<[typeof previous, typeof current]>([previous, current])
+    .returnType<"UPGRADED" | "DOWNGRADED" | null>()
+    .with(["A-RATING", "A-RATING"], () => null)
+    .with(["A-RATING", "B-RATING"], () => "DOWNGRADED")
+    .with(["A-RATING", "UNKNOWN"], () => {
+      return warnUnknownRating("Unrecognized current rating while classifying change");
+    })
+    .with(["B-RATING", "A-RATING"], () => "UPGRADED")
+    .with(["B-RATING", "B-RATING"], () => null)
+    .with(["B-RATING", "UNKNOWN"], () => {
+      return warnUnknownRating("Unrecognized current rating while classifying change");
+    })
+    .with(["UNKNOWN", "A-RATING"], () => {
+      return warnUnknownRating("Unrecognized previous rating while classifying change");
+    })
+    .with(["UNKNOWN", "B-RATING"], () => {
+      return warnUnknownRating("Unrecognized previous rating while classifying change");
+    })
+    .with(["UNKNOWN", "UNKNOWN"], () => {
+      return warnUnknownRating("Unrecognized previous/current ratings while classifying change");
+    })
+    .exhaustive();
+}
+
+function normalizeCanonicalStatus(status: string | null | undefined): SponsorCanonicalStatus {
+  return match((status ?? "").trim().toUpperCase())
+    .with("ACTIVE", () => "ACTIVE" as const)
+    .with("NEWLY_GRANTED", () => "NEWLY_GRANTED" as const)
+    .with("GRACE_PERIOD", () => "GRACE_PERIOD" as const)
+    .with("REMOVED_REVOKED", () => "REMOVED_REVOKED" as const)
+    .otherwise((unknownStatus) => {
+      log.warn({ unknownStatus }, "Unrecognized sponsor canonical status in state machine");
+      return "UNKNOWN" as const;
+    });
 }
 
 // ── Batch helper ──────────────────────────────────────────────────────────────
@@ -406,25 +457,28 @@ export async function applyStateMachine(
       
       reactivationCandidates.push(orgName);
       addedCount++;
-    } else if (existing.status === "REMOVED_REVOKED") {
-      // Reactivation
-      toReactivate.push(fp);
-      changes.push({ 
-        organisationName: orgName, 
-        changeType: "RE_ACTIVATED", 
-        previousValue: "REMOVED_REVOKED", 
-        newValue: "NEWLY_GRANTED", 
-        fingerprint: fp 
-      });
-      reactivationCandidates.push(orgName);
-      reactivatedCount++;
-    } else if (existing.status === "GRACE_PERIOD" || existing.status === "REMOVED_REVOKED") {
-      // Logic for re-appearing records: 
-      // If it's in REMOVED_REVOKED, we already handled it above.
-      // If it's in GRACE_PERIOD, it's a flicker (was gone yesterday, back today).
-      if (existing.status === "GRACE_PERIOD") {
-        toRecoverFlicker.push(fp);
-      }
+    } else {
+      match(normalizeCanonicalStatus(existing.status))
+        .with("REMOVED_REVOKED", () => {
+          // Reactivation
+          toReactivate.push(fp);
+          changes.push({
+            organisationName: orgName,
+            changeType: "RE_ACTIVATED",
+            previousValue: "REMOVED_REVOKED",
+            newValue: "NEWLY_GRANTED",
+            fingerprint: fp,
+          });
+          reactivationCandidates.push(orgName);
+          reactivatedCount++;
+        })
+        .with("GRACE_PERIOD", () => {
+          // Re-appearing after one-day miss = flicker recovery.
+          toRecoverFlicker.push(fp);
+        })
+        // Existing listed/unknown records require no additional Phase C action.
+        .with("ACTIVE", "NEWLY_GRANTED", "UNKNOWN", () => {})
+        .exhaustive();
     }
     // ACTIVE / NEWLY_GRANTED already in today's CSV — handled by modification phase or unchanged
   }
@@ -479,22 +533,27 @@ export async function applyStateMachine(
     const existing = canonicalMap.get(fp);
     if (!existing) continue; // not in DB (already removed before)
 
-    if (existing.status === "ACTIVE" || existing.status === "NEWLY_GRANTED") {
-      toGracePeriod.push(fp);
-      removedNames.set(fp, orgName || existing.currentName);
-      gracePeriodCount++;
-      // No change event yet — wait for second miss
-    } else if (existing.status === "GRACE_PERIOD") {
-      toRemove.push(fp);
-      changes.push({
-        organisationName: orgName || existing.currentName,
-        changeType:       "REMOVED_REVOKED",
-        previousValue:    "GRACE_PERIOD",
-        newValue:         "REMOVED_REVOKED",
-        fingerprint:      fp,
-      });
-      removedCount++;
-    }
+    match(normalizeCanonicalStatus(existing.status))
+      .with("ACTIVE", "NEWLY_GRANTED", () => {
+        toGracePeriod.push(fp);
+        removedNames.set(fp, orgName || existing.currentName);
+        gracePeriodCount++;
+        // No change event yet — wait for second miss
+      })
+      .with("GRACE_PERIOD", () => {
+        toRemove.push(fp);
+        changes.push({
+          organisationName: orgName || existing.currentName,
+          changeType:       "REMOVED_REVOKED",
+          previousValue:    "GRACE_PERIOD",
+          newValue:         "REMOVED_REVOKED",
+          fingerprint:      fp,
+        });
+        removedCount++;
+      })
+      .with("REMOVED_REVOKED", () => {})
+      .with("UNKNOWN", () => {})
+      .exhaustive();
     // REMOVED_REVOKED: already removed, increment misses only
   }
 

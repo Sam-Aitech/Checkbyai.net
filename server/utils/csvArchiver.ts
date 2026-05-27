@@ -34,7 +34,14 @@ import { qsvValidate, qsvCount } from "./binaryRunner";
 import { sendAdminAlert } from "./adminAlert";
 import { buildFingerprintedCsv, fingerprintedCsvPath } from "./csvFingerprintBuilder";
 import type { SponsorRecord } from "./sponsorListFetcher";
-import { logger } from "../utils/logger";
+import {
+  SponsorRowSchema,
+  deriveSponsorRowEnums,
+  issueFieldName,
+  shouldTriggerSchemaChangeAlert,
+  buildSchemaChangeAlertHtml,
+} from "./sponsorRowSchema";
+import { logger } from "./logger";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -119,6 +126,10 @@ interface ColumnIndexes {
   countyIdx: number;
   typeIdx: number;
   routeIdx: number;
+  statusIdx: number;
+  licenceTypeIdx: number;
+  ratingIdx: number;
+  lastUpdatedIdx: number;
 }
 
 function resolveColumnIndexes(header: string[]): ColumnIndexes {
@@ -129,6 +140,10 @@ function resolveColumnIndexes(header: string[]): ColumnIndexes {
     countyIdx: h.findIndex((c) => c.includes("county")),
     typeIdx:   h.findIndex((c) => c.includes("type") && c.includes("rating")),
     routeIdx:  h.findIndex((c) => c.includes("route")),
+    statusIdx: h.findIndex((c) => c.includes("status")),
+    licenceTypeIdx: h.findIndex((c) => c.includes("licence") && c.includes("type")),
+    ratingIdx: h.findIndex((c) => c.includes("rating") && !c.includes("type")),
+    lastUpdatedIdx: h.findIndex((c) => c.includes("last") && c.includes("updated")),
   };
 }
 
@@ -450,6 +465,7 @@ async function countCsvRows(filePath: string): Promise<number> {
  * Used after ensureTodaysArchive() validates the file.
  */
 export async function parseCsvFile(filePath: string): Promise<SponsorRecord[]> {
+  const log = logger.child({ module: "CsvArchiver", filePath });
   const readStream = fs.createReadStream(filePath);
   const parser = parseStream({
     skip_empty_lines: true,
@@ -460,6 +476,10 @@ export async function parseCsvFile(filePath: string): Promise<SponsorRecord[]> {
   let idx: ColumnIndexes | null = null;
   let headerRow: string[] | null = null;
   const sponsors: SponsorRecord[] = [];
+  let totalRowsProcessed = 0;
+  let rowsAccepted = 0;
+  let rowsRejected = 0;
+  const rejectionReasons: Record<string, number> = {};
 
   const collector = new Writable({
     objectMode: true,
@@ -484,18 +504,65 @@ export async function parseCsvFile(filePath: string): Promise<SponsorRecord[]> {
         return;
       }
 
-      const orgName = (row[idx!.nameIdx] ?? "").trim();
-      if (!orgName) {
+      totalRowsProcessed++;
+      const organisationName = (row[idx!.nameIdx] ?? "").trim();
+      const townCity = (idx!.townIdx >= 0 ? row[idx!.townIdx] ?? "" : "").trim() || null;
+      const county = (idx!.countyIdx >= 0 ? row[idx!.countyIdx] ?? "" : "").trim() || null;
+      const typeRating = (idx!.typeIdx >= 0 ? row[idx!.typeIdx] ?? "" : "").trim();
+      const route = (idx!.routeIdx >= 0 ? row[idx!.routeIdx] ?? "" : "").trim() || null;
+      const statusRaw = (idx!.statusIdx >= 0 ? row[idx!.statusIdx] ?? "" : "").trim() || null;
+      const licenceTypeRaw = (idx!.licenceTypeIdx >= 0 ? row[idx!.licenceTypeIdx] ?? "" : "").trim() || null;
+      const ratingRaw = (idx!.ratingIdx >= 0 ? row[idx!.ratingIdx] ?? "" : "").trim() || null;
+      const lastUpdatedRaw = (idx!.lastUpdatedIdx >= 0 ? row[idx!.lastUpdatedIdx] ?? "" : "").trim() || null;
+
+      const { licenceStatus, rating, licenceType } = deriveSponsorRowEnums({
+        statusRaw,
+        ratingRaw,
+        typeRating,
+        licenceTypeRaw,
+      });
+
+      const parsed = SponsorRowSchema.safeParse({
+        organisationName,
+        townCity,
+        county,
+        typeRating,
+        route,
+        licenceStatus,
+        licenceType,
+        rating,
+        lastUpdated: lastUpdatedRaw ?? undefined,
+      });
+
+      if (!parsed.success) {
+        rowsRejected++;
+        for (const issue of parsed.error.issues) {
+          const field = issueFieldName(issue.path);
+          rejectionReasons[field] = (rejectionReasons[field] ?? 0) + 1;
+        }
+        log.warn(
+          {
+            rowIndex: totalRowsProcessed,
+            errors: parsed.error.issues.map((issue) => ({
+              path: issue.path,
+              message: issue.message,
+              code: issue.code,
+            })),
+            rawRow: row,
+          },
+          "Sponsor CSV row rejected by Zod validation",
+        );
         callback();
         return;
       }
 
+      rowsAccepted++;
       sponsors.push({
-        organisationName: orgName,
-        townCity:   (idx!.townIdx   >= 0 ? row[idx!.townIdx]   ?? "" : "").trim(),
-        county:     (idx!.countyIdx >= 0 ? row[idx!.countyIdx] ?? "" : "").trim(),
-        typeRating: (idx!.typeIdx   >= 0 ? row[idx!.typeIdx]   ?? "" : "").trim(),
-        route:      (idx!.routeIdx  >= 0 ? row[idx!.routeIdx]  ?? "" : "").trim(),
+        organisationName: parsed.data.organisationName,
+        townCity: parsed.data.townCity ?? "",
+        county: parsed.data.county ?? "",
+        typeRating: parsed.data.typeRating,
+        route: parsed.data.route ?? "",
       });
       callback();
     },
@@ -507,6 +574,33 @@ export async function parseCsvFile(filePath: string): Promise<SponsorRecord[]> {
   //   collector error   → readStream + parser destroyed, Promise rejects
   // No manual .on("error") listener or try/catch/destroy block needed.
   await pipeline(readStream, parser, collector);
+
+  log.info(
+    {
+      totalRowsProcessed,
+      rowsAccepted,
+      rowsRejected,
+      rejectionReasons,
+    },
+    "Sponsor CSV validation summary",
+  );
+
+  const summary = { totalRowsProcessed, rowsAccepted, rowsRejected, rejectionReasons };
+  if (shouldTriggerSchemaChangeAlert(summary)) {
+    log.error(
+      {
+        totalRowsProcessed,
+        rowsRejected,
+        rejectionReasons,
+      },
+      "Sponsor CSV schema-change event detected (>20% rejected rows)",
+    );
+    await sendAdminAlert(
+      "🔴 CheckByAI: Sponsor CSV schema-change event detected",
+      `${buildSchemaChangeAlertHtml(`CsvArchiver file: ${filePath}`, summary)}`,
+    );
+  }
+
   return sponsors;
 }
 

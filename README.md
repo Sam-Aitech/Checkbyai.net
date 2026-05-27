@@ -3,6 +3,7 @@
 > **AI-powered UK immigration compliance monitoring & document verification**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=Sam-Aitech_Checkbyai.net&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=Sam-Aitech_Checkbyai.net)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.5-blue)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-20+-green)](https://nodejs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14+-blue)](https://www.postgresql.org/)
@@ -28,11 +29,11 @@ Forensic analysis of Certificate of Sponsorship PDFs using AI and metadata foren
 - Fabricated metadata (missing or reordered XMP fields)
 - Suspicious modification dates and metadata inconsistencies
 - Incremental updates and editing tool fingerprints
-- Invalid certificate generation (non-Apache FOP producers)
+- Invalid certificate generation (non-Apache)
 
 **Two-tier verification:**
 - **User View** — Verdict only: GENUINE (green shield) or EDITED (red shield) with one-line reason
-- **Admin View** — Full forensics: all 6 authenticity checks, XMP tags table, PDF properties, document stats, suspicious indicators
+- **Admin View** — Full forensics: all 6 authenticity checks.
 
 **Perfect for:** Anyone verifying a COS document authenticity
 
@@ -128,7 +129,6 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed setup instructions.
 
 **External Services:**
 - **Stripe** — Payment processing
-- **OpenAI / Claude** — AI analysis for COS verification
 - **Cloudflare Turnstile** — CAPTCHA/bot protection
 - **Resend / Brevo** — Email delivery
 - **Twilio** — SMS/WhatsApp notifications

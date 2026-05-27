@@ -1,6 +1,7 @@
 import { cn } from '@/lib/utils'
 import { useState, useEffect, useRef, Suspense, lazy } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { STALE_TIMES } from '@/lib/queryDefaults'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useInView } from 'react-intersection-observer'
 import { Zap, Lock, ArrowRight, Play, Bell, Activity, CheckCircle, XCircle, AlertTriangle, ShieldCheck, Search, Loader2, ChevronDown } from 'lucide-react'
@@ -68,7 +69,7 @@ function RecentlyRevokedSection() {
   const [ref, inView] = useInView({ triggerOnce: true, threshold: 0.1 });
   const { data, isLoading } = useQuery<RevokedEntry[]>({
     queryKey: ["/api/sponsors/recently-revoked"],
-    staleTime: 60 * 60 * 1_000,
+    staleTime: STALE_TIMES.INFREQUENT,
   });
 
   return (
@@ -180,7 +181,7 @@ function formatRunDate(dateStr: string | null): string {
 function NightlyStatsBar() {
   const { data, isLoading } = useQuery<NightlyStats>({
     queryKey: ["/api/sponsors/nightly-stats"],
-    staleTime: 60 * 60 * 1_000,
+    staleTime: STALE_TIMES.INFREQUENT,
   });
 
   const totalLabel   = isLoading ? "—" : (data?.totalActive  ?? 0).toLocaleString("en-GB");
@@ -259,7 +260,7 @@ function changeLabel(c: LatestChange): string {
 function LatestChangeToast() {
   const { data, isLoading } = useQuery<LatestChange | null>({
     queryKey: ["/api/sponsors/latest-change"],
-    staleTime: 60 * 60 * 1_000,
+    staleTime: STALE_TIMES.INFREQUENT,
   });
 
   if (isLoading || !data) return null;
@@ -287,7 +288,7 @@ function LatestChangeToast() {
 function UrgencyBanner() {
   const { data, isLoading } = useQuery<NightlyStats>({
     queryKey: ["/api/sponsors/nightly-stats"],
-    staleTime: 60 * 60 * 1_000,
+    staleTime: STALE_TIMES.INFREQUENT,
   });
 
   // Don't render until data arrives — avoids showing stale hardcoded text

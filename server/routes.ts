@@ -37,7 +37,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // Startup catchup: fires 5 minutes after boot to recover from overnight cron failures
-  // or server restarts that happened after 00:30 UTC. The advisory lock and idempotency
+  // or server restarts that happened after 00:30 UTC. The table-backed lock and idempotency
   // checks inside runSponsorMonitorJob prevent duplicate runs if the cron already fired.
   setTimeout(() => {
     checkAndTriggerIfNeeded(true).catch((err) =>

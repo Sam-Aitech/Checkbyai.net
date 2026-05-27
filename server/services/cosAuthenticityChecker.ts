@@ -21,6 +21,7 @@ const EDITING_TOOLS: Array<{ pattern: RegExp; name: string }> = [
   { pattern: /foxit/i,            name: 'Foxit PDF' },
   { pattern: /pdfescape/i,        name: 'PDFescape' },
   { pattern: /sejda/i,            name: 'Sejda PDF' },
+  // codeql[js/regex/missing-regexp-anchor] - Intentionally unanchored: checks if the string *contains* the tool signature, not whether the full string matches.
   { pattern: /pdf\.io/i,          name: 'PDF.io' },
   { pattern: /pdfcandy/i,         name: 'PDF Candy' },
   { pattern: /lightpdf/i,         name: 'LightPDF' },

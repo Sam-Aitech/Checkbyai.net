@@ -173,7 +173,7 @@ export default function COSDashboard() {
   }
 
   // Beta gate — not logged in
-  if (!authLoading && !isAuthenticated) {
+  if (!isAuthenticated) {
     return (
       <div className="bg-gray-50 dark:bg-gray-900 min-h-screen flex items-center justify-center px-4">
         <div className="max-w-md w-full text-center">
@@ -208,7 +208,7 @@ export default function COSDashboard() {
   }
 
   // Beta gate — logged in but not yet approved for COS Check
-  if (!authLoading && isAuthenticated && !hasElevatedAccess) {
+  if (!hasElevatedAccess) {
     return (
       <div className="bg-gray-50 dark:bg-gray-900 min-h-screen flex items-center justify-center px-4">
         <div className="max-w-md w-full text-center">
@@ -230,10 +230,10 @@ export default function COSDashboard() {
           </p>
           <button
             onClick={handleCheckApprovalStatus}
-            disabled={checkingStatus || authLoading}
+            disabled={checkingStatus}
             className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg font-semibold transition-colors mb-3"
           >
-            {checkingStatus || authLoading ? (
+            {checkingStatus ? (
               <>
                 <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />

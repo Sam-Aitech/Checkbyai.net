@@ -163,14 +163,23 @@ async function findCsvUrlPrimary(): Promise<string> {
   const html = await response.text();
   const $ = cheerio.load(html);
 
+  function isAllowedCsvHref(raw: string): boolean {
+    try {
+      const parsed = new URL(raw);
+      if (parsed.protocol !== "https:") return false;
+      const allowedHosts = new Set(["assets.publishing.service.gov.uk"]);
+      if (!allowedHosts.has(parsed.hostname.toLowerCase())) return false;
+      if (!parsed.pathname.toLowerCase().endsWith(".csv")) return false;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   let csvUrl: string | null = null;
   $("a[href]").each((_i, el) => {
     const href = $(el).attr("href");
-    if (
-      href &&
-      href.includes("assets.publishing.service.gov.uk") &&
-      href.endsWith(".csv")
-    ) {
+    if (href && isAllowedCsvHref(href)) {
       csvUrl = href;
       return false;
     }

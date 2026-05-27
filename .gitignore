@@ -7,7 +7,3 @@ vite.config.ts.*
 .claude/
 # ETL SQLite snapshots — environment-local, not for source control
 backend/etl_sponsors.db
-# Pipeline binaries (installed by scripts/setup-binaries.sh)
-bin/
-# Daily CSV archive files (large binary data, not for source control)
-data/

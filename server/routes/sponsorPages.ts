@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { db } from "../db";
-import { sql, eq, inArray, desc } from "drizzle-orm";
-import { sponsorCanonical, sponsorChanges, sponsorEnrichment, dailyDigest } from "@shared/schema";
+import { sql, eq, inArray, desc, and } from "drizzle-orm";
+import { sponsorCanonical, sponsorChanges, sponsorEnrichment, dailyDigest, monitorJobRuns } from "@shared/schema";
 import { cacheGet, cacheSet } from "../utils/redisClient";
 import { getAppUrl } from "../utils/appUrl";
 import { ensureIndexReady, getIndexData, type SearchIndexEntry } from "../utils/sponsorSearch";
@@ -249,11 +249,13 @@ export function registerSponsorPageRoutes(app: Express): void {
       return;
     }
 
-    const [countResult, digestRows, revokedResult] = await Promise.all([
+    const [countResult, digestRows, revokedResult, lastRunRows] = await Promise.all([
       db
         .select({ total: sql<number>`count(*)::int` })
         .from(sponsorCanonical)
         .where(inArray(sponsorCanonical.status, ["ACTIVE", "NEWLY_GRANTED"])),
+      // Only fetch the digest that is actively displayed on the landing page —
+      // this ensures zero-change days don't overwrite a meaningful digest.
       db
         .select({
           snapshotDate:  dailyDigest.snapshotDate,
@@ -262,8 +264,10 @@ export function registerSponsorPageRoutes(app: Express): void {
           updatedCount:  dailyDigest.updatedCount,
         })
         .from(dailyDigest)
+        .where(eq(dailyDigest.displayedOnLanding, true))
         .orderBy(desc(dailyDigest.snapshotDate))
         .limit(1),
+      // Count revocations in the last 12 months — trust signal for the homepage.
       db
         .select({ total: sql<number>`count(*)::int` })
         .from(sponsorCanonical)
@@ -271,23 +275,37 @@ export function registerSponsorPageRoutes(app: Express): void {
           sql`status = 'REMOVED_REVOKED'
               AND removed_at >= (CURRENT_DATE - INTERVAL '12 months')`
         ),
+      // Query the actual last successful cron/manual run date from monitor_job_runs.
+      // This powers the "Register last checked" stat — shows when the job actually ran,
+      // independent of which digest is displayed.
+      db
+        .select({ runDate: monitorJobRuns.runDate })
+        .from(monitorJobRuns)
+        .where(eq(monitorJobRuns.status, "success"))
+        .orderBy(desc(monitorJobRuns.runDate))
+        .limit(1),
     ]);
 
     const totalActive          = countResult[0]?.total ?? 0;
     const revokedLast12Months  = revokedResult[0]?.total ?? 0;
     const latest               = digestRows[0] ?? null;
+    // Use the last successful job run date as "Register last checked".
+    // Fall back to the active digest's snapshot date if no run recorded yet.
+    const lastRunDate = lastRunRows[0]?.runDate ?? latest?.snapshotDate ?? null;
 
     const payload = {
       totalActive,
-      lastRunDate:          latest?.snapshotDate  ?? null,
+      lastRunDate,
       addedCount:           latest?.addedCount    ?? 0,
       removedCount:         latest?.removedCount  ?? 0,
       changesCount:         latest?.updatedCount  ?? 0,
       revokedLast12Months,
     };
 
-    await cacheSet(cacheKey, payload, 3600);
-    res.set("Cache-Control", "public, max-age=3600");
+    // Cache for 5 minutes — balances freshness with DB load.
+    // Flushed immediately by sponsorMonitorJob after each nightly run.
+    await cacheSet(cacheKey, payload, 300);
+    res.set("Cache-Control", "public, max-age=300, stale-while-revalidate=600");
     success(res, payload);
   }));
 

@@ -773,6 +773,7 @@ export function registerBillingRoutes(app: Express): void {
             }
           }
         }
+      }
 
         const credits = await storage.getCredits(sessionUserId);
         const user = await storage.getUser(sessionUserId);

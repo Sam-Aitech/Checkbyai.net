@@ -18,6 +18,7 @@ services:
       DATABASE_URL: postgresql://checkbyai:checkbyai@postgres:5432/checkbyai?sslmode=disable
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis}
       # Copy remaining secrets from your .env file
       SESSION_SECRET: ${SESSION_SECRET}
       PHONE_ENCRYPTION_KEY: ${PHONE_ENCRYPTION_KEY}

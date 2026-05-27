@@ -1,5 +1,9 @@
 import express from "express";
 import compression from "compression";
+import rateLimit from "express-rate-limit";
+import helmet from "helmet";
+import * as Sentry from "@sentry/node";
+import { makeRateLimitStore } from "./utils/redisRateLimitStore";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { storage } from "./storage";
@@ -62,6 +66,18 @@ if (!process.env.STRIPE_WEBHOOK_SECRET) {
   );
 }
 
+const isProduction = process.env.NODE_ENV === "production";
+const isTestEnv = process.env.NODE_ENV === "test";
+const sentryDsn = process.env.SENTRY_DSN;
+const isSentryEnabled = !isTestEnv && Boolean(sentryDsn);
+
+Sentry.init({
+  dsn: sentryDsn,
+  enabled: isSentryEnabled,
+  environment: process.env.NODE_ENV ?? "development",
+  tracesSampleRate: isProduction ? 0.1 : 1.0,
+});
+
 async function seedAdminUser() {
   try {
     const adminEmail = process.env.ADMIN_EMAIL;
@@ -103,6 +119,49 @@ const app = express();
 // Trust the first proxy so req.ip is the real client IP behind Nginx/load balancer.
 // Without this, req.ip is undefined or 127.0.0.1, which breaks all IP-based rate limiting.
 app.set('trust proxy', 1);
+app.disable('x-powered-by');
+
+if (isSentryEnabled) {
+  app.use(Sentry.Handlers.requestHandler());
+  app.use(Sentry.Handlers.tracingHandler());
+}
+
+// Helmet is applied first to enforce baseline browser hardening before any other middleware:
+// CSP allows only self + Stripe + Cloudflare Turnstile (with narrowly scoped unsafe-inline/unsafe-eval
+// kept only where required by existing inline SEO JSON-LD + inline styles in client/index.html and Vite dev HMR), HSTS is enabled
+// in production, and frame-ancestors/x-frame-options deny embedding to prevent clickjacking on sensitive pages/PDF flows.
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: isProduction
+        ? ["'self'", "'unsafe-inline'", "https://js.stripe.com", "https://challenges.cloudflare.com"]
+        : ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://js.stripe.com", "https://challenges.cloudflare.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: isProduction
+        ? ["'self'", "https://api.stripe.com", "https://challenges.cloudflare.com"]
+        : ["'self'", "https://api.stripe.com", "https://challenges.cloudflare.com", "ws:", "wss:"],
+      frameSrc: ["https://js.stripe.com", "https://hooks.stripe.com", "https://challenges.cloudflare.com"],
+      workerSrc: ["'self'", "blob:"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      frameAncestors: ["'none'"],
+      upgradeInsecureRequests: isProduction ? [] : null,
+    },
+  },
+  hsts: isProduction
+    ? {
+        maxAge: 63072000,
+        includeSubDomains: true,
+        preload: true,
+      }
+    : false,
+  xFrameOptions: { action: "deny" },
+  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+}));
 
 app.use(compression({
   level: 6,
@@ -114,6 +173,22 @@ app.use(compression({
   },
 }));
 
+
+// Global catch-all fallback rate limiter (200 req / 15 min per IP).
+// Covers all endpoints that don't have their own tighter limiter.
+// This resolves the bulk of the 100+ CodeQL "Missing rate limiting" alerts.
+const globalFallbackLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 200,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: makeRateLimitStore("rl:global:"),
+    message: { message: "Too many requests. Please try again later." },
+    // Skip static asset paths — served by Vite/CDN in production
+    skip: (req: any) =>
+          req.path.startsWith("/assets/") || req.path.startsWith("/static/"),
+});
+app.use(globalFallbackLimiter);
 // WWW redirect middleware - redirect www to non-www
 app.use((req, res, next) => {
   if (req.headers.host && req.headers.host.startsWith('www.')) {
@@ -124,63 +199,19 @@ app.use((req, res, next) => {
   next();
 });
 
-// T001: Security and Performance Headers (including CSP, HSTS, Permissions-Policy)
+// T001: Security and Performance Headers
 app.use((req, res, next) => {
-  const isProd = process.env.NODE_ENV === 'production';
-
-  // Basic security headers
-  res.header('X-Content-Type-Options', 'nosniff');
-  res.header('X-Frame-Options', 'DENY');
-  res.header('X-XSS-Protection', '1; mode=block');
-  res.header('Referrer-Policy', 'strict-origin-when-cross-origin');
-
-  // HSTS — enforce HTTPS in production only
-  if (isProd) {
-    res.header('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
-  }
-
-  // Permissions-Policy — restrict browser features
   res.header(
     'Permissions-Policy',
     'camera=(), microphone=(), geolocation=(), payment=(self "https://js.stripe.com")'
   );
 
-  // Content-Security-Policy
-  // Dev: relaxed to allow Vite HMR websocket and inline scripts
-  // Prod: tighter, no unsafe-eval
-  const scriptSrc = isProd
-    ? "'self' 'unsafe-inline' https://js.stripe.com"
-    : "'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com";
-  const connectSrc = isProd
-    ? "'self' https://api.stripe.com"
-    : "'self' https://api.stripe.com ws: wss:";
-
-  res.header(
-    'Content-Security-Policy',
-    [
-      `default-src 'self'`,
-      `script-src ${scriptSrc}`,
-      `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
-      `font-src 'self' https://fonts.gstatic.com data:`,
-      `img-src 'self' data: https:`,
-      `connect-src ${connectSrc}`,
-      `frame-src https://js.stripe.com https://hooks.stripe.com https://challenges.cloudflare.com`,
-      `script-src ${scriptSrc} https://challenges.cloudflare.com`,
-      `worker-src 'self' blob:`,
-      `object-src 'none'`,
-      `base-uri 'self'`,
-      `form-action 'self'`,
-    ].join('; ')
-  );
 
   // Performance headers for static assets
   if (req.url.match(/\.(jpg|jpeg|png|gif|ico|css|js|svg|woff|woff2|ttf|eot)$/)) {
     res.header('Cache-Control', 'public, max-age=31536000, immutable'); // 1 year
     res.header('Expires', new Date(Date.now() + 31536000000).toUTCString());
   }
-  
-  // Disable powered-by header
-  res.removeHeader('X-Powered-By');
   
   // Block access to uploads folder (private documents)
   if (req.url.startsWith('/uploads/')) {
@@ -268,6 +299,21 @@ app.use((req, res, next) => {
 async function applyDataFixbacks() {
   const client = await pool.connect();
   try {
+    // ── Table-backed locks initialization ──
+    try {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS "job_locks" (
+          "job_name" VARCHAR(100) PRIMARY KEY,
+          "locked_at" TIMESTAMP WITH TIME ZONE NOT NULL,
+          "locked_by" VARCHAR(255) NOT NULL,
+          "expires_at" TIMESTAMP WITH TIME ZONE NOT NULL
+        )
+      `);
+    } catch (err) {
+      logger.error({ err }, "Failed to ensure job_locks table exists at startup");
+    }
+
+
     // ── One-time backfill: retire the legacy "NOT_LISTED" status value ──────
     // The current schema enum is ACTIVE | NEWLY_GRANTED | GRACE_PERIOD | REMOVED_REVOKED.
     // Earlier ingestion code wrote NOT_LISTED rows that were never migrated,
@@ -357,9 +403,9 @@ async function applyDataFixbacks() {
    } catch (err) {
      logger.warn({ err }, "Non-blocking: status cache flush failed on boot");
    }
-   setupWorkers();
-   
-   const server = await registerRoutes(app);
+    setupWorkers();
+    
+    const server = await registerRoutes(app);
 
    app.use(errorHandler);
 

@@ -11,7 +11,7 @@ import { logger } from "../utils/logger";
  * its own DB writes — all using the same advisory lock key, causing race conditions.
  *
  * runSponsorMonitorJob() handles:
- *   - pg_try_advisory_lock acquisition + release in finally
+ *   - Table-backed lock acquisition + release in finally
  *   - CSV download with retries
  *   - 4-phase bulk reconciliation
  *   - Fuse.js index rebuild

@@ -81,6 +81,7 @@ export interface IStorage {
   getVerificationById(id: number): Promise<VerificationResult | undefined>;
   getPaginatedVerificationLogs(options: { page: number; limit: number; status?: string; startDate?: string; endDate?: string; search?: string; period?: string }): Promise<{ data: (VerificationResult & { userEmail?: string | null })[]; total: number; page: number; limit: number; totalPages: number }>;
   getStats(): Promise<{ trustedPatterns: number; verificationsToday: number; totalUsers: number; proUsers: number }>;
+
   createFeedback(feedbackData: InsertFeedback): Promise<Feedback>;
   getFeedbackStats(): Promise<{ totalFeedback: number; averageRating: number; helpfulCount: number; accuracyBreakdown: { correct: number; incorrect: number; unsure: number }; recentFeedback: Feedback[] }>;
   createSupportTicket(userId: string, data: InsertSupportTicket): Promise<SupportTicket>;

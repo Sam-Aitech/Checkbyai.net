@@ -3,6 +3,7 @@ import { logger } from "../utils/logger";
 import type { SponsorChange } from "../utils/sponsorListFetcher";
 import * as crypto from "crypto";
 import * as fs from "fs";
+import * as path from "path";
 import { db } from "../db";
 import { sql, eq, and, desc, gte, asc, inArray } from "drizzle-orm";
 import {
@@ -28,7 +29,7 @@ import { upload } from "./verification";
 import { sendEmailReliably } from "../utils/resilientEmail";
 import { getAppUrl } from "../utils/appUrl";
 import { checkBinaryHealth } from "../utils/binaryRunner";
-import { sanitizeUploadPath } from "../utils/uploadGuard";
+import { sanitizeUploadPath, UPLOADS_DIR } from "../utils/uploadGuard";
 import { isJobRunning, getLastRunInfo, runSponsorMonitorJob } from "../utils/sponsorMonitorJob";
 import { rebuildSponsorIndex } from "../utils/sponsorSearch";
 import { isQueueAvailable, getSponsorRefreshQueue } from "../services/jobQueue";
@@ -37,6 +38,11 @@ import { getWatchLimit } from "../utils/tierConfig";
 function sanitizeForPrompt(text: string): string {
   return text.replace(/[<>`{}]/g, '');
 }
+
+function sanitizeLog(value: string): string {
+  return value.replace(/[\r\n]/g, ' ');
+}
+
 
 const SPONSOR_JOB_LOCK_KEY = 7483920; // Same key as sponsorMonitorJob — init and nightly are mutually exclusive
 
@@ -104,7 +110,7 @@ export function registerAdminRoutes(app: Express): void {
   });
 
   app.post('/api/admin/trusted-patterns', requireRole("admin"), upload.single('file'), async (req, res) => {
-    let safeFilePath;
+    let safeFilePath: string | undefined;
     try {
       if (!req.file) {
         return res.status(400).json({ message: 'No file uploaded' });
@@ -151,7 +157,7 @@ export function registerAdminRoutes(app: Express): void {
   });
 
   app.post('/api/admin/extract-metadata', requireRole("admin"), upload.single('file'), async (req: any, res) => {
-    let safeFilePath;
+    let safeFilePath: string | undefined;
     try {
       if (!req.file) {
         return res.status(400).json({ message: 'No file uploaded' });
@@ -462,16 +468,15 @@ Format your response in clear, professional markdown.`;
 
   app.post('/api/admin/sponsor-monitor/release-lock', requireRole("admin"), async (req: any, res) => {
     try {
-      const unlockResult = await db.execute(
-        sql`SELECT pg_advisory_unlock(${SPONSOR_JOB_LOCK_KEY}) AS released`
+      // Force release by deleting the job lock record from the job_locks table
+      const deleteResult = await db.execute(
+        sql`DELETE FROM job_locks WHERE job_name = 'sponsorMonitorJob'`
       );
-      const released = (unlockResult.rows[0] as any)?.released === true;
-
-      await db.execute(sql`SELECT pg_advisory_unlock_all()`);
+      const released = deleteResult.rowCount !== null && deleteResult.rowCount > 0;
 
       const message = released
-        ? "Advisory lock was held and has been released. You can now trigger a new run."
-        : "No lock was held by this connection (may have been on a different pooled connection). All locks on this connection cleared.";
+        ? "Job lock was held in job_locks table and has been force-released. You can now trigger a new run."
+        : "No active lock for 'sponsorMonitorJob' was found in the job_locks table.";
 
       logger.warn(`[SponsorMonitorJob] Admin force-release: ${message}`);
       res.json({ released, message });
@@ -508,36 +513,18 @@ Format your response in clear, professional markdown.`;
       }
 
       try {
-        const lockHolder = await db.execute(sql`
-          SELECT pl.pid, pa.state,
-                 EXTRACT(EPOCH FROM (now() - pa.state_change))::int AS idle_seconds
-          FROM   pg_locks pl
-          LEFT JOIN pg_stat_activity pa ON pa.pid = pl.pid
-          WHERE  pl.locktype  = 'advisory'
-            AND  pl.classid   = (${SPONSOR_JOB_LOCK_KEY}::bigint >> 32)::int
-            AND  pl.objid     = (${SPONSOR_JOB_LOCK_KEY}::bigint & x'ffffffff'::bigint)::int
-            AND  pl.granted   = true
+        // Pre-flight check on job_locks table for active locks
+        const activeLock = await db.execute(sql`
+          SELECT locked_at, locked_by, expires_at
+          FROM job_locks
+          WHERE job_name = 'sponsorMonitorJob' AND expires_at > NOW()
         `);
-        const holder = lockHolder.rows[0] as any;
-        const ZOMBIE_IDLE_THRESHOLD_SECONDS = 600;
-        if (
-          holder &&
-          (holder.state === 'idle' || holder.state === 'idle in transaction') &&
-          holder.idle_seconds > ZOMBIE_IDLE_THRESHOLD_SECONDS
-        ) {
-          logger.warn(
-            `[SponsorMonitor] Advisory lock held by idle backend PID ${holder.pid} ` +
-            `(idle ${holder.idle_seconds}s > ${ZOMBIE_IDLE_THRESHOLD_SECONDS}s threshold) — terminating zombie to release lock.`
-          );
-          await db.execute(sql`SELECT pg_terminate_backend(${holder.pid})`);
-        } else if (holder && (holder.state === 'idle' || holder.state === 'idle in transaction')) {
-          logger.info(
-            `[SponsorMonitor] Advisory lock held by idle backend PID ${holder.pid} ` +
-            `(idle ${holder.idle_seconds}s) — within active-job window, not terminating.`
-          );
+        if (activeLock.rows.length > 0) {
+          const lock = activeLock.rows[0] as { locked_at: Date, locked_by: string, expires_at: Date };
+          logger.info(`[SponsorMonitor] Active lock found for sponsorMonitorJob: locked_by ${lock.locked_by}, expires_at ${lock.expires_at}`);
         }
       } catch (lockCheckErr: any) {
-        logger.warn({ errMsg: lockCheckErr.message }, '[SponsorMonitor] Pre-flight zombie-lock check failed (non-fatal):');
+        logger.warn({ errMsg: lockCheckErr.message }, '[SponsorMonitor] Pre-flight lock check failed (non-fatal):');
       }
 
       const jobId = crypto.randomUUID();
@@ -1492,8 +1479,13 @@ Format your response in clear, professional markdown.`;
         },
       });
 
+      const currentUserId = (req as any).user?.id;
+      if (!currentUserId) {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
+
       const submission = await storage.createPaidSubmission({
-        userId: req.user.id,
+        userId: currentUserId,
         email: '',
         packageType,
         paymentStatus: 'pending',
@@ -1551,7 +1543,12 @@ Format your response in clear, professional markdown.`;
         return res.status(404).json({ message: 'Submission not found' });
       }
 
-      if (submission.userId !== req.user.id) {
+      const currentUserId = (req as any).user?.id;
+      if (!currentUserId) {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
+
+      if (submission.userId !== currentUserId) {
         return res.status(403).json({ message: 'Forbidden' });
       }
 
@@ -1601,7 +1598,12 @@ Format your response in clear, professional markdown.`;
         return res.status(404).json({ message: 'Submission not found' });
       }
 
-      if (submission.userId !== req.user.id) {
+      const currentUserId = (req as any).user?.id;
+      if (!currentUserId) {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
+
+      if (submission.userId !== currentUserId) {
         return res.status(403).json({ message: 'Forbidden' });
       }
 
@@ -2260,7 +2262,10 @@ Format your response in clear, professional markdown.`;
         if (!Object.prototype.hasOwnProperty.call(DEFAULT_NOTIF_PREFS, k)) continue;
         const key = k as keyof NotifPrefs;
         if (merged[key]) {
-          merged[key] = { ...merged[key], ...v, channels: { ...merged[key].channels, ...(v as any).channels } };
+          merged[key] = {
+            enabled: v.enabled ?? merged[key].enabled,
+            channels: { ...merged[key].channels, ...v.channels },
+          };
         }
       }
 

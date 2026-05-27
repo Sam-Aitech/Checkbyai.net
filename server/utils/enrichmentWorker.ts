@@ -8,7 +8,7 @@
  * Architecture:
  *   - PostgreSQL `enrichment_queue` table is the durable state ledger (survives Redis restarts).
  *   - `FOR UPDATE SKIP LOCKED` subquery ensures safe concurrent batch claiming with no races.
- *   - Advisory lock 7483922 guards the nightly seeder (not the batch runner — batch is race-safe).
+ *   - Table-backed lock "enrichmentSeed" guards the nightly seeder (not the batch runner — batch is race-safe).
  *   - Exponential backoff + jitter on transient failures; 5-minute queue pause on CF blocks.
  *
  * Cron schedule:
@@ -28,12 +28,13 @@ import {
 import { eq, sql, inArray } from "drizzle-orm";
 import { logger } from "./logger";
 import { startJobRun, finishJobRun } from "./jobTelemetry";
+import crypto from "crypto";
+import { tryAcquireLock, releaseLock } from "./lockManager";
 
 const log = logger.child({ module: "EnrichmentWorker" });
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const ADVISORY_LOCK_KEY = 7483922;
 const PYTHON_BACKEND_URL = process.env.PYTHON_BACKEND_URL || "http://localhost:8000";
 const CH_API_KEY = process.env.COMPANIES_HOUSE_API_KEY ?? "";
 const CH_BASE = "https://api.company-information.service.gov.uk";
@@ -64,19 +65,27 @@ async function isSidecarAvailable(): Promise<boolean> {
   }
 }
 
-// ── Advisory lock ─────────────────────────────────────────────────────────────
+// ── Table-backed lock ─────────────────────────────────────────────────────────
+
+let lockHolderId: string | null = null;
+const LOCK_LEASE_MS = 30 * 60 * 1000; // 30 minutes lease duration
 
 async function tryAcquireEnrichmentLock(): Promise<boolean> {
   try {
-    const result = await db.execute(sql`SELECT pg_try_advisory_lock(${ADVISORY_LOCK_KEY}) AS acquired`);
-    return (result.rows[0] as any)?.acquired === true;
+    if (!lockHolderId) {
+      lockHolderId = crypto.randomUUID();
+    }
+    return await tryAcquireLock("enrichmentSeed", LOCK_LEASE_MS, lockHolderId);
   } catch {
     return false;
   }
 }
 
 async function releaseEnrichmentLock(): Promise<void> {
-  await db.execute(sql`SELECT pg_advisory_unlock(${ADVISORY_LOCK_KEY})`).catch(() => {});
+  if (lockHolderId) {
+    await releaseLock("enrichmentSeed", lockHolderId);
+    lockHolderId = null;
+  }
 }
 
 // ── Direct Companies House REST API client ────────────────────────────────────
@@ -281,7 +290,7 @@ function backoffDelayMs(attemptCount: number): number {
 export async function seedEnrichmentQueue(): Promise<{ inserted: number }> {
   const lockAcquired = await tryAcquireEnrichmentLock();
   if (!lockAcquired) {
-    log.info("seedEnrichmentQueue: advisory lock held by another instance — skipping.");
+    log.info("seedEnrichmentQueue: table-backed lock held by another instance — skipping.");
     return { inserted: 0 };
   }
 

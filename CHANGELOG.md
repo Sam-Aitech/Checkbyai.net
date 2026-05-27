@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `sponsors.ts` history/changes enrichment — projects only display columns
 - **Backend Patterns Audit — RBAC unification**: Legacy `isAdmin` guard (hard-coded `role === 'admin'` check in `auth.ts`) replaced with `requireRole("admin")` from the 6-level `roleGuard.ts` hierarchy. Applied across `admin.ts` (62 usages), `sponsors.ts`, `support.ts`, and `monitoringService.ts`.
 
+
 ### Fixed
 - **SEC-001 (Critical) — Path traversal on file upload endpoints**: Three endpoints (`/api/admin/extract-metadata`, `/api/admin/trusted-patterns`, `/api/verify`) used `req.file.path` directly without sanitization, allowing path traversal via crafted filenames. Created `server/utils/uploadGuard.ts` with `sanitizeUploadPath()` that resolves paths relative to the uploads directory and rejects traversal attempts.
 - **SEC-002 — HMAC secret fallback chain**: `hmacSecret` in billing.ts fell back through multiple env vars (`CHECKOUT_HMAC_SECRET` → `STRIPE_WEBHOOK_SECRET` → `secret`), leaking which env vars are set to an attacker who can provoke an error. Now requires `CHECKOUT_HMAC_SECRET` unconditionally.

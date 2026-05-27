@@ -20,8 +20,16 @@
 import fs from "fs";
 import path from "path";
 import { parse as parseStream } from "csv-parse";
-import { normalizeName, generateFingerprint } from "./sponsorListFetcher";
-import { logger } from "../utils/logger";
+import { generateFingerprint } from "./sponsorListFetcher";
+import { sendAdminAlert } from "./adminAlert";
+import { logger } from "./logger";
+import {
+  SponsorRowSchema,
+  deriveSponsorRowEnums,
+  issueFieldName,
+  shouldTriggerSchemaChangeAlert,
+  buildSchemaChangeAlertHtml,
+} from "./sponsorRowSchema";
 
 // ── CSV quoting ───────────────────────────────────────────────────────────────
 
@@ -42,7 +50,13 @@ function rowToCsvLine(fields: string[]): string {
 interface ColIdx {
   nameIdx: number;
   townIdx: number;
+  countyIdx: number;
+  typeIdx: number;
   routeIdx: number;
+  statusIdx: number;
+  licenceTypeIdx: number;
+  ratingIdx: number;
+  lastUpdatedIdx: number;
 }
 
 function detectCols(header: string[]): ColIdx {
@@ -50,7 +64,13 @@ function detectCols(header: string[]): ColIdx {
   return {
     nameIdx:  h.findIndex((c) => c.includes("organisation") && c.includes("name")),
     townIdx:  h.findIndex((c) => c.includes("town") || c.includes("city")),
+    countyIdx: h.findIndex((c) => c.includes("county")),
+    typeIdx: h.findIndex((c) => c.includes("type") && c.includes("rating")),
     routeIdx: h.findIndex((c) => c.includes("route")),
+    statusIdx: h.findIndex((c) => c.includes("status")),
+    licenceTypeIdx: h.findIndex((c) => c.includes("licence") && c.includes("type")),
+    ratingIdx: h.findIndex((c) => c.includes("rating") && !c.includes("type")),
+    lastUpdatedIdx: h.findIndex((c) => c.includes("last") && c.includes("updated")),
   };
 }
 
@@ -67,6 +87,7 @@ export async function buildFingerprintedCsv(
   rawPath: string,
   outputPath: string,
 ): Promise<string> {
+  const log = logger.child({ module: "FingerprintBuilder", rawPath, outputPath });
   // Skip if already built
   if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 0) {
     logger.info(`[FingerprintBuilder] Already exists: ${path.basename(outputPath)}`);
@@ -88,6 +109,9 @@ export async function buildFingerprintedCsv(
   let headerRow: string[] | null = null;
   let cols: ColIdx | null = null;
   let rowsWritten = 0;
+  let totalRowsProcessed = 0;
+  let rowsRejected = 0;
+  const rejectionReasons: Record<string, number> = {};
 
   try {
     for await (const row of parser as AsyncIterable<string[]>) {
@@ -108,13 +132,64 @@ export async function buildFingerprintedCsv(
         continue;
       }
 
-      const orgName  = (row[cols!.nameIdx]  ?? "").trim();
-      const townCity = (cols!.townIdx  >= 0 ? row[cols!.townIdx]  ?? "" : "").trim();
-      const route    = (cols!.routeIdx >= 0 ? row[cols!.routeIdx] ?? "" : "").trim();
+      totalRowsProcessed++;
+      const organisationName = (row[cols!.nameIdx] ?? "").trim();
+      const townCity = (cols!.townIdx >= 0 ? row[cols!.townIdx] ?? "" : "").trim() || null;
+      const county = (cols!.countyIdx >= 0 ? row[cols!.countyIdx] ?? "" : "").trim() || null;
+      const typeRating = (cols!.typeIdx >= 0 ? row[cols!.typeIdx] ?? "" : "").trim();
+      const route = (cols!.routeIdx >= 0 ? row[cols!.routeIdx] ?? "" : "").trim() || null;
+      const statusRaw = (cols!.statusIdx >= 0 ? row[cols!.statusIdx] ?? "" : "").trim() || null;
+      const licenceTypeRaw = (cols!.licenceTypeIdx >= 0 ? row[cols!.licenceTypeIdx] ?? "" : "").trim() || null;
+      const ratingRaw = (cols!.ratingIdx >= 0 ? row[cols!.ratingIdx] ?? "" : "").trim() || null;
+      const lastUpdatedRaw = (cols!.lastUpdatedIdx >= 0 ? row[cols!.lastUpdatedIdx] ?? "" : "").trim() || null;
 
-      if (!orgName) continue; // skip blank rows
+      const { licenceStatus, rating, licenceType } = deriveSponsorRowEnums({
+        statusRaw,
+        ratingRaw,
+        typeRating,
+        licenceTypeRaw,
+      });
 
-      const fingerprint = generateFingerprint(orgName, townCity, route);
+      const parsed = SponsorRowSchema.safeParse({
+        organisationName,
+        townCity,
+        county,
+        typeRating,
+        route,
+        licenceStatus,
+        licenceType,
+        rating,
+        lastUpdated: lastUpdatedRaw ?? undefined,
+      });
+
+      if (!parsed.success) {
+        rowsRejected++;
+        for (const issue of parsed.error.issues) {
+          const field = issueFieldName(issue.path);
+          rejectionReasons[field] = (rejectionReasons[field] ?? 0) + 1;
+        }
+        log.warn(
+          {
+            rowIndex: totalRowsProcessed,
+            errors: parsed.error.issues.map((issue) => ({
+              path: issue.path,
+              message: issue.message,
+              code: issue.code,
+            })),
+            rawRow: row,
+          },
+          "Sponsor CSV row rejected while building fingerprinted CSV",
+        );
+        continue;
+      }
+
+      const fingerprint = generateFingerprint(
+        parsed.data.organisationName,
+        // Fingerprint generator expects normalized string components, so null
+        // optional values are intentionally coerced to empty strings.
+        parsed.data.townCity ?? "",
+        parsed.data.route ?? "",
+      );
       const dataLine = rowToCsvLine([fingerprint, ...row]) + "\n";
       writeStream.write(dataLine);
       rowsWritten++;
@@ -131,6 +206,33 @@ export async function buildFingerprintedCsv(
   await new Promise<void>((resolve, reject) => {
     writeStream.end((err: Error | null | undefined) => (err ? reject(err) : resolve()));
   });
+
+  const rowsAccepted = rowsWritten;
+  log.info(
+    {
+      totalRowsProcessed,
+      rowsAccepted,
+      rowsRejected,
+      rejectionReasons,
+    },
+    "Sponsor CSV validation summary (fingerprint builder)",
+  );
+
+  const summary = { totalRowsProcessed, rowsAccepted, rowsRejected, rejectionReasons };
+  if (shouldTriggerSchemaChangeAlert(summary)) {
+    log.error(
+      {
+        totalRowsProcessed,
+        rowsRejected,
+        rejectionReasons,
+      },
+      "Sponsor CSV schema-change event detected in fingerprint builder (>20% rejected rows)",
+    );
+    await sendAdminAlert(
+      "🔴 CheckByAI: Sponsor CSV schema-change event detected",
+      `${buildSchemaChangeAlertHtml(`FingerprintBuilder source: ${rawPath}`, summary)}`,
+    );
+  }
 
   logger.info(
     `[FingerprintBuilder] Done: ${rowsWritten.toLocaleString()} rows → ${path.basename(outputPath)}`,

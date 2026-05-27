@@ -281,27 +281,16 @@ export function registerSponsorRoutes(app: Express): void {
     const removedCompanies: string[] = [];
     const addedCompanies: string[] = [];
 
-    if (latestChanges.length > 0) {
-      for (const c of latestChanges) {
-        if (c.changeType === "ADDED" || c.changeType === "NEW_LICENCE") {
-          addedCount += c.count;
-          if (addedCompanies.length < 5) addedCompanies.push(c.organisationName);
-        } else if (c.changeType === "REMOVED_REVOKED") {
-          removedCount += c.count;
-          if (removedCompanies.length < 10) removedCompanies.push(c.organisationName);
-        } else if (["UPGRADED", "DOWNGRADED", "ROUTE_CHANGE", "NAME_CHANGE"].includes(c.changeType)) {
-          updatedCount += c.count;
-        }
+    for (const c of latestChanges) {
+      if (c.changeType === "ADDED" || c.changeType === "NEW_LICENCE") {
+        addedCount += c.count;
+        if (addedCompanies.length < 5) addedCompanies.push(c.organisationName);
+      } else if (c.changeType === "REMOVED_REVOKED") {
+        removedCount += c.count;
+        if (removedCompanies.length < 10) removedCompanies.push(c.organisationName);
+      } else if (["UPGRADED", "DOWNGRADED", "ROUTE_CHANGE", "NAME_CHANGE"].includes(c.changeType)) {
+        updatedCount += c.count;
       }
-    } else {
-      const stats = await db
-        .select({
-          active: sql<number>`count(*) filter (where ${sponsorCanonical.status} = 'ACTIVE')::int`,
-          revoked: sql<number>`count(*) filter (where ${sponsorCanonical.status} = 'REMOVED_REVOKED')::int`,
-        })
-        .from(sponsorCanonical);
-      addedCount = stats[0]?.active || 0;
-      removedCount = stats[0]?.revoked || 0;
     }
 
     const headlineResult = await generateHeadline({
@@ -313,7 +302,10 @@ export function registerSponsorRoutes(app: Express): void {
       addedCompanies,
     });
 
-    await db.update(dailyDigest).set({ displayedOnLanding: false });
+    const hasChanges = addedCount > 0 || removedCount > 0 || updatedCount > 0;
+    if (hasChanges) {
+      await db.update(dailyDigest).set({ displayedOnLanding: false });
+    }
     await db.insert(dailyDigest).values({
       snapshotDate: today,
       addedCount,
@@ -321,22 +313,26 @@ export function registerSponsorRoutes(app: Express): void {
       removedCount,
       headlineGenerated: headlineResult.headline,
       headlineVariants: headlineResult.variants,
-      displayedOnLanding: true,
+      displayedOnLanding: hasChanges,
       selectedVariantIndex: 0,
       aiModel: headlineResult.model,
+      generatedAt: new Date(),
     }).onConflictDoUpdate({
       target: dailyDigest.snapshotDate,
       set: {
         headlineGenerated: headlineResult.headline,
         headlineVariants: headlineResult.variants,
-        displayedOnLanding: true,
+        displayedOnLanding: hasChanges,
         selectedVariantIndex: 0,
         aiModel: headlineResult.model,
         generatedAt: new Date(),
       },
     });
 
-    success(res, { headline: headlineResult.headline, model: headlineResult.model });
+    // Flush Redis so the frontend gets fresh data immediately after admin refresh.
+    await cacheFlushPattern("sponsors:*");
+
+    success(res, { headline: headlineResult.headline, model: headlineResult.model, hasChanges });
   }));
 
   app.get('/api/sponsors/directory', directoryRateLimit, asyncHandler(async (req: any, res) => {

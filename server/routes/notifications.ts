@@ -52,6 +52,7 @@ const jobAlertSchema = z.object({
   enabled: z.boolean(),
 });
 
+
 export function registerNotificationRoutes(app: Express): void {
   app.get('/api/notification-preferences', isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.id;

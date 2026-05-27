@@ -10,10 +10,17 @@ import { normalizeName } from "./sponsorListFetcher";
 import { getAppUrl } from "./appUrl";
 import { sendSMS, sendWhatsApp } from "../services/messaging";
 import { decryptPhone } from "./phoneCrypto";
-import { getTierConfig, getDeliverAfter, isChannelAllowed } from "./tierConfig";
+import { getTierConfig, getDeliverAfter } from "./tierConfig";
+import { logger } from "./logger";
+import { match } from "ts-pattern";
+
+// Why ts-pattern: notification event branching on change/status values must stay
+// explicit and exhaustively handled to avoid silent alert-routing regressions.
+// Priority 5 enum source of truth: shared/schema.ts sponsor_licence_timeline.licenceStatus.
 
 const MAX_NOTIFICATIONS_PER_DAY = 10;
 const FROM_ADDRESS = "Sponsor Monitor <alerts@checkbyai.net>";
+const log = logger.child({ module: "NotificationDispatcher" });
 
 interface SendResult {
   success: boolean;
@@ -59,22 +66,17 @@ function escapeHtml(str: string): string {
 }
 
 function buildPlainTextAlert(changeType: string, companyName: string, previousValue?: string | null, newValue?: string | null): string {
-  switch (changeType) {
-    case "REMOVED_REVOKED":
-      return `URGENT: ${companyName} has been REMOVED from the UK sponsor licence register. If you hold a visa sponsored by this organisation, seek immigration advice immediately. checkbyai.net/sponsor-monitor`;
-    case "GRACE_PERIOD":
-      return `Alert: ${companyName} has been absent from the UK sponsor licence register. Monitoring for confirmation. checkbyai.net/sponsor-monitor`;
-    case "DOWNGRADED":
-      return `Alert: ${companyName} sponsor licence DOWNGRADED${previousValue && newValue ? ` from ${previousValue} to ${newValue}` : ""}. Compliance issues identified by Home Office. checkbyai.net/sponsor-monitor`;
-    case "UPGRADED":
-      return `Good news: ${companyName} sponsor licence UPGRADED${previousValue && newValue ? ` from ${previousValue} to ${newValue}` : ""}. Now fully compliant. checkbyai.net/sponsor-monitor`;
-    case "NEW_LICENCE":
-      return `Update: ${companyName} has been ADDED to the UK sponsor licence register${newValue ? ` (${newValue})` : ""}. checkbyai.net/sponsor-monitor`;
-    case "RE_ACTIVATED":
-      return `Update: ${companyName} has RETURNED to the UK sponsor licence register${newValue ? ` (${newValue})` : ""}. checkbyai.net/sponsor-monitor`;
-    default:
+  return match(changeType)
+    .with("REMOVED_REVOKED", () => `URGENT: ${companyName} has been REMOVED from the UK sponsor licence register. If you hold a visa sponsored by this organisation, seek immigration advice immediately. checkbyai.net/sponsor-monitor`)
+    .with("GRACE_PERIOD", () => `Alert: ${companyName} has been absent from the UK sponsor licence register. Monitoring for confirmation. checkbyai.net/sponsor-monitor`)
+    .with("DOWNGRADED", () => `Alert: ${companyName} sponsor licence DOWNGRADED${previousValue && newValue ? ` from ${previousValue} to ${newValue}` : ""}. Compliance issues identified by Home Office. checkbyai.net/sponsor-monitor`)
+    .with("UPGRADED", () => `Good news: ${companyName} sponsor licence UPGRADED${previousValue && newValue ? ` from ${previousValue} to ${newValue}` : ""}. Now fully compliant. checkbyai.net/sponsor-monitor`)
+    .with("NEW_LICENCE", () => `Update: ${companyName} has been ADDED to the UK sponsor licence register${newValue ? ` (${newValue})` : ""}. checkbyai.net/sponsor-monitor`)
+    .with("RE_ACTIVATED", () => `Update: ${companyName} has RETURNED to the UK sponsor licence register${newValue ? ` (${newValue})` : ""}. checkbyai.net/sponsor-monitor`)
+    .otherwise((unknownChangeType) => {
+      log.warn({ unknownChangeType }, "Unhandled change type in plain-text notification builder");
       return `Sponsor licence change for ${companyName}: ${changeType}. checkbyai.net/sponsor-monitor`;
-  }
+    });
 }
 
 function buildEmailHtml(changeType: string, companyName: string, previousValue?: string | null, newValue?: string | null): { subject: string; html: string } {
@@ -96,8 +98,8 @@ function buildEmailHtml(changeType: string, companyName: string, previousValue?:
   let headline = "";
   let bodyParagraphs: string[] = [];
 
-  switch (changeType) {
-    case "REMOVED_REVOKED":
+  match(changeType)
+    .with("REMOVED_REVOKED", () => {
       subject = `URGENT: ${companyName} removed from UK sponsor licence register`;
       headline = "Sponsor Licence Removed";
       bodyParagraphs = [
@@ -106,9 +108,8 @@ function buildEmailHtml(changeType: string, companyName: string, previousValue?:
         "If you hold a visa sponsored by this organisation, or are in the process of applying, we strongly recommend seeking professional immigration advice as soon as possible.",
         "You can verify this change directly on the <a href=\"https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers\" style=\"color: " + colors.accent + ";\">official register</a>.",
       ];
-      break;
-
-    case "GRACE_PERIOD":
+    })
+    .with("GRACE_PERIOD", () => {
       subject = `Alert: ${companyName} absent from UK sponsor licence register`;
       headline = "Sponsor Licence — Absence Detected";
       bodyParagraphs = [
@@ -116,9 +117,8 @@ function buildEmailHtml(changeType: string, companyName: string, previousValue?:
         "This may be a temporary data issue or the start of a revocation. We are monitoring for a second consecutive absence before issuing a confirmed removal alert.",
         "No action is needed right now, but you may wish to verify directly on the <a href=\"https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers\" style=\"color: " + colors.accent + ";\">official register</a>.",
       ];
-      break;
-
-    case "DOWNGRADED":
+    })
+    .with("DOWNGRADED", () => {
       subject = `Alert: ${companyName} sponsor licence downgraded`;
       headline = "Sponsor Licence Downgraded";
       bodyParagraphs = [
@@ -127,9 +127,8 @@ function buildEmailHtml(changeType: string, companyName: string, previousValue?:
         "While existing visa holders are not immediately affected, this may impact future sponsorship applications and could indicate broader compliance concerns.",
         "We recommend monitoring the situation and consulting with your employer or an immigration adviser if you have questions.",
       ];
-      break;
-
-    case "UPGRADED":
+    })
+    .with("UPGRADED", () => {
       subject = `Good news: ${companyName} sponsor licence upgraded`;
       headline = "Sponsor Licence Upgraded";
       bodyParagraphs = [
@@ -137,9 +136,8 @@ function buildEmailHtml(changeType: string, companyName: string, previousValue?:
         "This is a positive development, indicating the organisation has met or exceeded the Home Office's compliance requirements for sponsor licence holders.",
         "An A-rating confirms the sponsor is fully compliant and in good standing to continue sponsoring workers.",
       ];
-      break;
-
-    case "NEW_LICENCE":
+    })
+    .with("NEW_LICENCE", () => {
       subject = `Update: ${companyName} added to sponsor licence register`;
       headline = "New Sponsor Licence Granted";
       bodyParagraphs = [
@@ -147,26 +145,24 @@ function buildEmailHtml(changeType: string, companyName: string, previousValue?:
         `They are now authorised to sponsor workers${safeNew ? ` under the <strong>${safeNew}</strong> route` : ""}.`,
         "This means the organisation has successfully applied for and been granted a sponsor licence by the Home Office.",
       ];
-      break;
-
-    case "RE_ACTIVATED":
+    })
+    .with("RE_ACTIVATED", () => {
       subject = `Update: ${companyName} has returned to the sponsor licence register`;
       headline = "Sponsor Licence Reinstated";
       bodyParagraphs = [
         `<strong>${safeCompanyName}</strong> has reappeared on the UK Home Office Register of Licensed Sponsors after a period of absence.`,
         `They are once again authorised to sponsor workers${safeNew ? ` under the <strong>${safeNew}</strong> route` : ""}.`,
       ];
-      break;
-
-    default:
+    })
+    .otherwise((unknownChangeType) => {
+      log.warn({ unknownChangeType }, "Unhandled change type in HTML notification builder");
       subject = `Sponsor licence update: ${companyName}`;
       headline = "Sponsor Licence Change Detected";
       bodyParagraphs = [
         `A change has been detected for <strong>${safeCompanyName}</strong> on the UK Home Office Register of Licensed Sponsors.`,
         `Change type: <strong>${escapeHtml(changeType)}</strong>${safePrev ? ` (previous: ${safePrev})` : ""}${safeNew ? ` (new: ${safeNew})` : ""}.`,
       ];
-      break;
-  }
+    });
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
