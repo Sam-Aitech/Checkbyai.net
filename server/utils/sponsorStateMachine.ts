@@ -32,17 +32,16 @@ import type { SponsorChange } from "./sponsorListFetcher";
 import { loadFingerprintSet } from "./csvFingerprintBuilder";
 import { storage } from "../storage";
 import { logger } from "./logger";
-
-const log = logger.child({ module: "SponsorStateMachine" });
 import { buildEmail, sendViaResend } from "../services/notificationEngine";
-import { 
-  areCompaniesFuzzyMatch, 
+import {
+  areCompaniesFuzzyMatch,
   reconcileAdditionsDeletions,
   DEFAULT_FUZZY_CONFIG,
   type CompanyRecord
 } from "./fuzzyMatcher";
 import { match } from "ts-pattern";
-import { logger } from "./logger";
+
+const log = logger.child({ module: "SponsorStateMachine" });
 
 const RENAME_SIMILARITY_THRESHOLD = 0.85;
 const BATCH_SIZE = 500; // for bulk DB operations

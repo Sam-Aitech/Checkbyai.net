@@ -1858,7 +1858,6 @@ Format your response in clear, professional markdown.`;
         adminReviewedBy: req.user.id,
         adminReviewedAt: new Date(),
         accuracyScore: adminStatus === 'fake' ? 0 : (accuracyScore || null),
-        overrideResult: adminStatus === 'fake' ? 'fake' : undefined,
       });
 
       if (adminStatus === 'fake' && adminFeedback?.trim()) {

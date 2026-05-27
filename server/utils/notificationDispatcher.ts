@@ -1,7 +1,5 @@
 import { logger } from "./logger";
 import { db } from "../db";
-
-const log = logger.child({ module: "NotificationDispatcher" });
 import { storage } from "../storage";
 import { eq, and, gte, lte, sql, inArray } from "drizzle-orm";
 import { companyWatches, notificationPreferences, notificationLog, users, sponsorChanges } from "@shared/schema";
@@ -11,7 +9,6 @@ import { getAppUrl } from "./appUrl";
 import { sendSMS, sendWhatsApp } from "../services/messaging";
 import { decryptPhone } from "./phoneCrypto";
 import { getTierConfig, getDeliverAfter } from "./tierConfig";
-import { logger } from "./logger";
 import { match } from "ts-pattern";
 
 // Why ts-pattern: notification event branching on change/status values must stay
