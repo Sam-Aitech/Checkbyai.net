@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { storage } from "../storage";
 import { withCache } from "../lib/cacheAside";
-import { success, fail } from "../lib/response";
+import { success } from "../lib/response";
 import { asyncHandler } from "../lib/errorHandler";
 
 const STATS_CACHE_TTL = 5 * 60;

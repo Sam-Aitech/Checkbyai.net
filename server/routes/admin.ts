@@ -29,7 +29,7 @@ import { upload } from "./verification";
 import { sendEmailReliably } from "../utils/resilientEmail";
 import { getAppUrl } from "../utils/appUrl";
 import { checkBinaryHealth } from "../utils/binaryRunner";
-import { sanitizeUploadPath, UPLOADS_DIR } from "../utils/uploadGuard";
+import { sanitizeUploadPath, assertSafeUploadFilename, UPLOADS_DIR } from "../utils/uploadGuard";
 import { isJobRunning, getLastRunInfo, runSponsorMonitorJob } from "../utils/sponsorMonitorJob";
 import { rebuildSponsorIndex } from "../utils/sponsorSearch";
 import { isQueueAvailable, getSponsorRefreshQueue } from "../services/jobQueue";
@@ -117,6 +117,7 @@ export function registerAdminRoutes(app: Express): void {
       }
 
       safeFilePath = sanitizeUploadPath(req.file.path);
+      assertSafeUploadFilename(req.file.originalname);
       const pdfAnalyzer = new PDFAnalyzer();
       const metadata = await pdfAnalyzer.extractMetadata(safeFilePath);
       const patterns = { metadata, documentType: 'trusted_cos' };
@@ -124,7 +125,7 @@ export function registerAdminRoutes(app: Express): void {
       const aiInstructions = req.body?.aiInstructions || null;
 
       const patternId = await storage.createTrustedPattern(
-        req.file.originalname,
+        path.basename(req.file.originalname),
         metadata,
         patterns,
         aiInstructions
@@ -1993,7 +1994,7 @@ Format your response in clear, professional markdown.`;
               .where(eq(companyWatches.id, watch.id));
           }
           deactivatedWatchCount = watchesToDeactivate.length;
-          logger.info(`[AdminPlanOverride] Deactivated ${deactivatedWatchCount} excess watches for user ${userId} (${previousStatus} → ${plan}, limit=${newWatchLimit})`);
+          logger.info(`[AdminPlanOverride] Deactivated ${deactivatedWatchCount} excess watches for user ${sanitizeLog(String(userId))} (${sanitizeLog(String(previousStatus))} → ${sanitizeLog(String(plan))}, limit=${newWatchLimit})`);
         }
       }
 
@@ -2107,7 +2108,7 @@ Format your response in clear, professional markdown.`;
 
       const newCredits = updatedUser?.credits ?? 0;
       const delta = newCredits - prevCredits;
-      logger.info(`[AdminCredits] User ${userId}: ${prevCredits} → ${newCredits} (${operation} ${amount}, reason: ${reason ?? 'none'})`);
+      logger.info(`[AdminCredits] User ${sanitizeLog(String(userId))}: ${prevCredits} → ${newCredits} (${sanitizeLog(String(operation))} ${amount}, reason: ${sanitizeLog(String(reason ?? 'none'))})`);
 
       // Audit log
       storage.logSubscriptionChange({
@@ -2273,7 +2274,7 @@ Format your response in clear, professional markdown.`;
         .set({ notifPrefs: merged })
         .where(eq(users.id, id));
 
-      logger.info(`[Admin] notif_prefs updated for user ${id} by ${req.user?.email ?? req.user?.id}`);
+      logger.info(`[Admin] notif_prefs updated for user ${sanitizeLog(String(id))} by ${sanitizeLog(String(req.user?.email ?? req.user?.id ?? 'unknown'))}`);
       res.json({ notifPrefs: merged });
     } catch (error) {
       logger.error({ err: error }, 'Error updating notif_prefs:');

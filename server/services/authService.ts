@@ -3,7 +3,6 @@ import bcrypt from "bcrypt";
 import { storage } from "../storage";
 import { logger } from "../utils/logger";
 import { ApiError } from "../lib/apiError";
-import { getAppUrl } from "../utils/appUrl";
 
 export class AuthService {
   generateOTP(): string {
@@ -120,6 +119,9 @@ export class AuthService {
       throw new ApiError(400, "Email and password are required");
     }
 
+    if (email.length > 254) {
+      throw new ApiError(400, "Invalid email format");
+    }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       throw new ApiError(400, "Invalid email format");

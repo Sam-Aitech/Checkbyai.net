@@ -14,7 +14,7 @@ import { storage } from "../storage";
 import { cacheGet, cacheSet, cacheFlushPattern } from "../utils/redisClient";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { makeRateLimitStore } from "../utils/redisRateLimitStore";
-import { success, fail } from "../lib/response";
+import { success } from "../lib/response";
 import { asyncHandler } from "../lib/errorHandler";
 import { ApiError } from "../lib/apiError";
 import { logger } from "../utils/logger";
@@ -450,7 +450,7 @@ export function registerSponsorRoutes(app: Express): void {
       page,
       totalPages,
       limit,
-      stats: stats ?? { active: 0, newlyGranted: 0, removedThisWeek: 0, gracePeriod: 0 },
+      stats: stats!,
     };
     await cacheSet(dirCacheKey, dirResponse, 300);
     res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");

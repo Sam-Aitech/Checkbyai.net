@@ -13,8 +13,8 @@ import { verifyLimiter } from "../middleware/rateLimiter";
 import { PDFAnalyzer } from "../services/pdfAnalyzer";
 import { COSAuthenticityChecker } from "../services/cosAuthenticityChecker";
 import { getClientIp, hashIpAddress } from "../ipRateLimit";
-import { sanitizeUploadPath } from "../utils/uploadGuard";
-import { success, fail } from "../lib/response";
+import { sanitizeUploadPath, assertSafeUploadFilename } from "../utils/uploadGuard";
+import { success } from "../lib/response";
 import { asyncHandler } from "../lib/errorHandler";
 import { ApiError } from "../lib/apiError";
 import { logger } from "../utils/logger";
@@ -72,6 +72,7 @@ export function registerVerificationRoutes(app: Express): void {
     }
 
     const safeFilePath = sanitizeUploadPath(req.file.path);
+    assertSafeUploadFilename(req.file.originalname);
 
     let userId: string | undefined = betaUserId;
 
@@ -233,7 +234,7 @@ export function registerVerificationRoutes(app: Express): void {
       }
       const insertValues: any = {
         userId,
-        filename: req.file!.originalname,
+        filename: path.basename(req.file!.originalname),
         result,
         confidence: Math.floor(analysis.confidence),
         metadata: isAdminOverride ? (priorAdminFlag!.metadata ?? {}) : metadata,

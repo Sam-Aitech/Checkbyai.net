@@ -28,7 +28,7 @@ import { eq, desc } from "drizzle-orm";
 import { isAuthenticated } from "../auth";
 import { resolveTier } from "../utils/tierConfig";
 import { enrichLimiter } from "../middleware/rateLimiter";
-import { success, fail } from "../lib/response";
+import { success } from "../lib/response";
 import { asyncHandler } from "../lib/errorHandler";
 import { ApiError } from "../lib/apiError";
 

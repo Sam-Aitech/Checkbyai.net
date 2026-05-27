@@ -6,7 +6,7 @@ import { cacheGet, cacheSet } from "../utils/redisClient";
 import { getAppUrl } from "../utils/appUrl";
 import { ensureIndexReady, getIndexData, type SearchIndexEntry } from "../utils/sponsorSearch";
 import rateLimit from "express-rate-limit";
-import { success, fail } from "../lib/response";
+import { success } from "../lib/response";
 import { asyncHandler } from "../lib/errorHandler";
 import { ApiError } from "../lib/apiError";
 

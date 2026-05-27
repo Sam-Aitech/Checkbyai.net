@@ -13,7 +13,7 @@ import { storage } from "../storage";
 import { logger } from "../utils/logger";
 import { getWatchLimit } from "../utils/tierConfig";
 import { normalizeName, generateFingerprint } from "../utils/sponsorListFetcher";
-import { success, fail } from "../lib/response";
+import { success } from "../lib/response";
 import { asyncHandler } from "../lib/errorHandler";
 import { ApiError } from "../lib/apiError";
 

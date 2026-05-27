@@ -1,5 +1,4 @@
 import { storage } from "../storage";
-import { logger } from "../utils/logger";
 import { ApiError } from "../lib/apiError";
 import { getWatchLimit as getWatchLimitFromTier, getTierConfig } from "../utils/tierConfig";
 

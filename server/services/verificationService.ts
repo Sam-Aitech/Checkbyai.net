@@ -6,7 +6,6 @@ import { sql, eq } from "drizzle-orm";
 import { users, verificationResults } from "@shared/schema";
 import { withRetry } from "../utils/dbRetry";
 import { ApiError } from "../lib/apiError";
-import { logger } from "../utils/logger";
 
 export class VerificationService {
   generateReceiptId(): string {

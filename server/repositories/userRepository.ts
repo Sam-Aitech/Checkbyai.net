@@ -1,6 +1,6 @@
 import { users, type User, type UpsertUser, type SubscriptionAuditLogEntry, type NotifPrefs, type NotifEventType, DEFAULT_NOTIF_PREFS, subscriptionAuditLog } from "@shared/schema";
 import { db } from "../db";
-import { eq, desc, count, sql, and, isNull, inArray } from "drizzle-orm";
+import { eq, desc, count, sql, and, isNull } from "drizzle-orm";
 
 export class UserRepository {
   async getUser(id: string): Promise<User | undefined> {

@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
-import { z, ZodError } from "zod";
+import { z } from "zod";
 import { ApiError } from "./apiError";
 
 export function validateBody<T extends z.ZodTypeAny>(schema: T) {

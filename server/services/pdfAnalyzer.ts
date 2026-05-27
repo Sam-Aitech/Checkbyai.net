@@ -235,7 +235,7 @@ export class PDFAnalyzer {
       await yieldToEventLoop();
       metadata.forensic = this.buildForensicProfile(metadata, xmpHistory);
 
-      logger.info(`Forensic profile built for ${filePath} (${fileSize} bytes, ${metadata.fonts.length} fonts, ${xmpHistory.length} XMP history entries)`);
+      logger.info(`Forensic profile built for ${filePath.replace(/[\r\n]/g, ' ')} (${fileSize} bytes, ${metadata.fonts.length} fonts, ${xmpHistory.length} XMP history entries)`);
 
       return metadata;
     } catch (error) {
