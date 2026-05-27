@@ -41,13 +41,32 @@ jobs:
         run: npm ci
 
       - name: Run Vitest with coverage
-        run: npm run test:run -- --coverage
+        run: npm run test:run -- --coverage --coverage.reporter=text --coverage.reporter=lcov
+
+      - name: Verify LCOV report exists
+        run: |
+          if [ ! -s coverage/lcov.info ]; then
+            echo "::error::coverage/lcov.info was not generated or is empty."
+            exit 1
+          fi
+          echo "Generated coverage/lcov.info"
+          wc -l coverage/lcov.info
+
+      - name: Upload LCOV artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonar-lcov
+          path: coverage/lcov.info
+          retention-days: 7
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@v5.0.0
         with:
           args: >
             -Dsonar.qualitygate.wait=true
+            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+            -Dsonar.typescript.lcov.reportPaths=coverage/lcov.info
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

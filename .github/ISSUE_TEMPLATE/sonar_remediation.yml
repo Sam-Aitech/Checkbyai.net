@@ -1,0 +1,101 @@
+name: Sonar Remediation
+description: Track a SonarCloud remediation bucket (security/reliability/maintainability/coverage)
+title: "[Sonar]: "
+labels: ["quality", "sonar", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template to track one SonarCloud remediation bucket at a time.
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      description: Select exactly one remediation category for this issue.
+      options:
+        - Security
+        - Reliability
+        - Maintainability
+        - Coverage
+    validations:
+      required: true
+
+  - type: input
+    id: analysis-id
+    attributes:
+      label: Sonar analysis ID
+      description: The failing or target analysis ID (for example b0490b13).
+      placeholder: b0490b13
+    validations:
+      required: true
+
+  - type: textarea
+    id: gate-condition
+    attributes:
+      label: Failed Quality Gate condition
+      description: Paste the exact failed condition from SonarCloud.
+      placeholder: New Code Coverage is below threshold (currently X%, required Y%)
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Define what is in/out of scope for this remediation bucket.
+      placeholder: |
+        In scope:
+        - ...
+        Out of scope:
+        - ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: ownership
+    attributes:
+      label: Owner and SLA
+      description: Assign owner and target date for completion.
+      placeholder: |
+        Owner: @username
+        SLA / target date: YYYY-MM-DD
+    validations:
+      required: true
+
+  - type: textarea
+    id: plan
+    attributes:
+      label: Remediation plan
+      description: List the ordered implementation steps for this bucket.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: weekly-progress
+    attributes:
+      label: Weekly progress updates
+      description: Add update entries each week (burn-down, blockers, next step).
+      placeholder: |
+        Week YYYY-MM-DD:
+        - Done:
+        - Remaining:
+        - Blockers:
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I captured the exact failed Quality Gate condition from SonarCloud
+          required: true
+        - label: This issue tracks one remediation category only
+          required: true
+        - label: Owner and SLA are defined
+          required: true
