@@ -262,9 +262,10 @@ function LatestChangeToast() {
   const { data, isLoading } = useQuery<LatestChange | null>({
     queryKey: ["/api/sponsors/latest-change"],
     staleTime: STALE_TIMES.INFREQUENT,
+    select: (res: any) => (res?.data ?? null) as LatestChange | null,
   });
 
-  if (isLoading || !data) return null;
+  if (isLoading || !data || !data.companyName) return null;
 
   const slug = toHeroSlug(data.companyName);
   const href = `/sponsor/${data.companyId}/${slug}`;
@@ -497,7 +498,8 @@ function clientSearch(q: string, limit = 20): FreeSearchResult[] {
     }));
 }
 
-function toHeroSlug(name: string): string {
+function toHeroSlug(name: string | null | undefined): string {
+  if (!name) return "";
   return name.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim().replace(/\s+/g, "-").slice(0, 80);
 }
 
