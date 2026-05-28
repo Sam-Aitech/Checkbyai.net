@@ -70,6 +70,7 @@ function RecentlyRevokedSection() {
   const { data, isLoading } = useQuery<RevokedEntry[]>({
     queryKey: ["/api/sponsors/recently-revoked"],
     staleTime: STALE_TIMES.INFREQUENT,
+    select: (res: any) => (res?.data ?? res) as RevokedEntry[],
   });
 
   return (
@@ -183,6 +184,7 @@ function NightlyStatsBar() {
   const { data, isLoading } = useQuery<NightlyStats>({
     queryKey: ["/api/sponsors/nightly-stats"],
     staleTime: STALE_TIMES.INFREQUENT,
+    select: (res: any) => (res?.data ?? res) as NightlyStats,
   });
 
   const totalLabel   = isLoading ? "—" : (data?.totalActive  ?? 0).toLocaleString("en-GB");
@@ -291,6 +293,7 @@ function UrgencyBanner() {
   const { data, isLoading } = useQuery<NightlyStats>({
     queryKey: ["/api/sponsors/nightly-stats"],
     staleTime: STALE_TIMES.INFREQUENT,
+    select: (res: any) => (res?.data ?? res) as NightlyStats,
   });
 
   // Don't render until data arrives — avoids showing stale hardcoded text
