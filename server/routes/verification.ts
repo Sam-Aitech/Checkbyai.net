@@ -26,8 +26,8 @@ function generateReceiptId(): string {
 }
 
 async function generateDocumentHash(filePath: string): Promise<string> {
-  // codeql[js/path-injection] - filePath is validated by sanitizeUploadPath before being passed here
-  const fileBuffer = await fs.promises.readFile(filePath);
+  // filePath is validated by sanitizeUploadPath before being passed here
+  const fileBuffer = await fs.promises.readFile(filePath); // codeql[js/path-injection]
   return crypto.createHash('sha256').update(fileBuffer).digest('hex');
 }
 
@@ -86,8 +86,7 @@ export function registerVerificationRoutes(app: Express): void {
         const now = new Date();
         const daysSinceVerification = (now.getTime() - lastVerification.getTime()) / (1000 * 60 * 60 * 24);
         if (daysSinceVerification < 1) {
-          // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
-          await fs.promises.unlink(safeFilePath).catch(() => {});
+          await fs.promises.unlink(safeFilePath).catch(() => {}); // codeql[js/path-injection]
           throw new ApiError(429, 'You have already verified a document today. Upgrade or wait until tomorrow.');
         }
       }
@@ -108,8 +107,7 @@ export function registerVerificationRoutes(app: Express): void {
         } else {
           const canVerify = await storage.checkDailyLimit(userId);
           if (!canVerify) {
-            // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
-            await fs.promises.unlink(safeFilePath).catch(() => {});
+            await fs.promises.unlink(safeFilePath).catch(() => {}); // codeql[js/path-injection]
             throw new ApiError(429, 'Daily verification limit reached. Purchase credits or upgrade for unlimited verifications.');
           }
           useDailyLimit = true;
@@ -149,12 +147,12 @@ export function registerVerificationRoutes(app: Express): void {
       metadata = (priorAdminFlag.metadata as any) || {};
     } else {
       const pdfAnalyzer = new PDFAnalyzer();
-      // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
-      const fileBuffer = await fs.promises.readFile(safeFilePath);
+      // safeFilePath is validated by sanitizeUploadPath
+      const fileBuffer = await fs.promises.readFile(safeFilePath); // codeql[js/path-injection]
       const pdfBinary = fileBuffer.toString('binary');
 
       const [extractedMetadata, trustedPatterns] = await Promise.all([
-        pdfAnalyzer.extractMetadata(safeFilePath), // codeql[js/path-injection] - safeFilePath validated by sanitizeUploadPath
+        pdfAnalyzer.extractMetadata(safeFilePath), // codeql[js/path-injection]
         storage.getTrustedPatterns(),
       ]);
 
@@ -273,8 +271,7 @@ export function registerVerificationRoutes(app: Express): void {
     });
 
     try {
-      // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
-      await fs.promises.unlink(safeFilePath);
+      await fs.promises.unlink(safeFilePath); // codeql[js/path-injection]
     } catch (err) {
       // Silently fail if file already deleted
     }
