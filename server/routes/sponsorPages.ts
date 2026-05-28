@@ -307,7 +307,6 @@ export function registerSponsorPageRoutes(app: Express): void {
       revokedLast12Months,
       staleDays,
     };
-
     // Cache for 5 minutes — balances freshness with DB load.
     // Flushed immediately by sponsorMonitorJob after each nightly run.
     await cacheSet(cacheKey, payload, 300);
