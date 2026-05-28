@@ -164,6 +164,7 @@ interface NightlyStats {
   removedCount:         number;
   changesCount:         number;
   revokedLast12Months:  number;
+  staleDays:            number;
 }
 
 function formatRunDate(dateStr: string | null): string {
@@ -340,7 +341,23 @@ function UrgencyBanner() {
     );
   }
 
-  // No changes at all — show a calm confirmation strip
+  // No changes at all
+  // If staleDays >= 3 (no successful run in 3+ calendar days), show an amber
+  // warning banner — the register data may be outdated.
+  if (data.staleDays >= 3) {
+    return (
+      <div className="bg-amber-900 text-amber-100">
+        <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2 text-center">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-300" aria-hidden="true" />
+          <p className="text-xs sm:text-sm font-medium">
+            Register data may be out of date — last checked {formatRunDate(lastRunDate)}. The nightly update may have been delayed.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // No changes and data is fresh — show a calm confirmation strip
   return (
     <div className="bg-slate-800 text-slate-200">
       <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2 text-center">

@@ -848,4 +848,82 @@ export function registerOpsRoutes(app: Express): void {
 
     return res.status(202).json({ message: "Job triggered.", date: today });
   });
+
+  // GET /api/ops/cron-ping/health
+  //
+  // Diagnostic endpoint for the external cron pipeline.
+  // Authenticated via the same CRON_SECRET mechanism as POST /api/ops/cron-ping.
+  // Returns configuration state and recent run history without triggering any job.
+  //
+  // This is safe to call from GitHub Actions workflows or monitoring tools
+  // that already have the CRON_SECRET — no session cookie needed.
+  app.get("/api/ops/cron-ping/health", async (req: any, res) => {
+    const cronSecret = process.env.CRON_SECRET;
+    if (!cronSecret) {
+      return res.status(503).json({
+        cronConfigured: false,
+        cronUrlConfigured: !!process.env.CRON_URL,
+        message: "CRON_SECRET env var not set — external cron is disabled.",
+      });
+    }
+
+    const authHeader = String(req.headers["authorization"] ?? "");
+    const provided = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+
+    if (!provided || provided.length !== cronSecret.length ||
+        !crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(cronSecret))) {
+      log.warn({ ip: req.ip }, "[CronPingHealth] Invalid or missing secret.");
+      return res.status(401).json({ message: "Unauthorized." });
+    }
+
+    const today = new Date().toISOString().split("T")[0];
+
+    const [cronRuns, todayRun] = await Promise.all([
+      db
+        .select({
+          runDate: monitorJobRuns.runDate,
+          status: monitorJobRuns.status,
+          recordsProcessed: monitorJobRuns.recordsProcessed,
+          changesDetected: monitorJobRuns.changesDetected,
+          durationMs: monitorJobRuns.durationMs,
+          errorMessage: monitorJobRuns.errorMessage,
+          startedAt: monitorJobRuns.startedAt,
+          completedAt: monitorJobRuns.completedAt,
+        })
+        .from(monitorJobRuns)
+        .where(eq(monitorJobRuns.source, "cron"))
+        .orderBy(desc(monitorJobRuns.startedAt))
+        .limit(10)
+        .catch(() => []),
+      db
+        .select({
+          runDate: monitorJobRuns.runDate,
+          status: monitorJobRuns.status,
+          recordsProcessed: monitorJobRuns.recordsProcessed,
+          changesDetected: monitorJobRuns.changesDetected,
+          durationMs: monitorJobRuns.durationMs,
+          errorMessage: monitorJobRuns.errorMessage,
+        })
+        .from(monitorJobRuns)
+        .where(eq(monitorJobRuns.runDate, today))
+        .limit(1)
+        .catch(() => []),
+    ]);
+
+    const cronUrl = process.env.CRON_URL ?? "";
+    let cronUrlHostname = "";
+    try {
+      cronUrlHostname = new URL(cronUrl).hostname;
+    } catch {}
+
+    return res.json({
+      cronConfigured: true,
+      cronUrlSet: cronUrl.length > 0,
+      cronUrlHostname: cronUrlHostname || null,
+      today,
+      lastCronRuns: cronRuns,
+      todayRun: todayRun.length > 0 ? todayRun[0] : null,
+      utcTime: new Date().toISOString(),
+    });
+  });
 }

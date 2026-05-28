@@ -293,6 +293,11 @@ export function registerSponsorPageRoutes(app: Express): void {
     // Fall back to the active digest's snapshot date if no run recorded yet.
     const lastRunDate = lastRunRows[0]?.runDate ?? latest?.snapshotDate ?? null;
 
+    const today = new Date().toISOString().split("T")[0];
+    const staleDays = lastRunDate
+      ? Math.round((Date.parse(today) - Date.parse(lastRunDate)) / 86400000)
+      : 0;
+
     const payload = {
       totalActive,
       lastRunDate,
@@ -300,8 +305,8 @@ export function registerSponsorPageRoutes(app: Express): void {
       removedCount:         latest?.removedCount  ?? 0,
       changesCount:         latest?.updatedCount  ?? 0,
       revokedLast12Months,
+      staleDays,
     };
-
     // Cache for 5 minutes — balances freshness with DB load.
     // Flushed immediately by sponsorMonitorJob after each nightly run.
     await cacheSet(cacheKey, payload, 300);

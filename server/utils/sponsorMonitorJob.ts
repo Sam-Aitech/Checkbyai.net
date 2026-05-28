@@ -31,6 +31,7 @@ const LOCK_LEASE_MS = 60 * 60 * 1000; // 60 minutes lease duration
 
 let lastRequestCheckTime = 0;
 const REQUEST_CHECK_INTERVAL_MS = 60 * 60 * 1000;
+const BACKFILL_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 /**
  * Attempts to acquire a table-backed lock.
@@ -956,7 +957,7 @@ function recentWeekdays(lookbackDays: number): string[] {
  * Designed for Autoscale deployments where the in-process cron at 00:30 UTC
  * fires into a dead server. On every cold start we check and self-heal.
  */
-async function checkMissedJobsAndCatchUp(): Promise<void> {
+async function checkMissedJobsAndCatchUp(source: string = "startup-catchup"): Promise<void> {
   try {
     const weekdays = recentWeekdays(7);
     if (weekdays.length === 0) return;
@@ -988,25 +989,26 @@ async function checkMissedJobsAndCatchUp(): Promise<void> {
     });
 
     if (!missed) {
-      log.info("[SponsorMonitorJob] Startup catch-up: all recent weekday jobs are present.");
+      log.info(`[SponsorMonitorJob] ${source === "startup-catchup" ? "Startup catch-up" : "Backfill check"}: all recent weekday jobs are present.`);
       return;
     }
 
+    const isStartup = source === "startup-catchup";
     log.warn(
-      { missedDate: missed, successDates: [...successDates] },
-      `[SponsorMonitorJob] Startup catch-up: no successful run found for ${missed} (and possibly earlier). Triggering now.`,
+      { missedDate: missed, successDates: [...successDates], source },
+      `[SponsorMonitorJob] ${isStartup ? "Startup catch-up" : "Backfill check"}: no successful run found for ${missed} (and possibly earlier). Triggering now.`,
     );
 
     await sendAdminAlert(
-      "ℹ️ CheckByAI: Startup catch-up triggered",
-      `<p>Server booted and detected a missed sponsor monitor job.</p>
+      `ℹ️ CheckByAI: ${isStartup ? "Startup" : "Periodic"} catch-up triggered`,
+      `<p>${isStartup ? "Server booted" : "Periodic 6-hour check"} detected a missed sponsor monitor job.</p>
        <p>Most recent missed weekday: <strong>${missed}</strong></p>
        <p>Successful runs found: ${[...successDates].join(", ") || "none in last 7 days"}</p>
        <p>Running now to fetch the latest register CSV and apply any accumulated changes.</p>`,
     ).catch(() => {});
 
-    runSponsorMonitorJob("startup-catchup", true).catch((err) => {
-      log.error({ err }, "[SponsorMonitorJob] Startup catch-up job failed.");
+    runSponsorMonitorJob(source, true).catch((err) => {
+      log.error({ err }, `[SponsorMonitorJob] ${isStartup ? "Startup catch-up" : "Backfill"} job failed.`);
     });
   } catch (err) {
     log.error({ err }, "[SponsorMonitorJob] checkMissedJobsAndCatchUp failed.");
@@ -1057,6 +1059,16 @@ export function startSponsorMonitorCron(): void {
       log.error({ err }, "[SponsorMonitorJob] Startup catch-up check failed unexpectedly.");
     });
   }, 2 * 60 * 1000); // 2 min — lets DB migrations and search index finish first
+
+  // Periodic backfill: every 6 hours, check for missed weekday jobs.
+  // Unlike the startup catch-up (fires once on cold start), this ensures
+  // gaps are detected even on long-running servers that never restart.
+  setInterval(() => {
+    checkMissedJobsAndCatchUp("backfill").catch((err) => {
+      log.error({ err }, "[SponsorMonitorJob] Periodic backfill check failed.");
+    });
+  }, BACKFILL_INTERVAL_MS);
+  log.info(`[SponsorMonitorJob] Periodic backfill registered (every ${BACKFILL_INTERVAL_MS / 3600000} hours).`);
 }
 
 export async function isJobRunning(): Promise<boolean> {
