@@ -184,11 +184,10 @@ const globalFallbackLimiter = rateLimit({
     legacyHeaders: false,
     store: makeRateLimitStore("rl:global:"),
     message: { message: "Too many requests. Please try again later." },
-    // Skip static asset paths — served by Vite/CDN in production
-    skip: (req: any) =>
-          req.path.startsWith("/assets/") || req.path.startsWith("/static/"),
 });
-app.use(globalFallbackLimiter);
+// Scope to /api only — applying globally would rate-limit Vite dev-mode
+// module requests (/src/, /@vite/, /@fs/, etc.) and break lazy-loaded routes.
+app.use('/api', globalFallbackLimiter);
 // WWW redirect middleware - redirect www to non-www
 app.use((req, res, next) => {
   if (req.headers.host && req.headers.host.startsWith('www.')) {

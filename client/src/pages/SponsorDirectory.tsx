@@ -240,6 +240,7 @@ export default function SponsorDirectory() {
     },
     staleTime: 60_000,
     placeholderData: keepPreviousData,
+    select: (res: any) => (res?.data ?? res) as DirectoryResponse,
   });
 
   const handleStatusChange = (value: string) => { setStatus(value);     resetPage(); };
