@@ -26,7 +26,7 @@ sentence-transformers>=5.5.1    # optional: semantic embeddings (cos_verifier.py
                               # falls back to TF-IDF when not installed
 
 # ── Database ──────────────────────────────────────────────────────────────────
-duckdb>=1.3.1                 # in-process analytics DB (sponsor register)
+duckdb>=1.5.3                 # in-process analytics DB (sponsor register)
 psycopg2-binary>=2.9.12        # direct PostgreSQL writes in sponsor_etl_cron.py
 # sqlite3                     # stdlib — was used by sponsor_etl.py (now retired)
 
