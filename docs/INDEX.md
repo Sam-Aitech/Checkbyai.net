@@ -8,6 +8,9 @@
 | Document | Audience | Purpose |
 |---|---|---|
 | [PRD.md](PRD.md) | Product / Engineering | What the product does, user personas, feature requirements, success metrics |
+| [TRD.md](TRD.md) | Engineering / Product | Technical requirement contract: system boundaries, requirement mapping, NFRs, integrations, acceptance traceability |
+| [APP_FLOW.md](APP_FLOW.md) | Product / Engineering / Ops | End-to-end user, system, and operational flows including happy paths and exception paths |
+| [UI_UX_BRIEF.md](UI_UX_BRIEF.md) | Product / Design / Engineering | UX principles, IA, screen priorities, interaction/error/accessibility patterns, responsive expectations |
 | [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md) | Engineering | Full architecture, component deep-dives, data flows, external service integrations |
 | [DATA_MODEL.md](DATA_MODEL.md) | Engineering / DB | All database tables, column definitions, relationships, encryption schema |
 | [API_REFERENCE.md](API_REFERENCE.md) | Engineering / Frontend / Integration | All API endpoints, request/response shapes, auth requirements |
