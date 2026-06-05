@@ -46,6 +46,25 @@ const log = logger.child({ module: "SponsorStateMachine" });
 const RENAME_SIMILARITY_THRESHOLD = 0.85;
 const BATCH_SIZE = 500; // for bulk DB operations
 
+/**
+ * Length-adjusted similarity threshold for rename detection.
+ * Short names (e.g. "ABC Ltd" vs "XYZ Ltd") match at high similarity by chance,
+ * so we require a higher threshold for shorter names. Long names get the base
+ * 0.85 threshold because small differences in word order are meaningful.
+ *
+ * Scale:
+ *   length 5  → 0.95
+ *   length 10 → 0.90
+ *   length 20+ → 0.85 (base)
+ */
+function nameAdjustedThreshold(nameA: string, nameB: string): number {
+  const minLen = Math.min(nameA.length, nameB.length);
+  if (minLen >= 20) return RENAME_SIMILARITY_THRESHOLD;
+  // Linear ramp: minLen=5 → +0.10, minLen=20 → 0.00
+  const bonus = ((20 - minLen) / 15) * 0.10;
+  return RENAME_SIMILARITY_THRESHOLD + bonus;
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface CanonicalRow {
@@ -422,8 +441,20 @@ export async function applyStateMachine(
   const toRecoverFlicker: string[] = []; // fingerprints: GRACE_PERIOD → ACTIVE
   const reactivationCandidates: string[] = []; // company names to check for pending watches
   
-  // Detect first-run/seed by the sheer volume of additions
-  const isFirstRun = reconciliation.additions.length > 100000;
+  // Detect first-run/seed: suppress NEW_LICENCE events only when canonical
+  // is truly empty (< 1 000 rows). This prevents gap-recovery runs (canonical
+  // already populated) from silently dropping real changes at the 100K threshold.
+  const canonicalCountResult = await db.execute(sql`
+    SELECT COUNT(*)::int AS cnt FROM sponsor_canonical WHERE status != 'REMOVED_REVOKED'
+  `);
+  const activeCanonicalRows = (canonicalCountResult.rows[0] as { cnt: number } | undefined)?.cnt ?? 0;
+  const isFirstRun = reconciliation.additions.length > 100000 && activeCanonicalRows < 1000;
+  if (reconciliation.additions.length > 100000 && !isFirstRun) {
+    log.warn(
+      { additions: reconciliation.additions.length, activeCanonicalRows },
+      "[StateMachine] Additions > 100K but canonical is already populated — NOT treating as first run. Real NEW_LICENCE events will be emitted.",
+    );
+  }
 
   for (const row of reconciliation.additions) {
     const fp      = row.fingerprint;
@@ -714,12 +745,12 @@ async function detectRenames(
     for (const candidate of candidates) {
       if (renamedNewFPs.has(candidate.fp)) continue; // already claimed by another rename
 
-      const sim = stringSimilarity.compareTwoStrings(
-        normalizeName(existing.currentName),
-        normalizeName(candidate.name),
-      );
+      const normalizedExisting = normalizeName(existing.currentName);
+      const normalizedCandidate = normalizeName(candidate.name);
+      const sim = stringSimilarity.compareTwoStrings(normalizedExisting, normalizedCandidate);
+      const threshold = nameAdjustedThreshold(normalizedExisting, normalizedCandidate);
 
-      if (sim >= RENAME_SIMILARITY_THRESHOLD) {
+      if (sim >= threshold) {
         // This is a rename — update canonical record with new fingerprint + name
         const newHistorical = [...(existing.historicalNames ?? [])];
         if (existing.currentName && !newHistorical.includes(existing.currentName)) {

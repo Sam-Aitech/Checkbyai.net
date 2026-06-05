@@ -508,6 +508,7 @@ export const monitorJobRuns = pgTable("monitor_job_runs", {
   notificationsQueued: integer("notifications_queued").default(0),
   durationMs: integer("duration_ms"),
   errorMessage: text("error_message"),
+  isGapDay: boolean("is_gap_day").default(false),
   startedAt: timestamp("started_at").defaultNow(),
   completedAt: timestamp("completed_at"),
 });

@@ -4,7 +4,7 @@ import { dailyDigest, monitorJobRuns, diffResults, sponsorCanonical, csvArchive 
 import { eq, sql, and, inArray, gte } from "drizzle-orm";
 import { discoverCsvUrl, generateFingerprint, type SponsorChange } from "./sponsorListFetcher";
 import { ensureTodaysArchive, getArchiveForDate, parseCsvFile } from "./csvArchiver";
-import { runCsvDiff, type CsvDiffResult } from "./binaryRunner";
+import { runCsvDiff, getCsvdiffPath, type CsvDiffResult } from "./binaryRunner";
 import { applyStateMachine } from "./sponsorStateMachine";
 import { rebuildSponsorIndex } from "./sponsorSearch";
 import { cacheFlushPattern } from "./redisClient";
@@ -61,11 +61,34 @@ async function tryAcquireJobLock(): Promise<boolean> {
             { runtimeMs, runId: activeRun[0].id },
             `[SponsorMonitorJob] LOCK CONTENTION: Job has been in 'running' state for ${Math.round(runtimeMs/60000)} mins.`
           );
-          await sendAdminAlert(
-            "ALERT: Sponsor Monitor Ghost Lock Detected",
-            `<p>Job for today has been 'running' for ${Math.round(runtimeMs/60000)} mins without completion.</p>
-             <p>The lock is likely held by a zombie session. Check Neon dashboard and terminate stuck backend if necessary.</p>`
+
+          // Auto-cleanup: force-delete stale table lock so next attempt succeeds.
+          await db.execute(sql`DELETE FROM job_locks WHERE job_name = 'sponsorMonitorJob'`);
+          log.warn(
+            { runId: activeRun[0].id, runtimeMs },
+            "[SponsorMonitorJob] Force-released stale job_locks entry after ghost detection.",
           );
+
+          // Mark the ghost run as failed so idempotency check doesn't interfere.
+          await db
+            .update(monitorJobRuns)
+            .set({
+              status: "failed",
+              errorMessage: `Auto-terminated ghost run after ${Math.round(runtimeMs / 60000)} min`,
+            })
+            .where(eq(monitorJobRuns.id, activeRun[0].id))
+            .catch((err: unknown) =>
+              log.warn({ err }, "[SponsorMonitorJob] Failed to mark ghost run as failed")
+            );
+
+          await sendAdminAlert(
+            "ALERT: Sponsor Monitor Ghost Lock Auto-Terminated",
+            `<p>Job for today was 'running' for ${Math.round(runtimeMs/60000)} mins without completion.</p>
+             <p>Force-released stale <code>job_locks</code> entry and marked run as failed. Next retry will proceed normally.</p>`
+          );
+
+          // Retry lock acquisition now that the stale entry is cleared.
+          return await tryAcquireLock("sponsorMonitorJob", LOCK_LEASE_MS, lockHolderId ?? crypto.randomUUID());
         }
       }
     }
@@ -348,7 +371,7 @@ async function buildGapDayDiff(rawFilePath: string): Promise<CsvDiffResult> {
         fingerprint:         fp,
         "Organisation Name": canonical.currentName,
         "Town/City":         canonical.townCity ?? "",
-        "County":            "",                // not stored in canonical
+        "County":            canonical.county ?? "",
         "Type & Rating":     canonical.typeRating ?? "",
         "Route":             canonical.route ?? "",
       });
@@ -410,6 +433,7 @@ export async function runSponsorMonitorJob(
   notificationsSkipped: number;
   notificationsFailed: number;
   notificationsQueued: number;
+  isGapDay: boolean;
   error?: string;
 }> {
    const result = {
@@ -419,6 +443,7 @@ export async function runSponsorMonitorJob(
       notificationsSkipped: 0,
       notificationsFailed: 0,
       notificationsQueued: 0,
+      isGapDay: false,
       changes: {} as Record<string, number>,
    };
 
@@ -474,6 +499,7 @@ export async function runSponsorMonitorJob(
           changesDetected: 0,
           durationMs: failDuration,
           errorMessage: errorMsg,
+          isGapDay: result.isGapDay,
           completedAt: failTime,
         }).onConflictDoUpdate({
           target: monitorJobRuns.runDate,
@@ -481,6 +507,7 @@ export async function runSponsorMonitorJob(
             status: "failed",
             errorMessage: errorMsg,
             durationMs: failDuration,
+            isGapDay: result.isGapDay,
             completedAt: failTime,
           },
         });
@@ -523,22 +550,84 @@ export async function runSponsorMonitorJob(
 
     log.info(`[SponsorMonitorJob] === Daily sponsor monitor check starting (triggered by: ${source}) ===`);
 
+    // ── Pre-flight binary check ────────────────────────────────────────────────
+    // csvdiff is load-bearing for the diff phase. Throw immediately if missing
+    // to save 2+ minutes of CSV download + validation. Operators see this in
+    // the alert and can run `npm run setup:binaries`.
+    const csvdiffPath = getCsvdiffPath();
+    if (!csvdiffPath) {
+      const msg = "csvdiff binary is missing — cannot run diff phase. Run: npm run setup:binaries";
+      log.error(`[SponsorMonitorJob] ${msg}`);
+      await sendAdminAlert("ALERT: Sponsor Monitor Pre-Flight Failed", `<p>${msg}</p>`);
+      throw new Error(msg);
+    }
+
     // ── ETL integrity check (migration 0014) ───────────────────────────────────
     // Detect archives that were downloaded in a prior run but whose state machine
     // never completed (PENDING_SYNC). This happens when the server crashed between
     // the CSV download and the state machine write. Operators should re-trigger
     // the job manually to re-process these dates.
     const staleArchives = await db
-      .select({ snapshotDate: csvArchive.snapshotDate })
+      .select({ snapshotDate: csvArchive.snapshotDate, filePath: csvArchive.filePath })
       .from(csvArchive)
-      .where(eq(csvArchive.syncStatus, "PENDING_SYNC"));
+      .where(eq(csvArchive.syncStatus, "PENDING_SYNC"))
+      .orderBy(csvArchive.snapshotDate);
     if (staleArchives.length > 0) {
       const staleDates = staleArchives.map((r) => r.snapshotDate).join(", ");
       log.warn(
         { staleDates },
-        `[SponsorMonitorJob] INTEGRITY WARNING: ${staleArchives.length} archive(s) stuck at PENDING_SYNC — state machine may not have run for: ${staleDates}. ` +
-        `Trigger a manual re-run via POST /api/admin/sponsor-monitor/run to reprocess.`,
+        `[SponsorMonitorJob] Found ${staleArchives.length} PENDING_SYNC archive(s): ${staleDates}. Auto-reprocessing…`,
       );
+
+      for (const stale of staleArchives) {
+        // For each PENDING_SYNC date, rerun the state machine so changes
+        // from that date are persisted and the archive advances to SYNCED.
+        try {
+          const archive = await getArchiveForDate(stale.snapshotDate);
+          if (!archive) {
+            log.warn({ date: stale.snapshotDate }, "PENDING_SYNC archive file missing — skipping auto-reprocess.");
+            continue;
+          }
+
+          // Find the previous business day for csvdiff comparison.
+          const prevDate = findPreviousBusinessDay(stale.snapshotDate);
+          const prevArchive = await getArchiveForDate(prevDate);
+          let diff: CsvDiffResult;
+
+          if (prevArchive) {
+            diff = await runCsvDiff(prevArchive.fingerprintedFilePath, archive.fingerprintedFilePath, ["fingerprint"]);
+          } else {
+            // No previous archive — build gap-day diff from canonical DB.
+            diff = await buildGapDayDiff(archive.filePath);
+          }
+
+          // Run the state machine for this date.
+          log.info({ date: stale.snapshotDate }, `[SponsorMonitorJob] Auto-reprocessing PENDING_SYNC archive…`);
+          await applyStateMachine(diff, stale.snapshotDate, archive.fingerprintedFilePath);
+
+          // Mark the archive as SYNCED.
+          await db
+            .update(csvArchive)
+            .set({ syncStatus: "SYNCED" })
+            .where(eq(csvArchive.snapshotDate, stale.snapshotDate))
+            .catch((err: unknown) =>
+              log.warn({ err, date: stale.snapshotDate }, "[SponsorMonitorJob] Failed to mark reprocessed archive SYNCED")
+            );
+
+          log.info({ date: stale.snapshotDate, additions: diff.Additions.length, deletions: diff.Deletions.length, modifications: diff.Modifications.length },
+            `[SponsorMonitorJob] Auto-reprocess complete for ${stale.snapshotDate}.`);
+        } catch (err: unknown) {
+          log.error({ err, date: stale.snapshotDate }, "[SponsorMonitorJob] Auto-reprocess failed for PENDING_SYNC archive — continuing to today's run.");
+          // Mark as FAILED so operator can investigate via diagnostics.
+          await db
+            .update(csvArchive)
+            .set({ syncStatus: "FAILED" })
+            .where(eq(csvArchive.snapshotDate, stale.snapshotDate))
+            .catch((e: unknown) =>
+              log.warn({ err: e, date: stale.snapshotDate }, "[SponsorMonitorJob] Failed to mark failed reprocess archive FAILED")
+            );
+        }
+      }
     }
 
     // ── Idempotency check ──────────────────────────────────────────────────────
@@ -564,6 +653,30 @@ export async function runSponsorMonitorJob(
     const todayArchive = await ensureTodaysArchive(today, csvUrl);
     result.recordsProcessed = todayArchive.recordCount;
 
+    // ── HTML-fallback guard (defense in depth) ────────────────────────────────
+    // The archiver has a 100K record-count guard, but a partial record count
+    // (e.g. 60K) could pass the archiver if the threshold is misconfigured, or
+    // HTML-fallback data from a scraper failure could land in the archive via
+    // cache. Abort if we have fewer than 50K records — the register normally
+    // has ~140K sponsors.
+    if (todayArchive.recordCount < 50_000) {
+      const msg = `Refusing to run diff on suspiciously small archive: ${todayArchive.recordCount.toLocaleString()} records. ` +
+                  `Likely HTML-fallback or truncated CSV.`;
+      log.error(`[SponsorMonitorJob] ${msg}`);
+      await sendAdminAlert(
+        "ALERT: Sponsor Monitor Aborted — HTML Fallback Suspected",
+        `<p>${msg}</p>
+         <p>The nightly monitor has been aborted to prevent mass REMOVED_REVOKED for legitimate sponsors.</p>`,
+      );
+      // Mark archive as FAILED so the integrity check surfaces it.
+      await db
+        .update(csvArchive)
+        .set({ syncStatus: "FAILED" })
+        .where(eq(csvArchive.snapshotDate, today))
+        .catch(() => {});
+      throw new Error(msg);
+    }
+
     // ── Phase 2: Load yesterday's archive for csvdiff ─────────────────────────
     const yesterdayArchive = await getArchiveForDate(yesterday);
     let diff: CsvDiffResult;
@@ -582,6 +695,7 @@ export async function runSponsorMonitorJob(
           `running gap-day diff against DB. (Container restart or ephemeral disk issue.)`,
         );
         diff = await buildGapDayDiff(todayArchive.filePath);
+        result.isGapDay = true;
       } else {
         // True first run — canonical is empty. Seed it with all today's records.
         log.info(
@@ -610,6 +724,33 @@ export async function runSponsorMonitorJob(
 
     // Save diff metadata to diff_results table (non-fatal).
     await saveDiffResult(today, diff);
+
+    // ── Gap-day diff sanity check (Phase 2 P3) ─────────────────────────────
+    // Gap-day diffs bypass csvdiff and run in JS, which can miss edge cases
+    // (column-level changes, special-character mismatches). If the result
+    // shows zero changes despite both sources having 124K+ records, that is
+    // suspicious — alert the operator.
+    if (result.isGapDay) {
+      const totalChanges = diff.Additions.length + diff.Deletions.length + diff.Modifications.length;
+      const csvRecordCount = todayArchive.recordCount;
+      const canonicalCountResult = await db.execute(sql`
+        SELECT COUNT(*)::int AS cnt FROM sponsor_canonical
+      `);
+      const canonicalCount = (canonicalCountResult.rows[0] as { cnt: number } | undefined)?.cnt ?? 0;
+      if (csvRecordCount >= 124_000 && canonicalCount >= 124_000 && totalChanges === 0) {
+        const msg = `Gap-day diff reported 0 changes despite CSV (${csvRecordCount.toLocaleString()}) and canonical (${canonicalCount.toLocaleString()}) both having 124K+ records. ` +
+                    `This is suspicious — gap-day JS diff may have missed edge cases that csvdiff would have caught.`;
+        log.error(`[SponsorMonitorJob] ${msg}`);
+        await sendAdminAlert(
+          "ALERT: Sponsor Monitor Gap-Day Zero-Diff Suspicious",
+          `<p>${msg}</p>
+           <p>The Home Office register normally has daily additions/removals. A zero-diff on a fully populated gap-day is statistically improbable.</p>
+           <p>Action: Manually re-run the job when the previous archive becomes available, and verify the CSV is the current register.</p>`,
+        ).catch((err: unknown) =>
+          log.warn({ err }, "[SponsorMonitorJob] Failed to send gap-day zero-diff alert")
+        );
+      }
+    }
 
     // ── Phase 3: State machine ─────────────────────────────────────────────────
     // applyStateMachine handles all DB writes (canonical + sponsorChanges) internally.
@@ -642,10 +783,23 @@ export async function runSponsorMonitorJob(
     await rebuildSponsorIndex();
 
     // Flush stale Redis cache so the next request picks up the fresh index data.
-    // Non-fatal: if Redis is down, cacheFlushPattern returns 0 silently.
-    const flushed = await cacheFlushPattern("sponsors:*");
+    // Retry up to 3 times with 500ms backoff. If all fail, log at error level
+    // and record the last-flush timestamp so diagnostics can surface the gap.
+    let flushed = 0;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      flushed = await cacheFlushPattern("sponsors:*");
+      if (flushed > 0) break;
+      if (attempt < 3) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
     if (flushed > 0) {
       log.info(`[SponsorMonitorJob] Flushed ${flushed} Redis cache keys after nightly rebuild.`);
+    } else {
+      log.error(
+        `[SponsorMonitorJob] Redis cache flush failed after 3 attempts — stale 'sponsors:*' keys may persist. ` +
+        `Next request will see outdated data until the next successful flush.`,
+      );
     }
 
     const changeCounts: Record<string, number> = {};
@@ -699,9 +853,37 @@ export async function runSponsorMonitorJob(
             }
           }
        }
-     } else {
+      } else {
        log.info("[SponsorMonitorJob] No alertable changes today.");
-     }
+      }
+
+    // ── Notification failure alert (P2.2) ───────────────────────────────────
+    // If more than 10% of notifications failed, surface to admin. This
+    // primarily catches inline-fallback failures (Redis down → queue offline).
+    // BullMQ workers log to notif_log asynchronously; those are surfaced via
+    // diagnostics' checkQueueHealth() instead.
+    const notifTotal = result.notificationsQueued + result.notificationsSent + result.notificationsFailed;
+    if (notifTotal > 0) {
+      const failureRate = result.notificationsFailed / notifTotal;
+      if (failureRate > 0.10) {
+        const pctStr = (failureRate * 100).toFixed(1);
+        const msg = `Notification failure rate is ${pctStr}% (${result.notificationsFailed}/${notifTotal}) — exceeds 10% threshold.`;
+        log.error(`[SponsorMonitorJob] ${msg}`);
+        await sendAdminAlert(
+          "ALERT: Sponsor Monitor Notification Failure Rate High",
+          `<p>${msg}</p>
+           <ul>
+             <li><strong>Queued:</strong> ${result.notificationsQueued}</li>
+             <li><strong>Sent:</strong> ${result.notificationsSent}</li>
+             <li><strong>Failed:</strong> ${result.notificationsFailed}</li>
+             <li><strong>Skipped:</strong> ${result.notificationsSkipped}</li>
+           </ul>
+           <p>Action: Check Resend dashboard for bounce/unsubscribe spikes, and verify Redis health via the diagnostics endpoint.</p>`,
+        ).catch((err: unknown) =>
+          log.warn({ err }, "[SponsorMonitorJob] Failed to send notification failure alert")
+        );
+      }
+    }
 
     // ── Daily digest ────────────────────────────────────────────────────────────
     try {
@@ -785,6 +967,7 @@ export async function runSponsorMonitorJob(
          notificationsSkipped: result.notificationsSkipped,
          notificationsFailed: result.notificationsFailed,
          notificationsQueued: result.notificationsQueued,
+         isGapDay: result.isGapDay,
          durationMs: finalDuration,
          completedAt: completionTime,
        }).onConflictDoUpdate({
@@ -800,6 +983,7 @@ export async function runSponsorMonitorJob(
           notificationsSkipped: result.notificationsSkipped,
           notificationsFailed: result.notificationsFailed,
           notificationsQueued: result.notificationsQueued,
+          isGapDay: result.isGapDay,
           durationMs: finalDuration,
           completedAt: completionTime,
         },
@@ -914,6 +1098,16 @@ async function seedInitialDigest(): Promise<void> {
 function isWeekday(): boolean {
   const day = new Date().getUTCDay();
   return day >= 1 && day <= 5;
+}
+
+/** Returns the previous business day (Mon-Fri) for a given YYYY-MM-DD date. */
+function findPreviousBusinessDay(dateStr: string): string {
+  const d = new Date(dateStr + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() - 1);
+  while (d.getUTCDay() === 0 || d.getUTCDay() === 6) {
+    d.setUTCDate(d.getUTCDate() - 1);
+  }
+  return d.toISOString().split("T")[0];
 }
 
 export { isWeekday };
