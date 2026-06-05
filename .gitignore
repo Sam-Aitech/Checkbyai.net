@@ -7,3 +7,5 @@ vite.config.ts.*
 .claude/
 # ETL SQLite snapshots — environment-local, not for source control
 backend/etl_sponsors.db
+# Platform-specific binaries — only unix variants are tracked
+*.exe

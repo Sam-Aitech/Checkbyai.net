@@ -31,6 +31,11 @@ import { getAppUrl } from "../utils/appUrl";
 import { checkBinaryHealth } from "../utils/binaryRunner";
 import { sanitizeUploadPath, assertSafeUploadFilename } from "../utils/uploadGuard";
 import { isJobRunning, getLastRunInfo, runSponsorMonitorJob } from "../utils/sponsorMonitorJob";
+import {
+  buildDiagnosticsReport,
+  forceReleaseSponsorMonitorLock,
+  type ForceUnlockReport,
+} from "../utils/sponsorMonitorDiagnostics";
 import { rebuildSponsorIndex } from "../utils/sponsorSearch";
 import { isQueueAvailable, getSponsorRefreshQueue } from "../services/jobQueue";
 import { getWatchLimit } from "../utils/tierConfig";
@@ -483,6 +488,37 @@ Format your response in clear, professional markdown.`;
     } catch (error: unknown) {
       logger.error({ err: error }, "Error releasing advisory lock:");
       res.status(500).json({ message: "Failed to release lock: " + (error instanceof Error ? error.message : "") });
+    }
+  });
+
+  // ── Phase 1 Diagnostics ─────────────────────────────────────────────────────
+  app.get('/api/admin/sponsor-monitor/diagnostics', requireRole("admin"), async (_req, res) => {
+    try {
+      const report = await buildDiagnosticsReport();
+      const httpStatus = report.overall === "fail" ? 503 : 200;
+      res.status(httpStatus).json(report);
+    } catch (error: unknown) {
+      console.error("Error building sponsor monitor diagnostics:", error);
+      res.status(500).json({
+        message: "Failed to build diagnostics: " + (error instanceof Error ? error.message : String(error)),
+      });
+    }
+  });
+
+  // ── Phase 1 Force-Unlock ────────────────────────────────────────────────────
+  app.post('/api/admin/sponsor-monitor/force-unlock', requireRole("admin"), async (_req, res) => {
+    try {
+      const report: ForceUnlockReport = await forceReleaseSponsorMonitorLock();
+      const httpStatus = report.zombieTerminated ? 200 : 409;
+      console.warn(
+        `[SponsorMonitor] force-unlock: ${report.reason} — ${report.message}`,
+      );
+      res.status(httpStatus).json(report);
+    } catch (error: unknown) {
+      console.error("Error force-releasing advisory lock:", error);
+      res.status(500).json({
+        message: "Failed to force-release lock: " + (error instanceof Error ? error.message : String(error)),
+      });
     }
   });
 

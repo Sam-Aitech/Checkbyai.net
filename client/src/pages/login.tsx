@@ -19,7 +19,7 @@ const fadeUp = {
   initial: { opacity: 0, y: 16 },
   animate: { opacity: 1, y: 0 },
   exit: { opacity: 0, y: -16 },
-  transition: { type: "spring", stiffness: 100, damping: 15 },
+  transition: { type: "spring" as const, stiffness: 100, damping: 15 },
 };
 
 // ─── Premium 6-digit OTP input component ─────────────────────────────────────

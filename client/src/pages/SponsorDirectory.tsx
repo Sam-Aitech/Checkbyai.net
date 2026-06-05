@@ -122,7 +122,7 @@ function rowClass(status: string) {
 
 function StatCard({
   label, value, color, icon: Icon,
-}: { label: string; value: number | undefined; color: string; icon: React.ElementType }) {
+}: { label: string; value: number | undefined; color: string; icon: React.ComponentType<{ className?: string }> }) {
   return (
     <div className={`rounded-xl border bg-white dark:bg-slate-900 p-4 flex items-center gap-3 shadow-sm ${color}`}>
       <div className="rounded-lg p-2 bg-current/10">

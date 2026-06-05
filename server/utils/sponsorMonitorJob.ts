@@ -28,6 +28,7 @@ const log = logger.child({ module: "SponsorMonitorJob" });
 // Prevents duplicate execution across multiple server instances (horizontal scaling).
 let lockHolderId: string | null = null;
 const LOCK_LEASE_MS = 60 * 60 * 1000; // 60 minutes lease duration
+export const SPONSOR_MONITOR_LOCK_KEY = 7483920; // Unique magic int for advisory lock
 
 let lastRequestCheckTime = 0;
 const REQUEST_CHECK_INTERVAL_MS = 60 * 60 * 1000;
@@ -914,6 +915,8 @@ function isWeekday(): boolean {
   const day = new Date().getUTCDay();
   return day >= 1 && day <= 5;
 }
+
+export { isWeekday };
 
 async function hasTodayJobSucceeded(): Promise<boolean | null> {
   try {
