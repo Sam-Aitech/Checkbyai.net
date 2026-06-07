@@ -38,7 +38,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install --prefer-offline
 
       - name: Run Vitest with coverage
         run: npm run test:run -- --coverage
