@@ -24,7 +24,7 @@ jobs:
         python-version: '3.11'
 
     - name: Install dependencies
-      run: npm ci
+      run: npm install --prefer-offline
 
     - name: Build application
       run: npm run build
