@@ -46,8 +46,6 @@ function sanitizeForPrompt(text: string): string {
 
 
 
-const SPONSOR_JOB_LOCK_KEY = 7483920; // Same key as sponsorMonitorJob — init and nightly are mutually exclusive
-
 // ── Sponsor Monitor Initialize Job State ─────────────────────────────────────
 
 type InitStage =
@@ -2293,15 +2291,17 @@ Format your response in clear, professional markdown.`;
 
       const base = (existing.notifPrefs as NotifPrefs | null) ?? DEFAULT_NOTIF_PREFS;
       const merged: NotifPrefs = { ...base };
-      for (const [k, v] of Object.entries(patch)) {
-        if (!Object.prototype.hasOwnProperty.call(DEFAULT_NOTIF_PREFS, k)) continue;
-        const key = k as keyof NotifPrefs;
-        if (merged[key]) {
-          merged[key] = {
-            enabled: v.enabled ?? merged[key].enabled,
-            channels: { ...merged[key].channels, ...v.channels },
-          };
-        }
+      // Iterate over the trusted DEFAULT_NOTIF_PREFS keys (not user-supplied keys) so the
+      // write-target property name can never depend on user input (remote property injection).
+      for (const key of Object.keys(DEFAULT_NOTIF_PREFS) as (keyof NotifPrefs)[]) {
+        const v = (patch as Record<string, { enabled?: boolean; channels?: Record<string, unknown> }>)[key];
+        if (!v || !merged[key]) continue;
+        merged[key] = {
+          enabled: typeof v.enabled === 'boolean' ? v.enabled : merged[key].enabled,
+          channels: (typeof v.channels === 'object' && v.channels !== null)
+            ? { ...merged[key].channels, ...v.channels }
+            : merged[key].channels,
+        };
       }
 
       await db
