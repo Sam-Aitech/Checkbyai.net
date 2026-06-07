@@ -29,7 +29,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install --prefer-offline
 
       - name: ESLint
         run: npm run lint
@@ -52,7 +52,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install --prefer-offline
 
       - name: Run audit-ci
         id: audit
@@ -116,7 +116,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install --prefer-offline
 
       - name: Run tests
         run: npm run test:run
@@ -151,7 +151,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install --prefer-offline
 
       - name: Build application
         run: npm run build
