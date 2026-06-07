@@ -9,7 +9,7 @@ starlette>=1.2.1
 python-multipart>=0.0.29     # multipart/form-data (file uploads)
 
 # ── HTTP / scraping ────────────────────────────────────────────────────────────
-requests>=2.33.0              # streaming CSV download in sponsor_etl_cron.py
+requests>=2.34.2              # streaming CSV download in sponsor_etl_cron.py
 lxml>=6.1.1                   # XML/HTML parsing (fixes GHSA-vfmq-68hx-4jfw)
 scrapling>=0.4.8                # Gov.uk sponsor-register URL discovery
 curl_cffi>=0.15.0             # scrapling static-fetcher transport
