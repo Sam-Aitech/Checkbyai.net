@@ -25,8 +25,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: '22'
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
@@ -48,8 +48,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: '22'
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
@@ -73,19 +73,21 @@ jobs:
             const fs = require('fs');
             const cveFile = 'failing-cves.txt';
             const cves = fs.existsSync(cveFile)
-              ? fs.readFileSync(cveFile, 'utf8').split('\n').map(s => s.trim()).filter(Boolean)
+              ? fs.readFileSync(cveFile, 'utf8').split('
+').map(s => s.trim()).filter(Boolean)
               : [];
             const lines = cves.length > 0
               ? cves.map(cve => `- ${cve}`)
               : ['- Unable to parse CVE/GHSA IDs from audit output. Check CI logs for details.'];
             const body = [
-              '## 🚫 Dependency audit failed',
+              '## Dependency audit failed',
               '',
               'audit-ci detected high/critical vulnerabilities.',
               '',
               '### Failing CVEs / advisories',
               ...lines
-            ].join('\n');
+            ].join('
+');
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -110,8 +112,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: '22'
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
@@ -129,7 +131,7 @@ jobs:
           TEST_BASE_URL: ${{ vars.TEST_BASE_URL || secrets.TEST_BASE_URL }}
         run: |
           if [ -z "$TEST_BASE_URL" ]; then
-            echo "::warning::TEST_BASE_URL not configured — skipping Playwright E2E. Set TEST_BASE_URL repo variable to enable."
+            echo "::warning::TEST_BASE_URL not configured - skipping Playwright E2E. Set TEST_BASE_URL repo variable to enable."
             exit 0
           fi
           npm run test:e2e
@@ -145,8 +147,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: '22'
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
