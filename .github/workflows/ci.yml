@@ -73,8 +73,7 @@ jobs:
             const fs = require('fs');
             const cveFile = 'failing-cves.txt';
             const cves = fs.existsSync(cveFile)
-              ? fs.readFileSync(cveFile, 'utf8').split('
-').map(s => s.trim()).filter(Boolean)
+              ? fs.readFileSync(cveFile, 'utf8').split('\n').map(s => s.trim()).filter(Boolean)
               : [];
             const lines = cves.length > 0
               ? cves.map(cve => `- ${cve}`)
@@ -86,8 +85,7 @@ jobs:
               '',
               '### Failing CVEs / advisories',
               ...lines
-            ].join('
-');
+            ].join('\n');
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
