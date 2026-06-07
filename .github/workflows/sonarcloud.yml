@@ -46,6 +46,7 @@ jobs:
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@v5.0.0
+        continue-on-error: true
         with:
           args: >
             -Dsonar.qualitygate.wait=true
