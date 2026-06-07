@@ -2294,13 +2294,19 @@ Format your response in clear, professional markdown.`;
       // Iterate over the trusted DEFAULT_NOTIF_PREFS keys (not user-supplied keys) so the
       // write-target property name can never depend on user input (remote property injection).
       for (const key of Object.keys(DEFAULT_NOTIF_PREFS) as (keyof NotifPrefs)[]) {
-        const v = (patch as Record<string, { enabled?: boolean; channels?: Record<string, unknown> }>)[key];
+        const v = (patch as Record<string, { enabled?: unknown; channels?: Record<string, unknown> }>)[key];
         if (!v || !merged[key]) continue;
+        const nextChannels = { ...merged[key].channels };
+        if (typeof v.channels === 'object' && v.channels !== null) {
+          // Only copy the known channel keys, coercing to boolean — never arbitrary keys/values.
+          for (const ch of Object.keys(merged[key].channels) as (keyof typeof nextChannels)[]) {
+            const cv = (v.channels as Record<string, unknown>)[ch];
+            if (typeof cv === 'boolean') nextChannels[ch] = cv;
+          }
+        }
         merged[key] = {
           enabled: typeof v.enabled === 'boolean' ? v.enabled : merged[key].enabled,
-          channels: (typeof v.channels === 'object' && v.channels !== null)
-            ? { ...merged[key].channels, ...v.channels }
-            : merged[key].channels,
+          channels: nextChannels,
         };
       }
 
