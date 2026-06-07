@@ -45,9 +45,6 @@ export function getSession() {
   });
 }
 
-// Safe email validation regex — non-backtracking, disjoint character classes to prevent ReDoS.
-const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-
 // Generate 6-digit OTP code
 export function generateOTP(): string {
   return crypto.randomInt(100000, 999999).toString();
