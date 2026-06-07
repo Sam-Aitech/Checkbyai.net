@@ -4,10 +4,6 @@ import { logger } from '../utils/logger';
 import { XMLParser } from 'fast-xml-parser';
 import { sanitizeUploadPath, UPLOADS_DIR } from '../utils/uploadGuard';
 
-function sanitizeLog(value: string): string {
-  return value.replace(/[\r\n]/g, ' ');
-}
-
 /**
  * Yields control back to the Node.js event loop, preventing CPU-intensive
  * synchronous operations from starving incoming HTTP requests / webhooks.
