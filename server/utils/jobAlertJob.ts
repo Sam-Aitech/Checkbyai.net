@@ -15,7 +15,6 @@ import { eq, and, inArray, gte } from "drizzle-orm";
 import { resolveTier } from "./tierConfig";
 import { getOrFetchEnrichment } from "./companyEnricher";
 import { scrapeJobsForCompany, type ScrapedJob } from "./jobScraper";
-import { sql } from "drizzle-orm";
 import { startJobRun, finishJobRun, type TriggerSource } from "./jobTelemetry";
 import crypto from "crypto";
 import { tryAcquireLock, releaseLock } from "./lockManager";
