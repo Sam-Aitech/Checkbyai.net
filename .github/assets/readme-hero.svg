@@ -1,0 +1,58 @@
+<svg width="1200" height="600" viewBox="0 0 1200 600" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="1200" height="600" fill="#0A0A0D" />
+  
+  <!-- Subtle Grid Texture -->
+  <defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="white" stroke-width="0.5" stroke-opacity="0.03" />
+    </pattern>
+    <radialGradient id="glow" cx="50%" cy="40%" r="50%">
+      <stop offset="0%" stop-color="#7C3AED" stop-opacity="0.15" />
+      <stop offset="100%" stop-color="#4F46E5" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="shieldStroke" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7C3AED" />
+      <stop offset="100%" stop-color="#4F46E5" />
+    </linearGradient>
+  </defs>
+  
+  <rect width="1200" height="600" fill="url(#grid)" />
+  <rect width="1200" height="600" fill="url(#glow)" />
+
+  <!-- Floating Particles (Subtle) -->
+  <circle cx="200" cy="150" r="1.5" fill="white" fill-opacity="0.1" />
+  <circle cx="1000" cy="450" r="1" fill="white" fill-opacity="0.08" />
+  <circle cx="850" cy="100" r="2" fill="#7C3AED" fill-opacity="0.1" />
+  <circle cx="300" cy="500" r="1.5" fill="#4F46E5" fill-opacity="0.1" />
+
+  <!-- Shield Icon Group -->
+  <g transform="translate(540, 100)">
+    <path d="M60 0 L10 20 V60 C10 100 60 120 60 120 C60 120 110 100 110 60 V20 L60 0Z" 
+          fill="none" stroke="url(#shieldStroke)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M40 60 L55 75 L85 45" 
+          fill="none" stroke="url(#shieldStroke)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+    <!-- Outer Glow for Icon -->
+    <path d="M60 0 L10 20 V60 C10 100 60 120 60 120 C60 120 110 100 110 60 V20 L60 0Z" 
+          fill="none" stroke="#7C3AED" stroke-width="8" stroke-opacity="0.1" filter="blur(4px)" />
+  </g>
+
+  <!-- Wordmark & Tagline -->
+  <text x="600" y="280" text-anchor="middle" font-family="Geist, sans-serif" font-weight="800" font-size="64" fill="white" letter-spacing="-1">CheckByAI</text>
+  <text x="600" y="325" text-anchor="middle" font-family="Geist, sans-serif" font-size="20" fill="#A1A1AA" font-weight="400">AI-powered UK immigration compliance monitoring &amp; CoS document forensics</text>
+
+  <!-- Stat Chips (Glassmorphism Style) -->
+  <g transform="translate(250, 420)">
+    <!-- Chip 1 -->
+    <rect x="0" y="0" width="220" height="48" rx="24" fill="white" fill-opacity="0.03" stroke="white" stroke-opacity="0.1" />
+    <text x="110" y="30" text-anchor="middle" font-family="Geist, sans-serif" font-size="14" fill="#E4E4E7" font-weight="500">124,000+ sponsors tracked</text>
+    
+    <!-- Chip 2 -->
+    <rect x="240" y="0" width="220" height="48" rx="24" fill="white" fill-opacity="0.03" stroke="white" stroke-opacity="0.1" />
+    <text x="350" y="30" text-anchor="middle" font-family="Geist, sans-serif" font-size="14" fill="#E4E4E7" font-weight="500">Real-time licence alerts</text>
+    
+    <!-- Chip 3 -->
+    <rect x="480" y="0" width="220" height="48" rx="24" fill="white" fill-opacity="0.03" stroke="white" stroke-opacity="0.1" />
+    <text x="590" y="30" text-anchor="middle" font-family="Geist, sans-serif" font-size="14" fill="#E4E4E7" font-weight="500">6-point PDF forensics</text>
+  </g>
+</svg>
