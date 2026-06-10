@@ -24,11 +24,13 @@ import {
   csvArchive,
   sponsorChanges,
   sponsorCanonical,
+  dailyDigest,
 } from "@shared/schema";
 import { checkBinaryHealth, type BinaryHealthReport } from "./binaryRunner";
 import { isJobRunning, isWeekday, SPONSOR_MONITOR_LOCK_KEY } from "./sponsorMonitorJob";
 import { getCutoverStatusSnapshot, type CutoverStatus } from "./scheduler";
 import { getRedis } from "./redisClient";
+import { getIndexHealth } from "./sponsorSearch";
 import { isQueueAvailable } from "../services/jobQueue";
 import { logger } from "./logger";
 
@@ -339,6 +341,69 @@ export async function checkChangeProduction(): Promise<CheckResult<{
 }
 
 /**
+ * Digest health — how many rows have displayedOnLanding=true, what is
+ * the latest digest's staleness, and whether there's a mismatch between
+ * changes and display status (data hidden from homepage).
+ */
+export async function checkDigestHealth(): Promise<CheckResult<{
+  displayedOnLandingCount: number;
+  latestDigestDate: string | null;
+  latestDigestDaysAgo: number | null;
+  latestDigestHasChanges: boolean;
+  latestDigestDisplayed: boolean;
+  mismatch: boolean;  // true if hasChanges but !displayedOnLanding
+  digestCount: number;
+}>> {
+  return safeCall("digestHealth", async () => {
+    const [landingCount] = await db
+      .select({ value: count() })
+      .from(dailyDigest)
+      .where(eq(dailyDigest.displayedOnLanding, true));
+
+    const latest = await db
+      .select({
+        snapshotDate: dailyDigest.snapshotDate,
+        addedCount: dailyDigest.addedCount,
+        updatedCount: dailyDigest.updatedCount,
+        removedCount: dailyDigest.removedCount,
+        displayedOnLanding: dailyDigest.displayedOnLanding,
+      })
+      .from(dailyDigest)
+      .orderBy(desc(dailyDigest.snapshotDate))
+      .limit(1);
+
+    const [totalCount] = await db
+      .select({ value: count() })
+      .from(dailyDigest);
+
+    const latestDigest = latest[0] ?? null;
+    const latestDigestDaysAgo = latestDigest?.snapshotDate
+      ? Math.floor(
+          (Date.now() - new Date(latestDigest.snapshotDate + "T00:00:00Z").getTime()) /
+            (1000 * 60 * 60 * 24),
+        )
+      : null;
+
+    const hasChanges = latestDigest
+      ? (latestDigest.addedCount ?? 0) > 0 ||
+        (latestDigest.updatedCount ?? 0) > 0 ||
+        (latestDigest.removedCount ?? 0) > 0
+      : false;
+
+    return {
+      displayedOnLandingCount: landingCount?.value ?? 0,
+      latestDigestDate: latestDigest?.snapshotDate ?? null,
+      latestDigestDaysAgo,
+      latestDigestHasChanges: hasChanges,
+      latestDigestDisplayed: latestDigest?.displayedOnLanding ?? false,
+      mismatch: hasChanges && !(latestDigest?.displayedOnLanding ?? false),
+      digestCount: totalCount?.value ?? 0,
+    };
+  });
+}
+
+/**
+ * Redis cache health — is the client connected, how many keys in our
  * Redis cache health — is the client connected, how many keys in our
  * sponsor-related namespaces, ping latency.
  */
@@ -348,6 +413,8 @@ export async function checkRedisHealth(): Promise<CheckResult<{
   watchesCacheKeys?: number;
   sponsorsCacheKeys?: number;
   rateLimitKeys?: number;
+  changesCacheTtlSeconds?: number | null;
+  searchIndexTtlSeconds?: number | null;
   error?: string;
 }>> {
   return safeCall("redisHealth", async () => {
@@ -376,12 +443,24 @@ export async function checkRedisHealth(): Promise<CheckResult<{
       log.warn({ err: scanErr }, "Redis SCAN failed (non-fatal)");
     }
 
+    // Per-key freshness: TTL for the main sponsor cache keys
+    let changesKeyTtl: number | null = null;
+    let searchKeyTtl: number | null = null;
+    try {
+      changesKeyTtl = await client.ttl("sponsors:changes");
+      searchKeyTtl = await client.ttl("sponsors:search");
+    } catch (ttlErr: unknown) {
+      log.warn({ err: ttlErr }, "Redis TTL check failed (non-fatal)");
+    }
+
     return {
       connected: pingResult === "PONG",
       pingLatencyMs,
       watchesCacheKeys: watchesKeys,
       sponsorsCacheKeys: sponsorsKeys,
       rateLimitKeys: rlKeys,
+      changesCacheTtlSeconds: changesKeyTtl,
+      searchIndexTtlSeconds: searchKeyTtl,
     };
   });
 }
@@ -469,6 +548,23 @@ export async function checkQueueHealth(): Promise<CheckResult<{
   });
 }
 
+/**
+ * In-memory Fuse.js search index health — is it ready, how many
+ * records does it hold, when was it last built, and is a rebuild
+ * currently in progress?
+ */
+export async function checkSearchIndexHealth(): Promise<CheckResult<{
+  ready: boolean;
+  recordCount: number;
+  lastBuilt: string | null;
+  buildInProgress: boolean;
+  dbConnected: boolean;
+}>> {
+  return safeCall("searchIndexHealth", async () => {
+    return getIndexHealth();
+  });
+}
+
 // ── Aggregator ───────────────────────────────────────────────────────────────
 
 export interface DiagnosticsReport {
@@ -522,6 +618,8 @@ export interface DiagnosticsReport {
     watchesCacheKeys?: number;
     sponsorsCacheKeys?: number;
     rateLimitKeys?: number;
+    changesCacheTtlSeconds?: number | null;
+    searchIndexTtlSeconds?: number | null;
     error?: string;
   }>;
   pythonBackend: CheckResult<{
@@ -534,6 +632,22 @@ export interface DiagnosticsReport {
   queue: CheckResult<{
     available: boolean;
     redisConnected: boolean;
+  }>;
+  digest: CheckResult<{
+    displayedOnLandingCount: number;
+    latestDigestDate: string | null;
+    latestDigestDaysAgo: number | null;
+    latestDigestHasChanges: boolean;
+    latestDigestDisplayed: boolean;
+    mismatch: boolean;
+    digestCount: number;
+  }>;
+  searchIndex: CheckResult<{
+    ready: boolean;
+    recordCount: number;
+    lastBuilt: string | null;
+    buildInProgress: boolean;
+    dbConnected: boolean;
   }>;
   weekdayExpectedRun: boolean;
   nextExpectedRunUtc: string | null;
@@ -574,6 +688,8 @@ export async function buildDiagnosticsReport(): Promise<DiagnosticsReport> {
     redisHealth,
     pythonBackend,
     queueHealth,
+    digestHealth,
+    searchIndexHealth,
     jobRunning,
   ] = await Promise.all([
     checkCronOwnership(),
@@ -585,6 +701,8 @@ export async function buildDiagnosticsReport(): Promise<DiagnosticsReport> {
     checkRedisHealth(),
     checkPythonBackend(),
     checkQueueHealth(),
+    checkDigestHealth(),
+    checkSearchIndexHealth(),
     safeCall("isJobRunning", () => isJobRunning()),
   ]);
 
@@ -659,6 +777,43 @@ export async function buildDiagnosticsReport(): Promise<DiagnosticsReport> {
     );
   }
 
+  if (digestHealth.value && digestHealth.value.mismatch) {
+    recommendations.push(
+      "Latest daily digest has changes but displayedOnLanding is false — homepage showing stale landing data. Run admin refresh or check nightly job transaction logic.",
+    );
+  }
+
+  if (digestHealth.value && digestHealth.value.latestDigestDaysAgo !== null && digestHealth.value.latestDigestDaysAgo > 2 && isWeekday()) {
+    recommendations.push(
+      `Latest digest is ${digestHealth.value.latestDigestDaysAgo} day(s) old on a weekday — digest generation may be stuck.`,
+    );
+  }
+
+  if (searchIndexHealth.value && !searchIndexHealth.value.ready) {
+    recommendations.push(
+      "In-memory Fuse.js search index is not ready — sponsor search will fall back to SQL. POST /api/admin/sponsor-monitor/rebuild-index to warm it.",
+    );
+  }
+
+  if (searchIndexHealth.value && searchIndexHealth.value.lastBuilt !== null) {
+    const hoursSinceBuild = Math.floor(
+      (Date.now() - new Date(searchIndexHealth.value.lastBuilt).getTime()) / (1000 * 60 * 60),
+    );
+    if (hoursSinceBuild > 24) {
+      recommendations.push(
+        `Search index last rebuilt ${hoursSinceBuild}h ago — consider a daily rebuild to reflect the latest data.`,
+      );
+    }
+  }
+
+  if (redisHealth.value && redisHealth.value.changesCacheTtlSeconds !== null && redisHealth.value.changesCacheTtlSeconds !== undefined) {
+    if (redisHealth.value.changesCacheTtlSeconds >= 0 && redisHealth.value.changesCacheTtlSeconds < 60) {
+      recommendations.push(
+        `sponsors:changes cache TTL is only ${redisHealth.value.changesCacheTtlSeconds}s — cache is about to expire, next request hits the DB.`,
+      );
+    }
+  }
+
   // ── Overall level ─────────────────────────────────────────────────────────
   let overall: CheckLevel = "ok";
   if (
@@ -666,13 +821,16 @@ export async function buildDiagnosticsReport(): Promise<DiagnosticsReport> {
     lock.value?.locked === true ||
     archiveIntegrity.value?.pendingSyncCount ||
     archiveIntegrity.value?.failedCount ||
-    recentRuns.value?.stuckRunning
+    recentRuns.value?.stuckRunning ||
+    (digestHealth.value && digestHealth.value.mismatch)
   ) {
     overall = "fail";
   } else if (
     recommendations.length > 0 ||
     binaries.level === "warn" ||
-    (pythonBackend.value && pythonBackend.value.online === false)
+    (pythonBackend.value && pythonBackend.value.online === false) ||
+    (searchIndexHealth.value && !searchIndexHealth.value.ready) ||
+    (digestHealth.value && digestHealth.value.latestDigestDaysAgo !== null && digestHealth.value.latestDigestDaysAgo > 2 && isWeekday())
   ) {
     overall = "warn";
   }
@@ -690,6 +848,8 @@ export async function buildDiagnosticsReport(): Promise<DiagnosticsReport> {
     redis: redisHealth,
     pythonBackend,
     queue: queueHealth,
+    digest: digestHealth,
+    searchIndex: searchIndexHealth,
     weekdayExpectedRun: isWeekday(),
     nextExpectedRunUtc: computeNextExpectedRunUtc(),
     recommendations,

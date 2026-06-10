@@ -89,8 +89,9 @@ function AnimatedCounter({ value, label, icon, color, large }: { value: number; 
 export default function LandingDigest() {
   const { data, isLoading } = useQuery<DigestData>({
     queryKey: ["/api/daily-digest/current"],
-    staleTime: STALE_TIMES.INFREQUENT,
-    refetchOnWindowFocus: false,
+    staleTime: STALE_TIMES.NORMAL,
+    refetchInterval: STALE_TIMES.INFREQUENT,
+    refetchOnWindowFocus: true,
   });
 
   const [ref, inView] = useInView({ triggerOnce: true, threshold: 0.1 });

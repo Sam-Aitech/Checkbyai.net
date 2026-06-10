@@ -918,34 +918,63 @@ export async function runSponsorMonitorJob(
       // so the homepage shows meaningful data instead of all-zero counts.
       const hasChanges = addedCount > 0 || removedCount > 0 || updatedCount > 0;
 
+      // Atomically swap displayedOnLanding — wrap the bulk-flip and insert
+      // in a single transaction so the frontend never sees available:false
+      // between the two operations.
       if (hasChanges) {
-        await db.update(dailyDigest).set({ displayedOnLanding: false });
-      }
-
-      await db.insert(dailyDigest).values({
-        snapshotDate: today,
-        addedCount,
-        updatedCount,
-        removedCount,
-        headlineGenerated: headlineResult.headline,
-        headlineVariants: headlineResult.variants,
-        displayedOnLanding: hasChanges,
-        selectedVariantIndex,
-        aiModel: headlineResult.model,
-      }).onConflictDoUpdate({
-        target: dailyDigest.snapshotDate,
-        set: {
+        await db.transaction(async (tx) => {
+          await tx.update(dailyDigest).set({ displayedOnLanding: false });
+          await tx.insert(dailyDigest).values({
+            snapshotDate: today,
+            addedCount,
+            updatedCount,
+            removedCount,
+            headlineGenerated: headlineResult.headline,
+            headlineVariants: headlineResult.variants,
+            displayedOnLanding: true,
+            selectedVariantIndex,
+            aiModel: headlineResult.model,
+          }).onConflictDoUpdate({
+            target: dailyDigest.snapshotDate,
+            set: {
+              addedCount,
+              updatedCount,
+              removedCount,
+              headlineGenerated: headlineResult.headline,
+              headlineVariants: headlineResult.variants,
+              displayedOnLanding: true,
+              selectedVariantIndex,
+              aiModel: headlineResult.model,
+              generatedAt: new Date(),
+            },
+          });
+        });
+      } else {
+        await db.insert(dailyDigest).values({
+          snapshotDate: today,
           addedCount,
           updatedCount,
           removedCount,
           headlineGenerated: headlineResult.headline,
           headlineVariants: headlineResult.variants,
-          displayedOnLanding: hasChanges,
+          displayedOnLanding: false,
           selectedVariantIndex,
           aiModel: headlineResult.model,
-          generatedAt: new Date(),
-        },
-      });
+        }).onConflictDoUpdate({
+          target: dailyDigest.snapshotDate,
+          set: {
+            addedCount,
+            updatedCount,
+            removedCount,
+            headlineGenerated: headlineResult.headline,
+            headlineVariants: headlineResult.variants,
+            displayedOnLanding: false,
+            selectedVariantIndex,
+            aiModel: headlineResult.model,
+            generatedAt: new Date(),
+          },
+        });
+      }
 
       log.info(`[SponsorMonitorJob] Daily digest generated: "${headlineResult.headline}" (model: ${headlineResult.model})`);
     } catch (digestErr: any) {

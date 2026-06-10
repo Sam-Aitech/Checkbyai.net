@@ -26,6 +26,7 @@ import {
 import PageLayout from "@/components/PageLayout";
 import SEOHead from "@/components/SEOHead";
 import LandingDigest from "@/components/LandingDigest";
+import { STALE_TIMES } from "@/lib/queryDefaults";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -425,8 +426,8 @@ function StickyAlertBanner() {
   const [dismissed, setDismissed] = useState(false);
   const { data } = useQuery<DigestSummary>({
     queryKey: ["/api/daily-digest/current"],
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    staleTime: STALE_TIMES.NORMAL,
+    refetchOnWindowFocus: true,
   });
 
   if (dismissed) return null;
@@ -496,8 +497,8 @@ function HeroSection({ onScrollToSearch }: { onScrollToSearch: () => void }) {
 function ProofBar() {
   const { data, isLoading } = useQuery<DigestSummary>({
     queryKey: ["/api/daily-digest/current"],
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    staleTime: STALE_TIMES.NORMAL,
+    refetchOnWindowFocus: true,
   });
 
   const formattedDate = data?.date
@@ -665,8 +666,9 @@ function FeatureBlocks() {
 function SocialProof() {
   const { data: changesData } = useQuery<{ changes: SponsorChange[]; totalCount: number }>({
     queryKey: ["/api/sponsor-changes"],
-    staleTime: 10 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    staleTime: STALE_TIMES.INFREQUENT,
+    refetchInterval: STALE_TIMES.INFREQUENT,
+    refetchOnWindowFocus: true,
   });
 
   const recentChange = changesData?.changes?.find(

@@ -56,6 +56,7 @@ import { storage } from "../../storage";
 describe("sponsorStateMachine - first run logic", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (db.execute as any).mockResolvedValue({ rows: [{ cnt: 0 }] });
   });
 
   it("should NOT generate NEW_LICENCE changes during a massive first-run seed (>100k records)", async () => {

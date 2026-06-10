@@ -272,6 +272,7 @@ export function registerSponsorRoutes(app: Express): void {
         count: sql<number>`count(*)::int`,
       })
       .from(sponsorChanges)
+      .where(eq(sponsorChanges.isTest, false))
       .groupBy(sponsorChanges.changeType, sponsorChanges.organisationName)
       .orderBy(desc(sql`count(*)`))
       .limit(50);
@@ -303,31 +304,60 @@ export function registerSponsorRoutes(app: Express): void {
     });
 
     const hasChanges = addedCount > 0 || removedCount > 0 || updatedCount > 0;
+
+    // Atomically swap displayedOnLanding — wrap the bulk-flip and insert
+    // in a single transaction so the frontend never sees available:false
+    // between the two operations.
     if (hasChanges) {
-      await db.update(dailyDigest).set({ displayedOnLanding: false });
-    }
-    await db.insert(dailyDigest).values({
-      snapshotDate: today,
-      addedCount,
-      updatedCount,
-      removedCount,
-      headlineGenerated: headlineResult.headline,
-      headlineVariants: headlineResult.variants,
-      displayedOnLanding: hasChanges,
-      selectedVariantIndex: 0,
-      aiModel: headlineResult.model,
-      generatedAt: new Date(),
-    }).onConflictDoUpdate({
-      target: dailyDigest.snapshotDate,
-      set: {
+      await db.transaction(async (tx) => {
+        await tx.update(dailyDigest).set({ displayedOnLanding: false });
+        await tx.insert(dailyDigest).values({
+          snapshotDate: today,
+          addedCount,
+          updatedCount,
+          removedCount,
+          headlineGenerated: headlineResult.headline,
+          headlineVariants: headlineResult.variants,
+          displayedOnLanding: true,
+          selectedVariantIndex: 0,
+          aiModel: headlineResult.model,
+          generatedAt: new Date(),
+        }).onConflictDoUpdate({
+          target: dailyDigest.snapshotDate,
+          set: {
+            headlineGenerated: headlineResult.headline,
+            headlineVariants: headlineResult.variants,
+            displayedOnLanding: true,
+            selectedVariantIndex: 0,
+            aiModel: headlineResult.model,
+            generatedAt: new Date(),
+          },
+        });
+      });
+    } else {
+      await db.insert(dailyDigest).values({
+        snapshotDate: today,
+        addedCount,
+        updatedCount,
+        removedCount,
         headlineGenerated: headlineResult.headline,
         headlineVariants: headlineResult.variants,
-        displayedOnLanding: hasChanges,
+        displayedOnLanding: false,
         selectedVariantIndex: 0,
         aiModel: headlineResult.model,
         generatedAt: new Date(),
-      },
-    });
+      }).onConflictDoUpdate({
+        target: dailyDigest.snapshotDate,
+        set: {
+          headlineGenerated: headlineResult.headline,
+          headlineVariants: headlineResult.variants,
+          displayedOnLanding: false,
+          selectedVariantIndex: 0,
+          aiModel: headlineResult.model,
+          generatedAt: new Date(),
+        },
+      });
+    }
 
     // Flush Redis so the frontend gets fresh data immediately after admin refresh.
     await cacheFlushPattern("sponsors:*");
@@ -864,6 +894,7 @@ export function registerSponsorRoutes(app: Express): void {
   app.get('/api/sponsor-changes', changesRateLimit, asyncHandler(async (req, res) => {
     const changesCached = await cacheGet<{ changes: unknown[]; grouped: unknown; totalCount: number }>("sponsors:changes");
     if (changesCached) {
+      res.set("Cache-Control", "public, max-age=60");
       success(res, changesCached);
       return;
     }
@@ -880,7 +911,7 @@ export function registerSponsorRoutes(app: Express): void {
         snapshotDate: sponsorChanges.snapshotDate,
       })
       .from(sponsorChanges)
-      .where(gte(sponsorChanges.detectedAt, sevenDaysAgo))
+      .where(and(gte(sponsorChanges.detectedAt, sevenDaysAgo), eq(sponsorChanges.isTest, false)))
       .orderBy(desc(sponsorChanges.detectedAt))
       .limit(500);
 
@@ -893,6 +924,7 @@ export function registerSponsorRoutes(app: Express): void {
 
     const changesResponse = { changes, grouped, totalCount: changes.length };
     await cacheSet("sponsors:changes", changesResponse, 600);
+    res.set("Cache-Control", "public, max-age=60");
     success(res, changesResponse);
   }));
 

@@ -38,6 +38,7 @@ import {
 } from "../utils/sponsorMonitorDiagnostics";
 import { rebuildSponsorIndex } from "../utils/sponsorSearch";
 import { isQueueAvailable, getSponsorRefreshQueue } from "../services/jobQueue";
+import { cacheFlushPattern } from "../utils/redisClient";
 import { getWatchLimit } from "../utils/tierConfig";
 
 function sanitizeForPrompt(text: string): string {
@@ -832,6 +833,9 @@ Format your response in clear, professional markdown.`;
   app.post('/api/admin/sponsor-monitor/rebuild-index', requireRole("admin"), async (_req: any, res) => {
     try {
       await rebuildSponsorIndex();
+      // Flush Redis so the frontend's stale cached data doesn't
+      // mask a stale search index — the admin just rebuilt it.
+      await cacheFlushPattern("sponsors:*");
       const count = (await db
         .select({ n: sql<number>`count(*)::int` })
         .from(sponsorCanonical)

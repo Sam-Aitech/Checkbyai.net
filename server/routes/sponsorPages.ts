@@ -99,7 +99,7 @@ export function registerSponsorPageRoutes(app: Express): void {
 
     const payload = { ...sponsor, recentChanges, totalChanges, enrichment };
     await cacheSet(cacheKey, payload, 3600);
-    res.set("Cache-Control", "public, max-age=3600, stale-while-revalidate=7200");
+    res.set("Cache-Control", "public, max-age=300, stale-while-revalidate=600");
     success(res, payload);
   }));
 
@@ -193,7 +193,7 @@ export function registerSponsorPageRoutes(app: Express): void {
     const cached = await cacheGet<SearchIndexEntry[]>(cacheKey);
     if (cached) {
       res.set("Content-Type", "application/json");
-      res.set("Cache-Control", "public, max-age=43200, stale-while-revalidate=86400");
+      res.set("Cache-Control", "public, max-age=3600, stale-while-revalidate=3600");
       success(res, cached);
       return;
     }
@@ -231,7 +231,7 @@ export function registerSponsorPageRoutes(app: Express): void {
       .limit(7);
 
     await cacheSet(cacheKey, sponsors, 3600);
-    res.set("Cache-Control", "public, max-age=3600");
+    res.set("Cache-Control", "public, max-age=300");
     success(res, sponsors);
   }));
 
@@ -244,7 +244,7 @@ export function registerSponsorPageRoutes(app: Express): void {
     const cacheKey = "sponsors:nightly-stats";
     const cached = await cacheGet<object>(cacheKey);
     if (cached) {
-      res.set("Cache-Control", "public, max-age=3600");
+      res.set("Cache-Control", "public, max-age=300");
       success(res, cached);
       return;
     }
@@ -310,7 +310,7 @@ export function registerSponsorPageRoutes(app: Express): void {
     // Cache for 5 minutes — balances freshness with DB load.
     // Flushed immediately by sponsorMonitorJob after each nightly run.
     await cacheSet(cacheKey, payload, 300);
-    res.set("Cache-Control", "public, max-age=300, stale-while-revalidate=600");
+    res.set("Cache-Control", "public, max-age=300");
     success(res, payload);
   }));
 
@@ -322,7 +322,7 @@ export function registerSponsorPageRoutes(app: Express): void {
     const cacheKey = "sponsors:latest-change";
     const cached = await cacheGet<object>(cacheKey);
     if (cached) {
-      res.set("Cache-Control", "public, max-age=3600");
+      res.set("Cache-Control", "public, max-age=300");
       success(res, cached);
       return;
     }
@@ -344,7 +344,7 @@ export function registerSponsorPageRoutes(app: Express): void {
 
     const payload = rows[0] ?? null;
     await cacheSet(cacheKey, payload, 3600);
-    res.set("Cache-Control", "public, max-age=3600");
+    res.set("Cache-Control", "public, max-age=300");
     success(res, payload);
   }));
 

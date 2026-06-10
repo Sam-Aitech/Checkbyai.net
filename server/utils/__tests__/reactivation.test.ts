@@ -27,7 +27,8 @@ vi.mock("../../db", () => ({
     })),
     delete: vi.fn(() => ({
       where: vi.fn(() => [])
-    }))
+    })),
+    execute: vi.fn()
   }
 }));
 
@@ -54,6 +55,7 @@ import { db } from "../../db";
 describe("RE_ACTIVATED logic in sponsorStateMachine", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (db.execute as any).mockResolvedValue({ rows: [{ cnt: 1000 }] });
   });
 
   it("should detect RE_ACTIVATED when a REMOVED_REVOKED company appears in additions", async () => {
