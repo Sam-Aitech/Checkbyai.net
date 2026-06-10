@@ -1,3 +1,9 @@
+<div align="center">
+  <a href="https://checkbyai.net/">
+    <img src=".github/assets/readme-hero.svg" alt="CheckByAI — AI-powered UK immigration compliance monitoring & CoS document forensics" width="100%" />
+  </a>
+</div>
+
 # CheckByAI
 
 > **AI-powered UK immigration compliance monitoring & document verification**
@@ -12,6 +18,14 @@
 
 CheckByAI is a comprehensive SaaS platform for UK immigration professionals, HR teams, and visa holders. It provides real-time monitoring of the UK Home Office Register of Licensed Sponsors and forensic verification of Certificates of Sponsorship (COS) documents.
 
+<div align="center">
+  <a href="https://checkbyai.net/">
+    <img src=".github/assets/screenshot-home.png" alt="checkbyai.net — Your sponsor was revoked last night. Nobody told you." width="85%" />
+  </a>
+  <br />
+  <sub><em>🌐 Live at <a href="https://checkbyai.net/">checkbyai.net</a></em></sub>
+</div>
+
 ## 🎯 What We Do
 
 ### 1. **Sponsor Licence Monitor**
@@ -22,6 +36,14 @@ Automated monitoring of the [UK Home Office Register of Licensed Sponsors](https
 - Licence status is upgraded
 
 **Perfect for:** Visa holders, immigration advisers, HR compliance teams
+
+<div align="center">
+  <a href="https://checkbyai.net/sponsor-monitor">
+    <img src=".github/assets/screenshot-monitor.png" alt="Sponsor Licence Monitor — nightly Home Office register checks with instant alerts" width="85%" />
+  </a>
+  <br />
+  <sub><em>Live sponsor monitor — the Home Office updates the register at midnight; CheckByAI texts you instantly.</em></sub>
+</div>
 
 ### 2. **COS Check — PDF Metadata Inspector (MIS)**
 Forensic analysis of Certificate of Sponsorship PDFs using AI and metadata forensics. Detects:
@@ -36,6 +58,59 @@ Forensic analysis of Certificate of Sponsorship PDFs using AI and metadata foren
 - **Admin View** — Full forensics: all 6 authenticity checks.
 
 **Perfect for:** Anyone verifying a COS document authenticity
+
+<div align="center">
+  <a href="https://checkbyai.net/check-fake-cos">
+    <img src=".github/assets/screenshot-cos-guide.png" alt="5 Signs Your Certificate of Sponsorship Might Be Fake — free fraud prevention guide" width="85%" />
+  </a>
+  <br />
+  <sub><em>Free fraud-prevention guide: <a href="https://checkbyai.net/check-fake-cos">5 signs your CoS might be fake</a>.</em></sub>
+</div>
+
+---
+
+## 🔬 How It Works
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {
+  'primaryColor': '#1e1b2e', 'primaryTextColor': '#e4e4e7', 'primaryBorderColor': '#7C3AED',
+  'lineColor': '#7C3AED', 'secondaryColor': '#16121f', 'tertiaryColor': '#111114',
+  'clusterBkg': '#111114', 'clusterBorder': '#2d2640', 'edgeLabelBackground': '#111114',
+  'fontFamily': 'Segoe UI, sans-serif'
+}}}%%
+flowchart LR
+    subgraph monitor["🛡️ Sponsor Licence Monitor"]
+        direction LR
+        GOV["Gov.UK Register<br/>143,000+ sponsors"] -->|"nightly cron 00:30 UTC"| SCRAPE["Scraper +<br/>Firecrawl fallback"]
+        SCRAPE --> DIFF["Change detection<br/>7 change types"]
+        DIFF --> QUEUE["BullMQ + Redis<br/>job queue"]
+        QUEUE --> EMAIL["📧 Email"]
+        QUEUE --> WA["💬 WhatsApp"]
+        QUEUE --> SMS["📱 SMS"]
+        QUEUE --> HOOK["🔗 Webhooks"]
+    end
+```
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {
+  'primaryColor': '#1e1b2e', 'primaryTextColor': '#e4e4e7', 'primaryBorderColor': '#7C3AED',
+  'lineColor': '#7C3AED', 'secondaryColor': '#16121f', 'tertiaryColor': '#111114',
+  'clusterBkg': '#111114', 'clusterBorder': '#2d2640', 'edgeLabelBackground': '#111114',
+  'fontFamily': 'Segoe UI, sans-serif'
+}}}%%
+flowchart LR
+    subgraph cos["🔍 COS Check — PDF Forensics"]
+        direction LR
+        PDF["CoS PDF<br/>upload"] --> META["XMP metadata<br/>extraction"]
+        META --> CHECKS["6-point forensic<br/>analysis"]
+        CHECKS --> TOOLS["Editing tool<br/>fingerprints"]
+        CHECKS --> DATES["Timestamp<br/>consistency"]
+        CHECKS --> INCR["Incremental<br/>update trail"]
+        TOOLS & DATES & INCR --> VERDICT{"Verdict"}
+        VERDICT -->|"✅"| GENUINE["GENUINE<br/>green shield"]
+        VERDICT -->|"❌"| EDITED["EDITED<br/>red shield"]
+    end
+```
 
 ---
 
