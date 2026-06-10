@@ -357,6 +357,22 @@ async function applyDataFixbacks() {
     } catch (err) {
       logger.warn({ err }, "Non-blocking: NOT_LISTED → REMOVED_REVOKED backfill failed");
     }
+
+    // ── sponsor_changes.is_test guard ─────────────────────────────────────────
+    // Migration 0018 adds this column but drizzle-kit migrate may not run before
+    // the dev server starts.  The /api/sponsor-changes endpoint filters on it.
+    try {
+      await client.query(`
+        ALTER TABLE "sponsor_changes"
+        ADD COLUMN IF NOT EXISTS "is_test" boolean DEFAULT false
+      `);
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS "idx_sponsor_changes_is_test"
+        ON "sponsor_changes" ("is_test")
+      `);
+    } catch (err) {
+      logger.error({ err }, "Failed to ensure sponsor_changes.is_test column exists at startup");
+    }
   } finally {
     client.release();
   }
