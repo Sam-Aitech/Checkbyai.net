@@ -32,6 +32,7 @@ import type { SponsorChange } from "./sponsorListFetcher";
 import { loadFingerprintSet } from "./csvFingerprintBuilder";
 import { storage } from "../storage";
 import { logger } from "./logger";
+import { sendAdminAlert } from "./adminAlert";
 import { buildEmail, sendViaResend } from "../services/notificationEngine";
 import {
   areCompaniesFuzzyMatch,
@@ -45,6 +46,30 @@ const log = logger.child({ module: "SponsorStateMachine" });
 
 const RENAME_SIMILARITY_THRESHOLD = 0.85;
 const BATCH_SIZE = 500; // for bulk DB operations
+
+/**
+ * Mass-removal circuit breaker. If a single run tries to push more than this
+ * fraction of live records into GRACE_PERIOD/REMOVED_REVOKED, the run aborts.
+ * The 2026-05-20 incident (all 143K sponsors marked REMOVED_REVOKED after a
+ * GOV.UK CSV schema change emptied the fingerprinted file) is exactly the
+ * failure mode this guards against. Override with SPONSOR_ALLOW_MASS_REMOVAL=1
+ * for a deliberate, operator-approved mass operation.
+ */
+const MASS_REMOVAL_FRACTION = 0.2;
+const MASS_REMOVAL_MIN_LIVE = 1_000;
+
+/**
+ * Self-heal sweep: change events are suppressed above this count to avoid
+ * flooding sponsor_changes and notification queues during a bulk repair.
+ */
+const MASS_REPAIR_EVENT_THRESHOLD = 1_000;
+
+/**
+ * The register normally has ~140K rows. A fingerprint set smaller than this
+ * means the fingerprinted CSV is truncated or empty — never trust it for
+ * absence-based removals (Phase D2) or presence-based resurrection (Phase C2).
+ */
+const MIN_TRUSTWORTHY_FINGERPRINT_SET = 50_000;
 
 /**
  * Length-adjusted similarity threshold for rename detection.
@@ -550,6 +575,72 @@ export async function applyStateMachine(
   // surfaced on the Sponsor Monitor page. Do not remove without updating that flow.
   await notifyReactivationWatchers(reactivationCandidates);
 
+  // ── Phase C2: Self-heal sweep (presence-based resurrection) ───────────────
+  // csvdiff only reports day-over-day deltas, so a sponsor wrongly stuck in
+  // REMOVED_REVOKED/GRACE_PERIOD while present in today's register is invisible
+  // to Phases C and D forever (present yesterday AND today → no diff entry).
+  // This sweep reconciles DB state against today's full fingerprint set so a
+  // bad historical run (e.g. the 2026-05-20 mass removal) self-repairs on the
+  // next healthy run instead of persisting indefinitely.
+  const todayFingerprintSet = await loadFingerprintSet(todayFingerprintedCsvPath);
+
+  if (todayFingerprintSet.size >= MIN_TRUSTWORTHY_FINGERPRINT_SET) {
+    const handledThisRun = new Set([...toReactivate, ...toRecoverFlicker]);
+    const staleRows = await db
+      .select({
+        fingerprint: sponsorCanonical.fingerprint,
+        currentName: sponsorCanonical.currentName,
+        status:      sponsorCanonical.status,
+      })
+      .from(sponsorCanonical)
+      .where(inArray(sponsorCanonical.status, ["REMOVED_REVOKED", "GRACE_PERIOD"]));
+
+    const toResurrect = staleRows.filter(
+      (r) => todayFingerprintSet.has(r.fingerprint) && !handledThisRun.has(r.fingerprint),
+    );
+
+    if (toResurrect.length > 0) {
+      const suppressEvents = toResurrect.length > MASS_REPAIR_EVENT_THRESHOLD;
+      log.warn(
+        { count: toResurrect.length, suppressEvents },
+        "[StateMachine] Phase C2: resurrecting sponsors present in today's register but marked removed/grace in DB.",
+      );
+
+      const fps = toResurrect.map((r) => r.fingerprint);
+      for (let i = 0; i < fps.length; i += BATCH_SIZE) {
+        await db
+          .update(sponsorCanonical)
+          .set({ status: "ACTIVE", removedAt: null, consecutiveMisses: 0, lastSeen: today })
+          .where(inArray(sponsorCanonical.fingerprint, fps.slice(i, i + BATCH_SIZE)));
+      }
+
+      if (!suppressEvents) {
+        for (const r of toResurrect) {
+          changes.push({
+            organisationName: r.currentName,
+            changeType:       "RE_ACTIVATED",
+            previousValue:    r.status,
+            newValue:         "ACTIVE",
+            fingerprint:      r.fingerprint,
+          });
+        }
+      } else {
+        await sendAdminAlert(
+          "CheckByAI: Mass self-heal repair executed",
+          `<p>Phase C2 resurrected ${toResurrect.length.toLocaleString()} sponsors that were present ` +
+          `in today's register but marked REMOVED_REVOKED/GRACE_PERIOD in the database. ` +
+          `Per-company change events were suppressed to avoid flooding sponsor_changes.</p>`,
+        ).catch((err: unknown) => log.warn({ err }, "[StateMachine] Failed to send mass-repair alert"));
+      }
+      reactivatedCount += toResurrect.length;
+    }
+  } else {
+    log.warn(
+      { size: todayFingerprintSet.size },
+      "[StateMachine] Today's fingerprint set is suspiciously small — skipping Phase C2 sweep (and Phase D2 will be skipped too).",
+    );
+  }
+
   // ── Phase D: Deletions (first and second misses) ──────────────────────────
   const toGracePeriod: string[] = [];
   const toRemove: string[] = [];
@@ -587,6 +678,33 @@ export async function applyStateMachine(
     // REMOVED_REVOKED: already removed, increment misses only
   }
 
+  // ── Mass-removal circuit breaker ──────────────────────────────────────────
+  // A healthy day removes dozens of sponsors, not a meaningful fraction of the
+  // register. If this run wants to push more than MASS_REMOVAL_FRACTION of
+  // live records out of circulation, the input data is almost certainly bad
+  // (schema change, truncated CSV, empty fingerprint file) — abort loudly.
+  const deletionImpact = toGracePeriod.length + toRemove.length;
+  if (deletionImpact > 0 && process.env.SPONSOR_ALLOW_MASS_REMOVAL !== "1") {
+    const liveCountResult = await db.execute(sql`
+      SELECT COUNT(*)::int AS cnt FROM sponsor_canonical
+      WHERE status IN ('ACTIVE', 'NEWLY_GRANTED', 'GRACE_PERIOD')
+    `);
+    const liveCount = (liveCountResult.rows[0] as { cnt: number } | undefined)?.cnt ?? 0;
+    if (liveCount >= MASS_REMOVAL_MIN_LIVE && deletionImpact > liveCount * MASS_REMOVAL_FRACTION) {
+      const msg =
+        `Mass-removal circuit breaker tripped: run wants to remove/grace ${deletionImpact.toLocaleString()} ` +
+        `of ${liveCount.toLocaleString()} live sponsors (> ${MASS_REMOVAL_FRACTION * 100}%). ` +
+        `Aborting before any status changes are applied. ` +
+        `Set SPONSOR_ALLOW_MASS_REMOVAL=1 to override deliberately.`;
+      log.error({ deletionImpact, liveCount }, `[StateMachine] ${msg}`);
+      await sendAdminAlert(
+        "ALERT: Sponsor sync aborted — mass-removal circuit breaker",
+        `<p>${msg}</p><p>Likely cause: GOV.UK CSV schema change or truncated/empty fingerprinted CSV.</p>`,
+      ).catch((err: unknown) => log.warn({ err }, "[StateMachine] Failed to send circuit-breaker alert"));
+      throw new Error(msg);
+    }
+  }
+
   // Bulk move to GRACE_PERIOD
   if (toGracePeriod.length > 0) {
     for (let i = 0; i < toGracePeriod.length; i += BATCH_SIZE) {
@@ -619,17 +737,21 @@ export async function applyStateMachine(
   // These are companies that were absent in D-1 AND D. csvdiff won't show them
   // because they're absent in both files. We detect them by comparing all
   // GRACE_PERIOD records against today's fingerprint set.
-  const todayFingerprintSet = await loadFingerprintSet(todayFingerprintedCsvPath);
-  const processedInPhaseD   = new Set([...toGracePeriod, ...toRemove]);
+  // Reuses todayFingerprintSet loaded in Phase C2. Absence-based removal is
+  // only safe when the fingerprint set is plausibly the full register: an
+  // empty/truncated set would mark every GRACE_PERIOD sponsor as removed.
+  const processedInPhaseD = new Set([...toGracePeriod, ...toRemove]);
 
-  const allGracePeriod = await db
-    .select({
-      fingerprint:  sponsorCanonical.fingerprint,
-      currentName:  sponsorCanonical.currentName,
-      consecutiveMisses: sponsorCanonical.consecutiveMisses,
-    })
-    .from(sponsorCanonical)
-    .where(eq(sponsorCanonical.status, "GRACE_PERIOD"));
+  const allGracePeriod = todayFingerprintSet.size >= MIN_TRUSTWORTHY_FINGERPRINT_SET
+    ? await db
+        .select({
+          fingerprint:  sponsorCanonical.fingerprint,
+          currentName:  sponsorCanonical.currentName,
+          consecutiveMisses: sponsorCanonical.consecutiveMisses,
+        })
+        .from(sponsorCanonical)
+        .where(eq(sponsorCanonical.status, "GRACE_PERIOD"))
+    : [];
 
   const toRemoveD2 = allGracePeriod.filter(
     (r) => !processedInPhaseD.has(r.fingerprint) && !todayFingerprintSet.has(r.fingerprint),

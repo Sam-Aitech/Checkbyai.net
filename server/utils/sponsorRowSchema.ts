@@ -79,10 +79,17 @@ export const SponsorRowSchema = z
       .transform((v) => (v ?? "").trim())
       .refine((v) => v.length > 0, "typeRating is required")
       .refine((v) => v.length <= MAX_TYPE_RATING_LENGTH, `typeRating must be <= ${MAX_TYPE_RATING_LENGTH} chars`),
-    licenceStatus: SponsorLicenceStatusSchema,
-    licenceType: SponsorLicenceTypeSchema,
+    // Enum metadata is optional: the GOV.UK register CSV has shipped at least
+    // two column layouts (legacy "Type & Rating"/"Route" and the May 2026
+    // "TierRating"/"Migrant Classification"/"Sponsor Status" format), and not
+    // every layout carries every field. Requiring these caused 100% row
+    // rejection → empty fingerprinted CSV → the 2026-05-20 mass-removal
+    // incident. A row is identified by name + typeRating + route; enum
+    // metadata enriches it but must never reject it.
+    licenceStatus: SponsorLicenceStatusSchema.optional(),
+    licenceType: SponsorLicenceTypeSchema.optional(),
     // Kept as a separate field to support explicit rating-level analytics/tests.
-    rating: SponsorRatingSchema,
+    rating: SponsorRatingSchema.optional(),
   })
   .merge(SponsorRowPartialSchema)
   .strict();
