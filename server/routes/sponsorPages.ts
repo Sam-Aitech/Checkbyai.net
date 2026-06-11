@@ -279,7 +279,7 @@ export function registerSponsorPageRoutes(app: Express): void {
       // This powers the "Register last checked" stat — shows when the job actually ran,
       // independent of which digest is displayed.
       db
-        .select({ runDate: monitorJobRuns.runDate })
+        .select({ runDate: monitorJobRuns.runDate, completedAt: monitorJobRuns.completedAt })
         .from(monitorJobRuns)
         .where(eq(monitorJobRuns.status, "success"))
         .orderBy(desc(monitorJobRuns.runDate))
@@ -289,23 +289,33 @@ export function registerSponsorPageRoutes(app: Express): void {
     const totalActive          = countResult[0]?.total ?? 0;
     const revokedLast12Months  = revokedResult[0]?.total ?? 0;
     const latest               = digestRows[0] ?? null;
+    const lastRun              = lastRunRows[0] ?? null;
     // Use the last successful job run date as "Register last checked".
     // Fall back to the active digest's snapshot date if no run recorded yet.
-    const lastRunDate = lastRunRows[0]?.runDate ?? latest?.snapshotDate ?? null;
+    const lastRunDate = lastRun?.runDate ?? latest?.snapshotDate ?? null;
+    // Precise UTC timestamp of the last successful completion — used for <24h freshness check.
+    const lastSuccessfulRunAt = lastRun?.completedAt?.toISOString() ?? null;
 
+    const now = Date.now();
     const today = new Date().toISOString().split("T")[0];
     const staleDays = lastRunDate
       ? Math.round((Date.parse(today) - Date.parse(lastRunDate)) / 86400000)
       : 0;
+    // Hours since last successful run (precise, from completedAt if available).
+    const hoursStale = lastSuccessfulRunAt
+      ? Math.floor((now - Date.parse(lastSuccessfulRunAt)) / 3_600_000)
+      : staleDays * 24;
 
     const payload = {
       totalActive,
       lastRunDate,
+      lastSuccessfulRunAt,
       addedCount:           latest?.addedCount    ?? 0,
       removedCount:         latest?.removedCount  ?? 0,
       changesCount:         latest?.updatedCount  ?? 0,
       revokedLast12Months,
       staleDays,
+      hoursStale,
     };
     // Cache for 5 minutes — balances freshness with DB load.
     // Flushed immediately by sponsorMonitorJob after each nightly run.

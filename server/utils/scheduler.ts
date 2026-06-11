@@ -142,10 +142,29 @@ export function startCentralScheduler(): void {
     log.info("Central scheduler: SPONSOR_MONITOR registered (30 0 * * 1-5 UTC).");
   }
 
-  const active = getCutoverStatusSnapshot().filter((s) => s.cutover).map((s) => s.job);
+  const snapshot = getCutoverStatusSnapshot();
+  const active = snapshot.filter((s) => s.cutover).map((s) => s.job);
   if (active.length === 0) {
     log.info("Central scheduler started: no jobs cut over yet (all inline-cron owned).");
   } else {
     log.info({ active }, `Central scheduler started: ${active.length} job(s) cut over.`);
+  }
+
+  // ── Ownership sanity check ──────────────────────────────────────────────────
+  // The SPONSOR_MONITOR job must be owned by exactly one scheduler path.
+  // Log a clear warning if the cutover flag is true but the central scheduler
+  // somehow did NOT register the cron (e.g., code path skipped due to a bug).
+  // The inverse — cutover false, inline cron owns it — is the expected default.
+  // Note: we cannot detect if *neither* path registered without runtime state;
+  // this is a best-effort startup check for config drift.
+  const sponsorStatus = snapshot.find((s) => s.job === "SPONSOR_MONITOR");
+  if (sponsorStatus?.cutover && !isCutover("SPONSOR_MONITOR")) {
+    // Should be unreachable but guard against future refactors that call this
+    // function with stale env state.
+    log.error(
+      { sponsorStatus },
+      "Central scheduler: SPONSOR_MONITOR cutover flag is inconsistent — sponsor monitor may have NO active scheduler owner. " +
+        "Verify CUTOVER_SPONSOR_MONITOR env var and restart.",
+    );
   }
 }

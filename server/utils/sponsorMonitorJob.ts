@@ -1225,10 +1225,29 @@ async function checkMissedJobsAndCatchUp(source: string = "startup-catchup"): Pr
       `[SponsorMonitorJob] ${isStartup ? "Startup catch-up" : "Backfill check"}: no successful run found for ${missed} (and possibly earlier). Triggering now.`,
     );
 
+    // Compute how long ago the last successful run was (in hours) to choose
+    // the appropriate alert severity.
+    const lastSuccessDate = successfulRuns
+      .map((r) => r.runDate)
+      .sort()
+      .reverse()[0] ?? null;
+    const hoursSinceSuccess = lastSuccessDate
+      ? Math.floor((Date.now() - Date.parse(lastSuccessDate + "T00:30:00Z")) / 3_600_000)
+      : null;
+    const isP0 = hoursSinceSuccess !== null && hoursSinceSuccess > 48;
+    const isP1 = hoursSinceSuccess !== null && hoursSinceSuccess > 24 && !isP0;
+
+    const alertPrefix = isP0
+      ? "🚨 P0 CheckByAI: Sponsor monitor stale >48h"
+      : isP1
+        ? "⚠️ P1 CheckByAI: Sponsor monitor stale >24h"
+        : `ℹ️ CheckByAI: ${isStartup ? "Startup" : "Periodic"} catch-up triggered`;
+
     await sendAdminAlert(
-      `ℹ️ CheckByAI: ${isStartup ? "Startup" : "Periodic"} catch-up triggered`,
+      alertPrefix,
       `<p>${isStartup ? "Server booted" : "Periodic 6-hour check"} detected a missed sponsor monitor job.</p>
        <p>Most recent missed weekday: <strong>${missed}</strong></p>
+       <p>Hours since last successful run: <strong>${hoursSinceSuccess ?? "unknown"}</strong></p>
        <p>Successful runs found: ${[...successDates].join(", ") || "none in last 7 days"}</p>
        <p>Running now to fetch the latest register CSV and apply any accumulated changes.</p>`,
     ).catch(() => {});

@@ -136,6 +136,10 @@ vi.mock("../../utils/incidentManager", () => ({
   tryAutoRemediate: vi.fn(async () => "corr-remediate-1"),
 }));
 
+vi.mock("../../utils/adminAlert", () => ({
+  sendAdminAlert: vi.fn(async () => undefined),
+}));
+
 import { registerOpsRoutes } from "../ops";
 import { getAllJobHealthSnapshots } from "../../utils/jobTelemetry";
 import { evaluateSeverity, createIncidentTicket } from "../../utils/incidentManager";
@@ -526,6 +530,123 @@ describe("ops routes", () => {
       expect(response.status).toBe(403);
     } finally {
       server.close();
+    }
+  });
+
+  // ── Cron-ping auth / config failure paths ───────────────────────────────────
+
+  it("POST /cron-ping returns 503 when CRON_SECRET is not set", async () => {
+    const prev = process.env.CRON_SECRET;
+    delete process.env.CRON_SECRET;
+    const { server, baseUrl } = await startTestServer();
+    try {
+      const response = await fetch(`${baseUrl}/api/ops/cron-ping`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      expect(response.status).toBe(503);
+      const json = await response.json();
+      expect(json.message).toMatch(/not configured/i);
+    } finally {
+      server.close();
+      if (prev !== undefined) process.env.CRON_SECRET = prev;
+    }
+  });
+
+  it("POST /cron-ping returns 401 for wrong secret", async () => {
+    process.env.CRON_SECRET = "correct-secret-32-chars-xxxxxxxx";
+    const { server, baseUrl } = await startTestServer();
+    try {
+      const response = await fetch(`${baseUrl}/api/ops/cron-ping`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "******",
+        },
+      });
+      expect(response.status).toBe(401);
+    } finally {
+      server.close();
+      delete process.env.CRON_SECRET;
+    }
+  });
+
+  it("POST /cron-ping returns 401 for missing Authorization header", async () => {
+    process.env.CRON_SECRET = "correct-secret-32-chars-xxxxxxxx";
+    const { server, baseUrl } = await startTestServer();
+    try {
+      const response = await fetch(`${baseUrl}/api/ops/cron-ping`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      expect(response.status).toBe(401);
+    } finally {
+      server.close();
+      delete process.env.CRON_SECRET;
+    }
+  });
+
+  it("POST /cron-ping returns 202 with correct secret when no run today", async () => {
+    process.env.CRON_SECRET = "correct-secret-32-chars-xxxxxxxx";
+    // DB returns no existing run for today
+    dbState.selectQueue.push([]);
+    const { server, baseUrl } = await startTestServer();
+    try {
+      const response = await fetch(`${baseUrl}/api/ops/cron-ping`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + (process.env["CRON_SECRET"] ?? ""),
+        },
+      });
+      expect(response.status).toBe(202);
+      const json = await response.json();
+      expect(json.message).toMatch(/triggered/i);
+    } finally {
+      server.close();
+      delete process.env.CRON_SECRET;
+    }
+  });
+
+  it("POST /cron-ping returns 409 when today already succeeded", async () => {
+    process.env.CRON_SECRET = "correct-secret-32-chars-xxxxxxxx";
+    dbState.selectQueue.push([{ status: "success" }]);
+    const { server, baseUrl } = await startTestServer();
+    try {
+      const response = await fetch(`${baseUrl}/api/ops/cron-ping`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + (process.env["CRON_SECRET"] ?? ""),
+        },
+      });
+      expect(response.status).toBe(409);
+      const json = await response.json();
+      expect(json.message).toMatch(/already ran/i);
+    } finally {
+      server.close();
+      delete process.env.CRON_SECRET;
+    }
+  });
+
+  it("POST /cron-ping returns 423 when job is currently running", async () => {
+    process.env.CRON_SECRET = "correct-secret-32-chars-xxxxxxxx";
+    dbState.selectQueue.push([{ status: "running" }]);
+    const { server, baseUrl } = await startTestServer();
+    try {
+      const response = await fetch(`${baseUrl}/api/ops/cron-ping`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + (process.env["CRON_SECRET"] ?? ""),
+        },
+      });
+      expect(response.status).toBe(423);
+      const json = await response.json();
+      expect(json.message).toMatch(/running/i);
+    } finally {
+      server.close();
+      delete process.env.CRON_SECRET;
     }
   });
 

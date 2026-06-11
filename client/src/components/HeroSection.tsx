@@ -161,11 +161,13 @@ function RecentlyRevokedSection() {
 interface NightlyStats {
   totalActive:          number;
   lastRunDate:          string | null;
+  lastSuccessfulRunAt:  string | null;
   addedCount:           number;
   removedCount:         number;
   changesCount:         number;
   revokedLast12Months:  number;
   staleDays:            number;
+  hoursStale:           number;
 }
 
 function formatRunDate(dateStr: string | null): string {
@@ -226,7 +228,17 @@ function NightlyStatsBar() {
           </div>
           <div className="px-4">
             <p className={cn("text-2xl font-bold text-emerald-400", isLoading && "animate-pulse")}>{dateLabel}</p>
-            <p className="text-xs text-slate-400 mt-0.5">Register last checked</p>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Register last checked
+              {!isLoading && data?.lastSuccessfulRunAt && (
+                <span
+                  className="block text-slate-500 text-xs"
+                  title={new Date(data.lastSuccessfulRunAt).toUTCString()}
+                >
+                  {new Date(data.lastSuccessfulRunAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" })} UTC
+                </span>
+              )}
+            </p>
           </div>
         </div>
       </div>
@@ -345,23 +357,42 @@ function UrgencyBanner() {
     );
   }
 
-  // No changes at all
-  // If staleDays >= 3 (no successful run in 3+ calendar days), show an amber
-  // warning banner — the register data may be outdated.
-  if (data.staleDays >= 3) {
+  // No changes at all.
+  // Severity tiers based on hours since last successful run:
+  //   >48h  → critical (red-toned): the pipeline may be broken.
+  //   >24h  → warn (amber): nightly update overdue.
+  //   ≤24h  → fresh: show calm confirmation.
+  const hoursStale = data.hoursStale ?? data.staleDays * 24;
+
+  if (hoursStale > 48) {
     return (
-      <div className="bg-amber-900 text-amber-100">
+      <div className="bg-red-900 text-red-100">
         <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2 text-center">
-          <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-300" aria-hidden="true" />
+          <XCircle className="w-3.5 h-3.5 shrink-0 text-red-300" aria-hidden="true" />
           <p className="text-xs sm:text-sm font-medium">
-            Register data may be out of date — last checked {formatRunDate(lastRunDate)}. The nightly update may have been delayed.
+            Register data is out of date — last checked {formatRunDate(lastRunDate)}.{" "}
+            No update in {hoursStale}h. The nightly pipeline may be experiencing an issue.
           </p>
         </div>
       </div>
     );
   }
 
-  // No changes and data is fresh — show a calm confirmation strip
+  if (hoursStale > 24) {
+    return (
+      <div className="bg-amber-900 text-amber-100">
+        <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2 text-center">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-300" aria-hidden="true" />
+          <p className="text-xs sm:text-sm font-medium">
+            Register data may be out of date — last checked {formatRunDate(lastRunDate)}.{" "}
+            The nightly update may have been delayed.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // No changes and data is fresh (≤24h) — show a calm confirmation strip.
   return (
     <div className="bg-slate-800 text-slate-200">
       <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2 text-center">

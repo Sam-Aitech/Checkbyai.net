@@ -10,6 +10,7 @@ import { isSafeCallbackUrl, signPayload } from "../utils/callbackSigner";
 import { isUuidV4 } from "../utils/idempotency";
 import { generateCorrelationId, startJobRun, finishJobRun } from "../utils/jobTelemetry";
 import { runSponsorMonitorJob } from "../utils/sponsorMonitorJob";
+import { sendAdminAlert } from "../utils/adminAlert";
 import { runJobAlertJob } from "../utils/jobAlertJob";
 import { seedEnrichmentQueue, runEnrichmentBatch } from "../utils/enrichmentWorker";
 import { processQueuedEngineEvents } from "../services/notificationEngine";
@@ -27,6 +28,13 @@ import {
 const log = logger.child({ module: "OpsRoutes" });
 
 const IDEMPOTENCY_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+// Track cron-ping auth failures in-process to fire a throttled admin alert
+// when a misconfiguration is detected (e.g., rotated secret not deployed).
+let cronPingAuthFailureCount = 0;
+let cronPingAuthAlertLastSentAt = 0;
+const CRON_PING_AUTH_ALERT_THRESHOLD = 3;       // failures before alerting
+const CRON_PING_AUTH_ALERT_COOLDOWN_MS = 60 * 60 * 1000; // 1h between alerts
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -808,6 +816,13 @@ export function registerOpsRoutes(app: Express): void {
     const cronSecret = process.env.CRON_SECRET;
     if (!cronSecret) {
       log.warn("[CronPing] CRON_SECRET env var not set — endpoint disabled.");
+      // Fire a one-time admin alert so the configuration gap doesn't go unnoticed.
+      sendAdminAlert(
+        "⚠️ CheckByAI: CRON_SECRET not configured",
+        `<p>The external cron-ping endpoint received a request but <code>CRON_SECRET</code> is not set on this deployment.</p>
+         <p>The sponsor monitor will not be triggered by the GitHub Actions schedule until this env var is configured.</p>
+         <p>Request IP: ${req.ip ?? "unknown"} — ${new Date().toISOString()}</p>`,
+      ).catch(() => {});
       return res.status(503).json({ message: "External cron not configured." });
     }
 
@@ -817,8 +832,26 @@ export function registerOpsRoutes(app: Express): void {
     if (!provided || provided.length !== cronSecret.length ||
         !crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(cronSecret))) {
       log.warn({ ip: req.ip }, "[CronPing] Invalid or missing secret.");
+      cronPingAuthFailureCount += 1;
+      const now = Date.now();
+      if (
+        cronPingAuthFailureCount >= CRON_PING_AUTH_ALERT_THRESHOLD &&
+        now - cronPingAuthAlertLastSentAt > CRON_PING_AUTH_ALERT_COOLDOWN_MS
+      ) {
+        cronPingAuthAlertLastSentAt = now;
+        sendAdminAlert(
+          "🔐 CheckByAI: Repeated cron-ping auth failures — possible config drift",
+          `<p><strong>${cronPingAuthFailureCount}</strong> consecutive cron-ping authentication failures have been detected.</p>
+           <p>This usually means the <code>CRON_SECRET</code> in GitHub Actions secrets does not match the deployment env var.</p>
+           <p>The sponsor monitor <strong>will not run</strong> via the external schedule until this is fixed.</p>
+           <p>Last failure: ${new Date().toISOString()} — IP: ${req.ip ?? "unknown"}</p>`,
+        ).catch(() => {});
+      }
       return res.status(401).json({ message: "Unauthorized." });
     }
+
+    // Successful auth — reset failure counter.
+    cronPingAuthFailureCount = 0;
 
     const today = new Date().toISOString().split("T")[0];
     const existing = await db

@@ -57,3 +57,19 @@ jobs:
             cat /tmp/response.json
             exit 1
           fi
+
+      # Annotate the workflow run with a clear diagnosis when the ping fails.
+      # This surfaces silent scheduler failures in the GitHub Actions UI and
+      # the notification emails sent to repo watchers.
+      - name: Annotate failure cause
+        if: failure()
+        run: |
+          STATUS="${{ steps.ping.outputs.http_status }}"
+          BODY=$(cat /tmp/response.json 2>/dev/null || echo "(no response body)")
+          if [ "$STATUS" = "401" ]; then
+            echo "::error title=Cron-Ping Auth Failure::CRON_SECRET mismatch between GitHub Actions secret and deployment env var. The sponsor monitor will NOT run until this is fixed. HTTP $STATUS: $BODY"
+          elif [ "$STATUS" = "503" ]; then
+            echo "::error title=Cron-Ping Not Configured::CRON_SECRET is not set in the deployment environment. Sponsor monitor external trigger is disabled. HTTP $STATUS: $BODY"
+          else
+            echo "::error title=Cron-Ping Unexpected Failure::HTTP $STATUS — $BODY"
+          fi
