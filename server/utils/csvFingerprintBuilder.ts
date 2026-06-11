@@ -30,6 +30,7 @@ import {
   shouldTriggerSchemaChangeAlert,
   buildSchemaChangeAlertHtml,
 } from "./sponsorRowSchema";
+import { resolveSponsorCsvColumns, type SponsorCsvColumnIndexes } from "./sponsorCsvColumns";
 
 // ── CSV quoting ───────────────────────────────────────────────────────────────
 
@@ -45,34 +46,11 @@ function rowToCsvLine(fields: string[]): string {
   return fields.map(escapeCsvField).join(",");
 }
 
-// ── Column detection ──────────────────────────────────────────────────────────
+// ── Column detection (shared with csvArchiver) ────────────────────────────────
 
-interface ColIdx {
-  nameIdx: number;
-  townIdx: number;
-  countyIdx: number;
-  typeIdx: number;
-  routeIdx: number;
-  statusIdx: number;
-  licenceTypeIdx: number;
-  ratingIdx: number;
-  lastUpdatedIdx: number;
-}
+type ColIdx = SponsorCsvColumnIndexes;
 
-function detectCols(header: string[]): ColIdx {
-  const h = header.map((s) => s.trim().toLowerCase());
-  return {
-    nameIdx:  h.findIndex((c) => c.includes("organisation") && c.includes("name")),
-    townIdx:  h.findIndex((c) => c.includes("town") || c.includes("city")),
-    countyIdx: h.findIndex((c) => c.includes("county")),
-    typeIdx: h.findIndex((c) => c.includes("type") && c.includes("rating")),
-    routeIdx: h.findIndex((c) => c.includes("route")),
-    statusIdx: h.findIndex((c) => c.includes("status")),
-    licenceTypeIdx: h.findIndex((c) => c.includes("licence") && c.includes("type")),
-    ratingIdx: h.findIndex((c) => c.includes("rating") && !c.includes("type")),
-    lastUpdatedIdx: h.findIndex((c) => c.includes("last") && c.includes("updated")),
-  };
-}
+const detectCols = resolveSponsorCsvColumns;
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
@@ -231,6 +209,15 @@ export async function buildFingerprintedCsv(
     await sendAdminAlert(
       "🔴 CheckByAI: Sponsor CSV schema-change event detected",
       `${buildSchemaChangeAlertHtml(`FingerprintBuilder source: ${rawPath}`, summary)}`,
+    );
+    // Abort and remove the gutted output. An empty/near-empty fingerprinted
+    // CSV makes csvdiff report the entire register as deleted, which is how
+    // the 2026-05-20 mass-removal incident happened.
+    if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+    throw new Error(
+      `[FingerprintBuilder] Aborting: ${rowsRejected.toLocaleString()} of ${totalRowsProcessed.toLocaleString()} ` +
+      `CSV rows rejected by validation — probable register schema change. ` +
+      `Rejection reasons: ${JSON.stringify(rejectionReasons)}`,
     );
   }
 

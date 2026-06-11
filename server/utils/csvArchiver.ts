@@ -34,6 +34,7 @@ import { qsvValidate, qsvCount } from "./binaryRunner";
 import { sendAdminAlert } from "./adminAlert";
 import { buildFingerprintedCsv, fingerprintedCsvPath } from "./csvFingerprintBuilder";
 import type { SponsorRecord } from "./sponsorListFetcher";
+import { resolveSponsorCsvColumns, type SponsorCsvColumnIndexes } from "./sponsorCsvColumns";
 import {
   SponsorRowSchema,
   deriveSponsorRowEnums,
@@ -118,34 +119,11 @@ function detectHtmlContent(filePath: string): boolean {
   }
 }
 
-// ── Column resolution (duplicated here to avoid circular import) ──────────────
+// ── Column resolution (shared with csvFingerprintBuilder) ─────────────────────
 
-interface ColumnIndexes {
-  nameIdx: number;
-  townIdx: number;
-  countyIdx: number;
-  typeIdx: number;
-  routeIdx: number;
-  statusIdx: number;
-  licenceTypeIdx: number;
-  ratingIdx: number;
-  lastUpdatedIdx: number;
-}
+type ColumnIndexes = SponsorCsvColumnIndexes;
 
-function resolveColumnIndexes(header: string[]): ColumnIndexes {
-  const h = header.map((s) => s.trim().toLowerCase());
-  return {
-    nameIdx:   h.findIndex((c) => c.includes("organisation") && c.includes("name")),
-    townIdx:   h.findIndex((c) => c.includes("town") || c.includes("city")),
-    countyIdx: h.findIndex((c) => c.includes("county")),
-    typeIdx:   h.findIndex((c) => c.includes("type") && c.includes("rating")),
-    routeIdx:  h.findIndex((c) => c.includes("route")),
-    statusIdx: h.findIndex((c) => c.includes("status")),
-    licenceTypeIdx: h.findIndex((c) => c.includes("licence") && c.includes("type")),
-    ratingIdx: h.findIndex((c) => c.includes("rating") && !c.includes("type")),
-    lastUpdatedIdx: h.findIndex((c) => c.includes("last") && c.includes("updated")),
-  };
-}
+const resolveColumnIndexes = resolveSponsorCsvColumns;
 
 // ── Core public API ───────────────────────────────────────────────────────────
 
@@ -598,6 +576,14 @@ export async function parseCsvFile(filePath: string): Promise<SponsorRecord[]> {
     await sendAdminAlert(
       "🔴 CheckByAI: Sponsor CSV schema-change event detected",
       `${buildSchemaChangeAlertHtml(`CsvArchiver file: ${filePath}`, summary)}`,
+    );
+    // Abort instead of returning a near-empty record set. Feeding a gutted
+    // parse result into the diff engine reads as "the entire register was
+    // deleted" and triggers mass removals (2026-05-20 incident).
+    throw new Error(
+      `[CsvArchiver] Aborting: ${rowsRejected.toLocaleString()} of ${totalRowsProcessed.toLocaleString()} ` +
+      `CSV rows rejected by validation — probable register schema change. ` +
+      `Rejection reasons: ${JSON.stringify(rejectionReasons)}`,
     );
   }
 
