@@ -668,12 +668,16 @@ export async function runSponsorMonitorJob(
         `<p>${msg}</p>
          <p>The nightly monitor has been aborted to prevent mass REMOVED_REVOKED for legitimate sponsors.</p>`,
       );
-      // Mark archive as FAILED so the integrity check surfaces it.
+      // Mark archive as FAILED so the integrity check surfaces it. If this
+      // write fails the archive stays PENDING_SYNC and will be re-attempted
+      // on the next run — log it so the retry loop is explicable.
       await db
         .update(csvArchive)
         .set({ syncStatus: "FAILED" })
         .where(eq(csvArchive.snapshotDate, today))
-        .catch(() => {});
+        .catch((err: unknown) =>
+          log.error({ err }, "[SponsorMonitorJob] Failed to mark archive FAILED — status remains PENDING_SYNC"),
+        );
       throw new Error(msg);
     }
 

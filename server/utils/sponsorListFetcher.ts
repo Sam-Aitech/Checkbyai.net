@@ -300,38 +300,11 @@ export async function discoverCsvUrl(): Promise<string> {
   return url;
 }
 
-// ── Shared CSV parsing helpers ────────────────────────────────────────────────
-
-interface ColumnIndexes {
-  nameIdx: number;
-  townIdx: number;
-  countyIdx: number;
-  typeIdx: number;
-  routeIdx: number;
-}
-
-function resolveColumnIndexes(header: string[]): ColumnIndexes {
-  const h = header.map((s) => s.trim().toLowerCase());
-  return {
-    nameIdx:   h.findIndex((c) => c.includes("organisation") && c.includes("name")),
-    townIdx:   h.findIndex((c) => c.includes("town") || c.includes("city")),
-    countyIdx: h.findIndex((c) => c.includes("county")),
-    typeIdx:   h.findIndex((c) => c.includes("type") && c.includes("rating")),
-    routeIdx:  h.findIndex((c) => c.includes("route")),
-  };
-}
-
-function rowToRecord(row: string[], idx: ColumnIndexes): SponsorRecord | null {
-  const orgName = (row[idx.nameIdx] ?? "").trim();
-  if (!orgName) return null;
-  return {
-    organisationName: orgName,
-    townCity:  (idx.townIdx   >= 0 ? row[idx.townIdx]   ?? "" : "").trim(),
-    county:    (idx.countyIdx >= 0 ? row[idx.countyIdx] ?? "" : "").trim(),
-    typeRating:(idx.typeIdx   >= 0 ? row[idx.typeIdx]   ?? "" : "").trim(),
-    route:     (idx.routeIdx  >= 0 ? row[idx.routeIdx]  ?? "" : "").trim(),
-  };
-}
+// NOTE: this module deliberately has no CSV column-resolution logic of its own.
+// All header→index mapping lives in sponsorCsvColumns.ts (shared by csvArchiver
+// and csvFingerprintBuilder); CSV parsing goes through csvArchiver.parseCsvFile.
+// A private legacy-only resolver that used to live here was removed after the
+// May 2026 GOV.UK format change — do not reintroduce one.
 
 /**
  * Validates and returns HTML records from Scrapling fallback.

@@ -639,6 +639,18 @@ export async function applyStateMachine(
       { size: todayFingerprintSet.size },
       "[StateMachine] Today's fingerprint set is suspiciously small — skipping Phase C2 sweep (and Phase D2 will be skipped too).",
     );
+    // Operators must hear about this, not just the logs: while skipped, sponsors
+    // already in GRACE_PERIOD are neither promoted to REMOVED_REVOKED nor
+    // resurrected, so they strand there until a trustworthy register arrives.
+    await sendAdminAlert(
+      "ALERT: Sponsor sync degraded — fingerprint set too small, Phase C2/D2 skipped",
+      `<p>Today's fingerprint set has ${todayFingerprintSet.size.toLocaleString()} entries, below the ` +
+      `${MIN_TRUSTWORTHY_FINGERPRINT_SET.toLocaleString()} trust threshold (register is normally ~140K rows). ` +
+      `Phase C2 (self-heal resurrection) and Phase D2 (second-miss removal) were both skipped. ` +
+      `Sponsors currently in GRACE_PERIOD will not change state until a full register is processed.</p>` +
+      `<p>Likely cause: truncated download or GOV.UK CSV schema change. ` +
+      `File: ${todayFingerprintedCsvPath}</p>`,
+    ).catch((err: unknown) => log.warn({ err }, "[StateMachine] Failed to send small-fingerprint-set alert"));
   }
 
   // ── Phase D: Deletions (first and second misses) ──────────────────────────
@@ -694,7 +706,8 @@ export async function applyStateMachine(
       const msg =
         `Mass-removal circuit breaker tripped: run wants to remove/grace ${deletionImpact.toLocaleString()} ` +
         `of ${liveCount.toLocaleString()} live sponsors (> ${MASS_REMOVAL_FRACTION * 100}%). ` +
-        `Aborting before any status changes are applied. ` +
+        `Aborting before any removals are applied (Phase C2 resurrections from earlier in this run, ` +
+        `if any, remain committed — they only ever set sponsors back to ACTIVE). ` +
         `Set SPONSOR_ALLOW_MASS_REMOVAL=1 to override deliberately.`;
       log.error({ deletionImpact, liveCount }, `[StateMachine] ${msg}`);
       await sendAdminAlert(
