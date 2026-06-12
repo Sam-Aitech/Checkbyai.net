@@ -21,8 +21,8 @@ vi.mock("../adminAlert", () => ({
   sendAdminAlert: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock("../binaryRunner", () => ({
-  qsvValidate: vi.fn().mockResolvedValue({ ok: true }),
-  qsvCount: vi.fn().mockResolvedValue(0),
+  qsvValidate: vi.fn().mockResolvedValue({ valid: true, recordCount: 0, errors: [] }),
+  qsvCount: vi.fn().mockResolvedValue(150_000),
 }));
 
 import { parseCsvFile } from "../csvArchiver";
@@ -97,6 +97,37 @@ describe("new-format GOV.UK CSV — buildFingerprintedCsv", () => {
 
     expect(fpSet.size).toBe(3);
     expect(fpSet.has(generateFingerprint("Acme Global Ltd", "", "Skilled Worker"))).toBe(true);
+  });
+});
+
+describe("schema-change abort — mass row rejection must throw, never return a gutted result", () => {
+  // Rows with an empty TierRating fail the typeRating Zod refine, so 100% of
+  // rows are rejected — over the 20% SCHEMA_CHANGE_REJECTION_THRESHOLD. Before
+  // the fix this path silently returned a near-empty result, which csvdiff
+  // read as "entire register deleted" (the 2026-05-20 incident).
+  const REJECTED_CSV = [
+    NEW_FORMAT_HEADER,
+    "ABC123XYZ,Acme Global Ltd,,Skilled Worker,Licensed and Fully Active",
+    "DEF456UVW,Beta Care Homes Ltd,,Seasonal Worker,Licensed and Fully Active",
+    "GHI789RST,Gamma Logistics Ltd,,Skilled Worker,Licensed and Fully Active",
+  ].join("\n");
+
+  it("parseCsvFile throws instead of returning a near-empty record set", async () => {
+    const csvPath = writeTmpCsv("rejected.csv", REJECTED_CSV);
+
+    await expect(parseCsvFile(csvPath)).rejects.toThrow(/Aborting.*rejected by validation/);
+  });
+
+  it("buildFingerprintedCsv throws and deletes the gutted output file", async () => {
+    const csvPath = writeTmpCsv("rejected.csv", REJECTED_CSV);
+    const outPath = path.join(tmpDir, "rejected.fingerprinted.csv");
+
+    await expect(buildFingerprintedCsv(csvPath, outPath)).rejects.toThrow(
+      /Aborting.*rejected by validation/,
+    );
+    // Leaving a near-empty fingerprinted CSV on disk is how the incident
+    // propagated into the diff engine — the file must be gone.
+    expect(fs.existsSync(outPath)).toBe(false);
   });
 });
 

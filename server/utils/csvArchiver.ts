@@ -321,7 +321,7 @@ export async function ensureTodaysArchive(
       `<p>qsv found structural issues in the downloaded CSV for <strong>${date}</strong>:</p>
        <pre style="background:#fff3cd;padding:10px;border-radius:4px">${errMsg.replace(/</g, "&lt;")}</pre>
        <p>The pipeline will continue but the record count guard is the final safety check.</p>`,
-    ).catch(() => {});
+    ).catch((err: unknown) => logger.error({ err }, "[CsvArchiver] Failed to send validation-warning admin alert"));
   }
 
   // ── qsv count + hard guard ──────────────────────────────────────────────────
@@ -368,7 +368,7 @@ export async function ensureTodaysArchive(
        <p>The nightly monitor job has been aborted. No state machine changes were made.
           Yesterday's data remains unchanged.</p>
        <p>Action: Check Gov.uk manually to verify the CSV is complete.</p>`,
-    ).catch(() => {});
+    ).catch((err: unknown) => logger.error({ err }, "[CsvArchiver] Failed to send record-count-abort admin alert"));
 
     throw new Error(errorMsg);
   }

@@ -59,7 +59,10 @@ export function resolveSponsorCsvColumns(header: string[]): SponsorCsvColumnInde
     ),
     statusIdx: find((c) => c.includes("status")),
     licenceTypeIdx: find((c) => c.includes("licence") && c.includes("type")),
-    ratingIdx: find((c) => c.includes("rating") && !c.includes("type")),
+    // Must not match "TierRating" — that column is already claimed by typeIdx,
+    // and aliasing both onto it double-parses one column. With -1 here,
+    // deriveSponsorRowEnums falls back to typeRating, the correct source.
+    ratingIdx: find((c) => c.includes("rating") && !c.includes("type") && !c.includes("tier")),
     lastUpdatedIdx: find((c) => c.includes("last") && c.includes("updated")),
     licenceNumberIdx: find((c) => c.includes("licence") && c.includes("number")),
   };
