@@ -112,7 +112,7 @@ function canonicalRows(count: number, status: string) {
 }
 
 function alertSubjects(): string[] {
-  return (sendAdminAlert as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0] as string);
+  return vi.mocked(sendAdminAlert).mock.calls.map((c) => c[0] as string);
 }
 
 function statusesWritten(): unknown[] {
@@ -123,8 +123,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   selectResults = [];
   delete process.env.SPONSOR_ALLOW_MASS_REMOVAL;
-  (db.execute as ReturnType<typeof vi.fn>).mockResolvedValue({ rows: [{ cnt: 100_000 }] });
-  (loadFingerprintSet as ReturnType<typeof vi.fn>).mockResolvedValue(new Set());
+  vi.mocked(db.execute).mockResolvedValue({ rows: [{ cnt: 100_000 }] });
+  vi.mocked(loadFingerprintSet).mockResolvedValue(new Set());
 });
 
 afterEach(() => {
@@ -134,7 +134,7 @@ afterEach(() => {
 describe("mass-removal circuit breaker", () => {
   it("aborts before applying removals when deletions exceed 20% of live records", async () => {
     selectResults = [canonicalRows(300, "ACTIVE")]; // Phase A load
-    (db.execute as ReturnType<typeof vi.fn>)
+    vi.mocked(db.execute)
       .mockResolvedValueOnce({ rows: [{ cnt: 100_000 }] }) // Phase C first-run count
       .mockResolvedValueOnce({ rows: [{ cnt: 1_000 }] });  // breaker live count
 
@@ -148,7 +148,7 @@ describe("mass-removal circuit breaker", () => {
 
   it("does not trip below the threshold", async () => {
     selectResults = [canonicalRows(100, "ACTIVE")];
-    (db.execute as ReturnType<typeof vi.fn>)
+    vi.mocked(db.execute)
       .mockResolvedValueOnce({ rows: [{ cnt: 100_000 }] })
       .mockResolvedValueOnce({ rows: [{ cnt: 1_000 }] }); // 100 <= 20% of 1000
 
@@ -171,7 +171,7 @@ describe("mass-removal circuit breaker", () => {
 
 describe("Phase C2 self-heal sweep", () => {
   it("resurrects sponsors present in today's register but marked removed/grace in DB", async () => {
-    (loadFingerprintSet as ReturnType<typeof vi.fn>).mockResolvedValue(
+    vi.mocked(loadFingerprintSet).mockResolvedValue(
       trustedSet(["fp-stale-1", "fp-stale-2"]),
     );
     selectResults = [
@@ -195,7 +195,7 @@ describe("Phase C2 self-heal sweep", () => {
 
   it("suppresses per-company events and alerts admins above the mass-repair threshold", async () => {
     const staleFps = Array.from({ length: 1_001 }, (_, i) => `fp-stale-${i}`);
-    (loadFingerprintSet as ReturnType<typeof vi.fn>).mockResolvedValue(trustedSet(staleFps));
+    vi.mocked(loadFingerprintSet).mockResolvedValue(trustedSet(staleFps));
     selectResults = [
       staleFps.map((fp, i) => ({
         fingerprint: fp,
@@ -215,7 +215,7 @@ describe("Phase C2 self-heal sweep", () => {
 
 describe("MIN_TRUSTWORTHY_FINGERPRINT_SET gate", () => {
   it("skips C2/D2 on a small fingerprint set, alerts admins, and removes nothing", async () => {
-    (loadFingerprintSet as ReturnType<typeof vi.fn>).mockResolvedValue(new Set(["only-one"]));
+    vi.mocked(loadFingerprintSet).mockResolvedValue(new Set(["only-one"]));
 
     const result = await applyStateMachine(EMPTY_DIFF, TODAY, "dummy");
 
@@ -226,7 +226,7 @@ describe("MIN_TRUSTWORTHY_FINGERPRINT_SET gate", () => {
   });
 
   it("confirms D2 second-miss removals only under a trusted set", async () => {
-    (loadFingerprintSet as ReturnType<typeof vi.fn>).mockResolvedValue(trustedSet());
+    vi.mocked(loadFingerprintSet).mockResolvedValue(trustedSet());
     selectResults = [
       [], // Phase C2 stale rows
       [{ fingerprint: "fp-grace-1", currentName: "Gone Ltd", consecutiveMisses: 1 }], // Phase D2
