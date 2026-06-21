@@ -110,3 +110,28 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 - **P4 (naming)**: `for (const c of ...)` → `for (const change of ...)` at `sponsors.ts:285` and `sponsors.ts:756`
 - **P4 (magic numbers)**: 100000 → `FIRST_RUN_ADDITION_THRESHOLD`, 1000 → `FIRST_RUN_CANONICAL_MIN` / `FP_QUERY_CHUNK_SIZE` (`sponsorStateMachine.ts`)
 - **P4 (Cache-Control)**: Added `res.set("Cache-Control", "public, max-age=300")` to recently-revoked cached path (`sponsorPages.ts:214-216`)
+
+#### Session 2026-06-21 — Status Casing Root Cause (Phase 4)
+
+**Goal:** Fix production issue where landing page shows zero changes and empty recently-revoked licences despite 5 changes detected nightly.
+
+**Diagnosis (production diagnostics revealed):**
+- `sponsor_canonical` rows: 143,371 ✅
+- Pipeline runs ✅ — "5 changes detected"
+- Search index: **0 records** ⚠️ (smoking gun)
+- Redis: ECONNREFUSED (expected in Autoscale)
+- Python sidecar: OFFLINE (expected)
+- Server cold-restarted at 01:23 UTC due to Neon DB `57P01` termination
+
+**Root cause:** `sponsorCanonical.status` values stored with wrong casing (e.g. `"active"` instead of `"ACTIVE"`), breaking ALL 14+ case-sensitive `WHERE status IN ('ACTIVE', ...)` SQL queries — search index, nightly-stats, recently-revoked, seed digest, active count. The state machine's `normalizeCanonicalStatus()` writes uppercase, but the initial bulk load likely imported lowercase values.
+
+**Fixes:**
+- **P0** — Migration `0022_normalize_sponsor_status_casing.sql`: `UPDATE "sponsor_canonical" SET "status" = UPPER("status")` — one-time fix for existing data
+- **P1** — `seedInitialDigest()`: changed `addedCount: active` → `addedCount: 0` and `removedCount: revoked` → `removedCount: 0` because the seed represents first-run state, not daily deltas (`sponsorMonitorJob.ts:1047-1048`)
+- **P2 (defense-in-depth)** — Search index rebuild uses `sql\`UPPER(...)\`` instead of `inArray()` to be immune to future casing issues (`sponsorSearch.ts:106`)
+
+**Deployment steps (to run on production):**
+1. Run migration SQL via Neon Console or psql: `\i migrations/0022_normalize_sponsor_status_casing.sql`
+2. `POST /api/admin/sponsor-monitor/rebuild-index`
+3. `POST /api/admin/daily-digest/refresh`
+4. Verify landing page shows correct change counts

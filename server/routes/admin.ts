@@ -5,7 +5,7 @@ import * as crypto from "crypto";
 import * as fs from "fs";
 import * as path from "path";
 import { db } from "../db";
-import { sql, eq, and, desc, gte, asc, inArray } from "drizzle-orm";
+import { sql, eq, and, desc, gte, asc } from "drizzle-orm";
 import {
   insertFeedbackSchema,
   sponsorCanonical,
@@ -839,7 +839,7 @@ Format your response in clear, professional markdown.`;
       const count = (await db
         .select({ n: sql<number>`count(*)::int` })
         .from(sponsorCanonical)
-        .where(sql`${sponsorCanonical.status} IN ('ACTIVE', 'NEWLY_GRANTED')`))[0]?.n ?? 0;
+        .where(sql`UPPER(${sponsorCanonical.status}) IN ('ACTIVE', 'NEWLY_GRANTED')`))[0]?.n ?? 0;
       res.json({ count, message: `Search index rebuilt with ${count.toLocaleString()} active sponsors.` });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);

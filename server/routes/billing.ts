@@ -3,7 +3,7 @@ import rateLimit from "express-rate-limit";
 import * as crypto from "crypto";
 import Stripe from "stripe";
 import { db } from "../db";
-import { sql, eq, lt, and, inArray } from "drizzle-orm";
+import { sql, eq, lt, and } from "drizzle-orm";
 import { withRetry } from "../utils/dbRetry";
 import { users, processedCheckouts, companyWatches, sponsorCanonical, DEFAULT_NOTIF_PREFS } from "@shared/schema";
 import { sendEmailReliably } from "../utils/resilientEmail";
@@ -59,7 +59,7 @@ async function autoCreateWatchFromPayment(userId: string, companyName: string): 
 
     if (!match) {
       const candidates = await db.select().from(sponsorCanonical)
-        .where(inArray(sponsorCanonical.status, ['ACTIVE', 'NEWLY_GRANTED', 'REMOVED_REVOKED', 'GRACE_PERIOD']));
+        .where(sql`UPPER(${sponsorCanonical.status}) IN ('ACTIVE', 'NEWLY_GRANTED', 'REMOVED_REVOKED', 'GRACE_PERIOD')`);
       match = candidates.find(c => normalizeName(c.currentName) === normalized) ?? null;
     }
 

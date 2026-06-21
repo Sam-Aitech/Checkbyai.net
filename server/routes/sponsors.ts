@@ -596,7 +596,7 @@ export function registerSponsorRoutes(app: Express): void {
         })
         .from(sponsorCanonical)
         .where(
-          inArray(sponsorCanonical.status, ['ACTIVE', 'GRACE_PERIOD', 'NEWLY_GRANTED'])
+          sql`UPPER(${sponsorCanonical.status}) IN ('ACTIVE', 'GRACE_PERIOD', 'NEWLY_GRANTED')`
         );
 
       canonicalMatch = candidateRecords.find(m => {

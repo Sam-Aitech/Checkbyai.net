@@ -1081,9 +1081,9 @@ async function seedInitialDigest(): Promise<void> {
 
     await db.insert(dailyDigest).values({
       snapshotDate: today,
-      addedCount: active,
+      addedCount: 0,
       updatedCount: 0,
-      removedCount: revoked,
+      removedCount: 0,
       headlineGenerated: headline,
       headlineVariants: variants,
       displayedOnLanding: true,

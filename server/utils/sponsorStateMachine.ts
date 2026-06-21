@@ -605,7 +605,7 @@ export async function applyStateMachine(
         status:      sponsorCanonical.status,
       })
       .from(sponsorCanonical)
-      .where(inArray(sponsorCanonical.status, ["REMOVED_REVOKED", "GRACE_PERIOD"]));
+      .where(sql`UPPER(${sponsorCanonical.status}) IN ('REMOVED_REVOKED', 'GRACE_PERIOD')`);
 
     const toResurrect = staleRows.filter(
       (r) => todayFingerprintSet.has(r.fingerprint) && !handledThisRun.has(r.fingerprint),
@@ -711,7 +711,7 @@ export async function applyStateMachine(
   if (deletionImpact > 0 && process.env.SPONSOR_ALLOW_MASS_REMOVAL !== "1") {
     const liveCountResult = await db.execute(sql`
       SELECT COUNT(*)::int AS cnt FROM sponsor_canonical
-      WHERE status IN ('ACTIVE', 'NEWLY_GRANTED', 'GRACE_PERIOD')
+      WHERE UPPER(status) IN ('ACTIVE', 'NEWLY_GRANTED', 'GRACE_PERIOD')
     `);
     const liveCount = (liveCountResult.rows[0] as { cnt: number } | undefined)?.cnt ?? 0;
     if (liveCount >= MASS_REMOVAL_MIN_LIVE && deletionImpact > liveCount * MASS_REMOVAL_FRACTION) {

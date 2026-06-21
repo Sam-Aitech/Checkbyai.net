@@ -109,7 +109,7 @@ export function registerSponsorPageRoutes(app: Express): void {
     const [{ count }] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(sponsorCanonical)
-      .where(inArray(sponsorCanonical.status, ["ACTIVE", "NEWLY_GRANTED"]));
+      .where(sql`UPPER(${sponsorCanonical.status}) IN ('ACTIVE', 'NEWLY_GRANTED')`);
 
     const pages = Math.max(1, Math.ceil(count / SITEMAP_PAGE_SIZE));
     const today = new Date().toISOString().split("T")[0];
@@ -149,7 +149,7 @@ export function registerSponsorPageRoutes(app: Express): void {
         lastSeen:    sponsorCanonical.lastSeen,
       })
       .from(sponsorCanonical)
-      .where(inArray(sponsorCanonical.status, ["ACTIVE", "NEWLY_GRANTED"]))
+      .where(sql`UPPER(${sponsorCanonical.status}) IN ('ACTIVE', 'NEWLY_GRANTED')`)
       .orderBy(sponsorCanonical.id)
       .limit(SITEMAP_PAGE_SIZE)
       .offset(offset);
@@ -227,7 +227,7 @@ export function registerSponsorPageRoutes(app: Express): void {
         removedAt:   sponsorCanonical.removedAt,
       })
       .from(sponsorCanonical)
-      .where(eq(sponsorCanonical.status, "REMOVED_REVOKED"))
+      .where(sql`UPPER(${sponsorCanonical.status}) = 'REMOVED_REVOKED'`)
       .orderBy(desc(sponsorCanonical.removedAt))
       .limit(7);
 
@@ -254,7 +254,7 @@ export function registerSponsorPageRoutes(app: Express): void {
       db
         .select({ total: sql<number>`count(*)::int` })
         .from(sponsorCanonical)
-        .where(inArray(sponsorCanonical.status, ["ACTIVE", "NEWLY_GRANTED"])),
+        .where(sql`UPPER(${sponsorCanonical.status}) IN ('ACTIVE', 'NEWLY_GRANTED')`),
       // Only fetch the digest that is actively displayed on the landing page —
       // this ensures zero-change days don't overwrite a meaningful digest.
       db
@@ -364,7 +364,7 @@ export function registerSponsorPageRoutes(app: Express): void {
         status,
         granted_at
       FROM sponsor_canonical
-      WHERE status IN ('ACTIVE', 'NEWLY_GRANTED')
+      WHERE UPPER(status) IN ('ACTIVE', 'NEWLY_GRANTED')
       ORDER BY current_name ASC
     `);
 

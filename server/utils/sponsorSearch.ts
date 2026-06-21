@@ -1,7 +1,7 @@
 import Fuse, { type IFuseOptions } from "fuse.js";
 import { db } from "../db";
 import { sponsorCanonical } from "@shared/schema";
-import { inArray, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { logger } from "../utils/logger";
 
 interface SponsorSearchRecord {
@@ -103,7 +103,7 @@ export async function rebuildSponsorIndex(): Promise<void> {
       historicalNames:  sponsorCanonical.historicalNames,
     })
     .from(sponsorCanonical)
-    .where(inArray(sponsorCanonical.status, ["ACTIVE", "NEWLY_GRANTED"]));
+    .where(sql`UPPER(${sponsorCanonical.status}) IN ('ACTIVE', 'NEWLY_GRANTED')`);
 
   const searchRecords: SponsorSearchRecord[] = records.map((r) => ({
     id:               r.id,
@@ -260,7 +260,7 @@ export async function searchSponsorsFallback(
   // Build dynamic WHERE clauses
   const statusFilter = status
     ? sql`AND status = ${status}`
-    : sql`AND status IN ('ACTIVE', 'NEWLY_GRANTED')`;
+    : sql`AND UPPER(status) IN ('ACTIVE', 'NEWLY_GRANTED')`;
 
   const townFilter = town
     ? sql`AND town_city ILIKE ${"%" + town + "%"}`
