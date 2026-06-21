@@ -15,6 +15,7 @@ import { errorHandler } from "./lib/errorHandler";
 import { initJobQueue, setupWorkers } from "./services/jobQueue";
 import { initRedisCache, cacheFlushPattern } from "./utils/redisClient";
 import { rebuildSponsorIndex } from "./utils/sponsorSearch";
+import { runSponsorMonitorJob } from "./utils/sponsorMonitorJob";
 
 // Startup validation — fail fast if truly critical env vars are missing
 // ADMIN_EMAIL is intentionally excluded: the app handles its absence gracefully (admin emails disabled)
@@ -428,6 +429,59 @@ async function applyDataFixbacks() {
        );
      } else {
        logger.info({ rowCount }, "[Startup] sponsor_canonical loaded — register is ready.");
+
+       // ── Startup auto-reconcile guard ───────────────────────────────────────
+       // If the DB has a substantial number of rows but zero ACTIVE/NEWLY_GRANTED
+       // records, all statuses are stuck as REMOVED_REVOKED (common after an
+       // initial bulk-load that used the legacy NOT_LISTED status, which the
+       // startup DDL guard above converts to REMOVED_REVOKED).  The nightly
+       // incremental diff never promotes these rows back to ACTIVE on its own,
+       // because csvdiff only reports day-over-day *changes* — rows present in
+       // both yesterday's and today's CSV appear in neither Additions nor
+       // Deletions and are therefore invisible to the state machine.
+       //
+       // The fix: fire a full monitor job in the background on boot.  Phase C2
+       // inside applyStateMachine() (self-heal sweep) will compare today's full
+       // fingerprint set against sponsor_canonical and promote every
+       // REMOVED_REVOKED row that is present in today's register back to ACTIVE.
+       //
+       // Threshold: only trigger when ≥50 k rows exist (real register is ~140k)
+       // so we never accidentally fire on a fresh empty-ish DB.
+       // Non-blocking: errors are logged but never crash the server.
+       if (rowCount >= 50_000) {
+         try {
+           const activeResult = await pool.query<{ count: string }>(
+             `SELECT COUNT(*)::text AS count
+              FROM sponsor_canonical
+              WHERE status IN ('ACTIVE', 'NEWLY_GRANTED')`
+           );
+           const activeCount = parseInt(activeResult.rows[0]?.count ?? "0", 10);
+           if (activeCount === 0) {
+             logger.warn(
+               { rowCount, activeCount },
+               "[Startup] sponsor_canonical has rows but ZERO ACTIVE/NEWLY_GRANTED — " +
+               "all statuses are likely stuck as REMOVED_REVOKED. " +
+               "Triggering a full monitor job on boot to run Phase C2 self-heal."
+             );
+             // Fire-and-forget — runs in background after server is up
+             setImmediate(() => {
+               runSponsorMonitorJob("startup-reconcile", true).catch((err: unknown) =>
+                 logger.error(
+                   { err: err instanceof Error ? err.message : String(err) },
+                   "[Startup] Auto-reconcile monitor job failed (non-fatal)"
+                 )
+               );
+             });
+           } else {
+             logger.info(
+               { rowCount, activeCount },
+               "[Startup] Status distribution looks healthy — no auto-reconcile needed."
+             );
+           }
+         } catch (err) {
+           logger.warn({ err }, "[Startup] Auto-reconcile status check failed (non-fatal) — skipping.");
+         }
+       }
      }
    } catch (err) {
      logger.error({ err }, "[Startup] Failed to check sponsor_canonical row count — DB may be unavailable.");
