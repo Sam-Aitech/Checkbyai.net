@@ -373,6 +373,18 @@ async function applyDataFixbacks() {
     } catch (err) {
       logger.error({ err }, "Failed to ensure sponsor_changes.is_test column exists at startup");
     }
+
+    // ── monitor_job_runs.is_gap_day guard ─────────────────────────────────────
+    // Migration 0020 adds this column but drizzle-kit migrate may not run before
+    // the dev server starts.  The job telemetry upsert writes this column.
+    try {
+      await client.query(`
+        ALTER TABLE "monitor_job_runs"
+        ADD COLUMN IF NOT EXISTS "is_gap_day" boolean DEFAULT false
+      `);
+    } catch (err) {
+      logger.error({ err }, "Failed to ensure monitor_job_runs.is_gap_day column exists at startup");
+    }
   } finally {
     client.release();
   }
