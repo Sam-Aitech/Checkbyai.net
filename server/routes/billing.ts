@@ -141,14 +141,14 @@ function verifyClientReferenceId(clientRefId: string): { userId: string; package
   }
 }
 
-async function tryClaimSession(sessionId: string): Promise<boolean> {
+export async function tryClaimSession(sessionId: string): Promise<boolean> {
   const result = await db.execute(
     sql`INSERT INTO processed_checkouts (session_id) VALUES (${sessionId}) ON CONFLICT (session_id) DO NOTHING RETURNING id`
   );
   return (result as any).rowCount > 0;
 }
 
-async function isSessionProcessed(sessionId: string): Promise<boolean> {
+export async function isSessionProcessed(sessionId: string): Promise<boolean> {
   const [row] = await db
     .select({ sessionId: processedCheckouts.sessionId })
     .from(processedCheckouts)

@@ -404,7 +404,6 @@ export async function checkDigestHealth(): Promise<CheckResult<{
 
 /**
  * Redis cache health — is the client connected, how many keys in our
- * Redis cache health — is the client connected, how many keys in our
  * sponsor-related namespaces, ping latency.
  */
 export async function checkRedisHealth(): Promise<CheckResult<{

@@ -30,6 +30,7 @@ const About = lazy(() => import("@/pages/About"));
 const ProDashboard = lazy(() => import("@/pages/ProDashboard"));
 const SponsorDetail = lazy(() => import("@/pages/SponsorDetail"));
 const ReceiptPage = lazy(() => import("@/pages/ReceiptPage"));
+const SingleCheck = lazy(() => import("@/pages/SingleCheck"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 // Minimal loading component for route transitions
@@ -67,6 +68,7 @@ function Router() {
         <Route path="/sponsor-monitor" component={SponsorMonitor} />
         <Route path="/sponsor-changes" component={SponsorChanges} />
         <Route path="/sponsors" component={SponsorDirectory} />
+        <Route path="/single-check" component={SingleCheck} />
         <Route path="/check-fake-cos" component={CheckFakeCoS} />
         <Route path="/what-to-do-fake-cos" component={WhatToDoFakeCoS} />
         <Route path="/about" component={About} />

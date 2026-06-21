@@ -202,7 +202,7 @@ export function registerSponsorPageRoutes(app: Express): void {
     const data = getIndexData();
     await cacheSet(cacheKey, data, 43200);
     res.set("Content-Type", "application/json");
-    res.set("Cache-Control", "public, max-age=43200, stale-while-revalidate=86400");
+    res.set("Cache-Control", "public, max-age=3600, stale-while-revalidate=3600");
     success(res, data);
   }));
 
@@ -213,6 +213,7 @@ export function registerSponsorPageRoutes(app: Express): void {
     const cacheKey = "sponsors:recently-revoked";
     const cached = await cacheGet<object[]>(cacheKey);
     if (cached) {
+      res.set("Cache-Control", "public, max-age=300");
       success(res, cached);
       return;
     }

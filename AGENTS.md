@@ -101,3 +101,12 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 | `client/src/lib/queryDefaults.ts` | Standardized staleTime constants |
 | `shared/schema.ts` | DB schema (sponsorChanges.isTest, dailyDigest) |
 | `migrations/0020_monitor_job_runs_is_gap_day.sql` | Phase 2 migration |
+
+#### Coding-Standards Audit Fixes (this session)
+- **P0**: `search-index.json` fresh path Cache-Control `max-age=43200` → `max-age=3600` to match cached path (`sponsorPages.ts:205`)
+- **P2 (DRY)**: Extracted `insertDailyDigest()` helper into `server/services/aiDigest.ts` — refactored `sponsors.ts` and `sponsorMonitorJob.ts` to use it
+- **P3 (typo)**: Duplicated JSDoc line removed from `sponsorMonitorDiagnostics.ts:407`
+- **P4 (immutability)**: `grouped[dateKey].push(change)` → spread operator (`sponsors.ts:901-902`)
+- **P4 (naming)**: `for (const c of ...)` → `for (const change of ...)` at `sponsors.ts:285` and `sponsors.ts:756`
+- **P4 (magic numbers)**: 100000 → `FIRST_RUN_ADDITION_THRESHOLD`, 1000 → `FIRST_RUN_CANONICAL_MIN` / `FP_QUERY_CHUNK_SIZE` (`sponsorStateMachine.ts`)
+- **P4 (Cache-Control)**: Added `res.set("Cache-Control", "public, max-age=300")` to recently-revoked cached path (`sponsorPages.ts:214-216`)

@@ -9,7 +9,7 @@ import { getWatchLimit as getWatchLimitFromTier, getTierConfig } from "../utils/
 import { normalizeName, generateFingerprint } from "../utils/sponsorListFetcher";
 import { ensureIndexReady, isIndexReady, searchSponsors, searchSponsorsFallback, searchRevokedSponsors, getIndexHealth, type PagedSearchResult } from "../utils/sponsorSearch";
 import { recordSearchRequest } from "../services/monitoringService";
-import { generateHeadline, signDigest } from "../services/aiDigest";
+import { generateHeadline, signDigest, insertDailyDigest } from "../services/aiDigest";
 import { storage } from "../storage";
 import { cacheGet, cacheSet, cacheFlushPattern } from "../utils/redisClient";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
@@ -282,15 +282,15 @@ export function registerSponsorRoutes(app: Express): void {
     const removedCompanies: string[] = [];
     const addedCompanies: string[] = [];
 
-    for (const c of latestChanges) {
-      if (c.changeType === "ADDED" || c.changeType === "NEW_LICENCE") {
-        addedCount += c.count;
-        if (addedCompanies.length < 5) addedCompanies.push(c.organisationName);
-      } else if (c.changeType === "REMOVED_REVOKED") {
-        removedCount += c.count;
-        if (removedCompanies.length < 10) removedCompanies.push(c.organisationName);
-      } else if (["UPGRADED", "DOWNGRADED", "ROUTE_CHANGE", "NAME_CHANGE"].includes(c.changeType)) {
-        updatedCount += c.count;
+    for (const change of latestChanges) {
+      if (change.changeType === "ADDED" || change.changeType === "NEW_LICENCE") {
+        addedCount += change.count;
+        if (addedCompanies.length < 5) addedCompanies.push(change.organisationName);
+      } else if (change.changeType === "REMOVED_REVOKED") {
+        removedCount += change.count;
+        if (removedCompanies.length < 10) removedCompanies.push(change.organisationName);
+      } else if (["UPGRADED", "DOWNGRADED", "ROUTE_CHANGE", "NAME_CHANGE"].includes(change.changeType)) {
+        updatedCount += change.count;
       }
     }
 
@@ -311,7 +311,7 @@ export function registerSponsorRoutes(app: Express): void {
     if (hasChanges) {
       await db.transaction(async (tx) => {
         await tx.update(dailyDigest).set({ displayedOnLanding: false });
-        await tx.insert(dailyDigest).values({
+        await insertDailyDigest(tx, {
           snapshotDate: today,
           addedCount,
           updatedCount,
@@ -322,20 +322,10 @@ export function registerSponsorRoutes(app: Express): void {
           selectedVariantIndex: 0,
           aiModel: headlineResult.model,
           generatedAt: new Date(),
-        }).onConflictDoUpdate({
-          target: dailyDigest.snapshotDate,
-          set: {
-            headlineGenerated: headlineResult.headline,
-            headlineVariants: headlineResult.variants,
-            displayedOnLanding: true,
-            selectedVariantIndex: 0,
-            aiModel: headlineResult.model,
-            generatedAt: new Date(),
-          },
         });
       });
     } else {
-      await db.insert(dailyDigest).values({
+      await insertDailyDigest(db, {
         snapshotDate: today,
         addedCount,
         updatedCount,
@@ -346,16 +336,6 @@ export function registerSponsorRoutes(app: Express): void {
         selectedVariantIndex: 0,
         aiModel: headlineResult.model,
         generatedAt: new Date(),
-      }).onConflictDoUpdate({
-        target: dailyDigest.snapshotDate,
-        set: {
-          headlineGenerated: headlineResult.headline,
-          headlineVariants: headlineResult.variants,
-          displayedOnLanding: false,
-          selectedVariantIndex: 0,
-          aiModel: headlineResult.model,
-          generatedAt: new Date(),
-        },
       });
     }
 
@@ -773,10 +753,10 @@ export function registerSponsorRoutes(app: Express): void {
         .orderBy(desc(sponsorChanges.detectedAt))
       : [];
     const changesByOrg = new Map<string, typeof allRecentChanges>();
-    for (const c of allRecentChanges) {
-      const list = changesByOrg.get(c.organisationName) ?? [];
-      list.push(c);
-      changesByOrg.set(c.organisationName, list);
+    for (const change of allRecentChanges) {
+      const list = changesByOrg.get(change.organisationName) ?? [];
+      list.push(change);
+      changesByOrg.set(change.organisationName, list);
     }
 
     const enriched = watches.map((watch) => {
@@ -918,8 +898,7 @@ export function registerSponsorRoutes(app: Express): void {
     const grouped: Record<string, typeof changes> = {};
     for (const change of changes) {
       const dateKey = change.snapshotDate || (change.detectedAt ? new Date(change.detectedAt).toISOString().split('T')[0] : 'unknown');
-      if (!grouped[dateKey]) grouped[dateKey] = [];
-      grouped[dateKey].push(change);
+      grouped[dateKey] = [...(grouped[dateKey] || []), change];
     }
 
     const changesResponse = { changes, grouped, totalCount: changes.length };

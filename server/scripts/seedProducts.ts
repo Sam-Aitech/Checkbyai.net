@@ -15,6 +15,15 @@ interface Product {
 
 const products: Product[] = [
   {
+    name: 'Single Scam Check Report',
+    description: 'One-off CoS scam check: forensic document analysis, sponsor licence status & history, salary threshold check, and scam red flags. No account needed.',
+    priceAmount: 999, // £9.99 in pence
+    currency: 'gbp',
+    metadata: {
+      packageType: 'single_check',
+    },
+  },
+  {
     name: 'Starter Package',
     description: 'Monitor 5 companies with same-day alerts, 50 verification credits included',
     priceAmount: 2499, // £24.99 in pence

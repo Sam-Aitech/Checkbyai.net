@@ -6,6 +6,7 @@ import { registerSeoRoutes } from "./routes/seo";
 import { registerAuthRoutes } from "./routes/auth";
 import { registerBillingRoutes, cleanupOldProcessedCheckouts } from "./routes/billing";
 import { registerVerificationRoutes } from "./routes/verification";
+import { registerSingleCheckRoutes } from "./routes/singleCheck";
 import { registerSponsorRoutes } from "./routes/sponsors";
 import { registerNotificationRoutes } from "./routes/notifications";
 import { registerStatsRoutes } from "./routes/stats";
@@ -57,6 +58,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerAuthRoutes(app);
   registerBillingRoutes(app);
   registerVerificationRoutes(app);
+  registerSingleCheckRoutes(app);
   registerSponsorRoutes(app);
   registerSponsorPageRoutes(app);
   registerNotificationRoutes(app);

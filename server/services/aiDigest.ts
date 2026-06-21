@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { db } from "../db";
-import { aiGenerationLogs } from "@shared/schema";
+import { aiGenerationLogs, dailyDigest } from "@shared/schema";
 import { logger } from "../utils/logger";
 import { createChatCompletion, hasAnyProvider } from "./aiService";
 
@@ -191,3 +191,40 @@ export function signDigest(data: Record<string, any>): string {
 
 export { deterministicHeadline };
 export type { RawDigestData, HeadlineVariant, GenerateResult };
+
+/**
+ * Insert (or upsert) a daily digest row. Accepts any Drizzle client so
+ * it works both inside and outside transactions.
+ */
+export function insertDailyDigest(
+  client: any,
+  values: {
+    snapshotDate: string;
+    addedCount: number;
+    updatedCount: number;
+    removedCount: number;
+    headlineGenerated: string;
+    headlineVariants: HeadlineVariant[];
+    displayedOnLanding: boolean;
+    selectedVariantIndex: number;
+    aiModel: string;
+    generatedAt?: Date;
+  },
+) {
+  const payload = {
+    snapshotDate:          values.snapshotDate,
+    addedCount:           values.addedCount,
+    updatedCount:         values.updatedCount,
+    removedCount:         values.removedCount,
+    headlineGenerated:    values.headlineGenerated,
+    headlineVariants:     values.headlineVariants,
+    displayedOnLanding:   values.displayedOnLanding,
+    selectedVariantIndex: values.selectedVariantIndex,
+    aiModel:              values.aiModel,
+    generatedAt:          values.generatedAt ?? new Date(),
+  };
+  return client.insert(dailyDigest).values(payload).onConflictDoUpdate({
+    target: dailyDigest.snapshotDate,
+    set: payload,
+  });
+}

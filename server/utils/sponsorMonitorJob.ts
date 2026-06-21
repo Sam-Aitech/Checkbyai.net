@@ -10,7 +10,7 @@ import { rebuildSponsorIndex } from "./sponsorSearch";
 import { cacheFlushPattern } from "./redisClient";
 import { notifyUsersOfEvent, processQueuedEngineEvents } from "../services/notificationEngine";
 import { getNotificationQueue, NOTIFICATION_JOB } from "../services/jobQueue";
-import { generateHeadline, type RawDigestData } from "../services/aiDigest";
+import { generateHeadline, insertDailyDigest, type RawDigestData } from "../services/aiDigest";
 import { withRetry } from "./dbRetry";
 import { sendAdminAlert } from "./adminAlert";
 import { logger } from "./logger";
@@ -928,7 +928,7 @@ export async function runSponsorMonitorJob(
       if (hasChanges) {
         await db.transaction(async (tx) => {
           await tx.update(dailyDigest).set({ displayedOnLanding: false });
-          await tx.insert(dailyDigest).values({
+          await insertDailyDigest(tx, {
             snapshotDate: today,
             addedCount,
             updatedCount,
@@ -938,23 +938,11 @@ export async function runSponsorMonitorJob(
             displayedOnLanding: true,
             selectedVariantIndex,
             aiModel: headlineResult.model,
-          }).onConflictDoUpdate({
-            target: dailyDigest.snapshotDate,
-            set: {
-              addedCount,
-              updatedCount,
-              removedCount,
-              headlineGenerated: headlineResult.headline,
-              headlineVariants: headlineResult.variants,
-              displayedOnLanding: true,
-              selectedVariantIndex,
-              aiModel: headlineResult.model,
-              generatedAt: new Date(),
-            },
+            generatedAt: new Date(),
           });
         });
       } else {
-        await db.insert(dailyDigest).values({
+        await insertDailyDigest(db, {
           snapshotDate: today,
           addedCount,
           updatedCount,
@@ -964,19 +952,7 @@ export async function runSponsorMonitorJob(
           displayedOnLanding: false,
           selectedVariantIndex,
           aiModel: headlineResult.model,
-        }).onConflictDoUpdate({
-          target: dailyDigest.snapshotDate,
-          set: {
-            addedCount,
-            updatedCount,
-            removedCount,
-            headlineGenerated: headlineResult.headline,
-            headlineVariants: headlineResult.variants,
-            displayedOnLanding: false,
-            selectedVariantIndex,
-            aiModel: headlineResult.model,
-            generatedAt: new Date(),
-          },
+          generatedAt: new Date(),
         });
       }
 

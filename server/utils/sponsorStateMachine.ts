@@ -71,6 +71,18 @@ const MASS_REPAIR_EVENT_THRESHOLD = 1_000;
  */
 const MIN_TRUSTWORTHY_FINGERPRINT_SET = 50_000;
 
+/** Minimum active canonical rows to be considered "populated" (not first-run seed). */
+const FIRST_RUN_CANONICAL_MIN = 1_000;
+
+/** Addition count above which the pipeline treats it as a Home Office bulk seed. */
+const FIRST_RUN_ADDITION_THRESHOLD = 100_000;
+
+/**
+ * Batch DB query chunk size — keeps IN-clause lists from getting too long
+ * and avoids SQLite/PostgreSQL parameter limits.
+ */
+const FP_QUERY_CHUNK_SIZE = 1_000;
+
 /**
  * Length-adjusted similarity threshold for rename detection.
  * Short names (e.g. "ABC Ltd" vs "XYZ Ltd") match at high similarity by chance,
@@ -284,8 +296,8 @@ export async function applyStateMachine(
   if (allDiffFPs.size > 0) {
     const fpArray = Array.from(allDiffFPs);
     // Batch query to avoid huge IN clauses
-    for (let i = 0; i < fpArray.length; i += 1000) {
-      const chunk = fpArray.slice(i, i + 1000);
+    for (let i = 0; i < fpArray.length; i += FP_QUERY_CHUNK_SIZE) {
+      const chunk = fpArray.slice(i, i + FP_QUERY_CHUNK_SIZE);
       const rows = await db
         .select({
           id:               sponsorCanonical.id,
@@ -473,8 +485,8 @@ export async function applyStateMachine(
     SELECT COUNT(*)::int AS cnt FROM sponsor_canonical WHERE status != 'REMOVED_REVOKED'
   `);
   const activeCanonicalRows = (canonicalCountResult.rows[0] as { cnt: number } | undefined)?.cnt ?? 0;
-  const isFirstRun = reconciliation.additions.length > 100000 && activeCanonicalRows < 1000;
-  if (reconciliation.additions.length > 100000 && !isFirstRun) {
+  const isFirstRun = reconciliation.additions.length > FIRST_RUN_ADDITION_THRESHOLD && activeCanonicalRows < FIRST_RUN_CANONICAL_MIN;
+  if (reconciliation.additions.length > FIRST_RUN_ADDITION_THRESHOLD && !isFirstRun) {
     log.warn(
       { additions: reconciliation.additions.length, activeCanonicalRows },
       "[StateMachine] Additions > 100K but canonical is already populated — NOT treating as first run. Real NEW_LICENCE events will be emitted.",
