@@ -37,6 +37,33 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 3. Use `get_affected_flows` to understand impact.
 4. Use `query_graph` pattern="tests_for" to check coverage.
 
+<!-- ── Brand Tooling ──────────────────────────────────────── -->
+
+## Brand Tooling
+
+Brand identity for Checkbyai is documented in `docs/brand-guidelines.md`. Design tokens are auto-generated in `assets/`.
+
+| Command | What it does |
+|---------|-------------|
+| `node scripts/inject-brand-context.cjs` | Extract brand context for prompt injection (voice, colors, typography) |
+| `node scripts/sync-brand-to-tokens.cjs` | Sync `docs/brand-guidelines.md` → `assets/design-tokens.json` + `assets/design-tokens.css` |
+| `node scripts/validate-asset.cjs <path>` | Validate asset naming, size, format against brand standards |
+| `node scripts/extract-colors.cjs` | Extract and compare colors against brand palette |
+
+The brand voice is **Professional, Authoritative, Clear** — suitable for UK immigration compliance.
+
+Detailed references in `docs/brand/`:
+- `voice-framework.md` — Voice and tone guidelines
+- `visual-identity.md` — Visual identity standards
+- `messaging-framework.md` — Messaging frameworks
+- `consistency-checklist.md` — Brand consistency review
+- `typography-specifications.md` — Typography system
+- `logo-usage-rules.md` — Logo usage rules
+- `color-palette-management.md` — Color management
+- `asset-organization.md` — Asset naming and organization
+- `approval-checklist.md` — Approval checklist
+- `update.md` — How to update brand identity
+
 <!-- ── Session Context: Sponsor Monitor Pipeline Fix (Phases 1–3) ── -->
 
 ## Session Context: Sponsor Monitor Pipeline Fix

@@ -1,0 +1,217 @@
+{
+  "$schema": "https://design-tokens.org/format/v0.1",
+  "brand": "Checkbyai",
+  "primitive": {
+    "color": {
+      "indigo": {
+        "50": {
+          "$value": "#EAEAF6",
+          "$type": "color"
+        },
+        "100": {
+          "$value": "#EAEAF6",
+          "$type": "color"
+        },
+        "200": {
+          "$value": "#CDCDFF",
+          "$type": "color"
+        },
+        "300": {
+          "$value": "#9A9AFF",
+          "$type": "color"
+        },
+        "400": {
+          "$value": "#6767E5",
+          "$type": "color"
+        },
+        "500": {
+          "$value": "#3434B2",
+          "$type": "color"
+        },
+        "600": {
+          "$value": "#171A36",
+          "$type": "color"
+        },
+        "700": {
+          "$value": "#000066",
+          "$type": "color"
+        },
+        "800": {
+          "$value": "#00003F",
+          "$type": "color"
+        },
+        "900": {
+          "$value": "#000019",
+          "$type": "color"
+        }
+      },
+      "gray": {
+        "50": {
+          "$value": "#EDEDF3",
+          "$type": "color"
+        },
+        "100": {
+          "$value": "#EDEDF3",
+          "$type": "color"
+        },
+        "200": {
+          "$value": "#FFFFFF",
+          "$type": "color"
+        },
+        "300": {
+          "$value": "#FFFFFF",
+          "$type": "color"
+        },
+        "400": {
+          "$value": "#FFFFFF",
+          "$type": "color"
+        },
+        "500": {
+          "$value": "#E9E9F2",
+          "$type": "color"
+        },
+        "600": {
+          "$value": "#67697E",
+          "$type": "color"
+        },
+        "700": {
+          "$value": "#9D9DA6",
+          "$type": "color"
+        },
+        "800": {
+          "$value": "#76767F",
+          "$type": "color"
+        },
+        "900": {
+          "$value": "#505059",
+          "$type": "color"
+        }
+      },
+      "accent": {
+        "50": {
+          "$value": "#EDEDF7",
+          "$type": "color"
+        },
+        "100": {
+          "$value": "#EDEDF7",
+          "$type": "color"
+        },
+        "200": {
+          "$value": "#CACAFF",
+          "$type": "color"
+        },
+        "300": {
+          "$value": "#9797E7",
+          "$type": "color"
+        },
+        "400": {
+          "$value": "#6464B4",
+          "$type": "color"
+        },
+        "500": {
+          "$value": "#313181",
+          "$type": "color"
+        },
+        "600": {
+          "$value": "#0B0B5B",
+          "$type": "color"
+        },
+        "700": {
+          "$value": "#000035",
+          "$type": "color"
+        },
+        "800": {
+          "$value": "#00000E",
+          "$type": "color"
+        },
+        "900": {
+          "$value": "#000000",
+          "$type": "color"
+        }
+      }
+    }
+  },
+  "semantic": {
+    "color": {
+      "primary": {
+        "$value": "{primitive.color.indigo.500}",
+        "$type": "color"
+      },
+      "primary-hover": {
+        "$value": "{primitive.color.indigo.600}",
+        "$type": "color"
+      },
+      "primary-active": {
+        "$value": "{primitive.color.indigo.700}",
+        "$type": "color"
+      },
+      "primary-light": {
+        "$value": "{primitive.color.indigo.400}",
+        "$type": "color"
+      },
+      "primary-lighter": {
+        "$value": "{primitive.color.indigo.100}",
+        "$type": "color"
+      },
+      "primary-dark": {
+        "$value": "{primitive.color.indigo.600}",
+        "$type": "color"
+      },
+      "secondary": {
+        "$value": "{primitive.color.gray.500}",
+        "$type": "color"
+      },
+      "secondary-hover": {
+        "$value": "{primitive.color.gray.600}",
+        "$type": "color"
+      },
+      "secondary-light": {
+        "$value": "{primitive.color.gray.300}",
+        "$type": "color"
+      },
+      "secondary-dark": {
+        "$value": "{primitive.color.gray.600}",
+        "$type": "color"
+      },
+      "accent": {
+        "$value": "{primitive.color.accent.500}",
+        "$type": "color"
+      },
+      "accent-hover": {
+        "$value": "{primitive.color.accent.600}",
+        "$type": "color"
+      },
+      "accent-light": {
+        "$value": "{primitive.color.accent.300}",
+        "$type": "color"
+      },
+      "success": {
+        "$value": "{primitive.color.accent.500}",
+        "$type": "color"
+      },
+      "success-light": {
+        "$value": "{primitive.color.accent.300}",
+        "$type": "color"
+      },
+      "error": {
+        "$value": "{primitive.color.indigo.500}",
+        "$type": "color"
+      },
+      "error-light": {
+        "$value": "{primitive.color.indigo.300}",
+        "$type": "color"
+      },
+      "info": {
+        "$value": "{primitive.color.gray.500}",
+        "$type": "color"
+      },
+      "info-light": {
+        "$value": "{primitive.color.gray.300}",
+        "$type": "color"
+      }
+    }
+  },
+  "component": {
+    "button": {}
+  }
+}

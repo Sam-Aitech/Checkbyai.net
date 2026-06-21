@@ -1,0 +1,65 @@
+/* ── Design Tokens — Checkbyai ──────────────────────────────── */
+/* Auto-generated from docs/brand-guidelines.md                */
+/* Do not edit directly — run node scripts/sync-brand-to-tokens.cjs */
+
+:root {
+  /* Primitive — Indigo */
+  --color-indigo-50:  #EAEAF6;
+  --color-indigo-100: #EAEAF6;
+  --color-indigo-200: #CDCDFF;
+  --color-indigo-300: #9A9AFF;
+  --color-indigo-400: #6767E5;
+  --color-indigo-500: #3434B2;
+  --color-indigo-600: #171A36;
+  --color-indigo-700: #000066;
+  --color-indigo-800: #00003F;
+  --color-indigo-900: #000018;
+
+  /* Primitive — Gray */
+  --color-gray-50:  #E9E9F2;
+  --color-gray-100: #E9E9F2;
+  --color-gray-200: #FFFFFF;
+  --color-gray-300: #FFFFFF;
+  --color-gray-400: #FFFFFF;
+  --color-gray-500: #E9E9F2;
+  --color-gray-600: #171A36;
+  --color-gray-700: #000066;
+  --color-gray-800: #00003F;
+  --color-gray-900: #000018;
+
+  /* Primitive — Accent (Mid) */
+  --color-accent-50:  #C6C6EC;
+  --color-accent-100: #C6C6EC;
+  --color-accent-200: #C6C6FF;
+  --color-accent-300: #9494FF;
+  --color-accent-400: #6262C7;
+  --color-accent-500: #313181;
+  --color-accent-600: #00003B;
+  --color-accent-700: #000000;
+  --color-accent-800: #000000;
+  --color-accent-900: #000000;
+
+  /* Semantic */
+  --color-primary:        var(--color-indigo-500);
+  --color-primary-hover:  var(--color-indigo-600);
+  --color-primary-active: var(--color-indigo-700);
+  --color-primary-light:  var(--color-indigo-400);
+  --color-primary-lighter: var(--color-indigo-100);
+  --color-primary-dark:   var(--color-indigo-600);
+
+  --color-secondary:       var(--color-gray-500);
+  --color-secondary-hover: var(--color-gray-600);
+  --color-secondary-light: var(--color-gray-300);
+  --color-secondary-dark:  var(--color-gray-600);
+
+  --color-accent:       var(--color-accent-500);
+  --color-accent-hover: var(--color-accent-600);
+  --color-accent-light: var(--color-accent-300);
+
+  --color-success:       var(--color-accent-500);
+  --color-success-light: var(--color-accent-300);
+  --color-error:         var(--color-indigo-500);
+  --color-error-light:   var(--color-indigo-300);
+  --color-info:          var(--color-gray-500);
+  --color-info-light:    var(--color-gray-300);
+}
