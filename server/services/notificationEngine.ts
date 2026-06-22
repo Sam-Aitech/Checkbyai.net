@@ -5,8 +5,8 @@
  *   - EmailChannel (Resend → SendGrid → SMTP chain)
  *   - WhatsAppChannel (Twilio)
  *   - SMSChannel (Brevo)
- *   - WebhookChannel (HMAC-signed, 3 retries: 5m/15m/60m)
- *   - PushChannel (Web Push API via VAPID)
+ *   - WebhookChannel (HMAC-signed, HTTPS-only, quick in-process retries)
+ *   - PushChannel (Web Push API via VAPID, one send per subscribed device)
  *
  * Concurrency: p-limit(10) parallel user processing.
  * Rate limit: Redis-backed sliding window — 3 sends per user per company per hour.
@@ -27,6 +27,7 @@ import {
   notifEngineLog,
   notifLog,
   notificationPreferences,
+  pushSubscriptions,
   sponsorChanges,
   users,
 } from "@shared/schema";
@@ -122,6 +123,19 @@ export function isChannelEventEnabled(
   const pref = (prefs as any)[eventType] as NotifPrefs[NotifEventType] | undefined;
   if (pref === undefined) return true;
   return pref.enabled === true && (pref.channels as any)[channel] === true;
+}
+
+/**
+ * Event-level enable check, ignoring per-channel flags.
+ * Push has no per-event channel toggle in NotifPrefs (the UI exposes a single
+ * global subscribe switch), so it is gated by event enablement + an active
+ * subscription rather than by pref.channels.
+ */
+export function isEventEnabled(prefs: NotifPrefs | null, eventType: string): boolean {
+  if (!prefs) return true;
+  const pref = (prefs as any)[eventType] as NotifPrefs[NotifEventType] | undefined;
+  if (pref === undefined) return true;
+  return pref.enabled === true;
 }
 
 type SponsorLicenceStatus = "Active" | "Suspended" | "Revoked" | "Surrendered";
@@ -301,7 +315,7 @@ export async function notifyUsersOfEvent(change: SponsorChange): Promise<{
 
     const uniqueUserIds = [...new Set(activeWatches.map(w => w.userId))];
 
-    const [userRows, prefRows] = await Promise.all([
+    const [userRows, prefRows, pushSubRows] = await Promise.all([
       db
         .select({
           id: users.id,
@@ -315,10 +329,25 @@ export async function notifyUsersOfEvent(change: SponsorChange): Promise<{
         .select()
         .from(notificationPreferences)
         .where(inArray(notificationPreferences.userId, uniqueUserIds)),
+      db
+        .select({
+          userId: pushSubscriptions.userId,
+          endpoint: pushSubscriptions.endpoint,
+          p256dh: pushSubscriptions.p256dh,
+          auth: pushSubscriptions.auth,
+        })
+        .from(pushSubscriptions)
+        .where(inArray(pushSubscriptions.userId, uniqueUserIds)),
     ]);
 
     const userMap = new Map(userRows.map(u => [u.id, u]));
     const prefMap = new Map(prefRows.map(p => [p.userId, p]));
+    const pushSubMap = new Map<string, { endpoint: string; p256dh: string; auth: string }[]>();
+    for (const sub of pushSubRows) {
+      const arr = pushSubMap.get(sub.userId) ?? [];
+      arr.push(sub);
+      pushSubMap.set(sub.userId, arr);
+    }
 
     // Ensure the channel registry is populated once
     registerDefaultChannels();
@@ -338,7 +367,16 @@ export async function notifyUsersOfEvent(change: SponsorChange): Promise<{
           channelPrefs,
         );
 
-        if (enabledChannels.length === 0) {
+        // Push is dispatched separately (one send per subscribed device). It is
+        // gated by tier (paid plans, mirroring in-app availability), event-level
+        // enablement, and the presence of at least one active subscription.
+        const pushSubs = pushSubMap.get(userId) ?? [];
+        const pushAllowed =
+          getTierConfig(user.subscriptionStatus).channels.includes("inApp") &&
+          isEventEnabled(user.notifPrefs as NotifPrefs | null, prefsKey) &&
+          pushSubs.length > 0;
+
+        if (enabledChannels.length === 0 && !pushAllowed) {
           await logNotification({
             userId,
             changeId,
@@ -352,6 +390,9 @@ export async function notifyUsersOfEvent(change: SponsorChange): Promise<{
           return;
         }
 
+        // Channel used purely for rate-limit audit log rows
+        const rateLimitLogChannel = enabledChannels[0] ?? "push";
+
         // Check rate limit once before dispatching to all channels
         try {
           if (await isRateLimited(userId, companyName)) {
@@ -359,7 +400,7 @@ export async function notifyUsersOfEvent(change: SponsorChange): Promise<{
               userId,
               changeId,
               eventType: prefsKey,
-              channel: enabledChannels[0],
+              channel: rateLimitLogChannel,
               companyName,
               success: false,
               errorDetails: "Rate limit exceeded",
@@ -372,7 +413,7 @@ export async function notifyUsersOfEvent(change: SponsorChange): Promise<{
             userId,
             changeId,
             eventType: prefsKey,
-            channel: enabledChannels[0],
+            channel: rateLimitLogChannel,
             companyName,
             success: false,
             errorDetails: "Rate limit check failed",
@@ -441,6 +482,55 @@ export async function notifyUsersOfEvent(change: SponsorChange): Promise<{
               companyName, success: false, errorDetails: errMsg,
             });
             log.error({ err: errMsg, userId, channelName }, `Channel dispatch error`);
+          }
+        }
+
+        // Push: fan out one send per subscribed device. Unlike the other
+        // channels, push targets multiple endpoints per user, so it cannot use
+        // the single-recipient loop above.
+        if (pushAllowed) {
+          const pushChannel = getChannel("push");
+          if (!pushChannel) {
+            log.warn({ userId }, "Push channel not registered — skipping");
+          } else {
+            for (const sub of pushSubs) {
+              try {
+                const result = await pushChannel.send({
+                  userId,
+                  changeId,
+                  eventType: prefsKey,
+                  companyName,
+                  organisationName: companyName,
+                  changeType: change.changeType,
+                  previousValue: change.previousValue,
+                  newValue: change.newValue,
+                  recipient: sub.endpoint,
+                  subscriber: { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+                });
+
+                await logNotification({
+                  userId, changeId, eventType: prefsKey, channel: "push",
+                  companyName,
+                  success: result.success,
+                  providerMessageId: result.providerMessageId,
+                  errorDetails: result.error,
+                });
+
+                channelBreakdown.push = channelBreakdown.push ?? { sent: 0, failed: 0 };
+                if (result.success) { sent++; channelBreakdown.push.sent++; }
+                else { failed++; channelBreakdown.push.failed++; }
+              } catch (err: unknown) {
+                failed++;
+                const errMsg = err instanceof Error ? err.message : String(err);
+                channelBreakdown.push = channelBreakdown.push ?? { sent: 0, failed: 0 };
+                channelBreakdown.push.failed++;
+                await logNotification({
+                  userId, changeId, eventType: prefsKey, channel: "push",
+                  companyName, success: false, errorDetails: errMsg,
+                });
+                log.error({ err: errMsg, userId }, "Push dispatch error");
+              }
+            }
           }
         }
       })

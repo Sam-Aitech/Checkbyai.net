@@ -33,7 +33,7 @@ export function initSocketGateway(httpServer: HttpServer): SocketIOServer {
   io = new SocketIOServer(httpServer, {
     cors: {
       origin: process.env.NODE_ENV === "production"
-        ? (process.env.APP_URL ?? "https://checkbyai.com")
+        ? (process.env.APP_URL ?? "https://checkbyai.net")
         : "http://localhost:5000",
       credentials: true,
     },

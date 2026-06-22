@@ -21,6 +21,7 @@ import {
   normalizeSponsorLicenceStatus,
   mapStatusTransitionToNotifEvent,
   isChannelEventEnabled,
+  isEventEnabled,
   getEnabledChannelsForUser,
 } from "../notificationEngine";
 
@@ -41,6 +42,30 @@ describe("normalizeSponsorLicenceStatus", () => {
     ["Gibberish", "UNKNOWN"],
   ] as const)("normalizes '%s' → '%s'", (input, expected) => {
     expect(normalizeSponsorLicenceStatus(input)).toBe(expected);
+  });
+});
+
+// ── isEventEnabled (event-level, channel-agnostic — used for push gating) ──────
+
+describe("isEventEnabled", () => {
+  const eventType = "licence_revoked";
+
+  it("returns true when prefs is null", () => {
+    expect(isEventEnabled(null, eventType)).toBe(true);
+  });
+
+  it("returns true when event type not present in prefs", () => {
+    expect(isEventEnabled({} as any, eventType)).toBe(true);
+  });
+
+  it("returns true when event is enabled regardless of channel flags", () => {
+    const prefs = { licence_revoked: { enabled: true, channels: { email: false } } };
+    expect(isEventEnabled(prefs as any, eventType)).toBe(true);
+  });
+
+  it("returns false when event is disabled", () => {
+    const prefs = { licence_revoked: { enabled: false, channels: { email: true } } };
+    expect(isEventEnabled(prefs as any, eventType)).toBe(false);
   });
 });
 

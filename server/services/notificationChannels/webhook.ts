@@ -4,7 +4,32 @@ import { logger } from "../../utils/logger";
 
 const log = logger.child({ module: "Channel:Webhook" });
 
-const RETRY_DELAYS_MS = [5 * 60 * 1000, 15 * 60 * 1000, 60 * 60 * 1000];
+// Quick in-process backoff only. This runs INLINE inside notifyUsersOfEvent (awaited
+// via p-limit), so long delays here would stall the whole monitor job — previously
+// 5m/15m/60m could block a user task for ~80 minutes. Durable long-interval retries
+// belong in a queue (follow-up); here we cap total blocking to a few seconds.
+const RETRY_DELAYS_MS = [1000, 3000];
+
+// SSRF guard: block delivery to loopback / private / link-local / metadata hosts.
+// Webhook URLs are user-supplied (enterprise), so an attacker could otherwise point
+// them at internal services. HTTPS-only is already enforced by the caller.
+const BLOCKED_HOST_PATTERNS: RegExp[] = [
+  /^localhost$/i,
+  /^127\./,
+  /^0\./,
+  /^10\./,
+  /^192\.168\./,
+  /^169\.254\./,            // link-local (incl. cloud metadata 169.254.169.254)
+  /^172\.(1[6-9]|2\d|3[01])\./, // 172.16.0.0 – 172.31.255.255
+  /^::1$/,
+  /^fe80:/i,               // IPv6 link-local
+  /^f[cd][0-9a-f]{2}:/i,   // IPv6 unique-local (fc00::/7)
+];
+
+function isBlockedWebhookHost(hostname: string): boolean {
+  const host = hostname.replace(/^\[|\]$/g, "").toLowerCase(); // strip IPv6 brackets
+  return BLOCKED_HOST_PATTERNS.some((re) => re.test(host));
+}
 
 function signPayload(payload: string, secret: string): string {
   return crypto.createHmac("sha256", secret).update(payload).digest("hex");
@@ -32,6 +57,17 @@ export const webhookChannel: NotificationChannel = {
     const webhookUrl = payload.recipient;
     if (!webhookUrl || !webhookUrl.startsWith("https://")) {
       return { success: false, error: "Invalid webhook URL (must be HTTPS)" };
+    }
+
+    let parsedHost: string;
+    try {
+      parsedHost = new URL(webhookUrl).hostname;
+    } catch {
+      return { success: false, error: "Invalid webhook URL" };
+    }
+    if (isBlockedWebhookHost(parsedHost)) {
+      log.warn({ webhookUrl }, "Webhook delivery blocked — internal/private host");
+      return { success: false, error: "Webhook URL targets a disallowed (internal/private) host" };
     }
 
     const body = buildBody(payload);

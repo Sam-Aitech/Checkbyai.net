@@ -85,12 +85,18 @@ export function serveStatic(app: Express) {
   }
 
   // SSR route for landing page — must be before express.static so it
-  // takes priority over serving index.html from disk
+  // takes priority over serving index.html from disk.
+  // The template + rendered output are static between deploys, so render once
+  // and cache. Avoids a synchronous fs.readFileSync on every "/" request
+  // (the highest-traffic route) blocking the event loop.
+  let cachedLandingHtml: string | null = null;
   app.get("/", async (req, res, next) => {
     try {
-      const templatePath = path.resolve(distPath, "index.html");
-      const html = renderLandingPage(templatePath);
-      res.status(200).set({ "Content-Type": "text/html" }).end(html);
+      if (cachedLandingHtml === null) {
+        const templatePath = path.resolve(distPath, "index.html");
+        cachedLandingHtml = renderLandingPage(templatePath);
+      }
+      res.status(200).set({ "Content-Type": "text/html" }).end(cachedLandingHtml);
     } catch (e) {
       next(e);
     }

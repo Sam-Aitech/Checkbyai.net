@@ -32,6 +32,21 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CompanyIntelligenceDialog } from "@/components/CompanyIntelligencePanel";
 
+// Decode a base64url VAPID public key into the Uint8Array that
+// PushManager.subscribe expects as applicationServerKey.
+function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  // Allocate an explicit ArrayBuffer so the result is Uint8Array<ArrayBuffer>,
+  // which satisfies the BufferSource type required by applicationServerKey.
+  const outputArray = new Uint8Array(new ArrayBuffer(rawData.length));
+  for (let i = 0; i < rawData.length; i++) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
 interface SponsorSearchResult {
   fingerprint: string;
   organisationName: string;
@@ -1506,7 +1521,9 @@ function NotificationSettings({ user }: { user: any }) {
       const swReg = await navigator.serviceWorker.ready;
       const sub = await swReg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: publicKey,
+        // applicationServerKey must be a BufferSource; a raw base64url string is
+        // rejected by several browsers, so decode the VAPID key to bytes first.
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
       });
       const rawKey = sub.toJSON();
       await apiRequest("POST", "/api/push/subscribe", {

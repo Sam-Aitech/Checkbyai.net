@@ -232,7 +232,19 @@ describe("webhookChannel", () => {
     const { webhookChannel } = await import("../webhook");
     const result = await webhookChannel.send(payload);
     expect(result.success).toBe(false);
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    // 1 initial attempt + 2 quick retries (RETRY_DELAYS_MS has 2 entries)
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("blocks delivery to private/internal hosts (SSRF guard)", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { webhookChannel } = await import("../webhook");
+    const result = await webhookChannel.send({ ...payload, recipient: "https://169.254.169.254/latest/meta-data" });
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("internal/private");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("handles network errors gracefully", async () => {

@@ -11,13 +11,20 @@ const log = logger.child({ module: "ChannelRegistry" });
 
 const channels: Map<ChannelName, NotificationChannel> = new Map();
 
+// Guard so the default set is registered exactly once per process. Without this,
+// every notifyUsersOfEvent / processQueuedEngineEvents call re-runs registration
+// and emits a "duplicate" warning per channel on every sponsor change (log spam).
+let defaultsRegistered = false;
+
 export function registerDefaultChannels(): void {
+  if (defaultsRegistered) return;
   registerChannel(emailChannel);
   registerChannel(whatsAppChannel);
   registerChannel(smsChannel);
   registerChannel(webhookChannel);
   registerChannel(pushChannel);
   registerChannel(inAppChannel);
+  defaultsRegistered = true;
   log.info(`Registered ${channels.size} notification channels: ${[...channels.keys()].join(", ")}`);
 }
 
