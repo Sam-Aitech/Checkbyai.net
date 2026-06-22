@@ -421,23 +421,21 @@ async function processUser(
     isEventEnabled(user.notifPrefs, ctx.prefsKey) &&
     pushSubs.length > 0;
 
+  const rateLimitLogChannel = enabledChannels[0] ?? "push";
+
   if (enabledChannels.length === 0 && !pushAllowed) {
     await logNotification({
       userId: user.id, changeId: ctx.changeId, eventType: ctx.prefsKey, channel: "email",
       companyName: ctx.companyName, success: false, errorDetails: "No channels enabled for this event/tier",
     });
     tally.skipped++;
-    return tally;
-  }
-
-  const rateLimitLogChannel = enabledChannels[0] ?? "push";
-  if (!(await passesRateLimit(ctx, user.id, rateLimitLogChannel))) {
+  } else if (!(await passesRateLimit(ctx, user.id, rateLimitLogChannel))) {
     tally.skipped++;
-    return tally;
+  } else {
+    await dispatchChannels(ctx, user, channelPrefs, enabledChannels, tally);
+    if (pushAllowed) await dispatchPush(ctx, user.id, pushSubs, tally);
   }
 
-  await dispatchChannels(ctx, user, channelPrefs, enabledChannels, tally);
-  if (pushAllowed) await dispatchPush(ctx, user.id, pushSubs, tally);
   return tally;
 }
 

@@ -1481,7 +1481,7 @@ function NotificationSettings({ user }: { user: any }) {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const pushSupported = useRef<boolean | null>(null);
   if (pushSupported.current === null) {
-    pushSupported.current = typeof globalThis.window !== "undefined" && "serviceWorker" in navigator && "PushManager" in globalThis;
+    pushSupported.current = globalThis.window !== undefined && "serviceWorker" in navigator && "PushManager" in globalThis;
   }
 
   useEffect(() => {

@@ -37,8 +37,8 @@ export function toSlug(str: string): string {
     .replace(/[^a-z0-9\s]/g, "")      // keep only alphanumeric + spaces
     .trim()
     .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/-+$/, "")
+    .replace(/-+/g, "-")   // collapse runs of hyphens to a single hyphen
+    .replace(/-$/, "")     // strip the (now at most single) trailing hyphen
     .slice(0, 80);
 }
 
