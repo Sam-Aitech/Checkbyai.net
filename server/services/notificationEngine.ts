@@ -20,7 +20,7 @@
 
 import { db } from "../db";
 import { storage } from "../storage";
-import { eq, and, inArray, lte, sql } from "drizzle-orm";
+import { eq, and, inArray, lte } from "drizzle-orm";
 import { getRedis } from "../utils/redisClient";
 import {
   companyWatches,
@@ -34,9 +34,7 @@ import {
 import type { NotifPrefs } from "@shared/schema";
 import type { SponsorChange } from "../utils/sponsorListFetcher";
 import { normalizeName } from "../utils/sponsorListFetcher";
-import { getAppUrl } from "../utils/appUrl";
 import { getTierConfig } from "../utils/tierConfig";
-import { buildEmail, esc } from "../utils/emailTemplates";
 import { logger } from "../utils/logger";
 import { startJobRun, finishJobRun, type TriggerSource } from "../utils/jobTelemetry";
 import { match, P } from "ts-pattern";
@@ -46,8 +44,6 @@ import type { ChannelName } from "./notificationChannels/types";
 import { logNotification } from "./notificationChannels/audit";
 
 const log = logger.child({ module: "NotificationEngine" });
-
-type NotifPrefsChannels = NotifPrefs[NotifEventType]["channels"];
 
 const CONCURRENCY = 10;
 const limit = pLimit(CONCURRENCY);

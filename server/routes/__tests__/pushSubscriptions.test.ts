@@ -46,8 +46,6 @@ vi.mock("../../auth", () => ({
   },
 }));
 
-const BASE = { success: true };
-
 function body(res: any) {
   return res.body?.data ?? res.body;
 }

@@ -60,7 +60,10 @@ export function buildEmail(
     },
   };
 
-  const m = meta[changeType] ?? meta.NEW_LICENCE;
+  // Look up via a Map (keyed by the static object's own entries) so the
+  // dynamic changeType is not used as a computed object-index sink.
+  const metaByType = new Map<string, Meta>(Object.entries(meta));
+  const m = metaByType.get(changeType) ?? meta.NEW_LICENCE;
 
   const html = `
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">

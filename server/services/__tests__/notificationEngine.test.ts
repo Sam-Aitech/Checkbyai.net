@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
 // These are pure-logic functions exported from notificationEngine
 // that don't need DB/Redis mocking for their core behavior.
