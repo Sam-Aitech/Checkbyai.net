@@ -15,12 +15,14 @@ import { registerEnrichmentRoutes } from "./routes/enrichment";
 import { registerOpsRoutes } from "./routes/ops";
 import { registerSponsorPageRoutes } from "./routes/sponsorPages";
 import { registerFeedbackRoutes } from "./routes/feedback";
+import { registerPushSubscriptionRoutes } from "./routes/pushSubscriptions";
 import { rebuildSponsorIndex } from "./utils/sponsorSearch";
 import { startSponsorMonitorCron, checkAndTriggerIfNeeded } from "./utils/sponsorMonitorJob";
 import { startJobAlertScheduler } from "./utils/jobAlertJob";
 import { startEnrichmentCron } from "./utils/enrichmentWorker";
 import { logger } from "./utils/logger";
 import { startCentralScheduler } from "./utils/scheduler";
+import { initSocketGateway } from "./services/socketGateway";
 
 // Start background schedulers.
 // Central scheduler must run first so it can claim any cut-over jobs
@@ -65,6 +67,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerOpsRoutes(app);
   registerSupportRoutes(app);
   registerFeedbackRoutes(app);
+  registerPushSubscriptionRoutes(app);
   registerEnrichmentRoutes(app);
 
   rebuildSponsorIndex().catch((err) => {
@@ -74,5 +77,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   startSponsorMonitorCron();
 
   const httpServer = createServer(app);
+  initSocketGateway(httpServer);
   return httpServer;
 }

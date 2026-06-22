@@ -42,11 +42,12 @@ vi.mock("../../storage", () => ({
   }
 }));
 
-vi.mock("../services/notificationEngine", () => ({
+vi.mock("../emailTemplates", () => ({
   buildEmail: vi.fn(),
+}));
+
+vi.mock("../notificationDispatcher", () => ({
   sendViaResend: vi.fn(),
-  notifyUsersOfEvent: vi.fn(),
-  processQueuedEngineEvents: vi.fn()
 }));
 
 // We need to import the mocked db to set its behavior
@@ -104,9 +105,8 @@ describe("RE_ACTIVATED logic in sponsorStateMachine", () => {
     expect(db.update).toHaveBeenCalledWith(expect.anything());
   });
 
-  it("should suppress RE_ACTIVATED if the company is actually a rename (handled in Phase E/Fuzzy)", async () => {
-     // This is a more complex test case where fuzzy matching handles the pair first
-     // and RE_ACTIVATED shouldn't be triggered for the "new" fingerprint if it was 
-     // reconciled as a rename.
-  });
+  // A more complex case where fuzzy matching handles the pair first, so
+  // RE_ACTIVATED shouldn't fire for the "new" fingerprint when it was
+  // reconciled as a rename. Not yet implemented.
+  it.todo("should suppress RE_ACTIVATED if the company is actually a rename (handled in Phase E/Fuzzy)");
 });

@@ -301,7 +301,7 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
 
       res.set('Content-Type', 'text/html');
       // CDN-friendly: sponsor pages are static between nightly runs
-      res.set('Cache-Control', 'public, max-age=3600, stale-while-revalidate=7200');
+      res.set('Cache-Control', 'public, max-age=3600');
       res.send(html);
     } catch (err) {
       logger.error({ err }, 'Sponsor page meta injection error:');

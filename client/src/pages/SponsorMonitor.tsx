@@ -32,6 +32,21 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CompanyIntelligenceDialog } from "@/components/CompanyIntelligencePanel";
 
+// Decode a base64url VAPID public key into the Uint8Array that
+// PushManager.subscribe expects as applicationServerKey.
+function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replaceAll("-", "+").replaceAll("_", "/");
+  const rawData = atob(base64);
+  // Allocate an explicit ArrayBuffer so the result is Uint8Array<ArrayBuffer>,
+  // which satisfies the BufferSource type required by applicationServerKey.
+  const outputArray = new Uint8Array(new ArrayBuffer(rawData.length));
+  for (let i = 0; i < rawData.length; i++) {
+    outputArray[i] = rawData.codePointAt(i) ?? 0;
+  }
+  return outputArray;
+}
+
 interface SponsorSearchResult {
   fingerprint: string;
   organisationName: string;
@@ -228,6 +243,8 @@ interface NotificationPrefs {
   smsEnabled: boolean;
   smsNumber: string | null;
   smsVerified: boolean;
+  webhookEnabled: boolean;
+  webhookUrl: string | null;
 }
 
 function PhoneVerificationField({
@@ -1462,6 +1479,10 @@ function NotificationSettings({ user }: { user: any }) {
   const [smsEnabled, setSmsEnabled] = useState(false);
   const [smsNumber, setSmsNumber] = useState("");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const pushSupported = useRef<boolean | null>(null);
+  if (pushSupported.current === null) {
+    pushSupported.current = globalThis.window !== undefined && "serviceWorker" in navigator && "PushManager" in globalThis;
+  }
 
   useEffect(() => {
     if (prefs) {
@@ -1480,6 +1501,63 @@ function NotificationSettings({ user }: { user: any }) {
     },
     onSuccess: () => { setHasUnsavedChanges(false); queryClient.invalidateQueries({ queryKey: ["/api/notification-preferences"] }); toast({ title: "Preferences saved" }); },
     onError: (error: Error) => { toast({ title: "Could not save", description: error.message, variant: "destructive" }); },
+  });
+
+  const { data: pushSubsData } = useQuery<any>({
+    queryKey: ["/api/push/subscriptions"],
+    enabled: pushSupported.current ?? false,
+  });
+  const [pushSubscribed, setPushSubscribed] = useState(false);
+  useEffect(() => {
+    if (pushSubsData) setPushSubscribed((pushSubsData.subscriptions ?? []).length > 0);
+  }, [pushSubsData]);
+
+  const pushSubscribeMutation = useMutation({
+    mutationFn: async () => {
+      const vapidRes = await fetch("/api/push/vapid-public-key");
+      const vapidData = await vapidRes.json();
+      const publicKey = vapidData.data?.publicKey ?? vapidData.publicKey;
+      if (!publicKey) throw new Error("Push not configured");
+      const swReg = await navigator.serviceWorker.ready;
+      const sub = await swReg.pushManager.subscribe({
+        userVisibleOnly: true,
+        // applicationServerKey must be a BufferSource; a raw base64url string is
+        // rejected by several browsers, so decode the VAPID key to bytes first.
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
+      });
+      const rawKey = sub.toJSON();
+      await apiRequest("POST", "/api/push/subscribe", {
+        endpoint: rawKey.endpoint,
+        keys: { p256dh: rawKey.keys!.p256dh, auth: rawKey.keys!.auth },
+        deviceName: navigator.userAgent?.substring(0, 100),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/push/subscriptions"] });
+      toast({ title: "Push notifications enabled" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Could not enable push", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const pushUnsubscribeMutation = useMutation({
+    mutationFn: async () => {
+      const subs = pushSubsData?.subscriptions ?? [];
+      for (const sub of subs) {
+        await apiRequest("POST", "/api/push/unsubscribe", { endpoint: sub.endpoint ?? "" });
+        const swReg = await navigator.serviceWorker.ready;
+        const existingSub = await swReg.pushManager.getSubscription();
+        if (existingSub) await existingSub.unsubscribe();
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/push/subscriptions"] });
+      toast({ title: "Push notifications disabled" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Could not disable push", description: error.message, variant: "destructive" });
+    },
   });
 
   if (prefsLoading) {
@@ -1515,6 +1593,33 @@ function NotificationSettings({ user }: { user: any }) {
           <PhoneVerificationField channel="whatsapp" label="WhatsApp Notifications" icon={MessageSquare} enabled={whatsappEnabled} onToggle={(v) => { setWhatsappEnabled(v); markDirty(); }} phoneNumber={whatsappNumber} onPhoneChange={(v) => { setWhatsappNumber(v); markDirty(); }} verified={prefs?.whatsappVerified ?? false} channelAllowed={allowedChannels.includes("whatsapp")} requiredPlan="Pro" />
           <div className="border-t border-border/50" />
           <PhoneVerificationField channel="sms" label="SMS Notifications" icon={Phone} enabled={smsEnabled} onToggle={(v) => { setSmsEnabled(v); markDirty(); }} phoneNumber={smsNumber} onPhoneChange={(v) => { setSmsNumber(v); markDirty(); }} verified={prefs?.smsVerified ?? false} channelAllowed={allowedChannels.includes("sms")} requiredPlan="Unlimited" />
+          {pushSupported.current && (
+            <>
+              <div className="border-t border-border/50" />
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Smartphone className="w-4 h-4 text-muted-foreground" />
+                    <Label className="font-medium cursor-pointer">Push Notifications</Label>
+                  </div>
+                  <Switch
+                    checked={pushSubscribed}
+                    disabled={pushSubscribeMutation.isPending || pushUnsubscribeMutation.isPending}
+                    onCheckedChange={(v) => {
+                      if (v) pushSubscribeMutation.mutate();
+                      else pushUnsubscribeMutation.mutate();
+                    }}
+                  />
+                </div>
+                {pushSubscribed && (
+                  <p className="text-xs text-muted-foreground ml-7">Receiving browser push notifications</p>
+                )}
+                {!pushSubscribed && Notification.permission === "denied" && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 ml-7">Push permission was denied. Update your browser site settings to re-enable.</p>
+                )}
+              </div>
+            </>
+          )}
           <div className="border-t border-border/50" />
           <div className="flex items-center justify-between">
             <p className="text-xs text-muted-foreground">{hasUnsavedChanges ? "You have unsaved changes" : "All changes saved"}</p>

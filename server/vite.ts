@@ -6,6 +6,7 @@ import { type Server } from "http";
 import viteConfig from "../vite.config";
 import { logger } from "./utils/logger";
 import { nanoid } from "nanoid";
+import { renderLandingPage } from "./ssr/renderLanding";
 
 const viteLogger = createLogger();
 
@@ -44,6 +45,7 @@ export async function setupVite(app: Express, server: Server) {
   app.use(vite.middlewares);
   app.use("*", async (req, res, next) => {
     const url = req.originalUrl;
+    const isRoot = req.path === "/";
 
     try {
       const clientTemplate = path.resolve(
@@ -59,6 +61,11 @@ export async function setupVite(app: Express, server: Server) {
         `src="/src/main.tsx"`,
         `src="/src/main.tsx?v=${nanoid()}"`,
       );
+
+      if (isRoot) {
+        template = renderLandingPage(undefined, template);
+      }
+
       const page = await vite.transformIndexHtml(url, template);
       res.status(200).set({ "Content-Type": "text/html" }).end(page);
     } catch (e) {
@@ -76,6 +83,24 @@ export function serveStatic(app: Express) {
       `Could not find the build directory: ${distPath}, make sure to build the client first`,
     );
   }
+
+  // SSR route for landing page — must be before express.static so it
+  // takes priority over serving index.html from disk.
+  // The template + rendered output are static between deploys, so render once
+  // and cache. Avoids a synchronous fs.readFileSync on every "/" request
+  // (the highest-traffic route) blocking the event loop.
+  let cachedLandingHtml: string | null = null;
+  app.get("/", async (req, res, next) => {
+    try {
+      if (cachedLandingHtml === null) {
+        const templatePath = path.resolve(distPath, "index.html");
+        cachedLandingHtml = renderLandingPage(templatePath);
+      }
+      res.status(200).set({ "Content-Type": "text/html" }).end(cachedLandingHtml);
+    } catch (e) {
+      next(e);
+    }
+  });
 
   app.use(express.static(distPath));
 

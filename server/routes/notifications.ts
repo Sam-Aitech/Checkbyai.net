@@ -26,6 +26,8 @@ const notifPrefSchema = z.object({
   whatsapp_number: z.string().max(20).optional().nullable(),
   sms_enabled: z.boolean().optional(),
   sms_number: z.string().max(20).optional().nullable(),
+  webhook_enabled: z.boolean().optional(),
+  webhook_url: z.string().max(2048).optional().nullable(),
 });
 
 const eventSchema = z.object({
@@ -34,6 +36,7 @@ const eventSchema = z.object({
     email: z.boolean().optional(),
     inApp: z.boolean().optional(),
     sms:   z.boolean().optional(),
+    webhook: z.boolean().optional(),
   }).optional(),
 }).optional();
 
@@ -72,6 +75,8 @@ export function registerNotificationRoutes(app: Express): void {
         smsEnabled: false,
         smsNumber: null,
         smsVerified: false,
+        webhookEnabled: false,
+        webhookUrl: null,
       });
       return;
     }
@@ -86,6 +91,8 @@ export function registerNotificationRoutes(app: Express): void {
       smsEnabled: prefs.smsEnabled,
       smsNumber: prefs.smsNumber ? decryptPhone(prefs.smsNumber) : null,
       smsVerified: prefs.smsVerified,
+      webhookEnabled: prefs.webhookEnabled,
+      webhookUrl: prefs.webhookUrl,
     });
   }));
 
@@ -95,7 +102,7 @@ export function registerNotificationRoutes(app: Express): void {
     if (!parsed.success) {
       throw new ApiError(400, parsed.error.errors.map(e => e.message).join(', '));
     }
-    const { email_enabled, whatsapp_enabled, whatsapp_number, sms_enabled, sms_number } = parsed.data;
+    const { email_enabled, whatsapp_enabled, whatsapp_number, sms_enabled, sms_number, webhook_enabled, webhook_url } = parsed.data;
 
     if (whatsapp_number && !PHONE_REGEX.test(whatsapp_number)) {
       throw new ApiError(400, "Invalid WhatsApp number. Please provide a number starting with + followed by country code and digits (e.g. +447700900000).");
@@ -111,12 +118,22 @@ export function registerNotificationRoutes(app: Express): void {
       throw new ApiError(400, "Please provide an SMS number to enable SMS notifications.");
     }
 
+    if (webhook_url && !webhook_url.startsWith("https://")) {
+      throw new ApiError(400, "Webhook URL must start with https://");
+    }
+    if (webhook_enabled && !webhook_url) {
+      throw new ApiError(400, "Please provide a webhook URL to enable webhook notifications.");
+    }
+
     const userPlan = req.user.subscriptionStatus || "free";
     if (whatsapp_enabled && !isChannelAllowed(userPlan, "whatsapp")) {
       throw new ApiError(403, "WhatsApp notifications are available on Pro plan and above. Please upgrade to enable this channel.");
     }
     if (sms_enabled && !isChannelAllowed(userPlan, "sms")) {
       throw new ApiError(403, "SMS notifications are available on Unlimited plan and above. Please upgrade to enable this channel.");
+    }
+    if (webhook_enabled && !getTierConfig(userPlan).webhooks) {
+      throw new ApiError(403, "Webhook notifications are available on Enterprise plan only. Please upgrade to enable this channel.");
     }
 
     const existing = await db
@@ -149,6 +166,8 @@ export function registerNotificationRoutes(app: Express): void {
       smsNumber: sms_number ? encryptPhone(sms_number) : null,
       smsEnabled: sms_enabled ?? false,
       whatsappEnabled: whatsapp_enabled ?? false,
+      webhookEnabled: webhook_enabled ?? false,
+      webhookUrl: webhook_url || null,
       updatedAt: new Date(),
     };
 

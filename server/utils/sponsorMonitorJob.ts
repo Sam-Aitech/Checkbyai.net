@@ -825,30 +825,39 @@ export async function runSponsorMonitorJob(
        log.info(`[SponsorMonitorJob] Skipping notifications for ${alertableChanges.length} alertable changes (first-run / mass update).`);
      } else if (alertableChanges.length > 0) {
        log.info(`[SponsorMonitorJob] Queueing notifications for ${alertableChanges.length} alertable changes…`);
-       const notifQueue = getNotificationQueue();
-       if (notifQueue) {
-      const jobs = alertableChanges.map(change => ({
-        name: NOTIFICATION_JOB,
-        data: {
-          id: change.id, // NotificationEngine expects 'id'
-          organisationName: change.organisationName,
-          changeType: change.changeType,
-          previousValue: change.previousValue,
-          newValue: change.newValue,
-          snapshotDate: today
-        }
-      }));
-         await notifQueue.addBulk(jobs);
-         result.notificationsQueued = jobs.length;
-       } else {
+        const notifQueue = getNotificationQueue();
+        let queueFailed = false;
+        if (notifQueue) {
+       const jobs = alertableChanges.map(change => ({
+         name: NOTIFICATION_JOB,
+         data: {
+           id: change.id,
+           organisationName: change.organisationName,
+           changeType: change.changeType,
+           previousValue: change.previousValue,
+           newValue: change.newValue,
+           snapshotDate: today
+         }
+       }));
+          try {
+            await notifQueue.addBulk(jobs);
+            result.notificationsQueued = jobs.length;
+          } catch (err: unknown) {
+            log.error({ err: err instanceof Error ? err.message : String(err), jobCount: jobs.length },
+              "[SponsorMonitorJob] Failed to enqueue notification jobs — falling back to inline");
+            queueFailed = true;
+          }
+        } else {
           log.info('[SponsorMonitorJob] Notification queue not available (Redis down); falling back to inline processing');
-          // Fallback: process inline but with limits
-          for (const change of alertableChanges.slice(0, 50)) { // Limit fallback to prevent overload
+          queueFailed = true;
+        }
+        if (queueFailed) {
+          for (const change of alertableChanges.slice(0, 50)) {
             const notifResult = await notifyUsersOfEvent(change).catch((err: any) => {
               log.error({ err },
                 `[SponsorMonitorJob] Notification engine error for "${change.organisationName}"`,
               );
-              return { sent: 0, skipped: 0, failed: 1 }; // Count failures
+              return { sent: 0, skipped: 0, failed: 1 };
             });
             if (notifResult) {
               result.notificationsSent += notifResult.sent;
@@ -856,7 +865,7 @@ export async function runSponsorMonitorJob(
               result.notificationsFailed += notifResult.failed;
             }
           }
-       }
+        }
       } else {
        log.info("[SponsorMonitorJob] No alertable changes today.");
       }

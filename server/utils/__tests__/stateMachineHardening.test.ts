@@ -42,11 +42,12 @@ vi.mock("../../storage", () => ({
   }
 }));
 
-vi.mock("../services/notificationEngine", () => ({
+vi.mock("../emailTemplates", () => ({
   buildEmail: vi.fn(),
+}));
+
+vi.mock("../notificationDispatcher", () => ({
   sendViaResend: vi.fn(),
-  notifyUsersOfEvent: vi.fn(),
-  processQueuedEngineEvents: vi.fn()
 }));
 
 // We need to import the mocked db to set its behavior
@@ -90,7 +91,7 @@ describe("sponsorStateMachine - first run logic", () => {
     // 3. Verify changes array is empty (NEW_LICENCE suppressed)
     // We filter for NEW_LICENCE because other change types might still occur if there were any matches (none here)
     const newLicenceChanges = result.changes.filter(c => c.changeType === "NEW_LICENCE");
-    expect(newLicenceChanges.length).toBe(0);
+    expect(newLicenceChanges).toHaveLength(0);
     expect(result.addedCount).toBe(100001);
   });
 

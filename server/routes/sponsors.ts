@@ -402,7 +402,7 @@ export function registerSponsorRoutes(app: Express): void {
     const dirCacheKey = `sponsors:dir:${Buffer.from(JSON.stringify({ name, status, town, route, letter, page, limit })).toString("base64")}`;
     const dirCached = await cacheGet<DirectoryResponse>(dirCacheKey);
     if (dirCached) {
-      res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+      res.set("Cache-Control", "public, max-age=60");
       success(res, dirCached);
       return;
     }
@@ -483,7 +483,7 @@ export function registerSponsorRoutes(app: Express): void {
       stats: stats!,
     };
     await cacheSet(dirCacheKey, dirResponse, 300);
-    res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+    res.set("Cache-Control", "public, max-age=60");
     success(res, dirResponse);
   }));
 
@@ -948,7 +948,7 @@ export function registerSponsorRoutes(app: Express): void {
     const { companyName, companyNumber } = parsed.data;
 
     const existing = await storage.getSponsorWatchesByUserId(userId, 'pending_activation');
-    const duplicate = existing.find(
+    const duplicate = existing.some(
       (w) => w.companyName.toLowerCase() === companyName.toLowerCase()
     );
     if (duplicate) {

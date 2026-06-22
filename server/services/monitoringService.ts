@@ -1,5 +1,5 @@
 import { logger } from "../utils/logger";
-import { sendViaResend } from "./notificationEngine";
+import { sendViaResend } from "../utils/notificationDispatcher";
 import { requireRole } from "../middleware/roleGuard";
 
 // ---------------------------------------------------------------------------
