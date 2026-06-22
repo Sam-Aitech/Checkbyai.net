@@ -143,7 +143,9 @@ export default function SponsorDetail() {
     queryFn:  async () => {
       const res = await fetch(`/api/sponsors/detail/${id}`);
       if (!res.ok) throw new Error(res.status === 404 ? "not_found" : "error");
-      return res.json();
+      const json = await res.json();
+      // API returns { success: true, data: {...} } — unwrap it
+      return json?.data ?? json;
     },
     enabled:   !isNaN(id) && id > 0,
     staleTime: 60 * 60 * 1000, // 1 hr — matches server cache
