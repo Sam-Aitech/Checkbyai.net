@@ -25,7 +25,6 @@ import { getRedis } from "../utils/redisClient";
 import {
   companyWatches,
   notifEngineLog,
-  notifLog,
   notificationPreferences,
   pushSubscriptions,
   sponsorChanges,
@@ -40,7 +39,7 @@ import { startJobRun, finishJobRun, type TriggerSource } from "../utils/jobTelem
 import { match, P } from "ts-pattern";
 import pLimit from "p-limit";
 import { registerDefaultChannels, getChannel } from "./notificationChannels/registry";
-import type { ChannelName } from "./notificationChannels/types";
+import type { ChannelName, ChannelPayload, NotificationChannel } from "./notificationChannels/types";
 import { logNotification } from "./notificationChannels/audit";
 
 const log = logger.child({ module: "NotificationEngine" });
@@ -214,35 +213,21 @@ export function getEnabledChannelsForUser(
   channelPrefs: typeof notificationPreferences.$inferSelect | undefined,
 ): ChannelName[] {
   const enabled: ChannelName[] = [];
-
   const tierConfig = getTierConfig(user.subscriptionStatus);
 
-  // Email
-  if (tierConfig.channels.includes("email") && isChannelEventEnabled(user.notifPrefs, prefsKey, "email")) {
-    const emailAddr = channelPrefs?.email ?? null;
-    if (emailAddr) enabled.push("email");
-  }
+  // Tier permits the channel AND the user has it enabled for this event type.
+  // Param is the tier-config channel union (excludes webhook, which is gated separately).
+  const allows = (channel: "email" | "whatsapp" | "sms" | "inApp"): boolean =>
+    tierConfig.channels.includes(channel) && isChannelEventEnabled(user.notifPrefs, prefsKey, channel);
 
-  // WhatsApp
-  if (tierConfig.channels.includes("whatsapp") && isChannelEventEnabled(user.notifPrefs, prefsKey, "whatsapp")) {
-    if (channelPrefs?.whatsappNumber && channelPrefs.whatsappVerified) enabled.push("whatsapp");
-  }
+  if (allows("email") && Boolean(channelPrefs?.email)) enabled.push("email");
+  if (allows("whatsapp") && Boolean(channelPrefs?.whatsappNumber && channelPrefs.whatsappVerified)) enabled.push("whatsapp");
+  if (allows("sms") && Boolean(channelPrefs?.smsNumber && channelPrefs.smsVerified)) enabled.push("sms");
+  if (allows("inApp")) enabled.push("inApp");
 
-  // SMS
-  if (tierConfig.channels.includes("sms") && isChannelEventEnabled(user.notifPrefs, prefsKey, "sms")) {
-    if (channelPrefs?.smsNumber && channelPrefs.smsVerified) enabled.push("sms");
-  }
-
-  // Webhook (enterprise only via tierConfig)
-  if (tierConfig.webhooks && isChannelEventEnabled(user.notifPrefs, prefsKey, "webhook")) {
-    const webhookUrl = channelPrefs?.webhookUrl ?? null;
-    if (webhookUrl?.startsWith("https://")) enabled.push("webhook");
-  }
-
-  // In-app (real-time via Socket.IO)
-  if (tierConfig.channels.includes("inApp") && isChannelEventEnabled(user.notifPrefs, prefsKey, "inApp")) {
-    enabled.push("inApp");
-  }
+  // Webhook is gated by tierConfig.webhooks (enterprise) rather than the channels list.
+  const webhookEnabled = tierConfig.webhooks && isChannelEventEnabled(user.notifPrefs, prefsKey, "webhook");
+  if (webhookEnabled && Boolean(channelPrefs?.webhookUrl?.startsWith("https://"))) enabled.push("webhook");
 
   return enabled;
 }
@@ -263,6 +248,197 @@ function getRecipientForChannel(
     case "inApp": return user.id;
     default: return null;
   }
+}
+
+// ── Per-user dispatch helpers ───────────────────────────────────────────────
+
+interface DispatchContext {
+  change: SponsorChange;
+  changeId: number;
+  prefsKey: string;
+  companyName: string;
+}
+
+interface NotifUser {
+  id: string;
+  email: string | null;
+  subscriptionStatus: string | null;
+  notifPrefs: NotifPrefs | null;
+}
+
+type ChannelTally = Record<string, { sent: number; failed: number }>;
+
+interface UserTally {
+  sent: number;
+  skipped: number;
+  failed: number;
+  breakdown: ChannelTally;
+}
+
+function bumpBreakdown(breakdown: ChannelTally, channel: string, ok: boolean): void {
+  const entry = breakdown[channel] ?? { sent: 0, failed: 0 };
+  if (ok) entry.sent++; else entry.failed++;
+  breakdown[channel] = entry;
+}
+
+function mergeBreakdown(into: ChannelTally, from: ChannelTally): void {
+  for (const [channel, counts] of Object.entries(from)) {
+    const entry = into[channel] ?? { sent: 0, failed: 0 };
+    entry.sent += counts.sent;
+    entry.failed += counts.failed;
+    into[channel] = entry;
+  }
+}
+
+// Send one payload through one channel, audit-log it, and record counts.
+async function sendAndRecord(
+  channel: NotificationChannel,
+  payload: ChannelPayload,
+  ctx: DispatchContext,
+  channelName: string,
+  userId: string,
+  tally: UserTally,
+): Promise<void> {
+  try {
+    const result = await channel.send(payload);
+    await logNotification({
+      userId, changeId: ctx.changeId, eventType: ctx.prefsKey, channel: channelName,
+      companyName: ctx.companyName, success: result.success,
+      providerMessageId: result.providerMessageId, errorDetails: result.error,
+    });
+    if (result.success) tally.sent++; else tally.failed++;
+    bumpBreakdown(tally.breakdown, channelName, result.success);
+    log.info(`[NotificationEngine] ${result.success ? "Sent" : "Failed"} ${ctx.prefsKey} via ${channelName} to user ${userId}`);
+  } catch (err: unknown) {
+    tally.failed++;
+    bumpBreakdown(tally.breakdown, channelName, false);
+    const errMsg = err instanceof Error ? err.message : String(err);
+    await logNotification({
+      userId, changeId: ctx.changeId, eventType: ctx.prefsKey, channel: channelName,
+      companyName: ctx.companyName, success: false, errorDetails: errMsg,
+    });
+    log.error({ err: errMsg, userId, channelName }, "Channel dispatch error");
+  }
+}
+
+function buildChannelPayload(ctx: DispatchContext, userId: string, recipient: string): ChannelPayload {
+  return {
+    userId,
+    changeId: ctx.changeId,
+    eventType: ctx.prefsKey,
+    companyName: ctx.companyName,
+    organisationName: ctx.companyName,
+    changeType: ctx.change.changeType,
+    previousValue: ctx.change.previousValue,
+    newValue: ctx.change.newValue,
+    recipient,
+  };
+}
+
+async function dispatchChannels(
+  ctx: DispatchContext,
+  user: NotifUser,
+  channelPrefs: typeof notificationPreferences.$inferSelect | undefined,
+  enabledChannels: ChannelName[],
+  tally: UserTally,
+): Promise<void> {
+  for (const channelName of enabledChannels) {
+    const channel = getChannel(channelName);
+    if (!channel) {
+      log.warn({ channelName }, "Channel not registered — skipping");
+      continue;
+    }
+    const recipient = getRecipientForChannel(channelName, user, channelPrefs);
+    if (!recipient) {
+      await logNotification({
+        userId: user.id, changeId: ctx.changeId, eventType: ctx.prefsKey, channel: channelName,
+        companyName: ctx.companyName, success: false, errorDetails: "No recipient address",
+      });
+      tally.skipped++;
+      continue;
+    }
+    await sendAndRecord(channel, buildChannelPayload(ctx, user.id, recipient), ctx, channelName, user.id, tally);
+  }
+}
+
+// Push fans out one send per subscribed device (unlike single-recipient channels).
+async function dispatchPush(
+  ctx: DispatchContext,
+  userId: string,
+  pushSubs: { endpoint: string; p256dh: string; auth: string }[],
+  tally: UserTally,
+): Promise<void> {
+  const pushChannel = getChannel("push");
+  if (!pushChannel) {
+    log.warn({ userId }, "Push channel not registered — skipping");
+    return;
+  }
+  for (const sub of pushSubs) {
+    const payload: ChannelPayload = {
+      ...buildChannelPayload(ctx, userId, sub.endpoint),
+      subscriber: { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+    };
+    await sendAndRecord(pushChannel, payload, ctx, "push", userId, tally);
+  }
+}
+
+// Returns true if dispatch may proceed; false (and audit-logs) if rate-limited or the check errored.
+async function passesRateLimit(ctx: DispatchContext, userId: string, logChannel: string): Promise<boolean> {
+  try {
+    if (!(await isRateLimited(userId, ctx.companyName))) return true;
+    await logNotification({
+      userId, changeId: ctx.changeId, eventType: ctx.prefsKey, channel: logChannel,
+      companyName: ctx.companyName, success: false, errorDetails: "Rate limit exceeded",
+    });
+    return false;
+  } catch {
+    await logNotification({
+      userId, changeId: ctx.changeId, eventType: ctx.prefsKey, channel: logChannel,
+      companyName: ctx.companyName, success: false, errorDetails: "Rate limit check failed",
+    });
+    return false;
+  }
+}
+
+async function processUser(
+  ctx: DispatchContext,
+  user: NotifUser,
+  channelPrefs: typeof notificationPreferences.$inferSelect | undefined,
+  pushSubs: { endpoint: string; p256dh: string; auth: string }[],
+): Promise<UserTally> {
+  const tally: UserTally = { sent: 0, skipped: 0, failed: 0, breakdown: {} };
+
+  const enabledChannels = getEnabledChannelsForUser(
+    { subscriptionStatus: user.subscriptionStatus, notifPrefs: user.notifPrefs },
+    ctx.prefsKey,
+    channelPrefs,
+  );
+
+  // Push is gated by tier (paid plans, mirroring in-app), event-level enablement,
+  // and an active subscription — independent of the per-channel toggle.
+  const pushAllowed =
+    getTierConfig(user.subscriptionStatus).channels.includes("inApp") &&
+    isEventEnabled(user.notifPrefs, ctx.prefsKey) &&
+    pushSubs.length > 0;
+
+  if (enabledChannels.length === 0 && !pushAllowed) {
+    await logNotification({
+      userId: user.id, changeId: ctx.changeId, eventType: ctx.prefsKey, channel: "email",
+      companyName: ctx.companyName, success: false, errorDetails: "No channels enabled for this event/tier",
+    });
+    tally.skipped++;
+    return tally;
+  }
+
+  const rateLimitLogChannel = enabledChannels[0] ?? "push";
+  if (!(await passesRateLimit(ctx, user.id, rateLimitLogChannel))) {
+    tally.skipped++;
+    return tally;
+  }
+
+  await dispatchChannels(ctx, user, channelPrefs, enabledChannels, tally);
+  if (pushAllowed) await dispatchPush(ctx, user.id, pushSubs, tally);
+  return tally;
 }
 
 // ── Main dispatch ─────────────────────────────────────────────────────────────
@@ -336,7 +512,9 @@ export async function notifyUsersOfEvent(change: SponsorChange): Promise<{
         .where(inArray(pushSubscriptions.userId, uniqueUserIds)),
     ]);
 
-    const userMap = new Map(userRows.map(u => [u.id, u]));
+    const userMap = new Map<string, NotifUser>(
+      userRows.map(u => [u.id, { id: u.id, email: u.email, subscriptionStatus: u.subscriptionStatus, notifPrefs: u.notifPrefs as NotifPrefs | null }]),
+    );
     const prefMap = new Map(prefRows.map(p => [p.userId, p]));
     const pushSubMap = new Map<string, { endpoint: string; p256dh: string; auth: string }[]>();
     for (const sub of pushSubRows) {
@@ -348,187 +526,19 @@ export async function notifyUsersOfEvent(change: SponsorChange): Promise<{
     // Ensure the channel registry is populated once
     registerDefaultChannels();
 
-    // Process users concurrently with p-limit(10)
+    const ctx: DispatchContext = { change, changeId, prefsKey, companyName };
+
+    // Process users concurrently with p-limit(10), then fold per-user tallies in.
     const userTasks = uniqueUserIds.map(userId =>
       limit(async () => {
         const user = userMap.get(userId);
         if (!user) { skipped++; return; }
 
-        const channelPrefs = prefMap.get(userId);
-
-        // Determine which channels this user gets for this event
-        const enabledChannels = getEnabledChannelsForUser(
-          { subscriptionStatus: user.subscriptionStatus, notifPrefs: user.notifPrefs as NotifPrefs | null },
-          prefsKey,
-          channelPrefs,
-        );
-
-        // Push is dispatched separately (one send per subscribed device). It is
-        // gated by tier (paid plans, mirroring in-app availability), event-level
-        // enablement, and the presence of at least one active subscription.
-        const pushSubs = pushSubMap.get(userId) ?? [];
-        const pushAllowed =
-          getTierConfig(user.subscriptionStatus).channels.includes("inApp") &&
-          isEventEnabled(user.notifPrefs as NotifPrefs | null, prefsKey) &&
-          pushSubs.length > 0;
-
-        if (enabledChannels.length === 0 && !pushAllowed) {
-          await logNotification({
-            userId,
-            changeId,
-            eventType: prefsKey,
-            channel: "email",
-            companyName,
-            success: false,
-            errorDetails: "No channels enabled for this event/tier",
-          });
-          skipped++;
-          return;
-        }
-
-        // Channel used purely for rate-limit audit log rows
-        const rateLimitLogChannel = enabledChannels[0] ?? "push";
-
-        // Check rate limit once before dispatching to all channels
-        try {
-          if (await isRateLimited(userId, companyName)) {
-            await logNotification({
-              userId,
-              changeId,
-              eventType: prefsKey,
-              channel: rateLimitLogChannel,
-              companyName,
-              success: false,
-              errorDetails: "Rate limit exceeded",
-            });
-            skipped++;
-            return;
-          }
-        } catch {
-          await logNotification({
-            userId,
-            changeId,
-            eventType: prefsKey,
-            channel: rateLimitLogChannel,
-            companyName,
-            success: false,
-            errorDetails: "Rate limit check failed",
-          });
-          skipped++;
-          return;
-        }
-
-        // Dispatch to each enabled channel
-        for (const channelName of enabledChannels) {
-          const channel = getChannel(channelName);
-          if (!channel) {
-            log.warn({ channelName }, "Channel not registered — skipping");
-            continue;
-          }
-
-          const recipient = getRecipientForChannel(channelName, user, channelPrefs);
-          if (!recipient) {
-            await logNotification({
-              userId, changeId, eventType: prefsKey, channel: channelName,
-              companyName, success: false, errorDetails: "No recipient address",
-            });
-            skipped++;
-            continue;
-          }
-
-          try {
-            const result = await channel.send({
-              userId,
-              changeId,
-              eventType: prefsKey,
-              companyName,
-              organisationName: companyName,
-              changeType: change.changeType,
-              previousValue: change.previousValue,
-              newValue: change.newValue,
-              recipient,
-            });
-
-            await logNotification({
-              userId, changeId, eventType: prefsKey, channel: channelName,
-              companyName,
-              success: result.success,
-              providerMessageId: result.providerMessageId,
-              errorDetails: result.error,
-            });
-
-            if (result.success) {
-              sent++;
-              channelBreakdown[channelName] = channelBreakdown[channelName] ?? { sent: 0, failed: 0 };
-              channelBreakdown[channelName].sent++;
-            } else {
-              failed++;
-              channelBreakdown[channelName] = channelBreakdown[channelName] ?? { sent: 0, failed: 0 };
-              channelBreakdown[channelName].failed++;
-            }
-
-            log.info(
-              `[NotificationEngine] ${result.success ? "Sent" : "Failed"} ${prefsKey} via ${channelName} to user ${userId}`,
-            );
-          } catch (err: unknown) {
-            failed++;
-            const errMsg = err instanceof Error ? err.message : String(err);
-            await logNotification({
-              userId, changeId, eventType: prefsKey, channel: channelName,
-              companyName, success: false, errorDetails: errMsg,
-            });
-            log.error({ err: errMsg, userId, channelName }, `Channel dispatch error`);
-          }
-        }
-
-        // Push: fan out one send per subscribed device. Unlike the other
-        // channels, push targets multiple endpoints per user, so it cannot use
-        // the single-recipient loop above.
-        if (pushAllowed) {
-          const pushChannel = getChannel("push");
-          if (!pushChannel) {
-            log.warn({ userId }, "Push channel not registered — skipping");
-          } else {
-            for (const sub of pushSubs) {
-              try {
-                const result = await pushChannel.send({
-                  userId,
-                  changeId,
-                  eventType: prefsKey,
-                  companyName,
-                  organisationName: companyName,
-                  changeType: change.changeType,
-                  previousValue: change.previousValue,
-                  newValue: change.newValue,
-                  recipient: sub.endpoint,
-                  subscriber: { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-                });
-
-                await logNotification({
-                  userId, changeId, eventType: prefsKey, channel: "push",
-                  companyName,
-                  success: result.success,
-                  providerMessageId: result.providerMessageId,
-                  errorDetails: result.error,
-                });
-
-                channelBreakdown.push = channelBreakdown.push ?? { sent: 0, failed: 0 };
-                if (result.success) { sent++; channelBreakdown.push.sent++; }
-                else { failed++; channelBreakdown.push.failed++; }
-              } catch (err: unknown) {
-                failed++;
-                const errMsg = err instanceof Error ? err.message : String(err);
-                channelBreakdown.push = channelBreakdown.push ?? { sent: 0, failed: 0 };
-                channelBreakdown.push.failed++;
-                await logNotification({
-                  userId, changeId, eventType: prefsKey, channel: "push",
-                  companyName, success: false, errorDetails: errMsg,
-                });
-                log.error({ err: errMsg, userId }, "Push dispatch error");
-              }
-            }
-          }
-        }
+        const tally = await processUser(ctx, user, prefMap.get(userId), pushSubMap.get(userId) ?? []);
+        sent += tally.sent;
+        skipped += tally.skipped;
+        failed += tally.failed;
+        mergeBreakdown(channelBreakdown, tally.breakdown);
       })
     );
 

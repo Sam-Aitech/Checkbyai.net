@@ -1,4 +1,4 @@
-import { Server as HttpServer } from "http";
+import { Server as HttpServer } from "node:http";
 import { Server as SocketIOServer } from "socket.io";
 import cookie from "cookie";
 import cookieSignature from "cookie-signature";
@@ -50,7 +50,7 @@ export function initSocketGateway(httpServer: HttpServer): SocketIOServer {
 
       const cookies = cookie.parse(header);
       const signedSid = cookies["connect.sid"];
-      if (!signedSid || !signedSid.startsWith("s:")) return next(new Error("Invalid session cookie"));
+      if (!signedSid?.startsWith("s:")) return next(new Error("Invalid session cookie"));
 
       const sid = cookieSignature.unsign(signedSid.slice(2), secret);
       if (!sid) return next(new Error("Invalid session signature"));
@@ -62,7 +62,7 @@ export function initSocketGateway(httpServer: HttpServer): SocketIOServer {
         });
       });
 
-      if (!sess || !sess.passport?.user) return next(new Error("Not authenticated"));
+      if (!sess?.passport?.user) return next(new Error("Not authenticated"));
 
       const user = await storage.getUser(sess.passport.user);
       if (!user) return next(new Error("User not found"));

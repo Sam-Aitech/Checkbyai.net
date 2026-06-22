@@ -96,7 +96,7 @@ describe("push subscription routes", () => {
 
       expect(res.status).toBe(201);
       expect(body(res).status).toBe("created");
-      expect(dbState.inserted.length).toBe(1);
+      expect(dbState.inserted).toHaveLength(1);
       expect(dbState.inserted[0].endpoint).toBe(validBody.endpoint);
     });
 
@@ -108,7 +108,7 @@ describe("push subscription routes", () => {
 
       expect(res.status).toBe(200);
       expect(body(res).status).toBe("updated");
-      expect(dbState.updated.length).toBe(1);
+      expect(dbState.updated).toHaveLength(1);
     });
 
     it("returns 400 for invalid body", async () => {

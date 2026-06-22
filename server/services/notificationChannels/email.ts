@@ -5,7 +5,14 @@ import { sendAdminAlert } from "../../utils/adminAlert";
 
 const log = logger.child({ module: "Channel:Email" });
 
-const FROM_ADDRESS = "Sponsor Monitor <alerts@checkbyai.net>";
+const FROM_EMAIL = "alerts@checkbyai.net";
+const FROM_ADDRESS = `Sponsor Monitor <${FROM_EMAIL}>`;
+const RETRY_DELAYS_MS = [1000, 3000];
+const MAX_ATTEMPTS = 3;
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 let providerCache: EmailProvider[] | null = null;
 
@@ -53,7 +60,7 @@ function getProviders(): EmailProvider[] {
           },
           body: JSON.stringify({
             personalizations: [{ to: [{ email: to }] }],
-            from: { email: FROM_ADDRESS.match(/<([^>]+)>/)?.[1] ?? "alerts@checkbyai.net" },
+            from: { email: FROM_EMAIL },
             subject,
             content: [{ type: "text/html", value: html }],
           }),
@@ -76,6 +83,40 @@ export function clearProviderCache(): void {
   providerCache = null;
 }
 
+// Send via a single provider with bounded retries. Returns the first success,
+// or a failure carrying the last error once attempts are exhausted.
+async function sendWithProvider(
+  provider: EmailProvider,
+  to: string,
+  subject: string,
+  html: string,
+): Promise<SendResult> {
+  let lastError: string | undefined;
+
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    try {
+      const result = await provider.send(to, subject, html);
+      if (result.success) {
+        if (attempt > 0) log.info(`Delivered via ${provider.name} after ${attempt} retries`);
+        return result;
+      }
+      lastError = result.error;
+      log.warn({ provider: provider.name, attempt, error: result.error },
+        `Email send failed via ${provider.name}, attempt ${attempt + 1}`);
+    } catch (err: unknown) {
+      lastError = err instanceof Error ? err.message : String(err);
+      log.error({ err: lastError, provider: provider.name, attempt },
+        `Email send threw via ${provider.name}`);
+    }
+
+    if (attempt < RETRY_DELAYS_MS.length) {
+      await delay(RETRY_DELAYS_MS[attempt] ?? 1000);
+    }
+  }
+
+  return { success: false, error: lastError };
+}
+
 export const emailChannel: NotificationChannel = {
   name: "email",
 
@@ -93,31 +134,10 @@ export const emailChannel: NotificationChannel = {
     }
 
     let lastError: string | undefined;
-
     for (const provider of providers) {
-      for (let attempt = 0; attempt < 3; attempt++) {
-        try {
-          const result = await provider.send(payload.recipient, subject, html);
-          if (result.success) {
-            if (attempt > 0) {
-              log.info(`Delivered via ${provider.name} after ${attempt} retries`);
-            }
-            return result;
-          }
-          lastError = result.error;
-          log.warn({ provider: provider.name, attempt, error: result.error },
-            `Email send failed via ${provider.name}, attempt ${attempt + 1}`);
-        } catch (err: unknown) {
-          lastError = err instanceof Error ? err.message : String(err);
-          log.error({ err: lastError, provider: provider.name, attempt },
-            `Email send threw via ${provider.name}`);
-        }
-
-        if (attempt < 2) {
-          const delays = [1000, 3000];
-          await new Promise(r => setTimeout(r, delays[attempt] ?? 1000));
-        }
-      }
+      const result = await sendWithProvider(provider, payload.recipient, subject, html);
+      if (result.success) return result;
+      lastError = result.error;
     }
 
     sendAdminAlert(

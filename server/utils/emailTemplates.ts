@@ -1,7 +1,7 @@
 import { getAppUrl } from "./appUrl";
 
 export function esc(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 
 export function buildEmail(
@@ -13,6 +13,11 @@ export function buildEmail(
   const company = esc(organisationName);
   const prev = previousValue ? esc(previousValue) : null;
   const next = newValue ? esc(newValue) : null;
+
+  // Pre-compute conditional fragments so the body strings stay single-level
+  // template literals (no nested template literals).
+  const routeFragment = next ? ` under the <strong>${next}</strong> route` : "";
+  const fromToFragment = prev && next ? ` from <strong>${prev}</strong> to <strong>${next}</strong>` : "";
 
   type Meta = { bg: string; headline: string; subject: string; body: string };
   const meta: Record<string, Meta> = {
@@ -26,7 +31,7 @@ export function buildEmail(
       bg: "linear-gradient(135deg,#003366 0%,#0066CC 100%)",
       headline: "New Sponsor Licence Granted",
       subject: `Update: ${organisationName} added to sponsor licence register`,
-      body: `<strong>${company}</strong> has been added to the UK Home Office Register of Licensed Sponsors${next ? ` under the <strong>${next}</strong> route` : ""}.`,
+      body: `<strong>${company}</strong> has been added to the UK Home Office Register of Licensed Sponsors${routeFragment}.`,
     },
     RE_ACTIVATED: {
       bg: "linear-gradient(135deg,#003366 0%,#0066CC 100%)",
@@ -38,25 +43,25 @@ export function buildEmail(
       bg: "linear-gradient(135deg,#006633 0%,#009933 100%)",
       headline: "Sponsor Licence Upgraded",
       subject: `Good news: ${organisationName} sponsor licence upgraded`,
-      body: `<strong>${company}</strong> has had their sponsor licence rating upgraded${prev && next ? ` from <strong>${prev}</strong> to <strong>${next}</strong>` : ""}.`,
+      body: `<strong>${company}</strong> has had their sponsor licence rating upgraded${fromToFragment}.`,
     },
     DOWNGRADED: {
       bg: "linear-gradient(135deg,#CC6600 0%,#FF8C00 100%)",
       headline: "Sponsor Licence Downgraded",
       subject: `Alert: ${organisationName} sponsor licence downgraded`,
-      body: `<strong>${company}</strong> has had their sponsor licence rating downgraded${prev && next ? ` from <strong>${prev}</strong> to <strong>${next}</strong>` : ""}. The Home Office has identified compliance issues.`,
+      body: `<strong>${company}</strong> has had their sponsor licence rating downgraded${fromToFragment}. The Home Office has identified compliance issues.`,
     },
     ROUTE_CHANGE: {
       bg: "linear-gradient(135deg,#4B0082 0%,#8A2BE2 100%)",
       headline: "Sponsor Route Changed",
       subject: `Update: ${organisationName} sponsor route changed`,
-      body: `<strong>${company}</strong> has changed their sponsorship route${prev && next ? ` from <strong>${prev}</strong> to <strong>${next}</strong>` : ""}.`,
+      body: `<strong>${company}</strong> has changed their sponsorship route${fromToFragment}.`,
     },
     NAME_CHANGE: {
       bg: "linear-gradient(135deg,#333 0%,#666 100%)",
       headline: "Organisation Name Changed",
       subject: `Update: ${organisationName} has changed name`,
-      body: `This sponsor has changed their registered name${prev && next ? ` from <strong>${prev}</strong> to <strong>${next}</strong>` : ""}.`,
+      body: `This sponsor has changed their registered name${fromToFragment}.`,
     },
   };
 

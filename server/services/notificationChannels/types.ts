@@ -1,5 +1,3 @@
-import type { NotificationLogEntry } from "./audit";
-
 export interface SendResult {
   success: boolean;
   providerMessageId?: string;

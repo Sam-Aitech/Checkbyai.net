@@ -36,13 +36,13 @@ import { CompanyIntelligenceDialog } from "@/components/CompanyIntelligencePanel
 // PushManager.subscribe expects as applicationServerKey.
 function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const base64 = (base64String + padding).replaceAll("-", "+").replaceAll("_", "/");
   const rawData = atob(base64);
   // Allocate an explicit ArrayBuffer so the result is Uint8Array<ArrayBuffer>,
   // which satisfies the BufferSource type required by applicationServerKey.
   const outputArray = new Uint8Array(new ArrayBuffer(rawData.length));
   for (let i = 0; i < rawData.length; i++) {
-    outputArray[i] = rawData.charCodeAt(i);
+    outputArray[i] = rawData.codePointAt(i) ?? 0;
   }
   return outputArray;
 }
@@ -1481,7 +1481,7 @@ function NotificationSettings({ user }: { user: any }) {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const pushSupported = useRef<boolean | null>(null);
   if (pushSupported.current === null) {
-    pushSupported.current = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;
+    pushSupported.current = typeof globalThis.window !== "undefined" && "serviceWorker" in navigator && "PushManager" in globalThis;
   }
 
   useEffect(() => {

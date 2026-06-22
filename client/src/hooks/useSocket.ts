@@ -38,7 +38,7 @@ export function useSocket() {
 
       toast({
         title: titles[changeType] ?? "Sponsor Update",
-        description: `${companyName} — ${changeType.replace(/_/g, " ").toLowerCase()}`,
+        description: `${companyName} — ${changeType.replaceAll("_", " ").toLowerCase()}`,
         duration: 8000,
       });
     });

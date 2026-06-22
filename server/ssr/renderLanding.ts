@@ -1,6 +1,6 @@
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -115,9 +115,7 @@ function landingHTML(): string {
 export function renderLandingPage(templatePath?: string, preloadedTemplate?: string): string {
   let template: string;
 
-  if (preloadedTemplate !== undefined) {
-    template = preloadedTemplate;
-  } else {
+  if (preloadedTemplate === undefined) {
     const resolvedPath = templatePath ?? path.resolve(__dirname, "..", "..", "client", "index.html");
     try {
       template = fs.readFileSync(resolvedPath, "utf-8");
@@ -126,6 +124,8 @@ export function renderLandingPage(templatePath?: string, preloadedTemplate?: str
         `Could not read template at ${resolvedPath}. Make sure the file exists.`
       );
     }
+  } else {
+    template = preloadedTemplate;
   }
 
   const rootContent = landingHTML();

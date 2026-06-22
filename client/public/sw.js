@@ -1,12 +1,12 @@
-self.addEventListener("install", () => {
-  self.skipWaiting();
+globalThis.addEventListener("install", () => {
+  globalThis.skipWaiting();
 });
 
-self.addEventListener("activate", (event) => {
+globalThis.addEventListener("activate", (event) => {
   event.waitUntil(clients.claim());
 });
 
-self.addEventListener("push", (event) => {
+globalThis.addEventListener("push", (event) => {
   if (!event.data) return;
 
   try {
@@ -17,7 +17,7 @@ self.addEventListener("push", (event) => {
     const url = data.url ?? "/sponsor-monitor";
 
     event.waitUntil(
-      self.registration.showNotification(title, {
+      globalThis.registration.showNotification(title, {
         body,
         icon: "/icon-192x192.png",
         badge: "/icon-192x192.png",
@@ -29,7 +29,7 @@ self.addEventListener("push", (event) => {
   } catch {
     const title = "Sponsor Monitor Update";
     event.waitUntil(
-      self.registration.showNotification(title, {
+      globalThis.registration.showNotification(title, {
         body: event.data.text(),
         icon: "/icon-192x192.png",
       }),
@@ -37,7 +37,7 @@ self.addEventListener("push", (event) => {
   }
 });
 
-self.addEventListener("notificationclick", (event) => {
+globalThis.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const url = event.notification.data?.url ?? "/sponsor-monitor";
   event.waitUntil(

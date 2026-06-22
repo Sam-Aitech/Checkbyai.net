@@ -948,7 +948,7 @@ export function registerSponsorRoutes(app: Express): void {
     const { companyName, companyNumber } = parsed.data;
 
     const existing = await storage.getSponsorWatchesByUserId(userId, 'pending_activation');
-    const duplicate = existing.find(
+    const duplicate = existing.some(
       (w) => w.companyName.toLowerCase() === companyName.toLowerCase()
     );
     if (duplicate) {
