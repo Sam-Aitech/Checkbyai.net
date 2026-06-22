@@ -125,7 +125,10 @@ export default function LoginPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email, turnstileToken }),
+        body: JSON.stringify({
+          email,
+          ...(turnstileToken ? { turnstileToken } : {}),
+        }),
       });
 
       const data = await response.json();
@@ -228,7 +231,10 @@ export default function LoginPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({
+          email,
+          ...(turnstileToken ? { turnstileToken } : {}),
+        }),
       });
 
       if (!response.ok) {

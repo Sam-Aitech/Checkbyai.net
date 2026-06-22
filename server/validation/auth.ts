@@ -14,7 +14,7 @@ export const registerSchema = z.object({
 
 export const sendOtpSchema = z.object({
   email: z.string().email("Invalid email format"),
-  turnstileToken: z.string().optional(),
+  turnstileToken: z.string().nullish(),
 });
 
 export const verifyOtpSchema = z.object({

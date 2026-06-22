@@ -468,7 +468,11 @@ function preloadSearchIndex(): void {
   _indexFetching = true;
   fetch("/api/sponsors/search-index.json")
     .then((res) => res.json())
-    .then((data) => { _clientIndex = data; })
+    .then((data) => {
+      // Unwrap the API envelope { success: true, data: [...] }.
+      // The route may be called directly (raw array) or via getQueryFn (wrapped object).
+      _clientIndex = Array.isArray(data) ? data : (data?.data ?? []);
+    })
     .catch(() => {})
     .finally(() => { _indexFetching = false; });
 }
