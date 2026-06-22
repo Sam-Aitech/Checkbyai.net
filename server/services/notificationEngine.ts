@@ -382,21 +382,24 @@ async function dispatchPush(
   }
 }
 
-// Returns true if dispatch may proceed; false (and audit-logs) if rate-limited or the check errored.
-async function passesRateLimit(ctx: DispatchContext, userId: string, logChannel: string): Promise<boolean> {
+// Returns true (and audit-logs) if dispatch should be skipped because the user
+// is rate-limited or the rate-limit check itself errored.
+async function rateLimitBlocked(ctx: DispatchContext, userId: string, logChannel: string): Promise<boolean> {
   try {
-    if (!(await isRateLimited(userId, ctx.companyName))) return true;
-    await logNotification({
-      userId, changeId: ctx.changeId, eventType: ctx.prefsKey, channel: logChannel,
-      companyName: ctx.companyName, success: false, errorDetails: "Rate limit exceeded",
-    });
+    if (await isRateLimited(userId, ctx.companyName)) {
+      await logNotification({
+        userId, changeId: ctx.changeId, eventType: ctx.prefsKey, channel: logChannel,
+        companyName: ctx.companyName, success: false, errorDetails: "Rate limit exceeded",
+      });
+      return true;
+    }
     return false;
   } catch {
     await logNotification({
       userId, changeId: ctx.changeId, eventType: ctx.prefsKey, channel: logChannel,
       companyName: ctx.companyName, success: false, errorDetails: "Rate limit check failed",
     });
-    return false;
+    return true;
   }
 }
 
@@ -429,7 +432,7 @@ async function processUser(
       companyName: ctx.companyName, success: false, errorDetails: "No channels enabled for this event/tier",
     });
     tally.skipped++;
-  } else if (!(await passesRateLimit(ctx, user.id, rateLimitLogChannel))) {
+  } else if (await rateLimitBlocked(ctx, user.id, rateLimitLogChannel)) {
     tally.skipped++;
   } else {
     await dispatchChannels(ctx, user, channelPrefs, enabledChannels, tally);
