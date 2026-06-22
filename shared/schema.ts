@@ -34,18 +34,19 @@ export type NotifPrefs = {
       email: boolean;
       inApp: boolean;
       sms: boolean;
+      webhook: boolean;
     };
   };
 };
 
 export const DEFAULT_NOTIF_PREFS: NotifPrefs = {
-  licence_revoked:    { enabled: true,  channels: { email: true,  inApp: true,  sms: false } },
-  rating_downgraded:  { enabled: true,  channels: { email: true,  inApp: false, sms: false } },
-  licence_reinstated: { enabled: true,  channels: { email: true,  inApp: true,  sms: false } },
-  rating_upgraded:    { enabled: false, channels: { email: false, inApp: true,  sms: false } },
-  route_added:        { enabled: false, channels: { email: false, inApp: true,  sms: false } },
-  route_removed:      { enabled: false, channels: { email: false, inApp: false, sms: false } },
-  weekly_digest:      { enabled: true,  channels: { email: true,  inApp: false, sms: false } },
+  licence_revoked:    { enabled: true,  channels: { email: true,  inApp: true,  sms: false, webhook: false } },
+  rating_downgraded:  { enabled: true,  channels: { email: true,  inApp: false, sms: false, webhook: false } },
+  licence_reinstated: { enabled: true,  channels: { email: true,  inApp: true,  sms: false, webhook: false } },
+  rating_upgraded:    { enabled: false, channels: { email: false, inApp: true,  sms: false, webhook: false } },
+  route_added:        { enabled: false, channels: { email: false, inApp: true,  sms: false, webhook: false } },
+  route_removed:      { enabled: false, channels: { email: false, inApp: false, sms: false, webhook: false } },
+  weekly_digest:      { enabled: true,  channels: { email: true,  inApp: false, sms: false, webhook: false } },
 };
 
 // Session storage table for Replit Auth
@@ -395,8 +396,26 @@ export const notificationPreferences = pgTable("notification_preferences", {
   smsEnabled: boolean("sms_enabled").default(false),
   smsNumber: varchar("sms_number"),
   smsVerified: boolean("sms_verified").default(false),
+  webhookEnabled: boolean("webhook_enabled").default(false),
+  webhookUrl: varchar("webhook_url"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+// Browser push notification subscriptions (one row per user-device pair)
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  endpoint: text("endpoint").notNull(),
+  p256dh: varchar("p256dh").notNull(),
+  auth: varchar("auth").notNull(),
+  deviceName: varchar("device_name"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("uq_push_subscriptions").on(table.userId, table.endpoint),
+  index("idx_push_subscriptions_user_id").on(table.userId),
+]);
 
 // Records every notification sent
 export const notificationLog = pgTable(

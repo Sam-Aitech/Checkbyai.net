@@ -80,10 +80,20 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 - Phase 3 P0 focuses on display layer because Phases 1+2 fixed the pipeline.
 - React Query global `staleTime: Infinity` left unchanged (too wide a blast radius); overrides applied only to sponsor-specific queries.
 
+#### Phase 4 — SSR Landing Page
+- **Server-side render** for `/` route (landing page) in both dev (`setupVite`) and production (`serveStatic`).
+- **`server/ssr/renderLanding.ts`** — generates rich HTML landing page (hero, stats, features, how-it-works, CTA, footer) with inline styles (no Tailwind dependency).
+- **Comment marker replacement** (`<!--SSR-->...<!--/SSR-->` in `client/index.html`) for robust root content injection without regex fragility.
+- **`createRoot` (not `hydrateRoot`)** — avoids hydration mismatches with complex client components (framer-motion, lazy imports, useAuth).
+- SSR runs at request time → users see content immediately → React replaces on JS load.
+- No new dependencies; uses existing `react-helmet-async` (already in deps) for head management if needed.
+
 ### Remaining (Not Yet Scoped)
 - Fuse.js search index versioning for instant CDV cache bust on rebuild.
 - React Query `gcTime` reduction for sponsor pages (currently default 5min).
 - Consistent `stale-while-revalidate` policy across all endpoints.
+- Full free history browse endpoint wiring.
+- Observability dashboard UI for diagnostics.
 
 ### Relevant Files
 | File | Purpose |
@@ -101,3 +111,11 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 | `client/src/lib/queryDefaults.ts` | Standardized staleTime constants |
 | `shared/schema.ts` | DB schema (sponsorChanges.isTest, dailyDigest) |
 | `migrations/0020_monitor_job_runs_is_gap_day.sql` | Phase 2 migration |
+| `server/ssr/renderLanding.ts` | SSR landing page generator |
+| `server/vite.ts` | Dev/prod SSR wiring |
+| `client/index.html` | SSR comment markers |
+| `server/services/notificationChannels/` | 6 notification channels |
+| `server/services/socketGateway.ts` | Socket.IO real-time gateway |
+| `server/routes/pushSubscriptions.ts` | Push API endpoints |
+| `migrations/0022_push_subscriptions.sql` | Push subscriptions table |
+| `migrations/0023_notification_preferences_webhook.sql` | Webhook prefs columns |

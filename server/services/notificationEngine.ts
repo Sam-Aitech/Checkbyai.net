@@ -1,23 +1,26 @@
 /**
  * Notification Engine — event-type-filtered notification dispatch for paid subscribers.
  *
- * Supersedes the legacy notificationDispatcher for the main job loop.
- * Checks users.notif_prefs (jsonb) to skip events the user has opted out of.
- * Uses a Redis-backed sliding-window rate limiter (sorted set) — 3 sends per user per company per hour.
- * Logs every action to notif_engine_log for audit.
+ * Uses a channel-based dispatch architecture:
+ *   - EmailChannel (Resend → SendGrid → SMTP chain)
+ *   - WhatsAppChannel (Twilio)
+ *   - SMSChannel (Brevo)
+ *   - WebhookChannel (HMAC-signed, 3 retries: 5m/15m/60m)
+ *   - PushChannel (Web Push API via VAPID)
+ *
+ * Concurrency: p-limit(10) parallel user processing.
+ * Rate limit: Redis-backed sliding window — 3 sends per user per company per hour.
+ * Kill-switch: admin-toggleable global pause.
+ * Audit: every dispatch logged to notif_log with success/failure + providerMessageId.
  *
  * Deferred delivery (starter plan, same-day window):
  *   - Entries are written with status='queued' and a deliverAfter timestamp.
- *   - processQueuedEngineEvents() is called hourly by the cron scheduler to deliver them.
- *
- * Why ts-pattern: change-event and status-transition routing must be explicit,
- * exhaustive, and drift-resistant as upstream status enums evolve.
- * Priority 5 enum source of truth: shared/schema.ts sponsor_licence_timeline.licenceStatus.
+ *   - processQueuedEngineEvents() is called hourly by the cron scheduler.
  */
 
 import { db } from "../db";
 import { storage } from "../storage";
-import { eq, and, inArray, lte } from "drizzle-orm";
+import { eq, and, inArray, lte, sql } from "drizzle-orm";
 import { getRedis } from "../utils/redisClient";
 import {
   companyWatches,
@@ -30,17 +33,26 @@ import {
 import type { NotifPrefs } from "@shared/schema";
 import type { SponsorChange } from "../utils/sponsorListFetcher";
 import { normalizeName } from "../utils/sponsorListFetcher";
-import { getTierConfig } from "../utils/tierConfig";
 import { getAppUrl } from "../utils/appUrl";
+import { getTierConfig } from "../utils/tierConfig";
+import { buildEmail, esc } from "../utils/emailTemplates";
 import { logger } from "../utils/logger";
 import { startJobRun, finishJobRun, type TriggerSource } from "../utils/jobTelemetry";
 import { match, P } from "ts-pattern";
+import pLimit from "p-limit";
+import { registerDefaultChannels, getChannel } from "./notificationChannels/registry";
+import type { ChannelName } from "./notificationChannels/types";
+import { logNotification } from "./notificationChannels/audit";
 
 const log = logger.child({ module: "NotificationEngine" });
 
+type NotifPrefsChannels = NotifPrefs[NotifEventType]["channels"];
+
+const CONCURRENCY = 10;
+const limit = pLimit(CONCURRENCY);
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-// Snake_case event types matching users.notif_prefs keys (NotifPrefs in schema.ts).
 export type NotifEventType =
   | "licence_revoked"
   | "rating_downgraded"
@@ -50,8 +62,6 @@ export type NotifEventType =
   | "route_removed"
   | "weekly_digest";
 
-// Maps DB changeType (ALL_CAPS from sponsorChanges table) → snake_case NotifPrefs key.
-// Unmapped types (e.g. NEW_LICENCE) pass through isEventEnabled as unknown keys → enabled.
 const CHANGE_TYPE_MAP: Partial<Record<string, NotifEventType>> = {
   REMOVED_REVOKED: "licence_revoked",
   RE_ACTIVATED:    "licence_reinstated",
@@ -59,66 +69,6 @@ const CHANGE_TYPE_MAP: Partial<Record<string, NotifEventType>> = {
   DOWNGRADED:      "rating_downgraded",
   ROUTE_CHANGE:    "route_added",
 };
-
-type SponsorLicenceStatus = "Active" | "Suspended" | "Revoked" | "Surrendered";
-type NormalizedSponsorLicenceStatus = SponsorLicenceStatus | "UNKNOWN";
-
-function normalizeSponsorLicenceStatus(value: string | null | undefined): NormalizedSponsorLicenceStatus {
-  return match((value ?? "").trim().toUpperCase())
-    .with("ACTIVE", () => "Active" as const)
-    .with("SUSPENDED", () => "Suspended" as const)
-    .with("REVOKED", () => "Revoked" as const)
-    // Internal state-machine status is intentionally normalized into
-    // user-facing licence-status semantics for transition alert routing.
-    .with("REMOVED_REVOKED", () => "Revoked" as const)
-    .with("SURRENDERED", () => "Surrendered" as const)
-    .otherwise(() => "UNKNOWN" as const);
-}
-
-function mapStatusTransitionToNotifEvent(
-  previousStatusRaw: string | null | undefined,
-  newStatusRaw: string | null | undefined,
-): NotifEventType | null {
-  const previousStatus = normalizeSponsorLicenceStatus(previousStatusRaw);
-  const newStatus = normalizeSponsorLicenceStatus(newStatusRaw);
-
-  return match<[NormalizedSponsorLicenceStatus, NormalizedSponsorLicenceStatus]>([
-    previousStatus,
-    newStatus,
-  ])
-    .returnType<NotifEventType | null>()
-    .with(["Active", "Active"], () => null)
-    // TODO: add dedicated "licence_suspended" preference/event key; until then,
-    // suspension alerts are routed via "licence_revoked".
-    .with(["Active", "Suspended"], () => "licence_revoked")
-    .with(["Active", "Revoked"], () => "licence_revoked")
-    .with(["Active", "Surrendered"], () => "licence_revoked")
-    .with(["Suspended", "Active"], () => "licence_reinstated")
-    .with(["Suspended", "Suspended"], () => null)
-    .with(["Suspended", "Revoked"], () => "licence_revoked")
-    .with(["Suspended", "Surrendered"], () => "licence_revoked")
-    .with(["Revoked", "Active"], () => "licence_reinstated")
-    // No alert: already in a removed terminal family.
-    .with(["Revoked", "Suspended"], () => null)
-    .with(["Revoked", "Revoked"], () => null)
-    // No alert: both statuses represent non-active terminal states.
-    .with(["Revoked", "Surrendered"], () => null)
-    .with(["Surrendered", "Active"], () => "licence_reinstated")
-    // No alert: non-active terminal-family transitions currently not user-facing.
-    .with(["Surrendered", "Suspended"], () => null)
-    .with(["Surrendered", "Revoked"], () => null)
-    .with(["Surrendered", "Surrendered"], () => null)
-    .with(["UNKNOWN", "UNKNOWN"], () => null)
-    .with(["UNKNOWN", P.union("Active", "Suspended", "Revoked", "Surrendered")], () => {
-      log.warn({ previousStatusRaw, newStatusRaw }, "Unhandled sponsor status value for transition mapping");
-      return null;
-    })
-    .with([P.union("Active", "Suspended", "Revoked", "Surrendered"), "UNKNOWN"], () => {
-      log.warn({ previousStatusRaw, newStatusRaw }, "Unhandled sponsor status value for transition mapping");
-      return null;
-    })
-    .exhaustive();
-}
 
 // ── Rate limiter ──────────────────────────────────────────────────────────────
 // Keyed by `${userId}:${companyName}` — 3 sends per user per company per hour.
@@ -161,173 +111,73 @@ async function isRateLimited(userId: string | number, companyName: string): Prom
   }
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Channel-aware event check ──────────────────────────────────────────────────
 
-function isEventEnabled(prefs: NotifPrefs | null, eventType: string): boolean {
-  if (!prefs) return true; // null = all events enabled (default)
-  const pref = (prefs as any)[eventType] as NotifPrefs[NotifEventType] | undefined;
-  if (pref === undefined) return true; // unmapped event types always pass through
-  return pref.enabled === true && pref.channels.email === true;
-}
-
-function esc(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
-// ── Email builder ─────────────────────────────────────────────────────────────
-
-export function buildEmail(
-  changeType: string,
-  organisationName: string,
-  previousValue: string | null | undefined,
-  newValue: string | null | undefined,
-): { subject: string; html: string } {
-  const company = esc(organisationName);
-  const prev = previousValue ? esc(previousValue) : null;
-  const next = newValue ? esc(newValue) : null;
-
-  type Meta = { bg: string; headline: string; subject: string; body: string };
-  const meta: Record<string, Meta> = {
-    REMOVED_REVOKED: {
-      bg: "linear-gradient(135deg,#8B0000 0%,#CC0000 100%)",
-      headline: "Sponsor Licence Removed",
-      subject: `URGENT: ${organisationName} removed from UK sponsor licence register`,
-      body: `<strong>${company}</strong> has been removed from the UK Home Office Register of Licensed Sponsors. If you hold a visa sponsored by this organisation, seek immigration advice immediately.`,
-    },
-    NEW_LICENCE: {
-      bg: "linear-gradient(135deg,#003366 0%,#0066CC 100%)",
-      headline: "New Sponsor Licence Granted",
-      subject: `Update: ${organisationName} added to sponsor licence register`,
-      body: `<strong>${company}</strong> has been added to the UK Home Office Register of Licensed Sponsors${next ? ` under the <strong>${next}</strong> route` : ""}.`,
-    },
-    RE_ACTIVATED: {
-      bg: "linear-gradient(135deg,#003366 0%,#0066CC 100%)",
-      headline: "Sponsor Licence Reinstated",
-      subject: `Update: ${organisationName} has returned to the sponsor licence register`,
-      body: `<strong>${company}</strong> has reappeared on the UK Home Office Register of Licensed Sponsors after a period of absence.`,
-    },
-    UPGRADED: {
-      bg: "linear-gradient(135deg,#006633 0%,#009933 100%)",
-      headline: "Sponsor Licence Upgraded",
-      subject: `Good news: ${organisationName} sponsor licence upgraded`,
-      body: `<strong>${company}</strong> has had their sponsor licence rating upgraded${prev && next ? ` from <strong>${prev}</strong> to <strong>${next}</strong>` : ""}.`,
-    },
-    DOWNGRADED: {
-      bg: "linear-gradient(135deg,#CC6600 0%,#FF8C00 100%)",
-      headline: "Sponsor Licence Downgraded",
-      subject: `Alert: ${organisationName} sponsor licence downgraded`,
-      body: `<strong>${company}</strong> has had their sponsor licence rating downgraded${prev && next ? ` from <strong>${prev}</strong> to <strong>${next}</strong>` : ""}. The Home Office has identified compliance issues.`,
-    },
-    ROUTE_CHANGE: {
-      bg: "linear-gradient(135deg,#4B0082 0%,#8A2BE2 100%)",
-      headline: "Sponsor Route Changed",
-      subject: `Update: ${organisationName} sponsor route changed`,
-      body: `<strong>${company}</strong> has changed their sponsorship route${prev && next ? ` from <strong>${prev}</strong> to <strong>${next}</strong>` : ""}.`,
-    },
-    NAME_CHANGE: {
-      bg: "linear-gradient(135deg,#333 0%,#666 100%)",
-      headline: "Organisation Name Changed",
-      subject: `Update: ${organisationName} has changed name`,
-      body: `This sponsor has changed their registered name${prev && next ? ` from <strong>${prev}</strong> to <strong>${next}</strong>` : ""}.`,
-    },
-  };
-
-  const m = meta[changeType] ?? meta.NEW_LICENCE;
-
-  const html = `
-    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
-      <div style="background:${m.bg};padding:30px;border-radius:10px 10px 0 0;">
-        <h1 style="color:#fff;margin:0;text-align:center;font-size:22px;">${m.headline}</h1>
-      </div>
-      <div style="background:#fff;padding:30px;border:1px solid #e0e0e0;border-top:none;">
-        <p style="color:#333;font-size:15px;line-height:1.6;margin:0;">${m.body}</p>
-      </div>
-      <div style="background:#f8f9fa;padding:20px;border:1px solid #e0e0e0;border-top:none;border-radius:0 0 10px 10px;">
-        <p style="color:#666;font-size:12px;margin:0 0 8px;text-align:center;">
-          You are receiving this because you are watching <strong>${company}</strong> on Check By AI Sponsor Monitor.
-        </p>
-        <p style="color:#999;font-size:11px;margin:0;text-align:center;">
-          Manage your preferences at
-          <a href="${getAppUrl()}/dashboard/sponsor" style="color:#0066CC;">checkbyai.net/dashboard/sponsor</a>
-        </p>
-      </div>
-    </div>`;
-
-  return { subject: m.subject, html };
-}
-
-// ── Resend delivery ───────────────────────────────────────────────────────────
-
-const FROM_ADDRESS = "Sponsor Monitor <alerts@checkbyai.net>";
-
-export async function sendViaResend(
-  to: string,
-  subject: string,
-  html: string,
-): Promise<{ success: boolean; providerMessageId?: string; error?: string }> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) return { success: false, error: "RESEND_API_KEY not configured" };
-
-  try {
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({ from: FROM_ADDRESS, to: [to], subject, html }),
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      return { success: false, error: `Resend ${response.status}: ${text}` };
-    }
-
-    const data: any = await response.json();
-    return { success: true, providerMessageId: data.id };
-  } catch (err: unknown) {
-    return { success: false, error: (err instanceof Error ? err.message : String(err)) ?? "Unknown send error" };
-  }
-}
-
-// ── Audit logging ─────────────────────────────────────────────────────────────
-// Writes to notif_log (new schema). notif_engine_log is still read by
-// processQueuedEngineEvents to drain pre-Part-5 queued entries.
-
-async function logEvent(
-  userId: string,
-  changeId: number | undefined,
+export function isChannelEventEnabled(
+  prefs: NotifPrefs | null,
   eventType: string,
-  companyName: string,
-  success: boolean,
-  opts?: { errorDetails?: string; providerMessageId?: string },
-): Promise<void> {
-  try {
-    await db.insert(notifLog).values({
-      userId,
-      changeId: changeId ?? null,
-      eventType,
-      channel: "email",
-      companyName,
-      success,
-      providerMessageId: opts?.providerMessageId ?? null,
-      errorDetails: opts?.errorDetails ?? null,
-    });
-  } catch (err) {
-    log.error({ err }, "[NotificationEngine] Failed to write log entry");
-  }
+  channel: string,
+): boolean {
+  if (!prefs) return true;
+  const pref = (prefs as any)[eventType] as NotifPrefs[NotifEventType] | undefined;
+  if (pref === undefined) return true;
+  return pref.enabled === true && (pref.channels as any)[channel] === true;
 }
 
-// ── Public API ────────────────────────────────────────────────────────────────
+type SponsorLicenceStatus = "Active" | "Suspended" | "Revoked" | "Surrendered";
+type NormalizedSponsorLicenceStatus = SponsorLicenceStatus | "UNKNOWN";
 
-/**
- * Dispatches notifications for a single sponsor change event to all affected watchers.
- * Checks notif_prefs (per-event enabled + channels.email), applies per-company rate limit
- * (3/hour), and sends immediately via Resend. Writes results to notif_log.
- *
- * Call fire-and-forget from the sponsor monitor job:
- *   notifyUsersOfEvent(change).catch(err => console.error(...));
- */
+const STATUS_NORMALIZE_MAP: Record<string, NormalizedSponsorLicenceStatus> = {
+  ACTIVE: "Active",
+  SUSPENDED: "Suspended",
+  REVOKED: "Revoked",
+  REMOVED_REVOKED: "Revoked",
+  SURRENDERED: "Surrendered",
+};
+
+export function normalizeSponsorLicenceStatus(value: string | null | undefined): NormalizedSponsorLicenceStatus {
+  return STATUS_NORMALIZE_MAP[(value ?? "").trim().toUpperCase()] ?? "UNKNOWN";
+}
+
+export function mapStatusTransitionToNotifEvent(
+  previousStatusRaw: string | null | undefined,
+  newStatusRaw: string | null | undefined,
+): NotifEventType | null {
+  const previousStatus = normalizeSponsorLicenceStatus(previousStatusRaw);
+  const newStatus = normalizeSponsorLicenceStatus(newStatusRaw);
+
+  return match<[NormalizedSponsorLicenceStatus, NormalizedSponsorLicenceStatus]>([previousStatus, newStatus])
+    .returnType<NotifEventType | null>()
+    .with(["Active", "Active"], () => null)
+    .with(["Active", "Suspended"], () => "licence_revoked")
+    .with(["Active", "Revoked"], () => "licence_revoked")
+    .with(["Active", "Surrendered"], () => "licence_revoked")
+    .with(["Suspended", "Active"], () => "licence_reinstated")
+    .with(["Suspended", "Suspended"], () => null)
+    .with(["Suspended", "Revoked"], () => "licence_revoked")
+    .with(["Suspended", "Surrendered"], () => "licence_revoked")
+    .with(["Revoked", "Active"], () => "licence_reinstated")
+    .with(["Revoked", "Suspended"], () => null)
+    .with(["Revoked", "Revoked"], () => null)
+    .with(["Revoked", "Surrendered"], () => null)
+    .with(["Surrendered", "Active"], () => "licence_reinstated")
+    .with(["Surrendered", "Suspended"], () => null)
+    .with(["Surrendered", "Revoked"], () => null)
+    .with(["Surrendered", "Surrendered"], () => null)
+    .with(["UNKNOWN", "UNKNOWN"], () => null)
+    .with(["UNKNOWN", P.union("Active", "Suspended", "Revoked", "Surrendered")], () => {
+      log.warn({ previousStatusRaw, newStatusRaw }, "Unhandled sponsor status value for transition mapping");
+      return null;
+    })
+    .with([P.union("Active", "Suspended", "Revoked", "Surrendered"), "UNKNOWN"], () => {
+      log.warn({ previousStatusRaw, newStatusRaw }, "Unhandled sponsor status value for transition mapping");
+      return null;
+    })
+    .exhaustive();
+}
+
+// ── Kill-switch ───────────────────────────────────────────────────────────────
+
 let _pausedCache: { value: boolean; expiresAt: number } | null = null;
 
 export function invalidateNotificationsPausedCache(): void {
@@ -341,14 +191,85 @@ async function isNotificationsPaused(): Promise<boolean> {
   return _pausedCache.value;
 }
 
-export async function notifyUsersOfEvent(change: SponsorChange): Promise<{ sent: number; skipped: number; failed: number }> {
-  let sent = 0, skipped = 0, failed = 0;
+// ── Channel mapping ───────────────────────────────────────────────────────────
 
-  // Global kill switch — admin can pause all notifications via /api/admin/notifications/pause
+/**
+ * Maps DB notification_preferences columns + tier config to channel names.
+ * Returns the channels this user has enabled for the given event type,
+ * that their tier allows, and that are technically configured.
+ */
+export function getEnabledChannelsForUser(
+  user: { subscriptionStatus: string | null; notifPrefs: NotifPrefs | null },
+  prefsKey: string,
+  channelPrefs: typeof notificationPreferences.$inferSelect | undefined,
+): ChannelName[] {
+  const enabled: ChannelName[] = [];
+
+  const tierConfig = getTierConfig(user.subscriptionStatus);
+
+  // Email
+  if (tierConfig.channels.includes("email") && isChannelEventEnabled(user.notifPrefs, prefsKey, "email")) {
+    const emailAddr = channelPrefs?.email ?? null;
+    if (emailAddr) enabled.push("email");
+  }
+
+  // WhatsApp
+  if (tierConfig.channels.includes("whatsapp") && isChannelEventEnabled(user.notifPrefs, prefsKey, "whatsapp")) {
+    if (channelPrefs?.whatsappNumber && channelPrefs.whatsappVerified) enabled.push("whatsapp");
+  }
+
+  // SMS
+  if (tierConfig.channels.includes("sms") && isChannelEventEnabled(user.notifPrefs, prefsKey, "sms")) {
+    if (channelPrefs?.smsNumber && channelPrefs.smsVerified) enabled.push("sms");
+  }
+
+  // Webhook (enterprise only via tierConfig)
+  if (tierConfig.webhooks && isChannelEventEnabled(user.notifPrefs, prefsKey, "webhook")) {
+    const webhookUrl = channelPrefs?.webhookUrl ?? null;
+    if (webhookUrl?.startsWith("https://")) enabled.push("webhook");
+  }
+
+  // In-app (real-time via Socket.IO)
+  if (tierConfig.channels.includes("inApp") && isChannelEventEnabled(user.notifPrefs, prefsKey, "inApp")) {
+    enabled.push("inApp");
+  }
+
+  return enabled;
+}
+
+/**
+ * Returns the recipient identifier for a given channel.
+ */
+function getRecipientForChannel(
+  channel: ChannelName,
+  user: { id: string; email: string | null },
+  channelPrefs: typeof notificationPreferences.$inferSelect | undefined,
+): string | null {
+  switch (channel) {
+    case "email": return channelPrefs?.email ?? user.email;
+    case "whatsapp": return channelPrefs?.whatsappNumber ?? null;
+    case "sms": return channelPrefs?.smsNumber ?? null;
+    case "webhook": return channelPrefs?.webhookUrl ?? null;
+    case "inApp": return user.id;
+    default: return null;
+  }
+}
+
+// ── Main dispatch ─────────────────────────────────────────────────────────────
+
+export async function notifyUsersOfEvent(change: SponsorChange): Promise<{
+  sent: number;
+  skipped: number;
+  failed: number;
+  channelBreakdown?: Record<string, { sent: number; failed: number }>;
+}> {
+  let sent = 0, skipped = 0, failed = 0;
+  const channelBreakdown: Record<string, { sent: number; failed: number }> = {};
+
   if (await isNotificationsPaused()) {
-     log.info({ organisationName: change.organisationName }, 'Notifications paused by admin — skipping dispatch');
-     return { sent: 0, skipped: 0, failed: 0 };
-   }
+    log.info({ organisationName: change.organisationName }, 'Notifications paused by admin — skipping dispatch');
+    return { sent: 0, skipped: 0, failed: 0 };
+  }
 
   const changeId = change.id;
   if (changeId === undefined) {
@@ -356,8 +277,6 @@ export async function notifyUsersOfEvent(change: SponsorChange): Promise<{ sent:
     return { sent, skipped, failed };
   }
 
-  // Resolve snake_case prefs key from DB changeType (ALL_CAPS).
-  // Unmapped types (e.g. NEW_LICENCE) pass through isEventEnabled as unknown → enabled.
   const transitionEventType = match(change.changeType)
     .with("REMOVED_REVOKED", "RE_ACTIVATED", () =>
       mapStatusTransitionToNotifEvent(change.previousValue, change.newValue),
@@ -378,11 +297,10 @@ export async function notifyUsersOfEvent(change: SponsorChange): Promise<{ sent:
         ),
       );
 
-    if (activeWatches.length === 0) return { sent, skipped, failed };
+    if (activeWatches.length === 0) return { sent, skipped, failed, channelBreakdown };
 
     const uniqueUserIds = [...new Set(activeWatches.map(w => w.userId))];
 
-    // Batch all DB lookups upfront — 2 parallel queries instead of N×2
     const [userRows, prefRows] = await Promise.all([
       db
         .select({
@@ -402,95 +320,143 @@ export async function notifyUsersOfEvent(change: SponsorChange): Promise<{ sent:
     const userMap = new Map(userRows.map(u => [u.id, u]));
     const prefMap = new Map(prefRows.map(p => [p.userId, p]));
 
-    // Build email payload once, shared across all recipients
-    const { subject, html } = buildEmail(
-      change.changeType,
-      companyName,
-      change.previousValue,
-      change.newValue,
+    // Ensure the channel registry is populated once
+    registerDefaultChannels();
+
+    // Process users concurrently with p-limit(10)
+    const userTasks = uniqueUserIds.map(userId =>
+      limit(async () => {
+        const user = userMap.get(userId);
+        if (!user) { skipped++; return; }
+
+        const channelPrefs = prefMap.get(userId);
+
+        // Determine which channels this user gets for this event
+        const enabledChannels = getEnabledChannelsForUser(
+          { subscriptionStatus: user.subscriptionStatus, notifPrefs: user.notifPrefs as NotifPrefs | null },
+          prefsKey,
+          channelPrefs,
+        );
+
+        if (enabledChannels.length === 0) {
+          await logNotification({
+            userId,
+            changeId,
+            eventType: prefsKey,
+            channel: "email",
+            companyName,
+            success: false,
+            errorDetails: "No channels enabled for this event/tier",
+          });
+          skipped++;
+          return;
+        }
+
+        // Check rate limit once before dispatching to all channels
+        try {
+          if (await isRateLimited(userId, companyName)) {
+            await logNotification({
+              userId,
+              changeId,
+              eventType: prefsKey,
+              channel: enabledChannels[0],
+              companyName,
+              success: false,
+              errorDetails: "Rate limit exceeded",
+            });
+            skipped++;
+            return;
+          }
+        } catch {
+          await logNotification({
+            userId,
+            changeId,
+            eventType: prefsKey,
+            channel: enabledChannels[0],
+            companyName,
+            success: false,
+            errorDetails: "Rate limit check failed",
+          });
+          skipped++;
+          return;
+        }
+
+        // Dispatch to each enabled channel
+        for (const channelName of enabledChannels) {
+          const channel = getChannel(channelName);
+          if (!channel) {
+            log.warn({ channelName }, "Channel not registered — skipping");
+            continue;
+          }
+
+          const recipient = getRecipientForChannel(channelName, user, channelPrefs);
+          if (!recipient) {
+            await logNotification({
+              userId, changeId, eventType: prefsKey, channel: channelName,
+              companyName, success: false, errorDetails: "No recipient address",
+            });
+            skipped++;
+            continue;
+          }
+
+          try {
+            const result = await channel.send({
+              userId,
+              changeId,
+              eventType: prefsKey,
+              companyName,
+              organisationName: companyName,
+              changeType: change.changeType,
+              previousValue: change.previousValue,
+              newValue: change.newValue,
+              recipient,
+            });
+
+            await logNotification({
+              userId, changeId, eventType: prefsKey, channel: channelName,
+              companyName,
+              success: result.success,
+              providerMessageId: result.providerMessageId,
+              errorDetails: result.error,
+            });
+
+            if (result.success) {
+              sent++;
+              channelBreakdown[channelName] = channelBreakdown[channelName] ?? { sent: 0, failed: 0 };
+              channelBreakdown[channelName].sent++;
+            } else {
+              failed++;
+              channelBreakdown[channelName] = channelBreakdown[channelName] ?? { sent: 0, failed: 0 };
+              channelBreakdown[channelName].failed++;
+            }
+
+            log.info(
+              `[NotificationEngine] ${result.success ? "Sent" : "Failed"} ${prefsKey} via ${channelName} to user ${userId}`,
+            );
+          } catch (err: unknown) {
+            failed++;
+            const errMsg = err instanceof Error ? err.message : String(err);
+            await logNotification({
+              userId, changeId, eventType: prefsKey, channel: channelName,
+              companyName, success: false, errorDetails: errMsg,
+            });
+            log.error({ err: errMsg, userId, channelName }, `Channel dispatch error`);
+          }
+        }
+      })
     );
 
-    for (const userId of uniqueUserIds) {
-      try {
-        const user = userMap.get(userId);
-        if (!user) {
-          skipped++;
-          continue;
-        }
+    await Promise.all(userTasks);
+  } catch (err) {
+    log.error({ err, changeId }, "Fatal error for change");
+  }
 
-        // Free tier: no email channel — skip without logging
-        const tierConfig = getTierConfig(user.subscriptionStatus);
-        if (!tierConfig.channels.includes("email")) {
-          skipped++;
-          continue;
-        }
-
-        // Per-event, per-channel opt-out check (notif_prefs jsonb on users table)
-        if (!isEventEnabled(user.notifPrefs as NotifPrefs | null, prefsKey)) {
-          await logEvent(userId, changeId, prefsKey, companyName, false, {
-            errorDetails: "Event type opted out",
-          });
-          skipped++;
-          continue;
-        }
-
-        // In-memory rate limit: 3 sends per user per company per hour
-        if (await isRateLimited(userId, companyName)) {
-          await logEvent(userId, changeId, prefsKey, companyName, false, {
-            errorDetails: "Rate limit exceeded",
-          });
-          skipped++;
-          continue;
-        }
-
-        // Channel preference check
-        const channelPrefs = prefMap.get(userId);
-        const emailEnabled = !channelPrefs || channelPrefs.emailEnabled;
-        const recipientEmail = channelPrefs?.email ?? user.email;
-
-        if (!emailEnabled || !recipientEmail) {
-          await logEvent(userId, changeId, prefsKey, companyName, false, {
-            errorDetails: "Email disabled or no address on file",
-          });
-          skipped++;
-          continue;
-        }
-
-        // Send immediately (all tiers)
-        const sendResult = await sendViaResend(recipientEmail, subject, html);
-        await logEvent(userId, changeId, prefsKey, companyName, sendResult.success, {
-          errorDetails: sendResult.error,
-          providerMessageId: sendResult.providerMessageId,
-        });
-
-        if (sendResult.success) {
-          sent++;
-        } else {
-          failed++;
-        }
-
-        log.info(
-          `[NotificationEngine] ${sendResult.success ? "Sent" : "Failed"} ${prefsKey} to ${recipientEmail} (user ${userId})`,
-        );
-       } catch (err: unknown) {
-         failed++;
-         const errMsg = err instanceof Error ? err.message : String(err);
-         log.error({ err, userId, changeId }, `Error processing user ${userId}: ${errMsg}`);
-         await logEvent(userId, changeId, prefsKey, companyName, false, { errorDetails: errMsg });
-       }
-     }
-   } catch (err) {
-     log.error({ err, changeId }, "Fatal error for change");
-   }
-   
-   // Return metrics for aggregation
-   return { sent, skipped, failed };
- }
+  return { sent, skipped, failed, channelBreakdown };
+}
 
 /**
  * Drains pre-Part-5 queued entries from notif_engine_log (legacy table).
- * New sends write to notif_log; this function is transitional and will be retired
- * once the notif_engine_log queue is empty. Called hourly by the cron scheduler.
+ * Now uses the email channel instead of raw sendViaResend.
  */
 export async function processQueuedEngineEvents(orchestration?: { correlationId?: string; triggerSource?: TriggerSource }): Promise<void> {
   const now = new Date();
@@ -537,6 +503,9 @@ export async function processQueuedEngineEvents(orchestration?: { correlationId?
     const prefMap = new Map(prefRows.map(p => [p.userId, p]));
     const changeMap = new Map(changeRows.map(c => [c.id, c]));
 
+    registerDefaultChannels();
+    const emailChan = getChannel("email");
+
     for (const entry of queued) {
       try {
         const user = userMap.get(entry.userId);
@@ -553,40 +522,42 @@ export async function processQueuedEngineEvents(orchestration?: { correlationId?
         const channelPrefs = prefMap.get(entry.userId);
         const recipientEmail = channelPrefs?.email ?? user.email;
 
-        if (!recipientEmail) {
+        if (!recipientEmail || !emailChan) {
           await db
             .update(notifEngineLog)
-            .set({ status: "failed", errorDetails: "No recipient email" })
+            .set({ status: "failed", errorDetails: "No recipient email or email channel unavailable" })
             .where(eq(notifEngineLog.id, entry.id));
           continue;
         }
 
-        const { subject, html } = buildEmail(
-          change.changeType,
-          change.organisationName,
-          change.previousValue,
-          change.newValue,
-        );
-
-        const sendResult = await sendViaResend(recipientEmail, subject, html);
+        const result = await emailChan.send({
+          userId: entry.userId,
+          changeId: change.id,
+          eventType: entry.eventType,
+          companyName: change.organisationName,
+          organisationName: change.organisationName,
+          changeType: change.changeType,
+          previousValue: change.previousValue,
+          newValue: change.newValue,
+          snapshotDate: change.snapshotDate,
+          recipient: recipientEmail,
+        });
 
         await db
           .update(notifEngineLog)
           .set({
-            status: sendResult.success ? "sent" : "failed",
-            sentAt: sendResult.success ? new Date() : null,
-            providerMessageId: sendResult.providerMessageId ?? null,
-            errorDetails: sendResult.error ?? null,
+            status: result.success ? "sent" : "failed",
+            sentAt: result.success ? new Date() : null,
+            providerMessageId: result.providerMessageId ?? null,
+            errorDetails: result.error ?? null,
           })
           .where(eq(notifEngineLog.id, entry.id));
 
         log.info(
-          `[NotificationEngine] Deferred ${entry.eventType}: ${sendResult.success ? "sent" : "failed"} to ${recipientEmail}`,
+          `[NotificationEngine] Deferred ${entry.eventType}: ${result.success ? "sent" : "failed"} to ${recipientEmail}`,
         );
       } catch (err: unknown) {
-        log.error({ err },
-          `[NotificationEngine] Error delivering queued entry ${entry.id}`,
-        );
+        log.error({ err }, `[NotificationEngine] Error delivering queued entry ${entry.id}`);
         await db
           .update(notifEngineLog)
           .set({ status: "failed", errorDetails: err instanceof Error ? err.message : String(err) })

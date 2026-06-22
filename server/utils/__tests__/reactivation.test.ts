@@ -42,11 +42,12 @@ vi.mock("../../storage", () => ({
   }
 }));
 
-vi.mock("../services/notificationEngine", () => ({
+vi.mock("../emailTemplates", () => ({
   buildEmail: vi.fn(),
+}));
+
+vi.mock("../notificationDispatcher", () => ({
   sendViaResend: vi.fn(),
-  notifyUsersOfEvent: vi.fn(),
-  processQueuedEngineEvents: vi.fn()
 }));
 
 // We need to import the mocked db to set its behavior

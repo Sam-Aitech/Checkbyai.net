@@ -56,11 +56,12 @@ vi.mock("../../storage", () => ({
   },
 }));
 
-vi.mock("../services/notificationEngine", () => ({
+vi.mock("../emailTemplates", () => ({
   buildEmail: vi.fn(),
+}));
+
+vi.mock("../notificationDispatcher", () => ({
   sendViaResend: vi.fn(),
-  notifyUsersOfEvent: vi.fn(),
-  processQueuedEngineEvents: vi.fn(),
 }));
 
 import { applyStateMachine } from "../sponsorStateMachine";

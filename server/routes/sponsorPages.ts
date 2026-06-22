@@ -4,7 +4,7 @@ import { sql, eq, inArray, desc, and } from "drizzle-orm";
 import { sponsorCanonical, sponsorChanges, sponsorEnrichment, dailyDigest, monitorJobRuns } from "@shared/schema";
 import { cacheGet, cacheSet } from "../utils/redisClient";
 import { getAppUrl } from "../utils/appUrl";
-import { ensureIndexReady, getIndexData, type SearchIndexEntry } from "../utils/sponsorSearch";
+import { ensureIndexReady, getIndexData, getIndexVersion, type SearchIndexEntry } from "../utils/sponsorSearch";
 import rateLimit from "express-rate-limit";
 import { success } from "../lib/response";
 import { asyncHandler } from "../lib/errorHandler";
@@ -99,7 +99,7 @@ export function registerSponsorPageRoutes(app: Express): void {
 
     const payload = { ...sponsor, recentChanges, totalChanges, enrichment };
     await cacheSet(cacheKey, payload, 3600);
-    res.set("Cache-Control", "public, max-age=300, stale-while-revalidate=600");
+    res.set("Cache-Control", "public, max-age=300");
     success(res, payload);
   }));
 
@@ -189,20 +189,23 @@ export function registerSponsorPageRoutes(app: Express): void {
   // The gzip compression middleware (level 6) reduces ~10MB → ~1.5MB in transit.
   // Cached 12hr in Redis + HTTP (CDN-friendly). Invalidated on nightly index rebuild.
   app.get("/api/sponsors/search-index.json", asyncHandler(async (_req: any, res) => {
-    const cacheKey = "sponsors:search-index-json";
+    const version = getIndexVersion();
+    const cacheKey = `sponsors:search-index-json:v${version}`;
     const cached = await cacheGet<SearchIndexEntry[]>(cacheKey);
     if (cached) {
       res.set("Content-Type", "application/json");
-      res.set("Cache-Control", "public, max-age=3600, stale-while-revalidate=3600");
+      res.set("Cache-Control", "public, max-age=300");
+      res.set("ETag", `"search-v${version}"`);
       success(res, cached);
       return;
     }
 
     await ensureIndexReady();
     const data = getIndexData();
-    await cacheSet(cacheKey, data, 43200);
+    await cacheSet(cacheKey, data, 300);
     res.set("Content-Type", "application/json");
-    res.set("Cache-Control", "public, max-age=43200, stale-while-revalidate=86400");
+    res.set("Cache-Control", "public, max-age=300");
+    res.set("ETag", `"search-v${getIndexVersion()}"`);
     success(res, data);
   }));
 

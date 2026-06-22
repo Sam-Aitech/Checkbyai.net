@@ -2,7 +2,7 @@ export type PlanTier = "free" | "starter" | "pro" | "unlimited" | "enterprise";
 
 export interface TierConfig {
   watchLimit: number; // -1 = unlimited
-  channels: ("email" | "sms" | "whatsapp")[];
+  channels: ("email" | "sms" | "whatsapp" | "inApp")[];
   alertTiming: "next-morning" | "same-day" | "immediate";
   apiAccess: boolean;
   weeklyReports: boolean;
@@ -26,7 +26,7 @@ export const TIER_CONFIGS: Record<PlanTier, TierConfig> = {
   },
   starter: {
     watchLimit: 2,
-    channels: ["email", "whatsapp"],
+    channels: ["email", "whatsapp", "inApp"],
     alertTiming: "same-day",
     apiAccess: false,
     weeklyReports: false,
@@ -37,7 +37,7 @@ export const TIER_CONFIGS: Record<PlanTier, TierConfig> = {
   },
   pro: {
     watchLimit: 5,
-    channels: ["email", "whatsapp", "sms"],
+    channels: ["email", "whatsapp", "sms", "inApp"],
     alertTiming: "immediate",
     apiAccess: false,
     weeklyReports: false,
@@ -48,7 +48,7 @@ export const TIER_CONFIGS: Record<PlanTier, TierConfig> = {
   },
   unlimited: {
     watchLimit: -1,
-    channels: ["email", "whatsapp", "sms"],
+    channels: ["email", "whatsapp", "sms", "inApp"],
     alertTiming: "immediate",
     apiAccess: true,
     weeklyReports: true,
@@ -59,7 +59,7 @@ export const TIER_CONFIGS: Record<PlanTier, TierConfig> = {
   },
   enterprise: {
     watchLimit: -1,
-    channels: ["email", "whatsapp", "sms"],
+    channels: ["email", "whatsapp", "sms", "inApp"],
     alertTiming: "immediate",
     apiAccess: true,
     weeklyReports: true,
@@ -93,7 +93,7 @@ export function getWatchLimit(subscriptionStatus: string | null | undefined): nu
   return getTierConfig(subscriptionStatus).watchLimit;
 }
 
-export function isChannelAllowed(subscriptionStatus: string | null | undefined, channel: "email" | "sms" | "whatsapp"): boolean {
+export function isChannelAllowed(subscriptionStatus: string | null | undefined, channel: "email" | "sms" | "whatsapp" | "inApp"): boolean {
   return getTierConfig(subscriptionStatus).channels.includes(channel);
 }
 

@@ -33,7 +33,8 @@ import { loadFingerprintSet } from "./csvFingerprintBuilder";
 import { storage } from "../storage";
 import { logger } from "./logger";
 import { sendAdminAlert } from "./adminAlert";
-import { buildEmail, sendViaResend } from "../services/notificationEngine";
+import { buildEmail } from "./emailTemplates";
+import { sendViaResend } from "./notificationDispatcher";
 import {
   areCompaniesFuzzyMatch,
   reconcileAdditionsDeletions,

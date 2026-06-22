@@ -19,13 +19,13 @@ const MAX_NOTIFICATIONS_PER_DAY = 10;
 const FROM_ADDRESS = "Sponsor Monitor <alerts@checkbyai.net>";
 const log = logger.child({ module: "NotificationDispatcher" });
 
-interface SendResult {
+export interface SendResult {
   success: boolean;
   providerMessageId?: string;
   error?: string;
 }
 
-async function sendViaResend(to: string, subject: string, html: string): Promise<SendResult> {
+export async function sendViaResend(to: string, subject: string, html: string): Promise<SendResult> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     return { success: false, error: "RESEND_API_KEY not configured" };

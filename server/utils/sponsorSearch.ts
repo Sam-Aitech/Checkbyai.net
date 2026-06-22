@@ -48,6 +48,7 @@ let fuseIndex: Fuse<SponsorSearchRecord> | null = null;
 let rawRecords: SponsorSearchRecord[] = []; // kept for the JSON search-index export
 let indexRecordCount = 0;  // guards against empty-index false-positives
 let indexBuiltAt: number = 0;
+let indexVersion = 0;  // incremented on each rebuild for cache busting
 
 // Single rebuild promise — deduplicates all concurrent callers onto one DB fetch.
 // Without this, N concurrent requests at cold-start each trigger a full table scan.
@@ -121,6 +122,7 @@ export async function rebuildSponsorIndex(): Promise<void> {
   fuseIndex = new Fuse(searchRecords, FUSE_OPTIONS);
   rawRecords = searchRecords;  // store for getIndexData()
   indexRecordCount = searchRecords.length;
+  indexVersion++;
   indexBuiltAt = Date.now();
   logger.info(
     `[SponsorSearch] Index rebuilt: ${indexRecordCount} records ` +
@@ -148,6 +150,10 @@ export async function ensureIndexReady(): Promise<void> {
 
 export function isIndexReady(): boolean {
   return fuseIndex !== null && indexRecordCount > 0;
+}
+
+export function getIndexVersion(): number {
+  return indexVersion;
 }
 
 // Health monitoring for search system (Fix 2.1)

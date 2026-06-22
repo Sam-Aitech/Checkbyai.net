@@ -13,6 +13,14 @@ Sentry.init({
   tracesSampleRate: import.meta.env.PROD ? 0.1 : 1.0,
 });
 
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {
+      // SW registration failed — push notifications unavailable
+    });
+  });
+}
+
 createRoot(document.getElementById("root")!).render(
   <Sentry.ErrorBoundary fallback={<p>Something went wrong.</p>}>
     <App />

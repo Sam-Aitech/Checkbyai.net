@@ -367,6 +367,7 @@ export class UserRepository {
             email: s.channels?.email ?? DEFAULT_NOTIF_PREFS[key].channels.email,
             inApp: s.channels?.inApp ?? DEFAULT_NOTIF_PREFS[key].channels.inApp,
             sms:   s.channels?.sms   ?? DEFAULT_NOTIF_PREFS[key].channels.sms,
+            webhook: s.channels?.webhook ?? DEFAULT_NOTIF_PREFS[key].channels.webhook,
           },
         };
       }
@@ -384,6 +385,7 @@ export class UserRepository {
           email: patch[key]?.channels?.email ?? current[key].channels.email,
           inApp: patch[key]?.channels?.inApp ?? current[key].channels.inApp,
           sms:   patch[key]?.channels?.sms   ?? current[key].channels.sms,
+          webhook: patch[key]?.channels?.webhook ?? current[key].channels.webhook,
         },
       };
     }
