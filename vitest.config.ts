@@ -6,7 +6,7 @@ process.env.DATABASE_URL = process.env.DATABASE_URL || "postgres://dummy:dummy@l
 export default defineConfig({
   test: {
     environment: "node",
-    include: ["server/**/__tests__/**/*.test.ts"],
+    include: ["server/**/__tests__/**/*.test.ts", "tests/**/*.test.ts"],
     // Each file gets its own isolated module context (important for env-var tests)
     isolate: true,
     coverage: {
