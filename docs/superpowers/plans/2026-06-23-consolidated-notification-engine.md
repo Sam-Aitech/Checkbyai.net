@@ -1,6 +1,6 @@
 # Daily Consolidated Notification Engine Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Build a daily consolidated email notification engine that runs twice a day (07:00 AM & 07:00 PM), grouping all sponsor register changes for watched companies into a single daily email digest for paid users, using Resend's batch sending API and bulk DB logging.
 
@@ -16,7 +16,7 @@
 * Create: `server/services/consolidatedNotificationEngine.ts`
 * Create: `tests/server/services/consolidatedNotificationEngine.test.ts`
 
-- [ ] **Step 1: Write a test verifying database query and grouping**
+- [x] **Step 1: Write a test verifying database query and grouping**
   Write a test in `tests/server/services/consolidatedNotificationEngine.test.ts` to mock database rows and assert that the grouping function correctly groups multiple changes under the correct user ID.
 
 ```typescript
@@ -96,11 +96,11 @@ describe("consolidatedNotificationEngine - Grouping Logic", () => {
 });
 ```
 
-- [ ] **Step 2: Run Vitest to verify the test fails**
+- [x] **Step 2: Run Vitest to verify the test fails**
   Run: `npx vitest tests/server/services/consolidatedNotificationEngine.test.ts`
   Expected: FAIL with compilation error (module or export not found).
 
-- [ ] **Step 3: Implement minimal query and grouping logic**
+- [x] **Step 3: Implement minimal query and grouping logic**
   Create `server/services/consolidatedNotificationEngine.ts` containing the types, the grouping helper, and the query structure.
 
 ```typescript
@@ -196,11 +196,11 @@ export async function fetchPendingNotifications(): Promise<PendingRow[]> {
 }
 ```
 
-- [ ] **Step 4: Run Vitest to verify tests pass**
+- [x] **Step 4: Run Vitest to verify tests pass**
   Run: `npx vitest tests/server/services/consolidatedNotificationEngine.test.ts`
   Expected: PASS.
 
-- [ ] **Step 5: Commit changes**
+- [x] **Step 5: Commit changes**
   ```bash
   git add server/services/consolidatedNotificationEngine.ts tests/server/services/consolidatedNotificationEngine.test.ts
   git commit -m "feat: implement daily notification query and grouping logic"
@@ -214,7 +214,7 @@ export async function fetchPendingNotifications(): Promise<PendingRow[]> {
 * Modify: `server/services/consolidatedNotificationEngine.ts`
 * Modify: `tests/server/services/consolidatedNotificationEngine.test.ts`
 
-- [ ] **Step 1: Write test for consolidated HTML builder**
+- [x] **Step 1: Write test for consolidated HTML builder**
   Add a test to `tests/server/services/consolidatedNotificationEngine.test.ts` to assert that `renderConsolidatedEmail` returns a subject line containing the count of changes and an HTML string with a table listing the companies and color-coded statuses.
 
 ```typescript
@@ -252,11 +252,11 @@ describe("consolidatedNotificationEngine - HTML Rendering", () => {
 });
 ```
 
-- [ ] **Step 2: Run Vitest to verify the test fails**
+- [x] **Step 2: Run Vitest to verify the test fails**
   Run: `npx vitest tests/server/services/consolidatedNotificationEngine.test.ts`
   Expected: FAIL with compilation error (renderConsolidatedEmail not defined).
 
-- [ ] **Step 3: Implement rendering logic**
+- [x] **Step 3: Implement rendering logic**
   Add `renderConsolidatedEmail` to `server/services/consolidatedNotificationEngine.ts`.
 
 ```typescript
@@ -348,11 +348,11 @@ export function renderConsolidatedEmail(changes: UserDigest["changes"]): { subje
 }
 ```
 
-- [ ] **Step 4: Run Vitest to verify rendering tests pass**
+- [x] **Step 4: Run Vitest to verify rendering tests pass**
   Run: `npx vitest tests/server/services/consolidatedNotificationEngine.test.ts`
   Expected: PASS.
 
-- [ ] **Step 5: Commit changes**
+- [x] **Step 5: Commit changes**
   ```bash
   git add server/services/consolidatedNotificationEngine.ts tests/server/services/consolidatedNotificationEngine.test.ts
   git commit -m "feat: implement consolidated digest email HTML rendering"
@@ -366,7 +366,7 @@ export function renderConsolidatedEmail(changes: UserDigest["changes"]): { subje
 * Modify: `server/services/consolidatedNotificationEngine.ts`
 * Modify: `tests/server/services/consolidatedNotificationEngine.test.ts`
 
-- [ ] **Step 1: Write test for consolidated delivery orchestration**
+- [x] **Step 1: Write test for consolidated delivery orchestration**
   Add an integration test to mock `fetch` calls to Resend Batch Send API and mock `db.insert` to assert that they are called with correctly formatted batch payloads and bulk logs.
 
 ```typescript
@@ -404,11 +404,11 @@ describe("consolidatedNotificationEngine - Delivery Orchestration", () => {
 });
 ```
 
-- [ ] **Step 2: Run Vitest to verify the test fails**
+- [x] **Step 2: Run Vitest to verify the test fails**
   Run: `npx vitest tests/server/services/consolidatedNotificationEngine.test.ts`
   Expected: FAIL with compilation error (processConsolidatedNotifications not defined).
 
-- [ ] **Step 3: Implement chunking, sending and bulk log logic**
+- [x] **Step 3: Implement chunking, sending and bulk log logic**
   Add the orchestration logic to `server/services/consolidatedNotificationEngine.ts`.
 
 ```typescript
@@ -521,11 +521,11 @@ export async function runConsolidatedNotificationJob(): Promise<{ sentCount: num
 }
 ```
 
-- [ ] **Step 4: Run Vitest to verify all tests pass**
+- [x] **Step 4: Run Vitest to verify all tests pass**
   Run: `npx vitest tests/server/services/consolidatedNotificationEngine.test.ts`
   Expected: PASS.
 
-- [ ] **Step 5: Commit changes**
+- [x] **Step 5: Commit changes**
   ```bash
   git add server/services/consolidatedNotificationEngine.ts tests/server/services/consolidatedNotificationEngine.test.ts
   git commit -m "feat: implement chunking delivery orchestration and bulk db logging"
@@ -539,10 +539,10 @@ export async function runConsolidatedNotificationJob(): Promise<{ sentCount: num
 * Modify: `server/utils/scheduler.ts`
 * Modify: `server/utils/sponsorMonitorJob.ts`
 
-- [ ] **Step 1: Write test for scheduler updates**
+- [x] **Step 1: Write test for scheduler updates**
   Ensure we can trigger `runConsolidatedNotificationJob` from the scheduler. Add verification that the job is registered under `CONSOLIDATED_NOTIFICATIONS` in `CutoverJobKey`.
 
-- [ ] **Step 2: Add CONSOLIDATED_NOTIFICATIONS job to scheduler**
+- [x] **Step 2: Add CONSOLIDATED_NOTIFICATIONS job to scheduler**
   Add the job to `server/utils/scheduler.ts`.
 
 ```diff
@@ -580,7 +580,7 @@ And update the registration logic inside `startCentralScheduler()`:
 +  }
 ```
 
-- [ ] **Step 3: Disable inline notifications from daily sponsor sync**
+- [x] **Step 3: Disable inline notifications from daily sponsor sync**
   Disable the legacy single-change notification dispatching inside `server/utils/sponsorMonitorJob.ts` (lines 665-700). We no longer want individual queue additions to run immediately on database changes.
 
 ```diff
@@ -596,10 +596,10 @@ And update the registration logic inside `startCentralScheduler()`:
 +      console.log(`[SponsorMonitorJob] Bypassing inline notification queueing. Changes are staged for the scheduled consolidated digest job.`);
 ```
 
-- [ ] **Step 4: Verify test suite runs cleanly**
+- [x] **Step 4: Verify test suite runs cleanly**
   Run: `npm run dev` and `npm run test` to verify there are no compilation errors or broken imports in any related file.
 
-- [ ] **Step 5: Commit changes**
+- [x] **Step 5: Commit changes**
   ```bash
   git add server/utils/scheduler.ts server/utils/sponsorMonitorJob.ts
   git commit -m "feat: schedule consolidated notifications and disable legacy inline dispatching"
