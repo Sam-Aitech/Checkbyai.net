@@ -9,7 +9,7 @@ import { loadFingerprintSet } from '../server/utils/csvFingerprintBuilder';
 // (GOV.UK dropped the Town/City column; fingerprints went from
 // "name|town|route" to "name||route" — see migration 0021 and commit
 // 4a30855). Reports possible residue, does not fix anything.
-async function main() {
+async function main(): Promise<void> {
   console.log('=== Fingerprint Migration Audit ===');
 
   // 1. Stale-format fingerprints (old 3-segment pattern with a non-empty
@@ -40,9 +40,7 @@ async function main() {
   console.log('\n--- Active sponsors missing from today\'s fingerprint set ---');
   const today = new Date().toISOString().split('T')[0];
   const archive = await getArchiveForDate(today);
-  if (!archive) {
-    console.log(`No archive found for ${today} — skipping this check (run after today's job completes).`);
-  } else {
+  if (archive) {
     const todaySet = await loadFingerprintSet(archive.fingerprintedFilePath);
     const activeRows = await db
       .select({ id: sponsorCanonical.id, currentName: sponsorCanonical.currentName, fingerprint: sponsorCanonical.fingerprint })
@@ -56,13 +54,17 @@ async function main() {
       console.table(missing.slice(0, 50).map((r) => ({ id: r.id, name: r.currentName, fingerprint: r.fingerprint })));
       if (missing.length > 50) console.log(`...and ${missing.length - 50} more (truncated).`);
     }
+  } else {
+    console.log(`No archive found for ${today} — skipping this check (run after today's job completes).`);
   }
 
   console.log('\n=== Audit complete. No data was modified. ===');
-  process.exit(0);
 }
 
-main().catch((err) => {
+try {
+  await main();
+  process.exit(0);
+} catch (err) {
   console.error('Audit failed:', err);
   process.exit(1);
-});
+}
