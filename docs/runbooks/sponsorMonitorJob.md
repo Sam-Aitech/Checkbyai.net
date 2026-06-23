@@ -29,7 +29,9 @@ Is the job currently marked "running" in /api/health?
           │         Common causes:
           │         - GOV.UK CSV endpoint down or format changed
           │         - DB connection/timeout during diff write
-          │         - Notification engine queue full
+          │         - Notification engine queue full (jobs retry 3x with
+          │           exponential backoff before landing in the failed set —
+          │           see SYSTEM_DESIGN.md §6.1)
           │         Action: Fix root cause, then trigger manually (see below).
           └── NO  → Is the scheduler running?
                     Check /api/ops/scheduler/status.
@@ -50,6 +52,10 @@ curl -X POST \
 ## Rollback
 
 Set `CUTOVER_SPONSOR_MONITOR=false` and redeploy. Inline cron resumes on next restart.
+
+## Notification reliability (2026-06-23)
+
+If Redis is down, notifications fall back to inline processing of **all** alertable changes for the day (previously capped at 50 with the rest silently dropped — fixed). Each notification job has a deterministic `jobId` (`notif-<changeId>-<date>`) so a crash/restart mid-run can't double-send. See SYSTEM_DESIGN.md §6.1 for the full BullMQ retry/concurrency policy.
 
 ## Escalation
 

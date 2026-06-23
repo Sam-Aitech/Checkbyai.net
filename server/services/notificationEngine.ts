@@ -530,22 +530,35 @@ export async function notifyUsersOfEvent(change: SponsorChange): Promise<{
     const ctx: DispatchContext = { change, changeId, prefsKey, companyName };
 
     // Process users concurrently with p-limit(10), then fold per-user tallies in.
+    // Each task is caught individually: one user's failure (e.g. the rate
+    // limiter's fail-closed throw on a Redis blip) must not reject the whole
+    // Promise.all and trigger a job-level retry — that would re-send to every
+    // user who already succeeded in this same attempt.
     const userTasks = uniqueUserIds.map(userId =>
       limit(async () => {
         const user = userMap.get(userId);
         if (!user) { skipped++; return; }
 
-        const tally = await processUser(ctx, user, prefMap.get(userId), pushSubMap.get(userId) ?? []);
-        sent += tally.sent;
-        skipped += tally.skipped;
-        failed += tally.failed;
-        mergeBreakdown(channelBreakdown, tally.breakdown);
+        try {
+          const tally = await processUser(ctx, user, prefMap.get(userId), pushSubMap.get(userId) ?? []);
+          sent += tally.sent;
+          skipped += tally.skipped;
+          failed += tally.failed;
+          mergeBreakdown(channelBreakdown, tally.breakdown);
+        } catch (err) {
+          failed++;
+          log.error({ err, changeId, userId }, "Per-user dispatch failure");
+        }
       })
     );
 
     await Promise.all(userTasks);
   } catch (err) {
     log.error({ err, changeId }, "Fatal error for change");
+    // Rethrow: when this runs as a BullMQ job, swallowing here would let the
+    // job resolve "successfully" and BullMQ's retry/backoff would never fire.
+    // The inline fallback call site already wraps this call in its own catch.
+    throw err;
   }
 
   return { sent, skipped, failed, channelBreakdown };
