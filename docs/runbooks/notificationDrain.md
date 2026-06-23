@@ -52,6 +52,10 @@ curl -X POST \
 
 Set `CUTOVER_NOTIFICATION_DRAIN=false` and redeploy. Inline drain in `sponsorMonitorJob.ts` resumes.
 
+## Reliability notes (2026-06-23)
+
+The underlying BullMQ notification queue retries each job 3x with exponential backoff (was 0 retries) and keeps failed jobs for 7 days for inspection/replay instead of dropping them. Worker concurrency is 3 (sized against the shared DB pool, max 20 — see SYSTEM_DESIGN.md §6.1). A single user's dispatch failure can't abort an entire batch and trigger a re-send to already-notified users in that batch.
+
 ## P0 escalation
 
 Notifications are user-visible. A 6 h outage means users miss time-sensitive sponsor status changes. If auto-remediation has fired and failed: page on-call, check email provider status, and verify DB connectivity.

@@ -487,6 +487,20 @@ The monitor job also has an **idempotency check** (separate from the advisory lo
 
 **Caveat:** Session-level locks are tied to a specific DB connection. With Neon's serverless WebSocket pool, the connection holding the lock may be recycled. A DB-row mutex (`SELECT FOR UPDATE SKIP LOCKED`) would be more robust for a distributed setup.
 
+### 6.1 BullMQ Job Reliability (`server/services/jobQueue.ts`)
+
+| Setting | Value | Why |
+|---|---|---|
+| `defaultJobOptions.attempts` | 3 | Was 1 (no retry) — a transient failure permanently dropped a job |
+| `defaultJobOptions.backoff` | exponential, 5s base | Avoids retry storms against external providers/DB |
+| `removeOnComplete` | age 24h, count 5000 | Was unbounded — Redis memory grew forever |
+| `removeOnFail` | age 7d, count 5000 | Failed jobs kept for inspection/replay, not lost immediately |
+| Notification worker `concurrency` | 3 | `notifyUsersOfEvent()` fans out per-user via `p-limit(10)` internally; 3×10=30 against a DB pool `max:20` (`server/db.ts`) is the accepted ceiling — do not raise without also re-checking pool sizing |
+
+Notification jobs use a deterministic `jobId` (`notif-${change.id}-${today}`, `change.id` = `sponsor_changes` primary key) so a crash/restart mid-pipeline-run can't double-queue the same change. The Redis-down inline fallback in `sponsorMonitorJob.ts` processes the full list of alertable changes (previously capped at 50, silently dropping the rest).
+
+Per-user dispatch failures inside `notifyUsersOfEvent()` are caught individually so one user's failure (e.g. the rate limiter's fail-closed throw on a Redis blip) can't abort the whole batch — that would otherwise trigger a job-level BullMQ retry that re-sends to every user who already succeeded in the same attempt. Only failures before per-user dispatch starts (the DB queries that load watchers/prefs) propagate and trigger a retry, which is safe to replay.
+
 ---
 
 ## 7. Startup Sequence
