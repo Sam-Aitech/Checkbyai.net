@@ -72,6 +72,15 @@ function RecentlyRevokedSection() {
     staleTime: STALE_TIMES.INFREQUENT,
     select: (res: any) => (res?.data ?? res) as RevokedEntry[],
   });
+  // Shares the cache entry with NightlyStatsBar/UrgencyBanner (same queryKey) —
+  // no extra request. A long run of zero-new-revocations days can leave every
+  // row above showing an old date; this line confirms the scanner is still
+  // actually running, distinct from "most recent revocation".
+  const { data: stats, isLoading: statsLoading } = useQuery<NightlyStats>({
+    queryKey: ["/api/sponsors/nightly-stats"],
+    staleTime: STALE_TIMES.INFREQUENT,
+    select: (res: any) => (res?.data ?? res) as NightlyStats,
+  });
 
   return (
     <section ref={ref} className="bg-white dark:bg-background py-16 border-t border-border">
@@ -89,6 +98,11 @@ function RecentlyRevokedSection() {
               </div>
               <p className="text-sm text-muted-foreground">
                 Latest removals from the Home Office register — updated nightly.
+                {!statsLoading && stats?.lastRunDate && (
+                  <span className="ml-1 text-muted-foreground/70">
+                    Register last checked: {formatRunDate(stats.lastRunDate)}.
+                  </span>
+                )}
               </p>
             </div>
             <Link href="/sponsor-changes">
@@ -161,6 +175,8 @@ function RecentlyRevokedSection() {
 interface NightlyStats {
   totalActive:          number;
   lastRunDate:          string | null;
+  digestDate:           string | null;
+  isDigestCurrent:      boolean;
   addedCount:           number;
   removedCount:         number;
   changesCount:         number;
@@ -199,6 +215,12 @@ function NightlyStatsBar() {
   const dateLabel    = isLoading ? "—" : formatRunDate(data?.lastRunDate ?? null);
   const hasRemovals  = !isLoading && (data?.removedCount ?? 0) > 0;
   const revoked12Label = isLoading ? "—" : (data?.revokedLast12Months ?? 0).toLocaleString("en-GB");
+  // The digest can stay pinned to the last day with real changes (see
+  // sponsorPages.ts) — when that's not today, label the numbers with their
+  // actual date instead of implying they're from tonight's run.
+  const changesCaption = !isLoading && data && !data.isDigestCurrent
+    ? `As of ${formatRunDate(data.digestDate)}`
+    : "In last nightly run";
 
   return (
     <div className="bg-slate-900 border-y border-slate-700 -mt-16 relative z-10">
@@ -212,7 +234,7 @@ function NightlyStatsBar() {
             <p className={cn("text-2xl font-bold", isLoading ? "text-white animate-pulse" : hasRemovals ? "text-red-400" : "text-emerald-400")}>
               {changesLabel}
             </p>
-            <p className="text-xs text-slate-400 mt-0.5">In last nightly run</p>
+            <p className="text-xs text-slate-400 mt-0.5">{changesCaption}</p>
           </div>
           <div className="px-4">
             <Link href="/sponsor-changes" className="group">
