@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { createServer as createViteServer, createLogger } from "vite";
 import { type Server } from "http";
+import rateLimit from "express-rate-limit";
 import viteConfig from "../vite.config";
 import { logger } from "./utils/logger";
 import { nanoid } from "nanoid";
@@ -43,7 +44,21 @@ export async function setupVite(app: Express, server: Server) {
   });
 
   app.use(vite.middlewares);
-  app.use("*", async (req, res, next) => {
+
+  // Dev-only catch-all that reads index.html off disk per request (CodeQL
+  // js/missing-rate-limiting #336). The global /api limiter intentionally
+  // skips this path so it doesn't break Vite's own dev-mode module/HMR
+  // requests (see index.ts) — scope a generous limiter to just this handler
+  // instead so the underlying fs.readFile is still bounded.
+  const devTemplateLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 300,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: "Too many requests. Please try again later." },
+  });
+
+  app.use("*", devTemplateLimiter, async (req, res, next) => {
     const url = req.originalUrl;
     const isRoot = req.path === "/";
 
