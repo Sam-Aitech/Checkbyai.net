@@ -786,26 +786,6 @@ export async function runSponsorMonitorJob(
 
     await rebuildSponsorIndex();
 
-    // Flush stale Redis cache so the next request picks up the fresh index data.
-    // Retry up to 3 times with 500ms backoff. If all fail, log at error level
-    // and record the last-flush timestamp so diagnostics can surface the gap.
-    let flushed = 0;
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      flushed = await cacheFlushPattern("sponsors:*");
-      if (flushed > 0) break;
-      if (attempt < 3) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-    }
-    if (flushed > 0) {
-      log.info(`[SponsorMonitorJob] Flushed ${flushed} Redis cache keys after nightly rebuild.`);
-    } else {
-      log.error(
-        `[SponsorMonitorJob] Redis cache flush failed after 3 attempts — stale 'sponsors:*' keys may persist. ` +
-        `Next request will see outdated data until the next successful flush.`,
-      );
-    }
-
     const changeCounts: Record<string, number> = {};
     for (const change of smResult.changes) {
       changeCounts[change.changeType] = (changeCounts[change.changeType] || 0) + 1;
@@ -998,7 +978,20 @@ export async function runSponsorMonitorJob(
 
       log.info(`[SponsorMonitorJob] Daily digest generated: "${headlineResult.headline}" (model: ${headlineResult.model})`);
     } catch (digestErr: any) {
+      // The core job (CSV download, state machine, notifications) already
+      // succeeded by this point — don't fail the whole run over a digest
+      // error. But silently logging let this go unnoticed for days while the
+      // landing page kept showing a stale digest. Alert instead.
       log.error({ err: digestErr }, "[SponsorMonitorJob] Failed to generate daily digest");
+      await sendAdminAlert(
+        "ALERT: Sponsor Monitor Daily Digest Generation Failed",
+        `<p>The nightly sponsor monitor run for <strong>${today}</strong> completed successfully ` +
+         `(state machine + notifications), but daily digest generation threw an error. ` +
+         `The landing page's "last update" digest will keep showing a previous day's data until this is fixed.</p>
+         <p><strong>Error:</strong> ${digestErr instanceof Error ? digestErr.message : String(digestErr)}</p>`,
+      ).catch((err: unknown) =>
+        log.warn({ err }, "[SponsorMonitorJob] Failed to send digest-failure alert")
+      );
     }
 
     // ── Audit log ────────────────────────────────────────────────────────────────
@@ -1038,6 +1031,27 @@ export async function runSponsorMonitorJob(
         },
       });
     }, "Log job success");
+
+    // Flush stale Redis cache now that monitor_job_runs + daily_digest reflect
+    // today's run — flushing earlier (before these writes) let the next
+    // request rebuild the cache from yesterday's data and lock it in for the
+    // full TTL. Retry up to 3 times with 500ms backoff.
+    let flushed = 0;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      flushed = await cacheFlushPattern("sponsors:*");
+      if (flushed > 0) break;
+      if (attempt < 3) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
+    if (flushed > 0) {
+      log.info(`[SponsorMonitorJob] Flushed ${flushed} Redis cache keys after nightly run.`);
+    } else {
+      log.error(
+        `[SponsorMonitorJob] Redis cache flush failed after 3 attempts — stale 'sponsors:*' keys may persist. ` +
+        `Next request will see outdated data until the next successful flush.`,
+      );
+    }
 
     result.success = true;
 

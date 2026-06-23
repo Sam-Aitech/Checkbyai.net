@@ -301,9 +301,21 @@ export function registerSponsorPageRoutes(app: Express): void {
       ? Math.round((Date.parse(today) - Date.parse(lastRunDate)) / 86400000)
       : 0;
 
+    // The displayed digest intentionally stays pinned to the last day with
+    // real changes (see query comment above) — so on a run of zero-change
+    // days, addedCount/removedCount/changesCount below describe THAT old
+    // day, not today's run. isDigestCurrent tells the frontend whether it's
+    // safe to caption those numbers "in last nightly run" or whether it
+    // needs to say "as of {digestDate}" instead, so old numbers never get
+    // mistaken for today's.
+    const digestDate = latest?.snapshotDate ?? null;
+    const isDigestCurrent = !!(digestDate && lastRunDate && digestDate === lastRunDate);
+
     const payload = {
       totalActive,
       lastRunDate,
+      digestDate,
+      isDigestCurrent,
       addedCount:           latest?.addedCount    ?? 0,
       removedCount:         latest?.removedCount  ?? 0,
       changesCount:         latest?.updatedCount  ?? 0,
