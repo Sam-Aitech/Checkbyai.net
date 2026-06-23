@@ -36,7 +36,8 @@ export type CutoverJobKey =
   | "ENRICHMENT_BATCH"
   | "ENRICHMENT_SEED"
   | "JOB_ALERT"
-  | "SPONSOR_MONITOR";
+  | "SPONSOR_MONITOR"
+  | "CONSOLIDATED_NOTIFICATIONS";
 
 export interface CutoverStatus {
   job: CutoverJobKey;
@@ -51,6 +52,7 @@ const JOB_SCHEDULES: Record<CutoverJobKey, string> = {
   ENRICHMENT_SEED: "0 2 * * *",
   JOB_ALERT: "0 2 * * 1-5",
   SPONSOR_MONITOR: "30 0 * * 1-5",
+  CONSOLIDATED_NOTIFICATIONS: "0 7,19 * * *", // Run at 7:00 AM and 7:00 PM
 };
 
 export function getCutoverStatusSnapshot(): CutoverStatus[] {
@@ -140,6 +142,17 @@ export function startCentralScheduler(): void {
       );
     }, opts);
     log.info("Central scheduler: SPONSOR_MONITOR registered (30 0 * * 1-5 UTC).");
+  }
+
+  if (isCutover("CONSOLIDATED_NOTIFICATIONS")) {
+    cron.schedule(JOB_SCHEDULES.CONSOLIDATED_NOTIFICATIONS, () => {
+      log.info("Central scheduler: CONSOLIDATED_NOTIFICATIONS firing.");
+      runWithTelemetry("consolidatedNotifications", "Consolidated notifications digest", () => {
+        const { runConsolidatedNotificationJob } = require("../services/consolidatedNotificationEngine");
+        return runConsolidatedNotificationJob();
+      });
+    }, opts);
+    log.info("Central scheduler: CONSOLIDATED_NOTIFICATIONS registered (0 7,19 * * * UTC).");
   }
 
   const active = getCutoverStatusSnapshot().filter((s) => s.cutover).map((s) => s.job);

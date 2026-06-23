@@ -17,6 +17,7 @@ const ALL_FLAGS = [
   "CUTOVER_ENRICHMENT_SEED",
   "CUTOVER_JOB_ALERT",
   "CUTOVER_SPONSOR_MONITOR",
+  "CUTOVER_CONSOLIDATED_NOTIFICATIONS",
 ] as const;
 
 describe("getCutoverStatusSnapshot", () => {
@@ -32,9 +33,9 @@ describe("getCutoverStatusSnapshot", () => {
     }
   });
 
-  it("returns 5 jobs with all owned by inline-cron when no flags set", () => {
+  it("returns 6 jobs with all owned by inline-cron when no flags set", () => {
     const snap = getCutoverStatusSnapshot();
-    expect(snap).toHaveLength(5);
+    expect(snap).toHaveLength(6);
     for (const s of snap) {
       expect(s.cutover).toBe(false);
       expect(s.owner).toBe("inline-cron");
@@ -64,13 +65,14 @@ describe("getCutoverStatusSnapshot", () => {
     expect(monitor?.owner).toBe("inline-cron");
   });
 
-  it("all 5 jobs become central-scheduler when all flags set", () => {
+  it("all 6 jobs become central-scheduler when all flags set", () => {
     setEnv({
       CUTOVER_NOTIFICATION_DRAIN: "true",
       CUTOVER_ENRICHMENT_BATCH: "true",
       CUTOVER_ENRICHMENT_SEED: "true",
       CUTOVER_JOB_ALERT: "true",
       CUTOVER_SPONSOR_MONITOR: "true",
+      CUTOVER_CONSOLIDATED_NOTIFICATIONS: "true",
     });
     const snap = getCutoverStatusSnapshot();
     expect(snap.every((s) => s.cutover)).toBe(true);
@@ -85,6 +87,7 @@ describe("getCutoverStatusSnapshot", () => {
     expect(scheduleMap.ENRICHMENT_SEED).toBe("0 2 * * *");
     expect(scheduleMap.JOB_ALERT).toBe("0 2 * * 1-5");
     expect(scheduleMap.SPONSOR_MONITOR).toBe("30 0 * * 1-5");
+    expect(scheduleMap.CONSOLIDATED_NOTIFICATIONS).toBe("0 7,19 * * *");
   });
 
   it("partial cutover — only cut-over jobs show central-scheduler", () => {
@@ -100,5 +103,6 @@ describe("getCutoverStatusSnapshot", () => {
     expect(inline).toContain("ENRICHMENT_SEED");
     expect(inline).toContain("JOB_ALERT");
     expect(inline).toContain("SPONSOR_MONITOR");
+    expect(inline).toContain("CONSOLIDATED_NOTIFICATIONS");
   });
 });
