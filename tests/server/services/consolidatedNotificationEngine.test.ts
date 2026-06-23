@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { groupNotificationsByUser } from "../../../server/services/consolidatedNotificationEngine";
+import { groupNotificationsByUser, renderConsolidatedEmail } from "../../../server/services/consolidatedNotificationEngine";
 
 describe("consolidatedNotificationEngine - Grouping Logic", () => {
   it("should group multiple changes by user ID", () => {
@@ -70,5 +70,36 @@ describe("consolidatedNotificationEngine - Grouping Logic", () => {
         },
       ],
     });
+  });
+});
+
+describe("consolidatedNotificationEngine - HTML Rendering", () => {
+  it("should render a clean HTML table with correct status labels and pill styles", () => {
+    const changes = [
+      {
+        changeId: 101,
+        organisationName: "Alpha Corp",
+        changeType: "REMOVED_REVOKED",
+        previousValue: "ACTIVE",
+        newValue: "REMOVED_REVOKED",
+      },
+      {
+        changeId: 102,
+        organisationName: "Beta Ltd",
+        changeType: "NEW_LICENCE",
+        previousValue: null,
+        newValue: "ACTIVE",
+      },
+    ];
+
+    const { subject, html } = renderConsolidatedEmail(changes);
+
+    expect(subject).toBe("Sponsor Monitor: 2 updates to your watch list");
+    expect(html).toContain("Alpha Corp");
+    expect(html).toContain("Licence Revoked");
+    expect(html).toContain("Beta Ltd");
+    expect(html).toContain("New Licence");
+    expect(html).toContain("#dc2626"); // Crimson red hex for Revoked
+    expect(html).toContain("#16a34a"); // Emerald green hex for New
   });
 });
