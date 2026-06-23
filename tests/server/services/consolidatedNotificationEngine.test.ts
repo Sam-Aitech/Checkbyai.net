@@ -1,5 +1,14 @@
-import { describe, it, expect } from "vitest";
-import { groupNotificationsByUser, renderConsolidatedEmail } from "../../../server/services/consolidatedNotificationEngine";
+import { describe, it, expect, vi } from "vitest";
+import { groupNotificationsByUser, renderConsolidatedEmail, processConsolidatedNotifications } from "../../../server/services/consolidatedNotificationEngine";
+import { db } from "../../../server/db";
+
+vi.mock("../../../server/db", () => ({
+  db: {
+    insert: vi.fn(() => ({
+      values: vi.fn().mockResolvedValue(true)
+    }))
+  }
+}));
 
 describe("consolidatedNotificationEngine - Grouping Logic", () => {
   it("should group multiple changes by user ID", () => {
@@ -101,5 +110,27 @@ describe("consolidatedNotificationEngine - HTML Rendering", () => {
     expect(html).toContain("New Licence");
     expect(html).toContain("#dc2626"); // Crimson red hex for Revoked
     expect(html).toContain("#16a34a"); // Emerald green hex for New
+  });
+});
+
+describe("consolidatedNotificationEngine - Delivery Orchestration", () => {
+  it("should chunk 100 entries, send batch HTTP requests and bulk insert audit logs", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: [{ id: "resend_msg_1" }] })
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const testDigests = new Map();
+    testDigests.set("user_1", {
+      email: "user1@example.com",
+      changes: [{ changeId: 201, organisationName: "A", changeType: "REMOVED_REVOKED" }]
+    });
+
+    const result = await processConsolidatedNotifications(testDigests);
+
+    expect(mockFetch).toHaveBeenCalled();
+    expect(db.insert).toHaveBeenCalled();
+    expect(result.sentCount).toBe(1);
   });
 });

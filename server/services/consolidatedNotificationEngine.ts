@@ -174,3 +174,108 @@ export function renderConsolidatedEmail(changes: UserDigest["changes"]): { subje
 
   return { subject, html };
 }
+
+export async function processConsolidatedNotifications(
+  userDigests: Map<string, UserDigest>
+): Promise<{ sentCount: number; failedCount: number }> {
+  const digestEntries = Array.from(userDigests.entries());
+  let sentCount = 0;
+  let failedCount = 0;
+
+  const chunkArray = <T>(arr: T[], size: number): T[][] =>
+    Array.from({ length: Math.ceil(arr.length / size) }, (_, i) => arr.slice(i * size, i * size + size));
+
+  const chunks = chunkArray(digestEntries, 100);
+
+  for (const chunk of chunks) {
+    const batchPayload = chunk.map(([_, data]) => {
+      const { subject, html } = renderConsolidatedEmail(data.changes);
+      return {
+        from: "Sponsor Monitor <alerts@checkbyai.net>",
+        to: [data.email],
+        subject,
+        html,
+      };
+    });
+
+    try {
+      const response = await fetch("https://api.resend.com/emails/batch", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
+        },
+        body: JSON.stringify({ emails: batchPayload }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Resend batch API responded with status ${response.status}`);
+      }
+
+      const resendRes: any = await response.json();
+      const resendList = resendRes.data || [];
+
+      const logsToInsert: any[] = [];
+      chunk.forEach(([userId, data], idx) => {
+        const resendItem = resendList[idx];
+        const success = !!resendItem?.id;
+        if (success) sentCount++; else failedCount++;
+
+        data.changes.forEach((ch) => {
+          logsToInsert.push({
+            userId,
+            changeId: ch.changeId,
+            eventType: "consolidated_digest",
+            channel: "email",
+            companyName: ch.organisationName,
+            success,
+            providerMessageId: resendItem?.id || null,
+            errorDetails: success ? null : "Resend delivery item failed",
+          });
+        });
+      });
+
+      if (logsToInsert.length > 0) {
+        await db.insert(notifLog).values(logsToInsert);
+      }
+    } catch (err: unknown) {
+      console.error("[ConsolidatedNotificationEngine] Batch delivery failed:", err);
+      const errStr = err instanceof Error ? err.message : String(err);
+      
+      const failedLogs: any[] = [];
+      chunk.forEach(([userId, data]) => {
+        failedCount += data.changes.length;
+        data.changes.forEach((ch) => {
+          failedLogs.push({
+            userId,
+            changeId: ch.changeId,
+            eventType: "consolidated_digest",
+            channel: "email",
+            companyName: ch.organisationName,
+            success: false,
+            errorDetails: errStr,
+          });
+        });
+      });
+
+      if (failedLogs.length > 0) {
+        await db.insert(notifLog).values(failedLogs);
+      }
+    }
+  }
+
+  return { sentCount, failedCount };
+}
+
+export async function runConsolidatedNotificationJob(): Promise<{ sentCount: number; failedCount: number }> {
+  console.log("[ConsolidatedNotificationEngine] Starting consolidated notifications run...");
+  const rows = await fetchPendingNotifications();
+  if (rows.length === 0) {
+    console.log("[ConsolidatedNotificationEngine] Zero pending notifications found.");
+    return { sentCount: 0, failedCount: 0 };
+  }
+  const digests = groupNotificationsByUser(rows);
+  const outcome = await processConsolidatedNotifications(digests);
+  console.log(`[ConsolidatedNotificationEngine] Complete: Sent: ${outcome.sentCount}, Failed: ${outcome.failedCount}`);
+  return outcome;
+}
