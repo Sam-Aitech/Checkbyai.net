@@ -8,6 +8,7 @@ import { runCsvDiff, getCsvdiffPath, type CsvDiffResult } from "./binaryRunner";
 import { applyStateMachine } from "./sponsorStateMachine";
 import { rebuildSponsorIndex } from "./sponsorSearch";
 import { cacheFlushPattern } from "./redisClient";
+import { isExpectedPublishDay } from "./ukBankHolidays";
 import { notifyUsersOfEvent, processQueuedEngineEvents } from "../services/notificationEngine";
 import { getNotificationQueue, NOTIFICATION_JOB } from "../services/jobQueue";
 import { generateHeadline, type RawDigestData } from "../services/aiDigest";
@@ -982,12 +983,21 @@ export async function runSponsorMonitorJob(
       // succeeded by this point — don't fail the whole run over a digest
       // error. But silently logging let this go unnoticed for days while the
       // landing page kept showing a stale digest. Alert instead.
-      log.error({ err: digestErr }, "[SponsorMonitorJob] Failed to generate daily digest");
+      log.error({ err: digestErr, changeCounts }, "[SponsorMonitorJob] Failed to generate daily digest");
+      // Include today's actual change volume — a quiet zero-change day
+      // failing is routine to skip; a day with tens of thousands of changes
+      // failing to display is the case that actually needs urgent attention.
       await sendAdminAlert(
         "ALERT: Sponsor Monitor Daily Digest Generation Failed",
         `<p>The nightly sponsor monitor run for <strong>${today}</strong> completed successfully ` +
          `(state machine + notifications), but daily digest generation threw an error. ` +
          `The landing page's "last update" digest will keep showing a previous day's data until this is fixed.</p>
+         <ul>
+           <li><strong>Added:</strong> ${changeCounts["NEW_LICENCE"] ?? 0} new, ${changeCounts["RE_ACTIVATED"] ?? 0} reactivated</li>
+           <li><strong>Removed/revoked:</strong> ${changeCounts["REMOVED_REVOKED"] ?? 0}</li>
+           <li><strong>Updated:</strong> ${(changeCounts["UPGRADED"] ?? 0) + (changeCounts["DOWNGRADED"] ?? 0) + (changeCounts["ROUTE_CHANGE"] ?? 0) + (changeCounts["NAME_CHANGE"] ?? 0)}</li>
+           <li><strong>Total changes detected today:</strong> ${smResult.changes.length}</li>
+         </ul>
          <p><strong>Error:</strong> ${digestErr instanceof Error ? digestErr.message : String(digestErr)}</p>`,
       ).catch((err: unknown) =>
         log.warn({ err }, "[SponsorMonitorJob] Failed to send digest-failure alert")
@@ -1222,29 +1232,35 @@ async function checkMissedJobsAndCatchUp(source: string = "startup-catchup"): Pr
     const weekdays = recentWeekdays(7);
     if (weekdays.length === 0) return;
 
-    const cutoff = new Date();
-    cutoff.setUTCDate(cutoff.getUTCDate() - 7);
+    // Drop UK bank holidays from the candidate set — GOV.UK doesn't publish
+    // on these, so a missing run there isn't a real gap and shouldn't fire
+    // an admin alert or trigger a needless catch-up run.
+    const expectedDayChecks = await Promise.all(weekdays.map((date) => isExpectedPublishDay(date)));
+    const expectedDays = weekdays.filter((_, idx) => expectedDayChecks[idx]);
+    if (expectedDays.length === 0) return;
 
     const successfulRuns = await db
       .select({ runDate: monitorJobRuns.runDate })
       .from(monitorJobRuns)
       .where(
         and(
-          inArray(monitorJobRuns.runDate, weekdays),
+          inArray(monitorJobRuns.runDate, expectedDays),
           eq(monitorJobRuns.status, "success"),
         ),
       );
 
     const successDates = new Set(successfulRuns.map((r) => r.runDate));
 
-    // Find the most recent missed weekday (weekdays[0] = today, [1] = yesterday, …)
-    // Skip today if it's very early (before 00:35 UTC) — the cron will handle it.
+    // Find the most recent missed expected-publish day (expectedDays[0] =
+    // today if applicable, newest first). Skip today if it's very early
+    // (before 00:35 UTC) — the cron will handle it.
     const nowUTCHour = new Date().getUTCHours();
     const nowUTCMin  = new Date().getUTCMinutes();
     const tooEarlyForToday = nowUTCHour === 0 && nowUTCMin < 35;
+    const today = weekdays[0];
 
-    const missed = weekdays.find((date, idx) => {
-      if (idx === 0 && tooEarlyForToday) return false; // skip today before 00:35
+    const missed = expectedDays.find((date) => {
+      if (date === today && tooEarlyForToday) return false; // skip today before 00:35
       return !successDates.has(date);
     });
 
