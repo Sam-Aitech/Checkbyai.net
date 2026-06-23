@@ -963,30 +963,23 @@ export async function runSponsorMonitorJob(
           });
         });
       } else {
-        await db.insert(dailyDigest).values({
-          snapshotDate: today,
-          addedCount,
-          updatedCount,
-          removedCount,
-          headlineGenerated: headlineResult.headline,
-          headlineVariants: headlineResult.variants,
-          displayedOnLanding: false,
-          selectedVariantIndex,
-          aiModel: headlineResult.model,
-        }).onConflictDoUpdate({
-          target: dailyDigest.snapshotDate,
-          set: {
-            addedCount,
-            updatedCount,
-            removedCount,
-            headlineGenerated: headlineResult.headline,
-            headlineVariants: headlineResult.variants,
-            displayedOnLanding: false,
-            selectedVariantIndex,
-            aiModel: headlineResult.model,
-            generatedAt: new Date(),
-          },
-        });
+        // Fix 4a: Advance the displayed digest's date to today so the landing
+        // page never shows a stale date when no register changes occurred.
+        const [displayed] = await db
+          .select({ id: dailyDigest.id, snapshotDate: dailyDigest.snapshotDate })
+          .from(dailyDigest)
+          .where(eq(dailyDigest.displayedOnLanding, true))
+          .limit(1);
+
+        if (displayed && displayed.snapshotDate !== today) {
+          await db.transaction(async (tx) => {
+            await tx.delete(dailyDigest)
+              .where(eq(dailyDigest.snapshotDate, today));
+            await tx.update(dailyDigest)
+              .set({ snapshotDate: today, generatedAt: new Date() })
+              .where(eq(dailyDigest.id, displayed.id));
+          });
+        }
       }
 
       log.info(`[SponsorMonitorJob] Daily digest generated: "${headlineResult.headline}" (model: ${headlineResult.model})`);

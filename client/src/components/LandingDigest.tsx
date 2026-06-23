@@ -12,6 +12,7 @@ interface DigestData {
   available: boolean;
   type: "overview" | "daily";
   date: string;
+  lastPipelineRun: string | null;
   headline: string;
   emotion: string;
   focus: string;
@@ -117,10 +118,11 @@ export default function LandingDigest() {
 
   if (!data?.available) return null;
 
-  const { headline, emotion, counts, date, type, activeSponsors } = data;
+  const { headline, emotion, counts, date, lastPipelineRun, type, activeSponsors } = data;
   const total = counts.added + counts.updated + counts.removed;
   const hasChanges = type === "daily";
-  const formattedDate = new Date(date + "T00:00:00").toLocaleDateString("en-GB", {
+  const pipelineDate = lastPipelineRun || date;
+  const formattedDate = new Date(pipelineDate + "T00:00:00").toLocaleDateString("en-GB", {
     weekday: "long",
     day: "numeric",
     month: "long",

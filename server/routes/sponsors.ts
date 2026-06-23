@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { db } from "../db";
 import { sql, eq, and, desc, inArray, gte } from "drizzle-orm";
-import { sponsorCanonical, sponsorChanges, companyWatches, sponsorWatches, dailyDigest } from "@shared/schema";
+import { sponsorCanonical, sponsorChanges, companyWatches, sponsorWatches, dailyDigest, monitorJobRuns } from "@shared/schema";
 import { z } from "zod";
 import { isAuthenticated } from "../auth";
 import { requireRole } from "../middleware/roleGuard";
@@ -244,10 +244,18 @@ export function registerSponsorRoutes(app: Express): void {
       .where(eq(sponsorCanonical.status, "ACTIVE"));
     const activeSponsors = activeResult?.count ?? 0;
 
+    const [lastRun] = await db
+      .select({ runDate: monitorJobRuns.runDate })
+      .from(monitorJobRuns)
+      .where(eq(monitorJobRuns.status, "success"))
+      .orderBy(desc(monitorJobRuns.runDate))
+      .limit(1);
+
     const response = {
       available: true,
       type: isSeed ? "overview" : "daily",
       date: digest.snapshotDate,
+      lastPipelineRun: lastRun?.runDate ?? null,
       headline: selected.headline || digest.headlineGenerated,
       emotion: selected.emotion || "neutral",
       focus: selected.focus || "general",

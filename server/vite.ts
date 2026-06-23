@@ -63,7 +63,7 @@ export async function setupVite(app: Express, server: Server) {
       );
 
       if (isRoot) {
-        template = renderLandingPage(undefined, template);
+        template = await renderLandingPage(undefined, template);
       }
 
       const page = await vite.transformIndexHtml(url, template);
@@ -89,14 +89,11 @@ export function serveStatic(app: Express) {
   // The template + rendered output are static between deploys, so render once
   // and cache. Avoids a synchronous fs.readFileSync on every "/" request
   // (the highest-traffic route) blocking the event loop.
-  let cachedLandingHtml: string | null = null;
-  app.get("/", async (req, res, next) => {
+  app.get("/", async (_req, res, next) => {
     try {
-      if (cachedLandingHtml === null) {
-        const templatePath = path.resolve(distPath, "index.html");
-        cachedLandingHtml = renderLandingPage(templatePath);
-      }
-      res.status(200).set({ "Content-Type": "text/html" }).end(cachedLandingHtml);
+      const templatePath = path.resolve(distPath, "index.html");
+      const html = await renderLandingPage(templatePath);
+      res.status(200).set({ "Content-Type": "text/html" }).end(html);
     } catch (e) {
       next(e);
     }

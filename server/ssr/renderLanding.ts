@@ -1,13 +1,122 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { db } from "../db";
+import { dailyDigest, monitorJobRuns } from "@shared/schema";
+import { eq, desc, sql } from "drizzle-orm";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const SSR_MARKER = "<!--SSR-->";
 const SSR_END_MARKER = "<!--/SSR-->";
 
-function landingHTML(): string {
+interface SsrDigest {
+  snapshotDate: string;
+  addedCount: number;
+  updatedCount: number;
+  removedCount: number;
+  headlineGenerated: string;
+  lastPipelineRun: string | null;
+  activeSponsors: number;
+}
+
+async function fetchDigest(): Promise<SsrDigest | null> {
+  try {
+    const [digest] = await db
+      .select()
+      .from(dailyDigest)
+      .where(eq(dailyDigest.displayedOnLanding, true))
+      .orderBy(desc(dailyDigest.snapshotDate))
+      .limit(1);
+
+    if (!digest) return null;
+
+    const [lastRun] = await db
+      .select({ runDate: monitorJobRuns.runDate })
+      .from(monitorJobRuns)
+      .where(eq(monitorJobRuns.status, "success"))
+      .orderBy(desc(monitorJobRuns.runDate))
+      .limit(1);
+
+    const [activeResult] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(sql.raw("sponsor_canonical"))
+      .where(sql.raw("status = 'ACTIVE'"));
+
+    return {
+      snapshotDate: digest.snapshotDate,
+      addedCount: digest.addedCount,
+      updatedCount: digest.updatedCount,
+      removedCount: digest.removedCount,
+      headlineGenerated: digest.headlineGenerated,
+      lastPipelineRun: lastRun?.runDate ?? null,
+      activeSponsors: activeResult?.count ?? 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function formatDate(dateStr: string): string {
+  const d = new Date(dateStr + "T00:00:00Z");
+  return d.toLocaleDateString("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+async function landingHTML(): Promise<string> {
+  const digest = await fetchDigest();
+  const pipelineDate = digest?.lastPipelineRun ?? digest?.snapshotDate ?? null;
+  const dateLabel = pipelineDate ? `Updated ${formatDate(pipelineDate)}` : "";
+
+  const statsSection = digest
+    ? `
+  <section style="max-width:1280px;margin:0 auto;padding:3rem 2rem;">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1.5rem;text-align:center;">
+      <div style="padding:2rem;background:#f9fafb;border-radius:1rem;">
+        <div style="font-size:2rem;font-weight:800;color:#2563eb;margin-bottom:0.5rem;">${digest.activeSponsors.toLocaleString()}</div>
+        <div style="color:#6b7280;font-size:0.875rem;">Active Licences</div>
+      </div>
+      <div style="padding:2rem;background:#f9fafb;border-radius:1rem;">
+        <div style="font-size:2rem;font-weight:800;color:#ef4444;margin-bottom:0.5rem;">${digest.removedCount.toLocaleString()}</div>
+        <div style="color:#6b7280;font-size:0.875rem;">Revocations</div>
+      </div>
+      <div style="padding:2rem;background:#f9fafb;border-radius:1rem;">
+        <div style="font-size:2rem;font-weight:800;color:#10b981;margin-bottom:0.5rem;">${digest.addedCount.toLocaleString()}</div>
+        <div style="color:#6b7280;font-size:0.875rem;">New Licences</div>
+      </div>
+      <div style="padding:2rem;background:#f9fafb;border-radius:1rem;">
+        <div style="font-size:2rem;font-weight:800;color:#2563eb;margin-bottom:0.5rem;">${digest.updatedCount.toLocaleString()}</div>
+        <div style="color:#6b7280;font-size:0.875rem;">Updates Today</div>
+      </div>
+    </div>
+    ${dateLabel ? `<p style="text-align:center;color:#9ca3af;font-size:0.75rem;margin-top:1rem;">${dateLabel}</p>` : ""}
+  </section>`
+    : `
+  <section style="max-width:1280px;margin:0 auto;padding:3rem 2rem;">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1.5rem;text-align:center;">
+      <div style="padding:2rem;background:#f9fafb;border-radius:1rem;">
+        <div style="font-size:2rem;font-weight:800;color:#2563eb;margin-bottom:0.5rem;">99.9%</div>
+        <div style="color:#6b7280;font-size:0.875rem;">Uptime Monitoring</div>
+      </div>
+      <div style="padding:2rem;background:#f9fafb;border-radius:1rem;">
+        <div style="font-size:2rem;font-weight:800;color:#2563eb;margin-bottom:0.5rem;">4</div>
+        <div style="color:#6b7280;font-size:0.875rem;">Alert Channels</div>
+      </div>
+      <div style="padding:2rem;background:#f9fafb;border-radius:1rem;">
+        <div style="font-size:2rem;font-weight:800;color:#2563eb;margin-bottom:0.5rem;">Instant</div>
+        <div style="color:#6b7280;font-size:0.875rem;">Revocation Alerts</div>
+      </div>
+      <div style="padding:2rem;background:#f9fafb;border-radius:1rem;">
+        <div style="font-size:2rem;font-weight:800;color:#2563eb;margin-bottom:0.5rem;">24/7</div>
+        <div style="color:#6b7280;font-size:0.875rem;">Register Scanning</div>
+      </div>
+    </div>
+  </section>`;
+
   return `
 <div class="ssr-landing">
   <nav style="display:flex;align-items:center;justify-content:space-between;padding:1rem 2rem;max-width:1280px;margin:0 auto;">
@@ -39,26 +148,7 @@ function landingHTML(): string {
     </div>
   </section>
 
-  <section style="max-width:1280px;margin:0 auto;padding:3rem 2rem;">
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1.5rem;text-align:center;">
-      <div style="padding:2rem;background:#f9fafb;border-radius:1rem;">
-        <div style="font-size:2rem;font-weight:800;color:#2563eb;margin-bottom:0.5rem;">99.9%</div>
-        <div style="color:#6b7280;font-size:0.875rem;">Uptime Monitoring</div>
-      </div>
-      <div style="padding:2rem;background:#f9fafb;border-radius:1rem;">
-        <div style="font-size:2rem;font-weight:800;color:#2563eb;margin-bottom:0.5rem;">4</div>
-        <div style="color:#6b7280;font-size:0.875rem;">Alert Channels</div>
-      </div>
-      <div style="padding:2rem;background:#f9fafb;border-radius:1rem;">
-        <div style="font-size:2rem;font-weight:800;color:#2563eb;margin-bottom:0.5rem;">Instant</div>
-        <div style="color:#6b7280;font-size:0.875rem;">Revocation Alerts</div>
-      </div>
-      <div style="padding:2rem;background:#f9fafb;border-radius:1rem;">
-        <div style="font-size:2rem;font-weight:800;color:#2563eb;margin-bottom:0.5rem;">24/7</div>
-        <div style="color:#6b7280;font-size:0.875rem;">Register Scanning</div>
-      </div>
-    </div>
-  </section>
+${statsSection}
 
   <section style="max-width:1280px;margin:0 auto;padding:4rem 2rem;">
     <h2 style="font-size:1.75rem;font-weight:700;color:#1f2937;text-align:center;margin-bottom:3rem;">How It Works</h2>
@@ -112,7 +202,7 @@ function landingHTML(): string {
 `.trim();
 }
 
-export function renderLandingPage(templatePath?: string, preloadedTemplate?: string): string {
+export async function renderLandingPage(templatePath?: string, preloadedTemplate?: string): Promise<string> {
   let template: string;
 
   if (preloadedTemplate === undefined) {
@@ -128,7 +218,7 @@ export function renderLandingPage(templatePath?: string, preloadedTemplate?: str
     template = preloadedTemplate;
   }
 
-  const rootContent = landingHTML();
+  const rootContent = await landingHTML();
 
   const startIdx = template.indexOf(SSR_MARKER);
   const endIdx = template.indexOf(SSR_END_MARKER);
