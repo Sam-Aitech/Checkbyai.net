@@ -37,7 +37,7 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 3. Use `get_affected_flows` to understand impact.
 4. Use `query_graph` pattern="tests_for" to check coverage.
 
-<!-- ── Session Context: Sponsor Monitor Pipeline Fix (Phases 1–3) ── -->
+<!-- ── Session Context: Sponsor Monitor Pipeline Fix (Phases 1–5) ── -->
 
 ## Session Context: Sponsor Monitor Pipeline Fix
 
@@ -88,12 +88,21 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 - SSR runs at request time → users see content immediately → React replaces on JS load.
 - No new dependencies; uses existing `react-helmet-async` (already in deps) for head management if needed.
 
+#### Phase 5 — Landing Page Stale-Date Trust Fix
+- **A1/A2:** Added `lastPipelineRun` field to `/api/daily-digest/current` — queries `monitor_job_runs` for the most recent `status='success'` row, so the frontend shows when the pipeline actually ran.
+- **B1 (Fix 4a):** On no-change days, instead of inserting a hidden row (`displayedOnLanding=false`), the currently displayed digest's `snapshotDate` advances to today via transactional delete+update. The date marches forward even when the register is static.
+- **C1:** `LandingDigest.tsx` uses `lastPipelineRun` for the "Updated" label (falls back to `snapshotDate`), so users always see the correct last-run date.
+- **D1:** `renderLanding.ts` is now async — fetches the live digest from DB at render time and injects real stats (active licences, revocations, additions, updates) into the SSR HTML instead of hardcoded placeholders. Falls back to static placeholders when no data available.
+- **Prod SSR:** Removed static HTML caching — renders live data on every request (async).
+- **Cache strategy:** The 5-minute Redis cache on `/api/daily-digest/current` shields the DB on repeated requests; the SSR skips client-side cache entirely for the initial paint.
+
 ### Remaining (Not Yet Scoped)
 - Fuse.js search index versioning for instant CDV cache bust on rebuild.
 - React Query `gcTime` reduction for sponsor pages (currently default 5min).
 - Consistent `stale-while-revalidate` policy across all endpoints.
 - Full free history browse endpoint wiring.
 - Observability dashboard UI for diagnostics.
+- In-memory SSR digest cache (optional) — currently queries DB on every landing page load; <10ms overhead.
 
 ### Relevant Files
 | File | Purpose |
@@ -102,16 +111,17 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 | `server/utils/sponsorMonitorJob.ts` | Nightly job + lock management |
 | `server/utils/redisClient.ts` | Cache flush, get/set with TTL |
 | `server/utils/sponsorSearch.ts` | Fuse.js index + `getIndexHealth()` |
-| `server/routes/sponsors.ts` | `/api/sponsor-changes`, admin digest refresh |
+| `server/routes/sponsors.ts` | `/api/sponsor-changes`, `/api/daily-digest/current` (with `lastPipelineRun`) |
 | `server/routes/sponsorPages.ts` | Public endpoints + Cache-Control headers |
 | `server/routes/admin.ts` | Rebuild-index, diagnostics, force-unlock |
 | `client/src/pages/SponsorMonitor.tsx` | Frontend sponsor monitor page |
 | `client/src/components/LandingDigest.tsx` | Homepage digest |
 | `client/src/lib/queryClient.ts` | React Query global defaults |
 | `client/src/lib/queryDefaults.ts` | Standardized staleTime constants |
+| `client/src/components/LandingDigest.tsx` | `/api/daily-digest/current` consumer — displays `lastPipelineRun` as "Updated" label |
 | `shared/schema.ts` | DB schema (sponsorChanges.isTest, dailyDigest) |
 | `migrations/0020_monitor_job_runs_is_gap_day.sql` | Phase 2 migration |
-| `server/ssr/renderLanding.ts` | SSR landing page generator |
+| `server/ssr/renderLanding.ts` | SSR landing page generator (async, fetches live digest from DB) |
 | `server/vite.ts` | Dev/prod SSR wiring |
 | `client/index.html` | SSR comment markers |
 | `server/services/notificationChannels/` | 6 notification channels |
