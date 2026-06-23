@@ -1363,7 +1363,8 @@ export async function checkAndTriggerIfNeeded(startup = false): Promise<void> {
   }
 
   try {
-    if (!isWeekday()) return;
+    const todayStr = new Date().toISOString().split("T")[0];
+    if (!(await isExpectedPublishDay(todayStr))) return;
     const alreadyRan = await hasTodayJobSucceeded();
     if (alreadyRan === null || alreadyRan) return;
 
