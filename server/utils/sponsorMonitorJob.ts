@@ -837,7 +837,11 @@ export async function runSponsorMonitorJob(
            previousValue: change.previousValue,
            newValue: change.newValue,
            snapshotDate: today
-         }
+         },
+         // Deterministic jobId: if the pipeline crashes after addBulk succeeds
+         // but before the run is marked complete, a restart re-runs this block —
+         // BullMQ dedupes on jobId instead of re-queuing duplicate notifications.
+         opts: { jobId: `notif-${change.id}-${today}` },
        }));
           try {
             await notifQueue.addBulk(jobs);
@@ -852,7 +856,10 @@ export async function runSponsorMonitorJob(
           queueFailed = true;
         }
         if (queueFailed) {
-          for (const change of alertableChanges.slice(0, 50)) {
+          log.warn(
+            `[SponsorMonitorJob] Processing all ${alertableChanges.length} alertable changes inline (queue unavailable) — no changes will be dropped.`,
+          );
+          for (const change of alertableChanges) {
             const notifResult = await notifyUsersOfEvent(change).catch((err: any) => {
               log.error({ err },
                 `[SponsorMonitorJob] Notification engine error for "${change.organisationName}"`,

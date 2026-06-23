@@ -109,8 +109,18 @@ export async function initJobQueue(): Promise<void> {
   probe.disconnect();
 
 // Redis is reachable — create the queues using plain opts (no shared client).
-sponsorQueue = new Queue(SPONSOR_REFRESH_JOB, { connection: redisOpts });
-notificationQueue = new Queue(NOTIFICATION_JOB, { connection: redisOpts });
+// defaultJobOptions give every job a retry policy and bound Redis growth —
+// without this, BullMQ defaults to attempts:1 (no retry) and keeps
+// completed/failed jobs forever.
+const defaultJobOptions = {
+  attempts: 3,
+  backoff: { type: 'exponential' as const, delay: 5000 },
+  removeOnComplete: { age: 24 * 3600, count: 5000 },
+  removeOnFail: { age: 7 * 24 * 3600, count: 5000 },
+};
+
+sponsorQueue = new Queue(SPONSOR_REFRESH_JOB, { connection: redisOpts, defaultJobOptions });
+notificationQueue = new Queue(NOTIFICATION_JOB, { connection: redisOpts, defaultJobOptions });
 }
 
 /** Registers BullMQ workers. No-op if Redis was unavailable at startup. */
@@ -150,7 +160,14 @@ export function setupWorkers(): void {
         return notifyUsersOfEvent(job.data);
       });
     },
-    { connection: redisOpts }
+    // concurrency:1 default would process one change at a time; bump so a
+    // backlog of queued changes drains in parallel. Kept modest (3) because
+    // notifyUsersOfEvent() itself fans out per-user via p-limit(10) — at
+    // concurrency:8 that's up to 80 concurrent DB ops against a pool max of
+    // 20 (server/db.ts), shared with web requests and the sponsor-refresh
+    // worker. 3 * 10 = 30 worst-case, acceptable since most of those ops are
+    // short reads/writes, not held-open transactions.
+    { connection: redisOpts, concurrency: 3 }
   );
 
   logger.info('[JobQueue] BullMQ workers registered.');
