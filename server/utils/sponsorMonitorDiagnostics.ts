@@ -28,6 +28,7 @@ import {
 } from "@shared/schema";
 import { checkBinaryHealth, type BinaryHealthReport } from "./binaryRunner";
 import { isJobRunning, isWeekday, SPONSOR_MONITOR_LOCK_KEY } from "./sponsorMonitorJob";
+import { isExpectedPublishDay } from "./ukBankHolidays";
 import { getCutoverStatusSnapshot, type CutoverStatus } from "./scheduler";
 import { getRedis } from "./redisClient";
 import { getIndexHealth } from "./sponsorSearch";
@@ -706,6 +707,11 @@ export async function buildDiagnosticsReport(): Promise<DiagnosticsReport> {
     safeCall("isJobRunning", () => isJobRunning()),
   ]);
 
+  // Bank-holiday-aware: a plain weekday check would flag every UK bank
+  // holiday as a missed/stuck run, even though GOV.UK doesn't publish that
+  // day. Computed once and reused below.
+  const weekdayExpectedRun = await isExpectedPublishDay(new Date().toISOString().split("T")[0]);
+
   const recommendations: string[] = [];
 
   // ── Recommendations ────────────────────────────────────────────────────────
@@ -752,7 +758,7 @@ export async function buildDiagnosticsReport(): Promise<DiagnosticsReport> {
         `${ai.failedCount} archive(s) marked FAILED — check monitorJobRuns.errorMessage.`,
       );
     }
-    if (ai.daysSinceLatest !== null && ai.daysSinceLatest > 2 && isWeekday()) {
+    if (ai.daysSinceLatest !== null && ai.daysSinceLatest > 2 && weekdayExpectedRun) {
       recommendations.push(
         `Latest archive is ${ai.daysSinceLatest} day(s) old on a weekday — ETL likely failing silently.`,
       );
@@ -783,7 +789,7 @@ export async function buildDiagnosticsReport(): Promise<DiagnosticsReport> {
     );
   }
 
-  if (digestHealth.value && digestHealth.value.latestDigestDaysAgo !== null && digestHealth.value.latestDigestDaysAgo > 2 && isWeekday()) {
+  if (digestHealth.value && digestHealth.value.latestDigestDaysAgo !== null && digestHealth.value.latestDigestDaysAgo > 2 && weekdayExpectedRun) {
     recommendations.push(
       `Latest digest is ${digestHealth.value.latestDigestDaysAgo} day(s) old on a weekday — digest generation may be stuck.`,
     );
@@ -830,7 +836,7 @@ export async function buildDiagnosticsReport(): Promise<DiagnosticsReport> {
     binaries.level === "warn" ||
     (pythonBackend.value && pythonBackend.value.online === false) ||
     (searchIndexHealth.value && !searchIndexHealth.value.ready) ||
-    (digestHealth.value && digestHealth.value.latestDigestDaysAgo !== null && digestHealth.value.latestDigestDaysAgo > 2 && isWeekday())
+    (digestHealth.value && digestHealth.value.latestDigestDaysAgo !== null && digestHealth.value.latestDigestDaysAgo > 2 && weekdayExpectedRun)
   ) {
     overall = "warn";
   }
@@ -850,7 +856,7 @@ export async function buildDiagnosticsReport(): Promise<DiagnosticsReport> {
     queue: queueHealth,
     digest: digestHealth,
     searchIndex: searchIndexHealth,
-    weekdayExpectedRun: isWeekday(),
+    weekdayExpectedRun,
     nextExpectedRunUtc: computeNextExpectedRunUtc(),
     recommendations,
   };
