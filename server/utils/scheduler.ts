@@ -19,6 +19,7 @@ import { processQueuedEngineEvents } from "../services/notificationEngine";
 import { runEnrichmentBatch, seedEnrichmentQueue } from "./enrichmentWorker";
 import { runJobAlertJob } from "./jobAlertJob";
 import { runSponsorMonitorJob } from "./sponsorMonitorJob";
+import { runConsolidatedNotificationJob } from "../services/consolidatedNotificationEngine";
 import { finishJobRun, startJobRun } from "./jobTelemetry";
 import { logger } from "./logger";
 
@@ -147,10 +148,9 @@ export function startCentralScheduler(): void {
   if (isCutover("CONSOLIDATED_NOTIFICATIONS")) {
     cron.schedule(JOB_SCHEDULES.CONSOLIDATED_NOTIFICATIONS, () => {
       log.info("Central scheduler: CONSOLIDATED_NOTIFICATIONS firing.");
-      runWithTelemetry("consolidatedNotifications", "Consolidated notifications digest", () => {
-        const { runConsolidatedNotificationJob } = require("../services/consolidatedNotificationEngine");
-        return runConsolidatedNotificationJob();
-      });
+      runWithTelemetry("consolidatedNotifications", "Consolidated notifications digest", () =>
+        runConsolidatedNotificationJob(),
+      ).catch((err) => log.error({ err }, "consolidatedNotifications outer error."));
     }, opts);
     log.info("Central scheduler: CONSOLIDATED_NOTIFICATIONS registered (0 7,19 * * * UTC).");
   }
