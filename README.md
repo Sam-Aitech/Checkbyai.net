@@ -28,7 +28,7 @@
 
 | Persona | Problem | How CheckByAI Helps |
 |---|---|---|
-| 🧑‍💼 **Visa Holders** | Sponsor revoked without warning — you lose your visa | Real-time alerts before it's too late |
+| 🧑‍💼 **Visa Holders** | Sponsor revoked without warning - you lose your visa | Real-time alerts before it's too late |
 | 🏢 **HR Teams** | Accidentally hiring from revoked sponsors = illegal | Instant licence status verification |
 | 📋 **Immigration Advisers** | Manual checks are slow and unreliable | Automated daily monitoring + forensic CoS checks |
 | 🤝 **Recruiters** | Placing candidates at non-compliant employers | Pre-screen sponsors before any placement |
@@ -167,6 +167,6 @@ Checkbyai.net/
 
 Made with ❤️ by [Sam-Aitech](https://github.com/Sam-Aitech)
 
-If CheckByAI has helped you — please ⭐ star this repo to help others find it.
+If CheckByAI has helped you - please ⭐ star this repo to help others find it.
 
 </div>
