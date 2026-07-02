@@ -57,6 +57,7 @@ const CORE_URLS: Array<{ path: string; priority: string; changefreq: string }> =
   { path: '/guides/cos-scams-red-flags', priority: '0.6', changefreq: 'monthly' },
   { path: '/guides/employers-guide-fake-cos', priority: '0.5', changefreq: 'monthly' },
   { path: '/guides/what-to-do-fake-cos', priority: '0.5', changefreq: 'monthly' },
+  { path: '/guides/sponsor-licence-revoked-what-to-do', priority: '0.7', changefreq: 'weekly' },
 ];
 
 export function registerSeoRoutes(app: Express): void {
@@ -357,6 +358,10 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
     '/what-to-do-fake-cos': {
       title: 'Bought a Fake CoS? Here\'s What To Do Next | CheckByAI',
       description: 'If you\'ve paid for a fake Certificate of Sponsorship, act fast. Step-by-step guide: report to Action Fraud, contact an immigration solicitor, and recover your money.',
+    },
+    '/guides/sponsor-licence-revoked-what-to-do': {
+      title: 'Sponsor Licence Revoked — What To Do Next (2026 UK Guide) | CheckByAI',
+      description: 'Your employer\'s UK sponsor licence has been revoked. Here\'s exactly what to do: check your visa status, find your curtailment deadline, and start looking for a new sponsor. Step-by-step guide for Skilled Worker visa holders.',
     },
     '/about': {
       title: 'About CheckByAI | Our Mission to Stop Visa Fraud',

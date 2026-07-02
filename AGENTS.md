@@ -96,6 +96,13 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 - **Prod SSR:** Removed static HTML caching — renders live data on every request (async).
 - **Cache strategy:** The 5-minute Redis cache on `/api/daily-digest/current` shields the DB on repeated requests; the SSR skips client-side cache entirely for the initial paint.
 
+#### Phase 6 — SEO Content & Guide Pages
+- **SEO strategy** written to `docs/SEO_STRATEGY.md` (358 lines) — keyword research (25+ targets), competitor analysis (5 competitors), content plan, technical SEO roadmap, link-building strategy, phased 180-day timeline.
+- **`server/routes/guides.ts`** — SSR route engine for SEO-optimized guide pages. Renders full HTML via template + SSR markers, injects `Article` + `FAQPage` schema markup, breadcrumbs, CDN-friendly cache headers. Extensible `GUIDES` array pattern.
+- **First guide:** `/guides/sponsor-licence-revoked-what-to-do` — targets "sponsor licence revoked what to do" (~1,900/mo). 2,000+ words, TL;DR box, comparison table, 5-step action plan, 6 FAQ schema items, internal links, CTA.
+- **`CORE_URLS`** and `seoMetaMap` updated in `seo.ts` for bot meta injection on the guide path.
+- **0 lint errors, 328 tests pass** — verified.
+
 ### Remaining (Not Yet Scoped)
 - Fuse.js search index versioning for instant CDV cache bust on rebuild.
 - React Query `gcTime` reduction for sponsor pages (currently default 5min).
@@ -103,6 +110,7 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 - Full free history browse endpoint wiring.
 - Observability dashboard UI for diagnostics.
 - In-memory SSR digest cache (optional) — currently queries DB on every landing page load; <10ms overhead.
+- Remaining guide pages (14+ scheduled), FAQ page, free tool pages, blog section.
 
 ### Relevant Files
 | File | Purpose |
@@ -127,5 +135,7 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 | `server/services/notificationChannels/` | 6 notification channels |
 | `server/services/socketGateway.ts` | Socket.IO real-time gateway |
 | `server/routes/pushSubscriptions.ts` | Push API endpoints |
+| `server/routes/guides.ts` | SEO guide rendering engine |
+| `docs/SEO_STRATEGY.md` | Full SEO strategy — keyword targets, content plan, timeline |
 | `migrations/0022_push_subscriptions.sql` | Push subscriptions table |
 | `migrations/0023_notification_preferences_webhook.sql` | Webhook prefs columns |

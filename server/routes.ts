@@ -16,6 +16,7 @@ import { registerOpsRoutes } from "./routes/ops";
 import { registerSponsorPageRoutes } from "./routes/sponsorPages";
 import { registerFeedbackRoutes } from "./routes/feedback";
 import { registerPushSubscriptionRoutes } from "./routes/pushSubscriptions";
+import { registerGuideRoutes } from "./routes/guides";
 import { rebuildSponsorIndex } from "./utils/sponsorSearch";
 import { startSponsorMonitorCron, checkAndTriggerIfNeeded } from "./utils/sponsorMonitorJob";
 import { startJobAlertScheduler } from "./utils/jobAlertJob";
@@ -69,6 +70,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerFeedbackRoutes(app);
   registerPushSubscriptionRoutes(app);
   registerEnrichmentRoutes(app);
+  registerGuideRoutes(app);
 
   rebuildSponsorIndex().catch((err) => {
     logger.error({ err }, "[SponsorSearch] Failed to build initial index:");
