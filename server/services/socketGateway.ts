@@ -95,3 +95,10 @@ export function emitToUser(userId: string, event: string, data: any): void {
   if (!io) return;
   io.to(`user:${userId}`).emit(event, data);
 }
+
+export function broadcastSponsorUpdate(payload: { date: string; changesCount: number }): void {
+  if (!io) return;
+  io.emit("SPONSOR_DATA_UPDATED", payload);
+  log.info({ payload }, "Broadcasted SPONSOR_DATA_UPDATED event to all connected sockets");
+}
+

@@ -18,6 +18,8 @@ import { startJobRun, finishJobRun, type TriggerSource } from "./jobTelemetry";
 import { match } from "ts-pattern";
 import crypto from "crypto";
 import { tryAcquireLock, releaseLock, isLockActive } from "./lockManager";
+import { broadcastSponsorUpdate } from "../services/socketGateway";
+
 
 const log = logger.child({ module: "SponsorMonitorJob" });
 // Why ts-pattern: ETL status branching must stay explicit/exhaustive so upstream
@@ -999,6 +1001,11 @@ export async function runSponsorMonitorJob(
     // full TTL.
     await flushSponsorCaches();
     log.info(`[SponsorMonitorJob] Flushed sponsor Redis caches after nightly run.`);
+    broadcastSponsorUpdate({
+      date: today,
+      changesCount: Object.values(result.changes).reduce((a, b) => a + b, 0),
+    });
+
 
     result.success = true;
 

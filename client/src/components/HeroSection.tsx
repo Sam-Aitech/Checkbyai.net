@@ -69,7 +69,9 @@ function RecentlyRevokedSection() {
   const [ref, inView] = useInView({ triggerOnce: true, threshold: 0.1 });
   const { data, isLoading } = useQuery<RevokedEntry[]>({
     queryKey: ["/api/sponsors/recently-revoked"],
-    staleTime: STALE_TIMES.INFREQUENT,
+    staleTime: 60 * 1000,
+    refetchInterval: 3 * 60 * 1000,
+    refetchOnWindowFocus: true,
     select: (res: any) => (res?.data ?? res) as RevokedEntry[],
   });
   // Shares the cache entry with NightlyStatsBar/UrgencyBanner (same queryKey) —
@@ -78,7 +80,9 @@ function RecentlyRevokedSection() {
   // actually running, distinct from "most recent revocation".
   const { data: stats, isLoading: statsLoading } = useQuery<NightlyStats>({
     queryKey: ["/api/sponsors/nightly-stats"],
-    staleTime: STALE_TIMES.INFREQUENT,
+    staleTime: 60 * 1000,
+    refetchInterval: 3 * 60 * 1000,
+    refetchOnWindowFocus: true,
     select: (res: any) => (res?.data ?? res) as NightlyStats,
   });
 
@@ -199,7 +203,9 @@ function formatRunDate(dateStr: string | null): string {
 function NightlyStatsBar() {
   const { data, isLoading } = useQuery<NightlyStats>({
     queryKey: ["/api/sponsors/nightly-stats"],
-    staleTime: STALE_TIMES.INFREQUENT,
+    staleTime: 60 * 1000,
+    refetchInterval: 3 * 60 * 1000,
+    refetchOnWindowFocus: true,
     select: (res: any) => (res?.data ?? res) as NightlyStats,
   });
 
@@ -314,7 +320,9 @@ function LatestChangeToast() {
 function UrgencyBanner() {
   const { data, isLoading } = useQuery<NightlyStats>({
     queryKey: ["/api/sponsors/nightly-stats"],
-    staleTime: STALE_TIMES.INFREQUENT,
+    staleTime: 60 * 1000,
+    refetchInterval: 3 * 60 * 1000,
+    refetchOnWindowFocus: true,
     select: (res: any) => (res?.data ?? res) as NightlyStats,
   });
 
