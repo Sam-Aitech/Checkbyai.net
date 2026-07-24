@@ -7,7 +7,7 @@ import { ensureTodaysArchive, getArchiveForDate, parseCsvFile } from "./csvArchi
 import { runCsvDiff, getCsvdiffPath, type CsvDiffResult } from "./binaryRunner";
 import { applyStateMachine } from "./sponsorStateMachine";
 import { rebuildSponsorIndex } from "./sponsorSearch";
-import { cacheFlushPattern } from "./redisClient";
+import { flushSponsorCaches } from "./redisClient";
 import { isExpectedPublishDay } from "./ukBankHolidays";
 import { processQueuedEngineEvents } from "../services/notificationEngine";
 import { generateHeadline, type RawDigestData } from "../services/aiDigest";
@@ -996,23 +996,9 @@ export async function runSponsorMonitorJob(
     // Flush stale Redis cache now that monitor_job_runs + daily_digest reflect
     // today's run — flushing earlier (before these writes) let the next
     // request rebuild the cache from yesterday's data and lock it in for the
-    // full TTL. Retry up to 3 times with 500ms backoff.
-    let flushed = 0;
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      flushed = await cacheFlushPattern("sponsors:*");
-      if (flushed > 0) break;
-      if (attempt < 3) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-    }
-    if (flushed > 0) {
-      log.info(`[SponsorMonitorJob] Flushed ${flushed} Redis cache keys after nightly run.`);
-    } else {
-      log.error(
-        `[SponsorMonitorJob] Redis cache flush failed after 3 attempts — stale 'sponsors:*' keys may persist. ` +
-        `Next request will see outdated data until the next successful flush.`,
-      );
-    }
+    // full TTL.
+    await flushSponsorCaches();
+    log.info(`[SponsorMonitorJob] Flushed sponsor Redis caches after nightly run.`);
 
     result.success = true;
 

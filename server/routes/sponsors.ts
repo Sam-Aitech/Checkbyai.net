@@ -11,7 +11,7 @@ import { ensureIndexReady, isIndexReady, searchSponsors, searchSponsorsFallback,
 import { recordSearchRequest } from "../services/monitoringService";
 import { generateHeadline, signDigest } from "../services/aiDigest";
 import { storage } from "../storage";
-import { cacheGet, cacheSet, cacheFlushPattern } from "../utils/redisClient";
+import { cacheGet, cacheSet, cacheFlushPattern, flushSponsorCaches } from "../utils/redisClient";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { makeRateLimitStore } from "../utils/redisRateLimitStore";
 import { success } from "../lib/response";
@@ -360,7 +360,7 @@ export function registerSponsorRoutes(app: Express): void {
     }
 
     // Flush Redis so the frontend gets fresh data immediately after admin refresh.
-    await cacheFlushPattern("sponsors:*");
+    await flushSponsorCaches();
 
     success(res, { headline: headlineResult.headline, model: headlineResult.model, hasChanges });
   }));

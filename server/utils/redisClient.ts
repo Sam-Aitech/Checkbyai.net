@@ -80,3 +80,26 @@ export async function cacheFlushPattern(pattern: string): Promise<number> {
     return 0;
   }
 }
+
+/**
+ * Centralized cache flusher for all sponsor-related endpoints and jobs.
+ * Deletes specific high-traffic sponsor keys directly first, then performs pattern-based flush.
+ */
+export async function flushSponsorCaches(): Promise<void> {
+  if (_redis) {
+    const specificKeys = [
+      "sponsors:recently-revoked",
+      "sponsors:nightly-stats",
+      "sponsors:latest-change",
+      "sponsors:changes",
+      "sponsors:daily-digest:current",
+    ];
+    try {
+      await _redis.del(...specificKeys);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.warn(`[RedisCache] Failed to delete specific sponsor keys: ${msg}`);
+    }
+  }
+  await cacheFlushPattern("sponsors:*");
+}
