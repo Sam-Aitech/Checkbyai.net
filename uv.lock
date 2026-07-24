@@ -561,7 +561,7 @@ wheels = [
 
 [[package]]
 name = "crawl4ai"
-version = "0.9.0"
+version = "0.9.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiofiles" },
@@ -598,9 +598,9 @@ dependencies = [
     { name = "unclecode-litellm" },
     { name = "xxhash" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/52/37/9b288598bb0049b918eeb00f029592c748465c8a3e819461e95d8b5f9dab/crawl4ai-0.9.0.tar.gz", hash = "sha256:00c1c3516d9ca24a9b5004523ae67974ace8a5baadc6e92e295afca73f077153", size = 591734, upload-time = "2026-06-18T09:31:08.674Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ca/95/a307119201f09a5136be1e394282ee4d4d6e3816cbc3c73f370aaa4b5e56/crawl4ai-0.9.1.tar.gz", hash = "sha256:d04251f13ba180107324bb7bbe12029a63d95cc50248f05085743739f38404fc", size = 575249, upload-time = "2026-07-08T14:29:15.247Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c9/19/2d634f26d9ad1281874c503c1043174042fef9af631dc10798f4f22c1544/crawl4ai-0.9.0-py3-none-any.whl", hash = "sha256:1296072d9cd92e79144c6823ed6f27ab3966f16ce44e79fcbe86943b3435c366", size = 499084, upload-time = "2026-06-18T09:31:07.27Z" },
+    { url = "https://files.pythonhosted.org/packages/18/61/fd08ea5870bb7d5b3e028b784fb2e18343cc20b9aabdd4771df35c1a1642/crawl4ai-0.9.1-py3-none-any.whl", hash = "sha256:e154c3219d0cd46b4e06771a725bf35e6c31b19a5c2981afbcdba4574bd0a9dc", size = 479911, upload-time = "2026-07-08T14:29:14.038Z" },
 ]
 
 [[package]]
@@ -2756,7 +2756,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "camoufox", extras = ["geoip"], specifier = ">=0.4.11" },
-    { name = "crawl4ai", specifier = ">=0.9.0" },
+    { name = "crawl4ai", specifier = ">=0.9.1" },
     { name = "curl-cffi", specifier = ">=0.15.0" },
     { name = "duckdb", specifier = ">=1.5.4" },
     { name = "fastapi", specifier = ">=0.138.0" },
