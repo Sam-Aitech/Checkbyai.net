@@ -293,13 +293,10 @@ export function registerSponsorPageRoutes(app: Express): void {
     const totalActive          = countResult[0]?.total ?? 0;
     const revokedLast12Months  = revokedResult[0]?.total ?? 0;
     const latest               = digestRows[0] ?? null;
-    // Use the last successful job run date as "Register last checked".
-    // Fall back to the active digest's snapshot date if no run recorded yet.
-    const lastRunDate = lastRunRows[0]?.runDate ?? latest?.snapshotDate ?? null;
-
     const today = new Date().toISOString().split("T")[0];
+    const lastRunDate = lastRunRows[0]?.runDate ?? latest?.snapshotDate ?? today;
     const staleDays = lastRunDate
-      ? Math.round((Date.parse(today) - Date.parse(lastRunDate)) / 86400000)
+      ? Math.max(0, Math.round((Date.parse(today) - Date.parse(lastRunDate)) / 86400000))
       : 0;
 
     // The displayed digest intentionally stays pinned to the last day with

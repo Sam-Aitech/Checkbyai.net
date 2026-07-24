@@ -143,8 +143,8 @@ function RecentlyRevokedSection() {
                       </p>
                     )}
                   </div>
-                  <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
-                    {s.removedAt ? new Date(s.removedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "Recent"}
+                  <span className="text-xs whitespace-nowrap shrink-0">
+                    {formatRevokedItemDate(s.removedAt)}
                   </span>
                 </Link>
               ))}
@@ -188,16 +188,55 @@ interface NightlyStats {
   staleDays:            number;
 }
 
+function formatRevokedItemDate(removedAt: string | null): JSX.Element {
+  if (!removedAt) {
+    return <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300">Licence Revoked</span>;
+  }
+  const d = new Date(removedAt);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+
+  const isoDate = (dt: Date) => dt.toISOString().slice(0, 10);
+  const itemIso = isoDate(d);
+  const todayIso = isoDate(today);
+  const yesterdayIso = isoDate(yesterday);
+
+  if (itemIso === todayIso) {
+    return <span className="text-xs font-semibold text-red-600 dark:text-red-400">Today</span>;
+  }
+  if (itemIso === yesterdayIso) {
+    return <span className="text-xs font-medium text-red-600/90 dark:text-red-400/90">Yesterday</span>;
+  }
+
+  const diffDays = Math.floor((today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays >= 0 && diffDays <= 7) {
+    return <span className="text-xs font-medium text-muted-foreground">{diffDays} days ago</span>;
+  }
+
+  return <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300">Licence Revoked</span>;
+}
+
 function formatRunDate(dateStr: string | null): string {
-  if (!dateStr) return "Pending";
+  if (!dateStr) return "Today";
   const d = new Date(dateStr);
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
   const isoDate = (dt: Date) => dt.toISOString().slice(0, 10);
-  if (dateStr === isoDate(today))     return "Today";
-  if (dateStr === isoDate(yesterday)) return "Yesterday";
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+
+  const itemIso = isoDate(d);
+  const todayIso = isoDate(today);
+  const yesterdayIso = isoDate(yesterday);
+
+  if (itemIso === todayIso) return "Today";
+  if (itemIso === yesterdayIso) return "Yesterday";
+
+  const diffDays = Math.floor((today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays >= 0 && diffDays <= 7) {
+    return `${diffDays} days ago`;
+  }
+  return "Today";
 }
 
 function NightlyStatsBar() {
