@@ -124,3 +124,96 @@ describe("sponsorStateMachine - first run logic", () => {
     expect(storage.getPendingWatchesByCompanyName).not.toHaveBeenCalled();
   });
 });
+
+describe("sponsorStateMachine - Phase D3 Auto-Sweeper", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (db.execute as any).mockResolvedValue({ rows: [{ cnt: 1000 }] });
+  });
+
+  it("should auto-sweep stranded GRACE_PERIOD records to REMOVED_REVOKED", async () => {
+    const today = "2026-04-23";
+
+    const strandedRecords = [
+      {
+        fingerprint: "fp-stranded-1",
+        currentName: "Stranded Corp Ltd",
+        consecutiveMisses: 2,
+      },
+    ];
+
+    (db.select as any).mockReturnValue({
+      from: vi.fn(() => ({
+        where: vi.fn().mockResolvedValue(strandedRecords),
+      })),
+    });
+
+    const diff: CsvDiffResult = {
+      Additions: [],
+      Deletions: [],
+      Modifications: [],
+      durationMs: 0,
+    };
+
+    const result = await applyStateMachine(diff, today, "dummy_path");
+
+    expect(result.removedCount).toBe(1);
+    const autoSweptChange = result.changes.find(
+      (c) => c.fingerprint === "fp-stranded-1" && c.changeType === "REMOVED_REVOKED",
+    );
+    expect(autoSweptChange).toBeDefined();
+    expect(autoSweptChange?.previousValue).toBe("GRACE_PERIOD");
+    expect(autoSweptChange?.newValue).toBe("REMOVED_REVOKED");
+    expect(autoSweptChange?.organisationName).toBe("Stranded Corp Ltd");
+  });
+
+  it("should filter out records already processed in Phase D/D2 in the current run", async () => {
+    const today = "2026-04-23";
+
+    (db.select as any).mockReturnValue({
+      from: vi.fn(() => ({
+        where: vi.fn(() =>
+          Promise.resolve([
+            {
+              id: 1,
+              fingerprint: "fp-deleted-today",
+              currentName: "Deleted Today Corp",
+              townCity: "London",
+              typeRating: "Worker (A rating)",
+              route: "Skilled Worker",
+              status: "ACTIVE",
+              grantedAt: "2025-01-01",
+              consecutiveMisses: 0,
+              historicalNames: [],
+            },
+          ]),
+        ),
+      })),
+    });
+
+    const diff: CsvDiffResult = {
+      Additions: [],
+      Deletions: [
+        {
+          "Organisation Name": "Deleted Today Corp",
+          "Town/City": "London",
+          "Route": "Skilled Worker",
+          "Type & Rating": "Worker (A rating)",
+          "fingerprint": "fp-deleted-today",
+        },
+      ],
+      Modifications: [],
+      durationMs: 0,
+    };
+
+    const result = await applyStateMachine(diff, today, "dummy_path");
+
+    // "fp-deleted-today" was moved to GRACE_PERIOD in Phase D.
+    // So Phase D3 auto-sweeper should filter it out and NOT sweep it from GRACE_PERIOD -> REMOVED_REVOKED.
+    const autoSweptInD3 = result.changes.filter(
+      (c) => c.fingerprint === "fp-deleted-today" && c.previousValue === "GRACE_PERIOD",
+    );
+    expect(autoSweptInD3).toHaveLength(0);
+  });
+});
+

@@ -25,7 +25,7 @@
 import stringSimilarity from "string-similarity";
 import { db } from "../db";
 import { sponsorCanonical, sponsorChanges } from "@shared/schema";
-import { eq, inArray, and, sql, ne } from "drizzle-orm";
+import { eq, inArray, and, sql, ne, or, gte, lt } from "drizzle-orm";
 import { normalizeName, generateFingerprint } from "./sponsorListFetcher";
 import type { CsvDiffResult } from "./binaryRunner";
 import type { SponsorChange } from "./sponsorListFetcher";
@@ -796,6 +796,62 @@ export async function applyStateMachine(
     }
     log.info(`[StateMachine] Phase D2: ${toRemoveD2.length} second-miss removals confirmed.`);
   }
+
+  // ── Phase D3: Auto-Sweeper for Stranded GRACE_PERIOD records ───────────────
+  // Catches stranded GRACE_PERIOD records with consecutiveMisses >= 2 or
+  // lastSeen older than 2 days, regardless of todayFingerprintSet trust checks.
+  const strandedGracePeriod = await db
+    .select({
+      fingerprint: sponsorCanonical.fingerprint,
+      currentName: sponsorCanonical.currentName,
+      consecutiveMisses: sponsorCanonical.consecutiveMisses,
+    })
+    .from(sponsorCanonical)
+    .where(
+      and(
+        eq(sponsorCanonical.status, "GRACE_PERIOD"),
+        or(
+          gte(sponsorCanonical.consecutiveMisses, 2),
+          lt(sponsorCanonical.lastSeen, sql`CURRENT_DATE - INTERVAL '2 days'`),
+        ),
+      ),
+    );
+
+  const processedInPhaseDD2 = new Set([
+    ...processedInPhaseD,
+    ...toRemoveD2.map((r) => r.fingerprint),
+  ]);
+
+  const autoSwept = strandedGracePeriod.filter(
+    (r) => !processedInPhaseDD2.has(r.fingerprint),
+  );
+
+  if (autoSwept.length > 0) {
+    for (let i = 0; i < autoSwept.length; i += BATCH_SIZE) {
+      const chunk = autoSwept.slice(i, i + BATCH_SIZE);
+      await db
+        .update(sponsorCanonical)
+        .set({
+          status: "REMOVED_REVOKED",
+          removedAt: new Date(),
+          consecutiveMisses: sql`${sponsorCanonical.consecutiveMisses} + 1`,
+        })
+        .where(inArray(sponsorCanonical.fingerprint, chunk.map((r) => r.fingerprint)));
+
+      for (const r of chunk) {
+        changes.push({
+          organisationName: r.currentName,
+          changeType: "REMOVED_REVOKED",
+          previousValue: "GRACE_PERIOD",
+          newValue: "REMOVED_REVOKED",
+          fingerprint: r.fingerprint,
+        });
+        removedCount++;
+      }
+    }
+  }
+
+  log.info(`[StateMachine] Phase D3: ${autoSwept.length} stranded GRACE_PERIOD records auto-swept to REMOVED_REVOKED.`);
 
   // ── Phase E: Rename detection ─────────────────────────────────────────────
   // A rename creates a new fingerprint (normalizeName changes). csvdiff sees:
