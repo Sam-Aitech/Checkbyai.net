@@ -230,7 +230,7 @@ export function registerSponsorPageRoutes(app: Express): void {
       })
       .from(sponsorCanonical)
       .where(eq(sponsorCanonical.status, "REMOVED_REVOKED"))
-      .orderBy(desc(sponsorCanonical.removedAt))
+      .orderBy(sql`${sponsorCanonical.removedAt} DESC NULLS LAST, ${sponsorCanonical.id} DESC`)
       .limit(7);
 
     await cacheSet(cacheKey, sponsors, 3600);
@@ -276,6 +276,7 @@ export function registerSponsorPageRoutes(app: Express): void {
         .from(sponsorCanonical)
         .where(
           sql`status = 'REMOVED_REVOKED'
+              AND removed_at IS NOT NULL
               AND removed_at >= (CURRENT_DATE - INTERVAL '12 months')`
         ),
       // Query the actual last successful cron/manual run date from monitor_job_runs.
@@ -354,7 +355,7 @@ export function registerSponsorPageRoutes(app: Express): void {
       .from(sponsorChanges)
       .innerJoin(sponsorCanonical, eq(sponsorCanonical.fingerprint, sponsorChanges.fingerprint))
       .where(inArray(sponsorChanges.changeType, ["REMOVED_REVOKED", "DOWNGRADED", "UPGRADED"]))
-      .orderBy(desc(sponsorChanges.detectedAt))
+      .orderBy(sql`${sponsorChanges.detectedAt} DESC NULLS LAST, ${sponsorChanges.id} DESC`)
       .limit(1);
 
     const payload = rows[0] ?? null;
