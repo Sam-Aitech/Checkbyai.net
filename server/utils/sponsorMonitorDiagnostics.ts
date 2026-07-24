@@ -17,7 +17,7 @@
  * useful to the operator than a hard failure.
  */
 
-import { sql, desc, eq, gte, count } from "drizzle-orm";
+import { sql, desc, eq, gte, count, and, isNull } from "drizzle-orm";
 import { db } from "../db";
 import {
   monitorJobRuns,
@@ -307,6 +307,8 @@ export async function checkChangeProduction(): Promise<CheckResult<{
   changesLast30Days: number;
   changesToday: number;
   canonicalRecordCount: number;
+  nullRemovedAtCount: number;
+  strandedGracePeriodCount: number;
 }>> {
   return safeCall("changeProduction", async () => {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -332,11 +334,23 @@ export async function checkChangeProduction(): Promise<CheckResult<{
       .select({ value: count() })
       .from(sponsorCanonical);
 
+    const [nullRemovedAtRow] = await db
+      .select({ value: count() })
+      .from(sponsorCanonical)
+      .where(and(eq(sponsorCanonical.status, "REMOVED_REVOKED"), isNull(sponsorCanonical.removedAt)));
+
+    const [strandedGracePeriodRow] = await db
+      .select({ value: count() })
+      .from(sponsorCanonical)
+      .where(and(eq(sponsorCanonical.status, "GRACE_PERIOD"), gte(sponsorCanonical.consecutiveMisses, 2)));
+
     return {
       changesLast7Days: last7?.value ?? 0,
       changesLast30Days: last30?.value ?? 0,
       changesToday: todayCount?.value ?? 0,
       canonicalRecordCount: canonicalRow?.value ?? 0,
+      nullRemovedAtCount: nullRemovedAtRow?.value ?? 0,
+      strandedGracePeriodCount: strandedGracePeriodRow?.value ?? 0,
     };
   });
 }
@@ -611,6 +625,8 @@ export interface DiagnosticsReport {
     changesLast30Days: number;
     changesToday: number;
     canonicalRecordCount: number;
+    nullRemovedAtCount: number;
+    strandedGracePeriodCount: number;
   }>;
   binaries: CheckResult<BinaryHealthReport & { level: CheckLevel }>;
   redis: CheckResult<{
@@ -820,6 +836,20 @@ export async function buildDiagnosticsReport(): Promise<DiagnosticsReport> {
     }
   }
 
+  if (changeProduction.value) {
+    const cp = changeProduction.value;
+    if (cp.nullRemovedAtCount > 0) {
+      recommendations.push(
+        `${cp.nullRemovedAtCount} REMOVED_REVOKED sponsor(s) missing removedAt timestamp — state machine update incomplete.`,
+      );
+    }
+    if (cp.strandedGracePeriodCount > 0) {
+      recommendations.push(
+        `${cp.strandedGracePeriodCount} sponsor(s) stranded in GRACE_PERIOD with consecutiveMisses >= 2 — state machine transition missed.`,
+      );
+    }
+  }
+
   // ── Overall level ─────────────────────────────────────────────────────────
   let overall: CheckLevel = "ok";
   if (
@@ -828,7 +858,8 @@ export async function buildDiagnosticsReport(): Promise<DiagnosticsReport> {
     archiveIntegrity.value?.pendingSyncCount ||
     archiveIntegrity.value?.failedCount ||
     recentRuns.value?.stuckRunning ||
-    (digestHealth.value && digestHealth.value.mismatch)
+    (digestHealth.value && digestHealth.value.mismatch) ||
+    (changeProduction.value && (changeProduction.value.nullRemovedAtCount > 0 || changeProduction.value.strandedGracePeriodCount > 0))
   ) {
     overall = "fail";
   } else if (
