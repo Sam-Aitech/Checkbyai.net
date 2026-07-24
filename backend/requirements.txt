@@ -11,7 +11,7 @@ python-multipart>=0.0.32     # multipart/form-data (file uploads)
 # ── HTTP / scraping ────────────────────────────────────────────────────────────
 requests>=2.34.2              # streaming CSV download in sponsor_etl_cron.py
 lxml>=6.1.1                   # XML/HTML parsing (fixes GHSA-vfmq-68hx-4jfw)
-scrapling>=0.4.9                # Gov.uk sponsor-register URL discovery
+scrapling>=0.4.11                # Gov.uk sponsor-register URL discovery
 curl_cffi>=0.15.0             # scrapling static-fetcher transport
 # playwright                  # scrapling browser fetchers (install separately:
 #                             #   playwright install chromium)
