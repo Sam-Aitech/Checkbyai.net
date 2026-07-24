@@ -6,7 +6,7 @@ requires-python = ">=3.11"
 dependencies = [
     "duckdb>=1.5.4",
     "fastapi>=0.139.0",
-    "scrapling>=0.4.9",
+    "scrapling>=0.4.11",
     "numpy>=2.4.6",
     "onnxruntime>=1.27.0",
     "pymupdf>=1.28.0",
