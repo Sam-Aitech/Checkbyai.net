@@ -27,6 +27,11 @@ dependencies = [
 [tool.uv]
 override-dependencies = [
     "lxml>=6.1.1",
+    "pillow>=12.3.0",
+    "nltk>=3.10.1",
+    "cryptography>=50.0.0",
+    "urllib3>=2.7.0",
+    "soupsieve>=2.9.1",
 ]
 
 [[tool.uv.index]]
