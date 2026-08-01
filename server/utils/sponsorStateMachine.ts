@@ -25,7 +25,7 @@
 import stringSimilarity from "string-similarity";
 import { db } from "../db";
 import { sponsorCanonical, sponsorChanges } from "@shared/schema";
-import { eq, inArray, and, sql, ne, or, gte, lt } from "drizzle-orm";
+import { eq, inArray, and, sql, or, gte, lt } from "drizzle-orm";
 import { normalizeName, generateFingerprint } from "./sponsorListFetcher";
 import type { CsvDiffResult } from "./binaryRunner";
 import type { SponsorChange } from "./sponsorListFetcher";
