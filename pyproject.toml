@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.11"
 dependencies = [
-    "duckdb>=1.5.4",
+    "duckdb>=1.5.5",
     "fastapi>=0.140.0",
     "scrapling>=0.4.11",
     "numpy>=2.4.6",
