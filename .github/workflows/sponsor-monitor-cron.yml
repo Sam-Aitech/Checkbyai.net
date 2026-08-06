@@ -6,12 +6,15 @@ name: Sponsor Monitor – Daily Cron
 #
 # Required repository secrets (Settings → Secrets → Actions):
 #   CRON_SECRET  — must match the CRON_SECRET env var set in the Replit deployment
-#   CRON_URL     — production base URL, e.g. https://checkbyai.net
+#   CRON_URL     — production base URL only, e.g. https://checkbyai.net
+#                  (no path, no query string, no quotes, no trailing slash)
 
 on:
   schedule:
     - cron: "35 0 * * 1-5"   # 00:35 UTC, Mon–Fri
   workflow_dispatch:           # allow manual trigger from the GitHub UI
+
+permissions: {}
 
 jobs:
   ping:
@@ -20,9 +23,91 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - name: Ping cron endpoint
+      - name: Validate secrets and base URL
+        run: |
+          if [ -z "${{ secrets.CRON_SECRET }}" ]; then
+            echo "❌ CRON_SECRET repository secret is missing or empty."
+            exit 1
+          fi
+
+          URL="${{ secrets.CRON_URL }}"
+          if [ -z "$URL" ]; then
+            echo "❌ CRON_URL repository secret is missing or empty."
+            exit 1
+          fi
+
+          case "$URL" in
+            https://*) ;;
+            *)
+              echo "❌ CRON_URL must start with https:// (got: $URL)"
+              exit 1
+              ;;
+          esac
+
+          REST="${URL#https://}"
+          REST="${REST%/}"
+          case "$REST" in
+            */*)
+              echo "❌ CRON_URL must be a bare base URL with no path (got: $URL)"
+              exit 1
+              ;;
+            *\?*)
+              echo "❌ CRON_URL must not contain a query string (got: $URL)"
+              exit 1
+              ;;
+          esac
+
+          HOST="$REST"
+          echo "Resolving DNS for $HOST ..."
+          if ! getent hosts "$HOST" > /dev/null 2>&1; then
+            echo "❌ DNS resolution failed for host: $HOST"
+            echo "   CRON_URL is set to an unreachable hostname. Update the secret in"
+            echo "   Settings → Secrets and variables → Actions → CRON_URL."
+            exit 1
+          fi
+          echo "✅ DNS resolves for $HOST"
+
+          echo "cron_url=$URL" >> "$GITHUB_ENV"
+
+      - name: Check application health (authenticated, read-only)
+        id: health
+        run: |
+          set +e
+          HTTP_STATUS=$(curl --silent --output /tmp/health.json \
+            --write-out "%{http_code}" \
+            --max-time 15 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${cron_url}/api/ops/cron-ping/health")
+          CURL_EXIT=$?
+          set -e
+
+          if [ "$CURL_EXIT" -ne 0 ]; then
+            echo "❌ Health check transport failure (curl exit code $CURL_EXIT)."
+            case "$CURL_EXIT" in
+              6)  echo "   Meaning: could not resolve host." ;;
+              7)  echo "   Meaning: could not connect to host (connection refused)." ;;
+              28) echo "   Meaning: request timed out." ;;
+              35) echo "   Meaning: TLS/SSL handshake failed." ;;
+              52) echo "   Meaning: server returned an empty reply." ;;
+              56) echo "   Meaning: failure receiving network data." ;;
+              *)  echo "   See https://curl.se/libcurl/c/libcurl-errors.html for exit code $CURL_EXIT." ;;
+            esac
+            exit 1
+          fi
+
+          echo "Health endpoint HTTP status: $HTTP_STATUS"
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "❌ Application is not healthy (expected 200, got $HTTP_STATUS)."
+            echo "Response body:"
+            cat /tmp/health.json
+            exit 1
+          fi
+          echo "✅ Application is healthy."
+
+      - name: Trigger sponsor monitor job
         id: ping
         run: |
+          set +e
           HTTP_STATUS=$(curl --silent --output /tmp/response.json \
             --write-out "%{http_code}" \
             --max-time 30 \
@@ -32,9 +117,25 @@ jobs:
             -X POST \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             -H "Content-Type: application/json" \
-            "${{ secrets.CRON_URL }}/api/ops/cron-ping")
+            "${cron_url}/api/ops/cron-ping")
+          CURL_EXIT=$?
+          set -e
 
-          echo "http_status=$HTTP_STATUS" >> $GITHUB_OUTPUT
+          if [ "$CURL_EXIT" -ne 0 ]; then
+            echo "❌ Trigger request transport failure (curl exit code $CURL_EXIT)."
+            case "$CURL_EXIT" in
+              6)  echo "   Meaning: could not resolve host." ;;
+              7)  echo "   Meaning: could not connect to host (connection refused)." ;;
+              28) echo "   Meaning: request timed out." ;;
+              35) echo "   Meaning: TLS/SSL handshake failed." ;;
+              52) echo "   Meaning: server returned an empty reply." ;;
+              56) echo "   Meaning: failure receiving network data." ;;
+              *)  echo "   See https://curl.se/libcurl/c/libcurl-errors.html for exit code $CURL_EXIT." ;;
+            esac
+            exit 1
+          fi
+
+          echo "http_status=$HTTP_STATUS" >> "$GITHUB_OUTPUT"
           echo "Response body:"
           cat /tmp/response.json
 
