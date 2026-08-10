@@ -6,12 +6,18 @@ name: Sponsor Monitor – Daily Cron
 #
 # Required repository secrets (Settings → Secrets → Actions):
 #   CRON_SECRET  — must match the CRON_SECRET env var set in the Replit deployment
-#   CRON_URL     — production base URL, e.g. https://checkbyai.net
+#   CRON_URL     — production base URL only, e.g. https://checkbyai.net
+#                  (no path, no query string, no quotes, no trailing slash)
 
 on:
   schedule:
     - cron: "35 0 * * 1-5"   # 00:35 UTC, Mon–Fri
   workflow_dispatch:           # allow manual trigger from the GitHub UI
+
+# contents: read is the minimum needed to check out .github/scripts/ (the shared
+# curl exit-code decoder). Nothing else in this job touches the GitHub API.
+permissions:
+  contents: read
 
 jobs:
   ping:
@@ -20,9 +26,126 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - name: Ping cron endpoint
+      - name: Check out helper scripts
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+
+      - name: Validate secrets and base URL
+        run: |
+          if [ -z "${{ secrets.CRON_SECRET }}" ]; then
+            echo "❌ CRON_SECRET repository secret is missing or empty."
+            exit 1
+          fi
+
+          URL="${{ secrets.CRON_URL }}"
+          if [ -z "$URL" ]; then
+            echo "❌ CRON_URL repository secret is missing or empty."
+            exit 1
+          fi
+
+          case "$URL" in
+            https://*) ;;
+            *)
+              echo "❌ CRON_URL must start with https:// (got: $URL)"
+              exit 1
+              ;;
+          esac
+
+          REST="${URL#https://}"
+          REST="${REST%/}"
+          case "$REST" in
+            */*)
+              echo "❌ CRON_URL must be a bare base URL with no path (got: $URL)"
+              exit 1
+              ;;
+            *\?*)
+              echo "❌ CRON_URL must not contain a query string (got: $URL)"
+              exit 1
+              ;;
+          esac
+
+          # getent hosts takes a bare hostname — an explicit :port would make it
+          # fail and get misreported below as a DNS problem.
+          HOST="${REST%%:*}"
+          case "$REST" in
+            *:*)
+              PORT="${REST##*:}"
+              case "$PORT" in
+                ''|*[!0-9]*)
+                  echo "❌ CRON_URL has a malformed port (got: $URL)"
+                  exit 1
+                  ;;
+              esac
+              ;;
+          esac
+
+          # Retried: a single getent miss is more often transient resolver
+          # flakiness on the runner than a genuinely wrong secret.
+          echo "Resolving DNS for $HOST ..."
+          DNS_OK=0
+          for attempt in 1 2 3; do
+            if getent hosts "$HOST" > /dev/null 2>&1; then
+              DNS_OK=1
+              break
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "   Attempt $attempt failed — retrying in 5s ..."
+              sleep 5
+            fi
+          done
+
+          if [ "$DNS_OK" -ne 1 ]; then
+            echo "❌ DNS resolution failed for host: $HOST (3 attempts)"
+            echo "   Most likely: CRON_URL points at a hostname that does not exist."
+            echo "   Check Settings → Secrets and variables → Actions → CRON_URL."
+            echo "   If CRON_URL is known-good, this can also be transient resolver"
+            echo "   flakiness on the runner — re-run the job once before changing it."
+            exit 1
+          fi
+          echo "✅ DNS resolves for $HOST"
+
+          # Export the trailing-slash-stripped form: callers append "/api/...",
+          # so passing the raw value through would emit a double slash.
+          echo "cron_url=${URL%/}" >> "$GITHUB_ENV"
+
+      - name: Check application health (authenticated, read-only)
+        id: health
+        run: |
+          # Timeout/retry budget must be at least as generous as the trigger call
+          # below. The app scales to zero, so the first request of the day pays a
+          # cold start; a stingier gate here would fail the job before the trigger
+          # step's own retries ever got a chance to absorb it.
+          # --retry covers 408/429/5xx and transport errors; a 401 is not a curl
+          # error, so a wrong CRON_SECRET still fails fast instead of retrying.
+          set +e
+          HTTP_STATUS=$(curl --silent --output /tmp/health.json \
+            --write-out "%{http_code}" \
+            --max-time 30 \
+            --retry 3 \
+            --retry-delay 10 \
+            --retry-all-errors \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${cron_url}/api/ops/cron-ping/health")
+          CURL_EXIT=$?
+          set -e
+
+          bash .github/scripts/decode-curl-exit.sh "$CURL_EXIT" "Health check"
+
+          echo "Health endpoint HTTP status: $HTTP_STATUS"
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "❌ Application is not healthy (expected 200, got $HTTP_STATUS)."
+            echo "Response body:"
+            cat /tmp/health.json
+            exit 1
+          fi
+          echo "✅ Application is healthy."
+
+      - name: Trigger sponsor monitor job
         id: ping
         run: |
+          set +e
           HTTP_STATUS=$(curl --silent --output /tmp/response.json \
             --write-out "%{http_code}" \
             --max-time 30 \
@@ -32,9 +155,13 @@ jobs:
             -X POST \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             -H "Content-Type: application/json" \
-            "${{ secrets.CRON_URL }}/api/ops/cron-ping")
+            "${cron_url}/api/ops/cron-ping")
+          CURL_EXIT=$?
+          set -e
 
-          echo "http_status=$HTTP_STATUS" >> $GITHUB_OUTPUT
+          bash .github/scripts/decode-curl-exit.sh "$CURL_EXIT" "Trigger request"
+
+          echo "http_status=$HTTP_STATUS" >> "$GITHUB_OUTPUT"
           echo "Response body:"
           cat /tmp/response.json
 
