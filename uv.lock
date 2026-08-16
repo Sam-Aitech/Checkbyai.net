@@ -691,11 +691,11 @@ wheels = [
 
 [[package]]
 name = "cssselect"
-version = "1.4.0"
+version = "1.5.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/ec/2e/cdfd8b01c37cbf4f9482eefd455853a3cf9c995029a46acd31dfaa9c1dd6/cssselect-1.4.0.tar.gz", hash = "sha256:fdaf0a1425e17dfe8c5cf66191d211b357cf7872ae8afc4c6762ddd8ac47fc92", size = 40589, upload-time = "2026-01-29T07:00:26.701Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/8e/5a/6d6fcf922709391fac986f0a03ad4546f4f45b94d10aeb6c1ee041599993/cssselect-1.5.0.tar.gz", hash = "sha256:3cbe82dd7acbee9ba9e5723b5f9e4749826912f1fb31cd7f92aabed5fde15b15", size = 47598, upload-time = "2026-07-27T09:17:34.189Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/20/0c/7bb51e3acfafd16c48875bf3db03607674df16f5b6ef8d056586af7e2b8b/cssselect-1.4.0-py3-none-any.whl", hash = "sha256:c0ec5c0191c8ee39fcc8afc1540331d8b55b0183478c50e9c8a79d44dbceb1d8", size = 18540, upload-time = "2026-01-29T07:00:24.994Z" },
+    { url = "https://files.pythonhosted.org/packages/60/e9/6734502f67533a752ea8b1c8f7f227c94eecf300252ba8bf23e3e59d8a36/cssselect-1.5.0-py3-none-any.whl", hash = "sha256:1d1aded98e82bdde447ded990a191fd6916177c4f0c914fb62eccd58e2ffcdcc", size = 20797, upload-time = "2026-07-27T09:17:33.04Z" },
 ]
 
 [[package]]
@@ -2853,7 +2853,7 @@ requires-dist = [
     { name = "rapidfuzz", specifier = ">=3.6.0" },
     { name = "requests", specifier = ">=2.34.2" },
     { name = "scikit-learn", specifier = ">=1.9.0" },
-    { name = "scrapling", specifier = ">=0.4.12" },
+    { name = "scrapling", specifier = ">=0.4.14" },
     { name = "starlette", specifier = ">=1.4.1" },
     { name = "uvicorn", specifier = ">=0.52.1" },
 ]
@@ -3130,7 +3130,7 @@ wheels = [
 
 [[package]]
 name = "scrapling"
-version = "0.4.12"
+version = "0.4.14"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cssselect" },
@@ -3140,9 +3140,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "w3lib" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/12/a1/f1dc696450c65bd2b12e0b2b5c88de9d38ddec3f13f584c1859e12725f2b/scrapling-0.4.12.tar.gz", hash = "sha256:c6f06d0ea54208d430d47402c4e66760280718dc5b116fa99985beb7b9a517f4", size = 167523, upload-time = "2026-07-26T20:24:03.506Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/66/63/6fa90c739cb74a63bcc10cac1c9302474754e324da22d695d02c08ab716d/scrapling-0.4.14.tar.gz", hash = "sha256:d5b5f28ce0119b3620d653fb1c4b4655adb50d12b47273f3e76e69e3d3b36159", size = 171798, upload-time = "2026-08-10T22:27:44.017Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7d/64/845a2c5e4dbda0403e0662d553b94c84bd08a60f9ded5b04abcb9994e43e/scrapling-0.4.12-py3-none-any.whl", hash = "sha256:bff83185a226f14c1e50e4408a2d24c93bc6ffe4b83a904d2f11ad1ad3823a91", size = 169304, upload-time = "2026-07-26T20:24:01.958Z" },
+    { url = "https://files.pythonhosted.org/packages/b8/f3/44415358a97765ffcb5cce2e9f048444ec3d2fecefdb41afadda6241267f/scrapling-0.4.14-py3-none-any.whl", hash = "sha256:eef9d9ed239c978bb5f894701c3ce68f6e7dcaab2a5df70035001bd7e8a54fc2", size = 173649, upload-time = "2026-08-10T22:27:42.659Z" },
 ]
 
 [[package]]
