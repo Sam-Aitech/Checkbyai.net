@@ -31,6 +31,20 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("[ErrorBoundary]", error, errorInfo.componentStack);
+    // Report to server so the crash appears in deployment logs
+    try {
+      fetch("/api/ops/client-error", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: error?.message,
+          stack: error?.stack,
+          componentStack: errorInfo?.componentStack,
+          url: typeof window !== "undefined" ? window.location.href : null,
+          userAgent: typeof window !== "undefined" ? navigator.userAgent : null,
+        }),
+      }).catch(() => {/* ignore */});
+    } catch {/* ignore */}
   }
 
   render() {

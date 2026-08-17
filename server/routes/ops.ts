@@ -793,6 +793,19 @@ export function registerOpsRoutes(app: Express): void {
     },
   );
 
+  // ── Client-side error reporting ────────────────────────────────────────────
+  // POST /api/ops/client-error
+  // No auth required — called by the React ErrorBoundary to surface JS crashes
+  // in server logs so they appear in deployment/production log streams.
+  app.post("/api/ops/client-error", (req: any, res) => {
+    const { message, stack, componentStack, url, userAgent } = req.body ?? {};
+    log.error(
+      { message, stack, componentStack, url, userAgent },
+      "[ClientError] React ErrorBoundary caught a render crash",
+    );
+    res.status(204).end();
+  });
+
   // ── External cron ping ─────────────────────────────────────────────────────
   // POST /api/ops/cron-ping
   //
