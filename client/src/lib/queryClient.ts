@@ -39,7 +39,19 @@ export const getQueryFn: <T>(options: {
     }
 
     await throwIfResNotOk(res);
-    return await res.json();
+    const json = await res.json();
+    // Unwrap the { success: true, data: ... } envelope this server uses on every
+    // API route.  Return json.data when present so every useQuery call gets the
+    // inner value that TypeScript types already describe.
+    if (
+      json !== null &&
+      typeof json === "object" &&
+      json.success === true &&
+      "data" in json
+    ) {
+      return json.data;
+    }
+    return json;
   };
 
 export const queryClient = new QueryClient({
