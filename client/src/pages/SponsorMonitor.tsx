@@ -196,8 +196,8 @@ function StatusBadge({ status, typeRating }: { status: string; typeRating: strin
 function getWatchStatusBadge(currentStatus: WatchEntry["currentStatus"]) {
   // If the live canonical status is missing, render Unknown rather than guessing
   // ACTIVE — a missing status usually means we lost the canonical row.
-  const canonicalStatus = currentStatus.status || "UNKNOWN";
-  return <StatusBadge status={canonicalStatus} typeRating={currentStatus.typeRating} />;
+  const canonicalStatus = currentStatus?.status || "UNKNOWN";
+  return <StatusBadge status={canonicalStatus} typeRating={currentStatus?.typeRating} />;
 }
 
 function getChangeIcon(changeType: string) {
@@ -1333,10 +1333,10 @@ export default function SponsorMonitor() {
                             </div>
                             <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-sm text-muted-foreground mb-1">
                               {watch.townCity && <span className="inline-flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{watch.townCity}</span>}
-                              {watch.currentStatus.route && <span className="inline-flex items-center gap-1"><Route className="w-3.5 h-3.5" />{watch.currentStatus.route}</span>}
+                              {watch.currentStatus?.route && <span className="inline-flex items-center gap-1"><Route className="w-3.5 h-3.5" />{watch.currentStatus.route}</span>}
                               <span className="inline-flex items-center gap-1"><CalendarDays className="w-3.5 h-3.5" />Watching since {formatDate(watch.createdAt)}</span>
                             </div>
-                            {(watch.currentStatus.status === "REMOVED_REVOKED" || watch.currentStatus.status === "NOT_LISTED") && (
+                            {(watch.currentStatus?.status === "REMOVED_REVOKED" || watch.currentStatus?.status === "NOT_LISTED") && (
                               <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 mt-1">
                                 <Bell className="w-3 h-3 shrink-0" />
                                 Licence revoked — you&apos;ll be alerted if they reapply
@@ -1394,7 +1394,7 @@ export default function SponsorMonitor() {
                             {isRemoving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}<span className="sr-only">Remove</span>
                           </Button>
                         </div>
-                        {watch.recentChanges.length > 0 && (
+                        {(watch.recentChanges?.length ?? 0) > 0 && (
                           <div className="mt-4 pt-4 border-t border-border/50">
                             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Recent Changes</p>
                             <div className="relative pl-4">

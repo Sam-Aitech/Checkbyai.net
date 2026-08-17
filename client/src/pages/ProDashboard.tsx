@@ -197,8 +197,8 @@ function OverviewTab({ user, setTab }: { user: any; setTab: (t: Tab) => void }) 
   const revokedN    = watches?.filter(w => w.currentStatus?.status === "REMOVED_REVOKED" || w.currentStatus?.status === "NOT_LISTED").length || 0;
 
   // Only show changes for the user's own watched companies
-  const watchedNames = new Set((watches||[]).map(w => w.organisationName.toLowerCase()));
-  const myChanges = (changes?.changes || []).filter(c => watchedNames.has(c.organisationName.toLowerCase()));
+  const watchedNames = new Set((watches||[]).map(w => (w.organisationName ?? "").toLowerCase()));
+  const myChanges = (changes?.changes || []).filter(c => c.organisationName && watchedNames.has(c.organisationName.toLowerCase()));
   const alertsToday = myChanges.filter(c => Date.now() - new Date(c.detectedAt).getTime() < 86_400_000).length;
   const checksLeft  = user?.verificationLimit === -1 ? "∞" : user?.verificationLimit ?? "∞";
 
