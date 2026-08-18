@@ -139,6 +139,28 @@ const KNOWN_GENUINE_PRODUCERS = [
   'home office', 'uk visas', 'hmrc'
 ];
 
+/**
+ * Shortest producer/creator string usable as a match key.
+ *
+ * Guards the empty-string case: `'anything'.includes('')` is always true, so a
+ * document whose Producer could not be extracted from the Info dictionary would
+ * otherwise appear to match every admin rule in the system at once.
+ */
+const MIN_PRODUCER_MATCH_LENGTH = 4;
+
+/**
+ * Score deducted when a document's metadata cannot be read at all. Sized to push
+ * the result below the 'genuine' threshold: an unreadable file is unverifiable,
+ * and must be routed to human review rather than passed.
+ */
+const UNVERIFIABLE_METADATA_PENALTY = 35;
+
+/** True when `text` mentions `value`, ignoring values too short to be meaningful. */
+function mentions(text: string, value: string): boolean {
+  const trimmed = value.trim();
+  return trimmed.length >= MIN_PRODUCER_MATCH_LENGTH && text.includes(trimmed);
+}
+
 export class PDFAnalyzer {
   async extractMetadata(filePath: string): Promise<PDFMetadata> {
     try {
@@ -525,11 +547,30 @@ export class PDFAnalyzer {
     return parsed;
   }
   
+  /**
+   * Builds the match patterns for a Dublin Core property.
+   *
+   * DC values are normally wrapped in an RDF container — rdf:Seq for dc:date,
+   * rdf:Bag for dc:language, rdf:Alt for language-alternative text — rather than
+   * written as a bare text node. Apache FOP, the generator behind genuine UK
+   * Home Office CoS documents, always emits the container form, so patterns that
+   * only match bare text nodes read a valid document as having no DC fields at
+   * all. The container form is tried first, then the bare node, then attribute
+   * shorthand.
+   */
+  private dcFieldPatterns(field: string): RegExp[] {
+    return [
+      new RegExp(String.raw`<${field}[^>]*>\s*<rdf:(?:Seq|Bag|Alt)[^>]*>\s*<rdf:li[^>]*>([^<]+)<\/rdf:li>`, 'i'),
+      new RegExp(String.raw`<${field}[^>]*>([^<]+)<\/${field}>`, 'i'),
+      new RegExp(`${field}="([^"]+)"`, 'i'),
+    ];
+  }
+
   private parseXMPWithRegex(xmpData: string, target: any): void {
     const patterns = {
-      'dc:date': [/<dc:date[^>]*>([^<]+)<\/dc:date>/i, /dc:date="([^"]+)"/i],
-      'dc:format': [/<dc:format[^>]*>([^<]+)<\/dc:format>/i, /dc:format="([^"]+)"/i],
-      'dc:language': [/<dc:language[^>]*>([^<]+)<\/dc:language>/i, /dc:language="([^"]+)"/i],
+      'dc:date': this.dcFieldPatterns('dc:date'),
+      'dc:format': this.dcFieldPatterns('dc:format'),
+      'dc:language': this.dcFieldPatterns('dc:language'),
       'pdf:Producer': [/<pdf:Producer[^>]*>([^<]+)<\/pdf:Producer>/i, /pdf:Producer="([^"]+)"/i],
       'pdf:PDFVersion': [/<pdf:PDFVersion[^>]*>([^<]+)<\/pdf:PDFVersion>/i, /pdf:PDFVersion="([^"]+)"/i],
       'xmp:CreateDate': [/<xmp:CreateDate[^>]*>([^<]+)<\/xmp:CreateDate>/i, /xmp:CreateDate="([^"]+)"/i],
@@ -713,7 +754,28 @@ export class PDFAnalyzer {
       });
       totalScore -= 10;
     }
-    
+
+    // A document whose metadata could not be read is unverifiable, not authentic.
+    // Absence of evidence must never score the same as evidence of authenticity,
+    // so these cases carry enough weight to land on 'suspicious' for human review.
+    if (documentMetadata.error) {
+      checks.push({
+        name: 'Metadata Extraction',
+        passed: false,
+        severity: 'warning',
+        message: `Document metadata could not be read, so authenticity cannot be established: ${documentMetadata.error}`
+      });
+      totalScore -= UNVERIFIABLE_METADATA_PENALTY;
+    } else if (!documentMetadata.producer) {
+      checks.push({
+        name: 'Known Producer',
+        passed: false,
+        severity: 'warning',
+        message: 'Document has no Producer metadata, so authenticity cannot be established'
+      });
+      totalScore -= UNVERIFIABLE_METADATA_PENALTY;
+    }
+
     const confidence = Math.max(0, Math.min(100, totalScore));
     
     let status: 'genuine' | 'suspicious' | 'fake';
@@ -787,20 +849,19 @@ export class PDFAnalyzer {
       const docProducer = (metadata.producer || '').toLowerCase();
       const docCreator  = (metadata.creator  || '').toLowerCase();
 
-      // 1. Global AI rules — convert each active rule into an advisory check
+      // 1. Global AI rules — convert each matching rule into an advisory check
       for (const rule of adminContext.globalRules) {
         // Heuristic keyword match: does the rule text mention patterns visible in this doc?
         const ruleText  = rule.ruleText.toLowerCase();
-        const relevant  = ruleText.includes(docProducer) ||
-                          ruleText.includes(docCreator)  ||
-                          ruleText.includes('all documents') ||
-                          rule.category === 'hitl-override';
+        const relevant  = mentions(ruleText, docProducer) ||
+                          mentions(ruleText, docCreator)  ||
+                          ruleText.includes('all documents');
 
         if (relevant) {
           ruleResult.checks.push({
             name: `Admin Rule [${rule.category}]`,
             passed: false,
-            severity: 'critical',
+            severity: 'warning',
             message: `Admin directive: ${rule.ruleText.substring(0, 300)}`,
           } as any);
           // Each matching high-priority rule lowers the score significantly
@@ -808,30 +869,38 @@ export class PDFAnalyzer {
         }
       }
 
-      // 2. HITL — if human experts previously flagged docs with matching producer as fake, apply a penalty
+      // 2. HITL — if human experts previously flagged a document with this exact
+      // producer as fake, surface it. Comparison is on the full producer string,
+      // not the normalised family: normalizeProducer() collapses every Apache FOP
+      // release to one identifier, and Apache FOP is the generator behind *all*
+      // genuine Home Office CoS documents, so a family-level match would flag the
+      // entire legitimate population.
       for (const cas of adminContext.hitlKnowledge) {
-        const caseProducer = ((cas.metadata?.producer) || '').toLowerCase();
-        const isSignificantMatch = caseProducer &&
-          docProducer &&
-          this.normalizeProducer(docProducer) === this.normalizeProducer(caseProducer) &&
+        const caseProducer = ((cas.metadata?.producer) || '').toLowerCase().trim();
+        const isSignificantMatch = caseProducer.length >= MIN_PRODUCER_MATCH_LENGTH &&
+          caseProducer === docProducer.trim() &&
           this.normalizeProducer(caseProducer) !== 'unknown';
         if (isSignificantMatch) {
           const reason = cas.adminFeedback || 'No reason provided';
           ruleResult.checks.push({
             name: 'Human Expert Correction (HITL)',
             passed: false,
-            severity: 'critical',
+            severity: 'warning',
             message: `A human expert previously flagged a document with the same producer ("${cas.metadata?.producer}") as FAKE. Expert reason: ${reason}`,
           } as any);
           (ruleResult as any).confidence = Math.max(0, ((ruleResult as any).confidence ?? 100) - 30);
         }
       }
 
-      // Re-evaluate status based on any new critical failures injected above
+      // Re-evaluate status. Admin knowledge is advisory: it can raise suspicion
+      // but never on its own condemn a document, because a single admin decision
+      // about one file would otherwise propagate to every later verification.
+      // Only the forensic checks above can produce a critical failure.
       const criticalFails = ruleResult.checks.filter((c: any) => !c.passed && c.severity === 'critical');
+      const warningFails  = ruleResult.checks.filter((c: any) => !c.passed && c.severity === 'warning');
       if (criticalFails.length > 0) {
         (ruleResult as any).status = 'fake';
-      } else if (ruleResult.checks.filter((c: any) => !c.passed && c.severity === 'warning').length >= 2) {
+      } else if (warningFails.length >= 2 || ((ruleResult as any).confidence ?? 100) < 70) {
         (ruleResult as any).status = 'suspicious';
       }
     }

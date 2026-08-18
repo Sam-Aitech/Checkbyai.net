@@ -14,7 +14,7 @@ The Metadata Inspector (MIS) is a forensic PDF analysis engine that detects Cert
 2. **XMP Metadata** — All 8 required fields must be present (real values, not synthetic)
 3. **XMP Field Order** — Fields must follow strict sequence
 4. **Info/XMP Consistency** — Document properties must match metadata block
-5. **Incremental Updates** — Must be zero (any modification creates updates)
+5. **Incremental Updates** — Must be zero (any modification creates updates); linearized PDFs carry a second `startxref` by design and are not counted as modified
 6. **Editing Tool Fingerprints** — Detects 23 common editing tools (Photoshop, GIMP, Canva, etc.)
 
 **Verdict:** `GENUINE` (all checks pass) or `EDITED` (first failure sets reason)
@@ -93,7 +93,7 @@ export interface COSCheck {
 }
 
 export interface COSForensic {
-  incrementalUpdates: number;        // Count of startxref entries
+  incrementalUpdates: number;        // startxref entries beyond the expected baseline
   infoXmpConsistency: 'MATCH' | 'MISMATCH' | 'XMP_ABSENT';
   toolFingerprint: string;           // "None detected" or tool name(s)
   suspiciousIndicators: string[];   // ["Canva detected", "Metadata reordered", ...]
@@ -124,6 +124,7 @@ export class COSAuthenticityChecker {
 2. **`checkXmpFieldsPresent(parsedXmp, hasRealXmp): COSCheck`**
    - All 8 required XMP fields must have real values (from rawXmpData, not synthetic fallbacks)
    - Required fields: `dc:date`, `dc:format`, `dc:language`, `pdf:PDFVersion`, `pdf:Producer`, `xmp:CreateDate`, `xmp:CreatorTool`, `xmp:MetadataDate`
+   - Dublin Core values are read from RDF containers (`rdf:Seq`, `rdf:Bag`, `rdf:Alt`) as well as bare text nodes. Apache FOP emits `dc:date` inside an `rdf:Seq` and `dc:language` inside an `rdf:Bag`, so a parser that only reads bare text nodes sees a genuine document as having no DC fields at all
    - Failure reason: "missing {field list}"
 
 3. **`checkXmpFieldOrder(rawXmpData): COSCheck`**
@@ -136,9 +137,10 @@ export class COSAuthenticityChecker {
    - Only validates when real XMP exists
    - Failure reason: "document properties inconsistent"
 
-5. **`checkIncrementalUpdates(pdfBinary): COSCheck`**
-   - Counts "startxref" occurrences (should be 1 for genuine documents)
-   - Each modification adds an incremental update
+5. **`checkIncrementalUpdates(pdfBinary): { check: COSCheck; count: number }`**
+   - Counts "startxref" occurrences against the expected baseline for the file's structure
+   - Baseline is 1 for a standard PDF and 2 for a linearized ("fast web view") PDF, which carries a first-page cross-reference table plus the main one by design
+   - Anything above the baseline is a true incremental update — each later modification appends one
    - Failure reason: "document modified {count} times"
 
 6. **`checkEditingToolFingerprint(metadata): COSCheck`**
@@ -318,6 +320,9 @@ Modified to use `VerificationResultsTabbed` instead of plain `VerificationResult
 - [ ] Missing XMP fields are listed correctly in reason
 - [ ] XMP field order is validated when real XMP exists
 - [ ] Incremental update count is accurate
+- [ ] Dublin Core values inside `rdf:Seq` / `rdf:Bag` containers are read as present
+- [ ] A linearized genuine CoS is not reported as re-saved
+- [ ] A true incremental update is still reported as re-saved
 - [ ] All 23 editing tools are detected correctly
 - [ ] Admin sees full forensic data; non-admin sees verdict only
 - [ ] cosCheckApproved gate blocks users without access
