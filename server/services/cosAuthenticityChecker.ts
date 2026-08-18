@@ -85,23 +85,9 @@ export class COSAuthenticityChecker {
     checks.push(consistencyCheck);
     if (!consistencyCheck.passed) setEdited('document properties inconsistent');
 
-    // ── Check 5: No incremental updates — count startxref in the PDF binary ───
-    // A linearized ("fast web view") PDF carries two startxref tokens by design:
-    // the first-page cross-reference table plus the main one. That is how the file
-    // is written at generation time, not evidence of a later re-save, so the
-    // expected baseline is two rather than one for linearized documents.
-    const startxrefMatches = pdfBinary.match(/startxref/g);
-    const startxrefCount = startxrefMatches ? startxrefMatches.length : 0;
-    const isLinearized = /\/Linearized[\s/]/.test(pdfBinary.slice(0, LINEARIZATION_HEADER_BYTES));
-    const expectedStartxrefs = isLinearized ? 2 : 1;
-    const incrementalCount = Math.max(0, startxrefCount - expectedStartxrefs);
-    const incrementalCheck: COSCheck = {
-      name: 'Incremental Updates',
-      passed: incrementalCount <= 0,
-      detail: incrementalCount <= 0
-        ? 'No re-saves detected'
-        : `${incrementalCount} re-save(s) detected`,
-    };
+    // ── Check 5: No incremental updates ───────────────────────────────────────
+    const { check: incrementalCheck, count: incrementalCount } =
+      this.checkIncrementalUpdates(pdfBinary);
     checks.push(incrementalCheck);
     if (!incrementalCheck.passed) setEdited('re-saved after initial creation');
 
@@ -156,6 +142,33 @@ export class COSAuthenticityChecker {
         fileSizeBytes: metadata.fileSize       ?? 0,
       },
       forensic,
+    };
+  }
+
+  /**
+   * Counts cross-reference sections beyond the baseline the file's structure implies.
+   *
+   * A linearized ("fast web view") PDF carries two startxref tokens by design: the
+   * first-page cross-reference table plus the main one. That is how the file is
+   * written at generation time, not evidence of a later re-save, so the expected
+   * baseline is two rather than one. Anything above the baseline is a genuine
+   * incremental update — each later modification appends one.
+   *
+   * Returns the count alongside the check because the forensic summary reports it.
+   */
+  private checkIncrementalUpdates(pdfBinary: string): { check: COSCheck; count: number } {
+    const startxrefMatches = pdfBinary.match(/startxref/g);
+    const startxrefCount = startxrefMatches ? startxrefMatches.length : 0;
+    const isLinearized = /\/Linearized[\s/]/.test(pdfBinary.slice(0, LINEARIZATION_HEADER_BYTES));
+    const expectedStartxrefs = isLinearized ? 2 : 1;
+    const count = Math.max(0, startxrefCount - expectedStartxrefs);
+    return {
+      count,
+      check: {
+        name: 'Incremental Updates',
+        passed: count <= 0,
+        detail: count <= 0 ? 'No re-saves detected' : `${count} re-save(s) detected`,
+      },
     };
   }
 

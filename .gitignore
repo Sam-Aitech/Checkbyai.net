@@ -9,3 +9,6 @@ vite.config.ts.*
 backend/etl_sponsors.db
 # Platform-specific binaries — only unix variants are tracked
 *.exe
+
+# Test coverage output
+coverage

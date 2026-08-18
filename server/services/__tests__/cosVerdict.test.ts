@@ -146,6 +146,6 @@ describe('unverifiable documents must not pass as genuine', () => {
 
   it('an unreadable document is not double-penalised', async () => {
     const r = await analyse({ fileSize: 0, pages: 0, xmp_tags: {}, error: 'boom' } as unknown as PDFMetadata);
-    expect(r.checks.filter(c => !c.passed).length).toBe(1);
+    expect(r.checks.filter(c => !c.passed)).toHaveLength(1);
   });
 });

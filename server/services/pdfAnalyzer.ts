@@ -560,8 +560,8 @@ export class PDFAnalyzer {
    */
   private dcFieldPatterns(field: string): RegExp[] {
     return [
-      new RegExp(`<${field}[^>]*>\\s*<rdf:(?:Seq|Bag|Alt)[^>]*>\\s*<rdf:li[^>]*>([^<]+)<\\/rdf:li>`, 'i'),
-      new RegExp(`<${field}[^>]*>([^<]+)<\\/${field}>`, 'i'),
+      new RegExp(String.raw`<${field}[^>]*>\s*<rdf:(?:Seq|Bag|Alt)[^>]*>\s*<rdf:li[^>]*>([^<]+)<\/rdf:li>`, 'i'),
+      new RegExp(String.raw`<${field}[^>]*>([^<]+)<\/${field}>`, 'i'),
       new RegExp(`${field}="([^"]+)"`, 'i'),
     ];
   }

@@ -137,7 +137,7 @@ export class COSAuthenticityChecker {
    - Only validates when real XMP exists
    - Failure reason: "document properties inconsistent"
 
-5. **`checkIncrementalUpdates(pdfBinary): COSCheck`**
+5. **`checkIncrementalUpdates(pdfBinary): { check: COSCheck; count: number }`**
    - Counts "startxref" occurrences against the expected baseline for the file's structure
    - Baseline is 1 for a standard PDF and 2 for a linearized ("fast web view") PDF, which carries a first-page cross-reference table plus the main one by design
    - Anything above the baseline is a true incremental update — each later modification appends one
