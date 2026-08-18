@@ -1,0 +1,47 @@
+mcp__ccd_session__mark_chapter with title "Step 1: reproduce CoS false-positive"... actually let me just report.
+
+## Step 1 complete — defect reproduced against real code
+
+Repo left clean; repro files parked in scratchpad (`cos-repro/`), out of CI's path.
+
+**Baseline works.** Clean Apache FOP CoS, no admin rules → `genuine`. So the analyser itself is sound.
+
+**Three independent triggers each force `fake` on that same document:**
+
+| # | Trigger | Injected check | Verdict |
+|---|---|---|---|
+| 1 | One `hitl-override` rule exists — *about a different document* | `Admin Rule [hitl-override]` | `fake` |
+| 2 | Producer not extractable (`''`) + any active rule | `Admin Rule [producer-watchlist]` | `fake` |
+| 3 | Any past admin-flagged fake shared producer class `apache-fop` | `Human Expert Correction (HITL)` | `fake` |
+
+Each injects `severity: 'critical'`, and [pdfAnalyzer.ts:831](Checkbyai.net/server/services/pdfAnalyzer.ts:831) converts any critical → `fake`. No scoring, no threshold.
+
+**And the rescue is dead on arrival.** [verification.ts:188](Checkbyai.net/server/routes/verification.ts:188) only saves the doc if `COSAuthenticityChecker` returns `GENUINE`. Against a genuine Apache FOP CoS with standard Dublin Core XMP:
+
+```
+PLAIN      -> EDITED — missing dc:date, dc:language
+LINEARIZED -> EDITED — missing dc:date, dc:language
+              + Incremental Updates: 1 re-save(s) detected
+```
+
+FOP emits `dc:date` inside `<rdf:Seq>` and `dc:language` inside `<rdf:Bag>` per the DC spec. The regex at [pdfAnalyzer.ts:530](Checkbyai.net/server/services/pdfAnalyzer.ts:530) only matches bare text nodes, so both read as *absent* → `EDITED`. The rescue can **never** fire for a real CoS. Linearized files additionally trip the `startxref` counter ([cosAuthenticityChecker.ts:83](Checkbyai.net/server/services/cosAuthenticityChecker.ts:83)) — two tokens is normal for fast-web-view, counted as a re-save.
+
+That's the full chain: rescue permanently off + any one of three triggers → genuine document reported Fake.
+
+## What I need from you
+
+No `.env` here, so I can't read your production DB — that's the last piece: **which** trigger is live for you. Run against your prod DB (read-only):
+
+```bash
+psql "$DATABASE_URL" -c "SELECT id, category, priority, is_active, created_at, left(rule_text, 80) AS preview FROM global_ai_rules ORDER BY created_at DESC;"
+```
+
+```bash
+psql "$DATABASE_URL" -c "SELECT metadata->>'producer' AS producer, count(*) FROM verification_results WHERE admin_status = 'fake' GROUP BY 1 ORDER BY 2 DESC;"
+```
+
+First query: any `hitl-override` row with `is_active = true` confirms trigger 1 — and its `created_at` should line up with when the false positives started. Second: any `Apache FOP` row confirms trigger 3.
+
+Paste the output and I'll tell you which fired.
+
+**On deactivating the rules** — that mutates production verification behaviour, so I'm not doing it unattended. It's also only a partial mitigation: it clears triggers 1 and 3, but trigger 2 and the dead rescue path remain, so genuine docs with unreadable Producer metadata would still come back Fake. Say the word once you've seen the query output and I'll either walk you through the toggle calls or move to the code fix.
