@@ -1,8 +1,24 @@
 import path from "path";
 import fs from "fs";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import os from "os";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { assertSafeUploadFilename, sanitizeUploadPath, UPLOADS_DIR } from "../uploadGuard";
+// UPLOADS_DIR defaults to <cwd>/uploads when UPLOADS_DIR is unset, which is the
+// real uploads directory this repo ships from. Point it at a throwaway temp
+// directory BEFORE importing uploadGuard, so the rm/mkdir cycles in the tests
+// below can never reach — let alone delete — real uploaded documents.
+const tmpUploadsDir = fs.mkdtempSync(path.join(os.tmpdir(), "uploadguard-test-"));
+process.env.UPLOADS_DIR = tmpUploadsDir;
+
+let assertPdfMagicBytes: typeof import("../uploadGuard").assertPdfMagicBytes;
+let assertSafeUploadFilename: typeof import("../uploadGuard").assertSafeUploadFilename;
+let sanitizeUploadPath: typeof import("../uploadGuard").sanitizeUploadPath;
+let UPLOADS_DIR: typeof import("../uploadGuard").UPLOADS_DIR;
+
+beforeAll(async () => {
+  ({ assertPdfMagicBytes, assertSafeUploadFilename, sanitizeUploadPath, UPLOADS_DIR } =
+    await import("../uploadGuard"));
+});
 
 describe("sanitizeUploadPath", () => {
   beforeEach(() => {
@@ -65,5 +81,50 @@ describe("assertSafeUploadFilename", () => {
 
   it("rejects control characters", () => {
     expect(() => assertSafeUploadFilename("evil\u0000.pdf")).toThrow(/INVALID_UPLOAD_FILENAME/);
+  });
+});
+
+describe("assertPdfMagicBytes", () => {
+  beforeEach(() => {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  });
+
+  afterEach(() => {
+    fs.rmSync(UPLOADS_DIR, { recursive: true, force: true });
+  });
+
+  it("allows a file starting with the PDF header", async () => {
+    const filePath = path.join(UPLOADS_DIR, "genuine.pdf");
+    fs.writeFileSync(filePath, "%PDF-1.4\n1 0 obj\n<< >>\nendobj\n");
+
+    await expect(assertPdfMagicBytes(filePath)).resolves.toBeUndefined();
+  });
+
+  it("rejects a file with a spoofed mimetype but non-PDF content", async () => {
+    const filePath = path.join(UPLOADS_DIR, "fake.pdf");
+    fs.writeFileSync(filePath, "<html><body>not a pdf</body></html>");
+
+    await expect(assertPdfMagicBytes(filePath)).rejects.toThrow(/INVALID_FILE_TYPE/);
+  });
+
+  it("rejects an empty file", async () => {
+    const filePath = path.join(UPLOADS_DIR, "empty.pdf");
+    fs.writeFileSync(filePath, "");
+
+    await expect(assertPdfMagicBytes(filePath)).rejects.toThrow(/INVALID_FILE_TYPE/);
+  });
+
+  it("rejects a file shorter than the magic byte sequence", async () => {
+    const filePath = path.join(UPLOADS_DIR, "truncated.pdf");
+    fs.writeFileSync(filePath, "%PD");
+
+    await expect(assertPdfMagicBytes(filePath)).rejects.toThrow(/INVALID_FILE_TYPE/);
+  });
+
+  it("rejects a PDF header appearing later in the file, not at the start", async () => {
+    const filePath = path.join(UPLOADS_DIR, "prefixed.pdf");
+    fs.writeFileSync(filePath, "junk%PDF-1.4\n");
+
+    await expect(assertPdfMagicBytes(filePath)).rejects.toThrow(/INVALID_FILE_TYPE/);
   });
 });
