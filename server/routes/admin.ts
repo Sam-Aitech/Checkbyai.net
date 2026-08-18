@@ -29,7 +29,7 @@ import { upload } from "./verification";
 import { sendEmailReliably } from "../utils/resilientEmail";
 import { getAppUrl } from "../utils/appUrl";
 import { checkBinaryHealth } from "../utils/binaryRunner";
-import { sanitizeUploadPath, assertSafeUploadFilename } from "../utils/uploadGuard";
+import { sanitizeUploadPath, assertSafeUploadFilename, assertPdfMagicBytes } from "../utils/uploadGuard";
 import { isJobRunning, getLastRunInfo, runSponsorMonitorJob } from "../utils/sponsorMonitorJob";
 import {
   buildDiagnosticsReport,
@@ -119,6 +119,7 @@ export function registerAdminRoutes(app: Express): void {
 
       safeFilePath = sanitizeUploadPath(req.file.path);
       assertSafeUploadFilename(req.file.originalname);
+      await assertPdfMagicBytes(safeFilePath); // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
       const pdfAnalyzer = new PDFAnalyzer();
       // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
       const metadata = await pdfAnalyzer.extractMetadata(safeFilePath);
@@ -167,6 +168,7 @@ export function registerAdminRoutes(app: Express): void {
       }
 
       safeFilePath = sanitizeUploadPath(req.file.path);
+      await assertPdfMagicBytes(safeFilePath); // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
       const pdfAnalyzer = new PDFAnalyzer();
       // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
       const metadata = await pdfAnalyzer.extractMetadata(safeFilePath);
@@ -497,7 +499,7 @@ Format your response in clear, professional markdown.`;
       const httpStatus = report.overall === "fail" ? 503 : 200;
       res.status(httpStatus).json(report);
     } catch (error: unknown) {
-      console.error("Error building sponsor monitor diagnostics:", error);
+      logger.error({ err: error }, "Error building sponsor monitor diagnostics");
       res.status(500).json({
         message: "Failed to build diagnostics: " + (error instanceof Error ? error.message : String(error)),
       });
@@ -509,12 +511,13 @@ Format your response in clear, professional markdown.`;
     try {
       const report: ForceUnlockReport = await forceReleaseSponsorMonitorLock();
       const httpStatus = report.zombieTerminated ? 200 : 409;
-      console.warn(
-        `[SponsorMonitor] force-unlock: ${report.reason} — ${report.message}`,
+      logger.warn(
+        { reason: report.reason, message: report.message },
+        "[SponsorMonitor] force-unlock",
       );
       res.status(httpStatus).json(report);
     } catch (error: unknown) {
-      console.error("Error force-releasing advisory lock:", error);
+      logger.error({ err: error }, "Error force-releasing advisory lock");
       res.status(500).json({
         message: "Failed to force-release lock: " + (error instanceof Error ? error.message : String(error)),
       });

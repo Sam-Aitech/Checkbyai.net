@@ -24,6 +24,27 @@ export const otpLimiter = rateLimit({
   skipSuccessfulRequests: false,
 });
 
+/**
+ * Caps OTP requests per target email address, independent of the requester's IP.
+ * otpLimiter alone only bounds requests from a single IP; without this, an
+ * attacker distributed across IPs (or behind a shared NAT/proxy) can send an
+ * unlimited number of OTP emails to one victim address. Keyed on the email in
+ * the request body rather than the caller's IP.
+ */
+export const otpEmailLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: makeRateLimitStore("rl:otp-email:"),
+  message: { message: "Too many verification codes requested for this email. Please try again later." },
+  skipSuccessfulRequests: false,
+  keyGenerator: (req) => {
+    const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+    return email || ipKeyGenerator(req.ip ?? "unknown");
+  },
+});
+
 export const verifyLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 10,

@@ -1,6 +1,7 @@
 import { db } from "../db";
 import { eq, and, sql } from "drizzle-orm";
 import { companyWatches, sponsorChanges, users, notifLog } from "@shared/schema";
+import { logger } from "../utils/logger";
 
 export interface PendingRow {
   userId: string;
@@ -239,7 +240,7 @@ export async function processConsolidatedNotifications(
         await db.insert(notifLog).values(logsToInsert);
       }
     } catch (err: unknown) {
-      console.error("[ConsolidatedNotificationEngine] Batch delivery failed:", err);
+      logger.error({ err }, "[ConsolidatedNotificationEngine] Batch delivery failed");
       const errStr = err instanceof Error ? err.message : String(err);
       
       const failedLogs: any[] = [];
@@ -268,14 +269,17 @@ export async function processConsolidatedNotifications(
 }
 
 export async function runConsolidatedNotificationJob(): Promise<{ sentCount: number; failedCount: number }> {
-  console.log("[ConsolidatedNotificationEngine] Starting consolidated notifications run...");
+  logger.info("[ConsolidatedNotificationEngine] Starting consolidated notifications run...");
   const rows = await fetchPendingNotifications();
   if (rows.length === 0) {
-    console.log("[ConsolidatedNotificationEngine] Zero pending notifications found.");
+    logger.info("[ConsolidatedNotificationEngine] Zero pending notifications found.");
     return { sentCount: 0, failedCount: 0 };
   }
   const digests = groupNotificationsByUser(rows);
   const outcome = await processConsolidatedNotifications(digests);
-  console.log(`[ConsolidatedNotificationEngine] Complete: Sent: ${outcome.sentCount}, Failed: ${outcome.failedCount}`);
+  logger.info(
+    { sentCount: outcome.sentCount, failedCount: outcome.failedCount },
+    "[ConsolidatedNotificationEngine] Complete",
+  );
   return outcome;
 }

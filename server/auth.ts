@@ -5,7 +5,7 @@ import type { Express, RequestHandler } from "express";
 import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
 import crypto from "crypto";
-import { otpLimiter } from "./middleware/rateLimiter";
+import { otpLimiter, otpEmailLimiter } from "./middleware/rateLimiter";
 import { getAppUrl } from "./utils/appUrl";
 import { validateBody } from "./lib/validate";
 import { sendOtpSchema, verifyOtpSchema } from "./validation/auth";
@@ -349,7 +349,7 @@ export async function setupAuth(app: Express) {
   }
 
   // Email OTP: Send verification code
-  app.post("/api/auth/email/send-otp", otpLimiter, validateBody(sendOtpSchema), async (req, res) => {
+  app.post("/api/auth/email/send-otp", otpLimiter, validateBody(sendOtpSchema), otpEmailLimiter, async (req, res) => {
     try {
       const { email, turnstileToken } = req.body;
 
@@ -466,7 +466,7 @@ export async function setupAuth(app: Express) {
   });
 
   // Admin OTP: Send verification code via Resend
-  app.post("/api/auth/admin/send-otp", otpLimiter, validateBody(sendOtpSchema), async (req, res) => {
+  app.post("/api/auth/admin/send-otp", otpLimiter, validateBody(sendOtpSchema), otpEmailLimiter, async (req, res) => {
     try {
       const { email, turnstileToken } = req.body;
 

@@ -13,7 +13,7 @@ import { verifyLimiter } from "../middleware/rateLimiter";
 import { PDFAnalyzer } from "../services/pdfAnalyzer";
 import { COSAuthenticityChecker } from "../services/cosAuthenticityChecker";
 import { getClientIp, hashIpAddress } from "../ipRateLimit";
-import { sanitizeUploadPath, assertSafeUploadFilename } from "../utils/uploadGuard";
+import { sanitizeUploadPath, assertSafeUploadFilename, assertPdfMagicBytes } from "../utils/uploadGuard";
 import { success } from "../lib/response";
 import { asyncHandler } from "../lib/errorHandler";
 import { ApiError } from "../lib/apiError";
@@ -74,6 +74,16 @@ export function registerVerificationRoutes(app: Express): void {
 
     const safeFilePath = sanitizeUploadPath(req.file.path);
     assertSafeUploadFilename(req.file.originalname);
+
+    // The multer fileFilter only checks the client-supplied mimetype, which any
+    // client can spoof. Read the file's actual magic bytes before doing anything
+    // else with it.
+    try {
+      await assertPdfMagicBytes(safeFilePath); // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
+    } catch (err) {
+      await fs.promises.unlink(safeFilePath).catch(() => {}); // codeql[js/path-injection] - safeFilePath validated by sanitizeUploadPath
+      throw new ApiError(400, "Uploaded file is not a valid PDF.");
+    }
 
     let userId: string | undefined = betaUserId;
 

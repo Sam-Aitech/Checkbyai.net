@@ -1,6 +1,7 @@
 import { db } from "../db";
 import { sponsorStaging } from "@shared/schema";
 import { generateFingerprint } from "./sponsorListFetcher";
+import { logger } from "./logger";
 
 const ETL_BASE_URL = process.env.ETL_SERVICE_URL || "http://localhost:8000";
 const PAGE_LIMIT = 5000;
@@ -39,7 +40,7 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
 }
 
 export async function runEtlIngestion(today: string): Promise<{ snapshotId: string; totalRows: number }> {
-  console.log(`[EtlClient] Triggering ETL pipeline refresh for ${today}...`);
+  logger.info({ today }, "[EtlClient] Triggering ETL pipeline refresh");
 
   const refreshRes = await fetchWithTimeout(
     `${ETL_BASE_URL}/api/v1/sponsors/refresh`,
@@ -59,7 +60,7 @@ export async function runEtlIngestion(today: string): Promise<{ snapshotId: stri
     throw new Error("ETL refresh response missing snapshot_id");
   }
 
-  console.log(`[EtlClient] snapshot_id=${snapshotId}, fetching pages...`);
+  logger.info({ snapshotId }, "[EtlClient] Fetching pages");
 
   let page = 1;
   let totalRows = 0;
@@ -97,7 +98,10 @@ export async function runEtlIngestion(today: string): Promise<{ snapshotId: stri
     globalRowNum += pageData.rows.length;
     totalRows += pageData.rows.length;
 
-    console.log(`[EtlClient] Page ${page}: inserted ${pageData.rows.length} rows (total so far: ${totalRows})`);
+    logger.info(
+      { page, insertedRows: pageData.rows.length, totalRows },
+      "[EtlClient] Page ingested",
+    );
 
     if (pageData.rows.length < PAGE_LIMIT) {
       break;
@@ -106,6 +110,6 @@ export async function runEtlIngestion(today: string): Promise<{ snapshotId: stri
     page++;
   }
 
-  console.log(`[EtlClient] Ingestion complete: ${totalRows} rows written for snapshot_id=${snapshotId}`);
+  logger.info({ totalRows, snapshotId }, "[EtlClient] Ingestion complete");
   return { snapshotId, totalRows };
 }
