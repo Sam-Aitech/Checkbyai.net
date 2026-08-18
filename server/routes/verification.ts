@@ -79,10 +79,9 @@ export function registerVerificationRoutes(app: Express): void {
     // client can spoof. Read the file's actual magic bytes before doing anything
     // else with it.
     try {
-      await assertPdfMagicBytes(safeFilePath);
+      await assertPdfMagicBytes(safeFilePath); // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
     } catch (err) {
-      // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
-      await fs.promises.unlink(safeFilePath).catch(() => {});
+      await fs.promises.unlink(safeFilePath).catch(() => {}); // codeql[js/path-injection] - safeFilePath validated by sanitizeUploadPath
       throw new ApiError(400, "Uploaded file is not a valid PDF.");
     }
 

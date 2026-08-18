@@ -119,7 +119,7 @@ export function registerAdminRoutes(app: Express): void {
 
       safeFilePath = sanitizeUploadPath(req.file.path);
       assertSafeUploadFilename(req.file.originalname);
-      await assertPdfMagicBytes(safeFilePath);
+      await assertPdfMagicBytes(safeFilePath); // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
       const pdfAnalyzer = new PDFAnalyzer();
       // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
       const metadata = await pdfAnalyzer.extractMetadata(safeFilePath);
@@ -168,7 +168,7 @@ export function registerAdminRoutes(app: Express): void {
       }
 
       safeFilePath = sanitizeUploadPath(req.file.path);
-      await assertPdfMagicBytes(safeFilePath);
+      await assertPdfMagicBytes(safeFilePath); // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
       const pdfAnalyzer = new PDFAnalyzer();
       // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
       const metadata = await pdfAnalyzer.extractMetadata(safeFilePath);

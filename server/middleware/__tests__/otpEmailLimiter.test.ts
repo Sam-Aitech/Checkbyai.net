@@ -33,38 +33,33 @@ describe("otpEmailLimiter", () => {
     }
   });
 
-  it("blocks further requests for the same email once the limit is exceeded", async () => {
+  it.each([
+    {
+      name: "blocks further requests for the same email once the limit is exceeded",
+      seedEmail: "victim2@example.com",
+      checkEmail: "victim2@example.com",
+      expectedStatus: 429,
+    },
+    {
+      // Same caller (same in-process request agent / IP), different target email.
+      name: "tracks different emails independently, even from the same IP",
+      seedEmail: "exhausted@example.com",
+      checkEmail: "fresh@example.com",
+      expectedStatus: 200,
+    },
+    {
+      name: "is case-insensitive on the email so Victim@x and victim@x share one bucket",
+      seedEmail: "Casing@Example.com",
+      checkEmail: "casing@example.com",
+      expectedStatus: 429,
+    },
+  ])("$name", async ({ seedEmail, checkEmail, expectedStatus }) => {
     const app = buildApp();
     for (let i = 0; i < 5; i++) {
-      await request(app).post("/api/auth/email/send-otp").send({ email: "victim2@example.com" });
+      await request(app).post("/api/auth/email/send-otp").send({ email: seedEmail });
     }
-    const res = await request(app)
-      .post("/api/auth/email/send-otp")
-      .send({ email: "victim2@example.com" });
-    expect(res.status).toBe(429);
-  });
-
-  it("tracks different emails independently, even from the same IP", async () => {
-    const app = buildApp();
-    for (let i = 0; i < 5; i++) {
-      await request(app).post("/api/auth/email/send-otp").send({ email: "exhausted@example.com" });
-    }
-    // Same caller (same in-process request agent / IP), different target email.
-    const res = await request(app)
-      .post("/api/auth/email/send-otp")
-      .send({ email: "fresh@example.com" });
-    expect(res.status).toBe(200);
-  });
-
-  it("is case-insensitive on the email so Victim@x and victim@x share one bucket", async () => {
-    const app = buildApp();
-    for (let i = 0; i < 5; i++) {
-      await request(app).post("/api/auth/email/send-otp").send({ email: "Casing@Example.com" });
-    }
-    const res = await request(app)
-      .post("/api/auth/email/send-otp")
-      .send({ email: "casing@example.com" });
-    expect(res.status).toBe(429);
+    const res = await request(app).post("/api/auth/email/send-otp").send({ email: checkEmail });
+    expect(res.status).toBe(expectedStatus);
   });
 
   it("falls back to an IP-keyed bucket when no email is present", async () => {

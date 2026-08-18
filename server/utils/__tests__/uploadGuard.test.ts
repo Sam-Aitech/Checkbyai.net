@@ -100,30 +100,14 @@ describe("assertPdfMagicBytes", () => {
     await expect(assertPdfMagicBytes(filePath)).resolves.toBeUndefined();
   });
 
-  it("rejects a file with a spoofed mimetype but non-PDF content", async () => {
-    const filePath = path.join(UPLOADS_DIR, "fake.pdf");
-    fs.writeFileSync(filePath, "<html><body>not a pdf</body></html>");
-
-    await expect(assertPdfMagicBytes(filePath)).rejects.toThrow(/INVALID_FILE_TYPE/);
-  });
-
-  it("rejects an empty file", async () => {
-    const filePath = path.join(UPLOADS_DIR, "empty.pdf");
-    fs.writeFileSync(filePath, "");
-
-    await expect(assertPdfMagicBytes(filePath)).rejects.toThrow(/INVALID_FILE_TYPE/);
-  });
-
-  it("rejects a file shorter than the magic byte sequence", async () => {
-    const filePath = path.join(UPLOADS_DIR, "truncated.pdf");
-    fs.writeFileSync(filePath, "%PD");
-
-    await expect(assertPdfMagicBytes(filePath)).rejects.toThrow(/INVALID_FILE_TYPE/);
-  });
-
-  it("rejects a PDF header appearing later in the file, not at the start", async () => {
-    const filePath = path.join(UPLOADS_DIR, "prefixed.pdf");
-    fs.writeFileSync(filePath, "junk%PDF-1.4\n");
+  it.each([
+    { name: "a spoofed mimetype but non-PDF content", filename: "fake.pdf", content: "<html><body>not a pdf</body></html>" },
+    { name: "an empty file", filename: "empty.pdf", content: "" },
+    { name: "a file shorter than the magic byte sequence", filename: "truncated.pdf", content: "%PD" },
+    { name: "a PDF header appearing later in the file, not at the start", filename: "prefixed.pdf", content: "junk%PDF-1.4\n" },
+  ])("rejects $name", async ({ filename, content }) => {
+    const filePath = path.join(UPLOADS_DIR, filename);
+    fs.writeFileSync(filePath, content);
 
     await expect(assertPdfMagicBytes(filePath)).rejects.toThrow(/INVALID_FILE_TYPE/);
   });
