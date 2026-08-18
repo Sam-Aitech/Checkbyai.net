@@ -954,6 +954,10 @@ export default function SponsorMonitor() {
   } = useQuery<WatchEntry[]>({
     queryKey: ["/api/watches"],
     enabled: isAuthenticated,
+    // Normalise both the old {success,data} envelope (served from stale cache)
+    // and the already-unwrapped array (returned by the fixed queryFn).
+    select: (raw: any): WatchEntry[] =>
+      Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : [],
   });
 
   const activeWatches = watches?.filter((w) => w.isActive) ?? [];
@@ -962,6 +966,8 @@ export default function SponsorMonitor() {
   const { data: jobAlertPrefs, isLoading: jobPrefsLoading } = useQuery<{fingerprint: string; enabled: boolean}[]>({
     queryKey: ["/api/job-alert-preferences"],
     enabled: isProUser,
+    select: (raw: any): {fingerprint: string; enabled: boolean}[] =>
+      Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : [],
   });
   const jobAlertPrefMap = new Map((jobAlertPrefs ?? []).map((p) => [p.fingerprint, p.enabled]));
 

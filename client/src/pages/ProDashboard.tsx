@@ -188,7 +188,7 @@ function StatCard({ label, value, sub, gradient, Icon, loading }: StatCardProps)
 
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
 function OverviewTab({ user, setTab }: { user: any; setTab: (t: Tab) => void }) {
-  const { data: watches, isLoading: wL } = useQuery<WatchEntry[]>({ queryKey: ["/api/watches"], staleTime: STALE_TIMES.FREQUENT, retry: false });
+  const { data: watches, isLoading: wL } = useQuery<WatchEntry[]>({ queryKey: ["/api/watches"], staleTime: STALE_TIMES.FREQUENT, retry: false, select: (raw: any): WatchEntry[] => Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : [] });
   const { data: changes, isLoading: cL } = useQuery<{ changes: SponsorChange[]; totalCount: number }>({ queryKey: ["/api/sponsor-changes"], staleTime: STALE_TIMES.INFREQUENT, retry: false });
   const { data: verifs, isLoading: vL }  = useQuery<Verification[]>({ queryKey: ["/api/my-verifications"], staleTime: STALE_TIMES.NORMAL, retry: false });
 
@@ -346,7 +346,7 @@ function MonitorTab({ user }: { user: any }) {
   const isPro = ["starter","pro","unlimited","enterprise"].includes(user?.subscriptionStatus||"");
   const hasIntelligence = ["pro","unlimited","enterprise"].includes(user?.subscriptionStatus||"");
 
-  const { data: watches, isLoading } = useQuery<WatchEntry[]>({ queryKey:["/api/watches"], staleTime: STALE_TIMES.FREQUENT, retry:false });
+  const { data: watches, isLoading } = useQuery<WatchEntry[]>({ queryKey:["/api/watches"], staleTime: STALE_TIMES.FREQUENT, retry:false, select: (raw: any): WatchEntry[] => Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : [] });
 
   const { data: results, isFetching: searching } = useQuery<SponsorSearchResult[]>({
     queryKey:["/api/sponsors/search", dq],
