@@ -12,6 +12,12 @@ const REQUIRED_XMP_FIELDS = [
   'xmp:MetadataDate',
 ] as const;
 
+/**
+ * Bytes from the start of the file searched for the linearization dictionary.
+ * The spec requires it to be the first object, so a small window is sufficient.
+ */
+const LINEARIZATION_HEADER_BYTES = 4096;
+
 const EDITING_TOOLS: Array<{ pattern: RegExp; name: string }> = [
   { pattern: /ilovepdf/i,         name: 'iLovePDF' },
   { pattern: /smallpdf/i,         name: 'Smallpdf' },
@@ -80,8 +86,15 @@ export class COSAuthenticityChecker {
     if (!consistencyCheck.passed) setEdited('document properties inconsistent');
 
     // ── Check 5: No incremental updates — count startxref in the PDF binary ───
+    // A linearized ("fast web view") PDF carries two startxref tokens by design:
+    // the first-page cross-reference table plus the main one. That is how the file
+    // is written at generation time, not evidence of a later re-save, so the
+    // expected baseline is two rather than one for linearized documents.
     const startxrefMatches = pdfBinary.match(/startxref/g);
-    const incrementalCount = Math.max(0, (startxrefMatches ? startxrefMatches.length : 0) - 1);
+    const startxrefCount = startxrefMatches ? startxrefMatches.length : 0;
+    const isLinearized = /\/Linearized[\s/]/.test(pdfBinary.slice(0, LINEARIZATION_HEADER_BYTES));
+    const expectedStartxrefs = isLinearized ? 2 : 1;
+    const incrementalCount = Math.max(0, startxrefCount - expectedStartxrefs);
     const incrementalCheck: COSCheck = {
       name: 'Incremental Updates',
       passed: incrementalCount <= 0,

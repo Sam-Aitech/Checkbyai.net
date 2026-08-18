@@ -112,7 +112,8 @@ Fraudulent Certificates of Sponsorship are a known vector for immigration fraud.
 #### FR-COS-03: AI Scoring
 - Document metadata sent to AI provider (OpenAI → Claude → DeepSeek fallback chain)
 - Confidence score 0–100 returned
-- Global AI rules from `global_ai_rules` table applied to all verifications
+- Global AI rules from `global_ai_rules` table are evaluated for relevance against each document, and applied only when the rule actually mentions that document's producer or creator, or is explicitly addressed to all documents
+- Global rules are advisory: they contribute warnings that can lower confidence and downgrade a result to Suspicious, but cannot on their own classify a document as Fake
 - Pattern-specific AI instructions applied when pattern match found
 
 #### FR-COS-04: Result Classification
@@ -129,6 +130,8 @@ Fraudulent Certificates of Sponsorship are a known vector for immigration fraud.
 - Admins can override any AI result via the admin panel
 - Admin feedback (adminStatus, adminFeedback, adminReviewedBy) stored in `verification_results`
 - Feedback injected into future AI prompts for the same document patterns
+- Matching is on the exact producer string, not the producer family: Apache FOP generates every genuine CoS, so a family-level match would implicate the entire legitimate population
+- A HITL correction raises a warning on later documents; only forensic checks can classify a document as Fake
 
 #### FR-COS-07: Expert Review (Master Package)
 - Users can submit for expert human review (24-hour SLA)
