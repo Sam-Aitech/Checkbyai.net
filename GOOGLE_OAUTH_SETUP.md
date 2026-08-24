@@ -1,28 +1,56 @@
-# Google OAuth Setup for Replit
+# Google OAuth Setup
 
-Since `replit.dev` cannot be added as an authorized domain in Google Cloud Console, follow these steps:
+Google login is **optional**. When `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are unset,
+the strategy and its routes are not registered and the login page hides the Google button
+(the page checks `GET /api/auth/providers` to decide).
 
-## Google Cloud Console Configuration
+## 1. Create OAuth 2.0 credentials
 
-### 1. OAuth Consent Screen
-- **Application name**: `COS Check - Document Authenticator`
-- **Authorized domains**: **Leave this field EMPTY** (don't add any domains)
-- **Application home page**: Leave blank
-- **Privacy policy**: Leave blank
-- **Terms of service**: Leave blank
+In [Google Cloud Console](https://console.cloud.google.com/apis/credentials):
 
-### 2. Credentials (OAuth 2.0 Client ID)
-- **Application type**: Web application
-- **Name**: COS Check App
-- **Authorized redirect URIs**: Add this exact URL:
-  ```
-  https://da3ecd30-b16d-4788-a8ba-7feeaa4043e8-00-2vdug69y1lxnd.riker.replit.dev/api/auth/google/callback
-  ```
+1. **APIs & Services → OAuth consent screen** — set an application name (e.g. `CheckByAI`).
+   Add your production domain under *Authorized domains* if you have one.
+2. **APIs & Services → Credentials → Create Credentials → OAuth client ID**
+   - Application type: **Web application**
+   - Add an **Authorized redirect URI** for each environment you run.
 
-## Why This Works
-- Google OAuth works without authorized domains when the redirect URI is explicitly whitelisted
-- The consent screen will show your application name instead of the domain
-- This approach is commonly used for development and staging environments
+## 2. Redirect URI
 
-## Testing
-After configuring the above settings, wait 2-3 minutes for changes to propagate, then test the Google login button.
+The callback path is always `/api/auth/google/callback`. The origin is derived at startup
+from `APP_URL` (falling back to `REPLIT_DOMAINS`, then `localhost:5000`) — see
+`server/auth.ts`. Register the URI that matches the environment:
+
+| Environment | Redirect URI |
+|---|---|
+| Local dev | `http://localhost:5000/api/auth/google/callback` |
+| Production | `https://checkbyai.net/api/auth/google/callback` |
+| Other host | `https://<your-APP_URL-host>/api/auth/google/callback` |
+
+Set `APP_URL` to the exact origin with no trailing slash. A mismatch between `APP_URL` and
+the URI registered in Google Cloud produces a `redirect_uri_mismatch` error at login.
+
+## 3. Set environment variables
+
+```env
+GOOGLE_CLIENT_ID=<client id>.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=<client secret>
+APP_URL=https://checkbyai.net
+```
+
+Restart the server after setting these — the strategy is registered once at boot.
+
+## 4. Verify
+
+```bash
+curl https://<your-host>/api/auth/providers
+# { "success": true, "data": { "google": true } }
+```
+
+If `google` is `false`, the credentials are not visible to the process. Google config
+changes can take a few minutes to propagate before login succeeds.
+
+## Behaviour on first login
+
+A new user row is created with id `google_<profile id>`, `authProvider: 'google'`, and
+`isVerified: true`. Existing users are matched on Google profile id. On success the user
+is redirected to `/sponsor-monitor`; on failure, to `/login?error=auth_failed`.
