@@ -560,7 +560,7 @@ function clientSearch(q: string, limit = 20): FreeSearchResult[] {
   return hits
     .sort((a, b) => b.score - a.score || a.e.n.localeCompare(b.e.n))
     .slice(0, limit)
-    .map(({ e }) => ({
+    .map(({ e, score }) => ({
       id:               e.id,
       fingerprint:      String(e.id),
       organisationName: e.n,
@@ -568,7 +568,7 @@ function clientSearch(q: string, limit = 20): FreeSearchResult[] {
       typeRating:       e.t,
       route:            e.r,
       status:           e.s,
-      matchScore:       100,
+      matchScore:       score === 2 ? 100 : 60, // startsWith vs plain substring
       grantedAt:        null,
       isNew:            e.s === "NEWLY_GRANTED",
     }));

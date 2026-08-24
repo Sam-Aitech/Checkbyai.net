@@ -86,7 +86,7 @@ export default function ReceiptPage() {
         }
         return r.json();
       })
-      .then(setData)
+      .then(json => setData(json?.data ?? json))
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }, [receiptId]);

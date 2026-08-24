@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { useLocation, useSearch } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,8 +10,9 @@ import PageLayout from "@/components/PageLayout";
 import SEOHead from "@/components/SEOHead";
 import { motion, AnimatePresence } from "framer-motion";
 import logoImg from "@assets/logo_material.png";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, getQueryFn } from "@/lib/queryClient";
 import BrandLogo from "@/components/BrandLogo";
+import GoogleLoginButton from "@/components/GoogleLoginButton";
 import { Turnstile } from "@marsidev/react-turnstile";
 
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
@@ -96,6 +98,12 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const turnstileRef = useRef<any>(null);
+
+  const { data: authProviders } = useQuery<{ google: boolean }>({
+    queryKey: ["/api/auth/providers"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+    staleTime: Infinity,
+  });
 
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -350,6 +358,20 @@ export default function LoginPage() {
                       )}
                     </Button>
                   </form>
+
+                  {authProviders?.google && (
+                    <>
+                      <div className="relative my-6">
+                        <div className="absolute inset-0 flex items-center">
+                          <span className="w-full border-t border-border" />
+                        </div>
+                        <div className="relative flex justify-center text-xs uppercase">
+                          <span className="bg-card px-2 text-muted-foreground">Or</span>
+                        </div>
+                      </div>
+                      <GoogleLoginButton className="w-full rounded-full" />
+                    </>
+                  )}
                 </motion.div>
               ) : (
                 <motion.div

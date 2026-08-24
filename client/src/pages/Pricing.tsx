@@ -228,7 +228,8 @@ export default function Pricing() {
         packageType: plan.packageType,
         ...(companyParam ? { companyName: companyParam } : {}),
       });
-      const { clientReferenceId } = await res.json();
+      const envelope = await res.json();
+      const { clientReferenceId } = envelope?.data ?? envelope;
       const url = `${link}?client_reference_id=${encodeURIComponent(clientReferenceId)}&prefilled_email=${encodeURIComponent(user?.email || '')}`;
       window.location.href = url;
     } catch (error: any) {

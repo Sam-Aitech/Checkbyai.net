@@ -79,6 +79,34 @@ export function normalizeName(name: string): string {
     .trim();
 }
 
+/**
+ * SQL-side counterpart of the character stripping inside {@link normalizeName}:
+ * `regexp_replace(lower(current_name), '[^a-z0-9_ ]', '', 'g')`.
+ * Exported so the prefilter invariant can be asserted in tests.
+ */
+export function stripToSqlComparable(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9_ ]/g, "");
+}
+
+/**
+ * Picks the most selective token of a normalized company name, for use as a
+ * `LIKE %token%` prefilter against {@link stripToSqlComparable}.
+ *
+ * Matching the *whole* normalized name is unsafe: normalizeName() deletes
+ * characters, so "Smith & Jones Ltd" normalizes to "smith jones", which is not
+ * a substring of the raw name. A single token is safe — both sides delete
+ * exactly the same characters, and suffix removal only ever drops whole
+ * tokens, so any token survives contiguously on the SQL side.
+ *
+ * Returns null when the name normalizes to nothing, in which case callers must
+ * not prefilter (there is no safe pattern).
+ */
+export function namePrefilterToken(name: string): string | null {
+  const tokens = normalizeName(name).split(" ").filter(Boolean);
+  if (tokens.length === 0) return null;
+  return tokens.reduce((a, b) => (b.length > a.length ? b : a));
+}
+
 export function generateFingerprint(name: string, city: string, route: string): string {
   const normalizedName = normalizeName(name);
   const normalizedCity = normalizeName(city);

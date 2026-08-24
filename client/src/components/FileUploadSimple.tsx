@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'wouter';
-import { Lock, Crown, CheckCircle, ShieldAlert } from 'lucide-react';
+import { Lock, Crown, CheckCircle, ShieldAlert, LogIn } from 'lucide-react';
 
 interface VerificationResult {
   type: 'genuine' | 'suspicious' | 'fake';
@@ -43,7 +43,7 @@ export default function FileUploadSimple({
   const [loading, setLoading] = useState(false);
   const [hasUsedFreeCheck, setHasUsedFreeCheck] = useState(false);
   const [verificationCount, setVerificationCount] = useState(0);
-  const [accessDenied, setAccessDenied] = useState(false);
+  const [accessDenied, setAccessDenied] = useState<'login' | 'upgrade' | false>(false);
 
   // Check usage on component mount
   useEffect(() => {
@@ -144,9 +144,13 @@ export default function FileUploadSimple({
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
 
-        // Access denied — show upgrade card instead of raw error
-        if (response.status === 403 && (errorData.code === 'cos_access_denied' || errorData.code === 'beta_login_required')) {
-          setAccessDenied(true);
+        // Access denied — show a login/upgrade card instead of a raw error
+        if (response.status === 403 && errorData.code === 'beta_login_required') {
+          setAccessDenied('login');
+          return;
+        }
+        if (response.status === 403 && errorData.code === 'cos_access_denied') {
+          setAccessDenied('upgrade');
           return;
         }
 
@@ -163,8 +167,9 @@ export default function FileUploadSimple({
         throw new Error(`Verification failed: ${errorData.error || errorData.message || 'Unknown error'}`);
       }
       
-      const data = await response.json();
-      
+      const envelope = await response.json();
+      const data = envelope?.data ?? envelope;
+
       // Transform backend response
       const typeMapping: Record<string, 'genuine' | 'suspicious' | 'fake'> = {
         'genuine': 'genuine',
@@ -209,8 +214,32 @@ export default function FileUploadSimple({
     }
   };
 
-  // Show upgrade card when backend returns cos_access_denied
-  if (accessDenied) {
+  // Show a login or upgrade card when the backend denies access, instead of
+  // a raw error toast that dead-ends anonymous/unentitled users.
+  if (accessDenied === 'login') {
+    return (
+      <div className="w-full border border-amber-200 dark:border-amber-700/40 rounded-xl p-6 bg-amber-50 dark:bg-amber-900/10 text-center space-y-4">
+        <div className="flex justify-center">
+          <ShieldAlert className="w-10 h-10 text-amber-500" />
+        </div>
+        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Log In to Verify Your Document</h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          CoS Check is in closed beta — log in or create an account to run this verification.
+        </p>
+        <div className="flex justify-center">
+          <Link
+            href={`/login?redirect=${encodeURIComponent(window.location.pathname)}`}
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors"
+          >
+            <LogIn className="w-4 h-4" />
+            Log In / Sign Up
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (accessDenied === 'upgrade') {
     return (
       <div className="w-full border border-amber-200 dark:border-amber-700/40 rounded-xl p-6 bg-amber-50 dark:bg-amber-900/10 text-center space-y-4">
         <div className="flex justify-center">
@@ -260,9 +289,9 @@ export default function FileUploadSimple({
                     <span className="font-semibold">Upgrade to Pro</span>
                   </div>
                   <p className="text-sm opacity-90 mb-3">Get unlimited document verifications, priority support, and advanced analytics</p>
-                  <button className="bg-white text-blue-600 px-4 py-2 rounded-md font-medium hover:bg-gray-50 transition-colors">
+                  <Link href="/cos-pricing" className="inline-block bg-white text-blue-600 px-4 py-2 rounded-md font-medium hover:bg-gray-50 transition-colors">
                     Upgrade Now
-                  </button>
+                  </Link>
                 </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   Your free check will reset tomorrow

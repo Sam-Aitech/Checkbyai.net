@@ -341,6 +341,7 @@ export function registerBillingRoutes(app: Express): void {
       return res.status(400).send('Webhook signature verification failed');
     }
 
+    try {
     switch (event.type) {
       case 'customer.subscription.updated':
       case 'customer.subscription.deleted': {
@@ -569,6 +570,10 @@ export function registerBillingRoutes(app: Express): void {
         }
         break;
       }
+    }
+    } catch (err: unknown) {
+      logger.error({ err: err instanceof Error ? err.message : err, eventType: event.type, eventId: event.id }, 'Webhook handler failed processing event');
+      return res.status(500).send('Webhook handler error');
     }
 
     res.json({ received: true });
@@ -800,6 +805,12 @@ export function registerBillingRoutes(app: Express): void {
   });
 
   app.get('/api/stripe/publishable-key', stripeKeyLimiter, asyncHandler(async (req, res) => {
+    if (process.env.STRIPE_PUBLISHABLE_KEY) {
+      success(res, { publishableKey: process.env.STRIPE_PUBLISHABLE_KEY });
+      return;
+    }
+    // Replit-hosted deployments without STRIPE_PUBLISHABLE_KEY set fall back
+    // to the Replit connector (Railway/Docker/etc. must set the env var above).
     const { getStripePublishableKey } = await import('../stripeClient');
     const key = await getStripePublishableKey();
     success(res, { publishableKey: key });

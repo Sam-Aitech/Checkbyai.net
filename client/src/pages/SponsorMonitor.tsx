@@ -910,8 +910,9 @@ export default function SponsorMonitor() {
     queryKey: ["/api/sponsors/search", debouncedQuery],
     queryFn: async () => {
       const res = await fetch(`/api/sponsors/search?q=${encodeURIComponent(debouncedQuery.trim())}`, { credentials: "include" });
-      if (!res.ok) { const data = await res.json().catch(() => ({})); throw new Error(data.message || "Search failed"); }
-      return res.json();
+      const envelope = await res.json().catch(() => ({}));
+      if (!res.ok) { throw new Error(envelope.error || envelope.message || "Search failed"); }
+      return envelope.data ?? envelope;
     },
     enabled: shouldSearch && isAuthenticated,
     staleTime: 30 * 1000,
@@ -932,11 +933,12 @@ export default function SponsorMonitor() {
       try {
         const res = await fetch(`/api/sponsors/free-search?q=${encodeURIComponent(debouncedQuery.trim())}`);
         if (cancelled) return;
-        const data = await res.json();
-        if (res.status === 429 && data.limitReached) {
+        const envelope = await res.json();
+        if (res.status === 429) {
           setFreeSearchLimitReached(true);
           setFreeSearchResults([]);
         } else if (res.ok) {
+          const data = envelope?.data ?? envelope;
           setFreeSearchResults(data.results || []);
         }
       } catch {

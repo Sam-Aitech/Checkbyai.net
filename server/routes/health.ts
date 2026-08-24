@@ -3,6 +3,7 @@ import { isJobRunning, getLastRunInfo } from "../utils/sponsorMonitorJob";
 import { getJobHealthSnapshot } from "../utils/jobTelemetry";
 import { countMissedExpectedPublishDays } from "../utils/ukBankHolidays";
 import { success } from "../lib/response";
+import { asyncHandler } from "../lib/errorHandler";
 
 const CRITICAL_JOBS = [
   "sponsorMonitorJob",
@@ -13,7 +14,7 @@ const CRITICAL_JOBS = [
 ] as const;
 
 export function registerHealthRoutes(app: Express): void {
-  app.get('/api/health', async (req, res) => {
+  app.get('/api/health', asyncHandler(async (req, res) => {
     const lastRun = getLastRunInfo();
     const jobRunning = await isJobRunning();
 
@@ -36,9 +37,9 @@ export function registerHealthRoutes(app: Express): void {
       },
       jobs,
     });
-  });
+  }));
 
-  app.get('/api/health/sponsor-monitor', async (req, res) => {
+  app.get('/api/health/sponsor-monitor', asyncHandler(async (req, res) => {
     const lastRun = getLastRunInfo();
     const jobRunning = await isJobRunning();
 
@@ -78,5 +79,5 @@ export function registerHealthRoutes(app: Express): void {
       nextCronUtc: "Mon–Fri 00:30 UTC",
       timestamp: new Date().toISOString(),
     });
-  });
+  }));
 }

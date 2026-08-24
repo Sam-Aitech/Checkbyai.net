@@ -50,7 +50,7 @@ export const upload = multer({
 export function registerVerificationRoutes(app: Express): void {
   app.post('/api/verify', verifyLimiter, upload.single('file'), asyncHandler(async (req: any, res) => {
     if (!req.isAuthenticated()) {
-      throw new ApiError(403, 'CoS Check is currently in closed beta. Please log in and request access.');
+      throw new ApiError(403, 'CoS Check is currently in closed beta. Please log in and request access.', 'beta_login_required');
     }
 
     const betaUserId = req.user.id;
@@ -65,7 +65,7 @@ export function registerVerificationRoutes(app: Express): void {
     const hasAdminApproval = betaUser.cosCheckApproved === true;
 
     if (!isAdminUser && !hasCosSubscription && !hasPaidPlanWithCos && !hasAdminApproval) {
-      throw new ApiError(403, 'Your account is pending COS Check access. Please contact support or upgrade your subscription.');
+      throw new ApiError(403, 'Your account is pending COS Check access. Please contact support or upgrade your subscription.', 'cos_access_denied');
     }
 
     if (!req.file) {
@@ -200,6 +200,11 @@ export function registerVerificationRoutes(app: Express): void {
         result = 'genuine';
         analysis.result = 'genuine';
         analysis.confidence = Math.max(analysis.confidence as number, 85);
+      } else if (cosCheckResult.verdict === 'EDITED' && analysisResult.result === 'genuine') {
+        logger.info(`[COS] cosCheck EDITED overrides pattern analysis 'genuine' — treating as suspicious`);
+        result = 'suspicious';
+        analysis.result = 'suspicious';
+        analysis.confidence = Math.min(analysis.confidence as number, 50);
       } else {
         result = analysisResult.result;
       }

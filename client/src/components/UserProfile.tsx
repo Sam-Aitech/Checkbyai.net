@@ -40,11 +40,12 @@ export default function UserProfile() {
     try {
       setOpeningPortal(true);
       const res = await apiRequest("POST", "/api/billing/portal");
-      const data = await res.json();
+      const envelope = await res.json();
+      const data = envelope?.data ?? envelope;
       if (data.url) {
         window.location.href = data.url;
       } else {
-        throw new Error(data.message || "No portal URL returned");
+        throw new Error(envelope.error || data.message || "No portal URL returned");
       }
     } catch (error: any) {
       toast({

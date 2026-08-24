@@ -541,7 +541,8 @@ export default function SimpleAdmin() {
       ]);
       
       if (statsRes.ok) {
-        setStats(await statsRes.json());
+        const envelope = await statsRes.json();
+        setStats(envelope?.data ?? envelope);
       }
       if (patternsRes.ok) {
         setPatterns(await patternsRes.json());
