@@ -104,7 +104,9 @@ export function stripToSqlComparable(name: string): string {
 export function namePrefilterToken(name: string): string | null {
   const tokens = normalizeName(name).split(" ").filter(Boolean);
   if (tokens.length === 0) return null;
-  return tokens.reduce((a, b) => (b.length > a.length ? b : a));
+  // Seeded with tokens[0] so reduce() can never throw on an empty array,
+  // independently of the guard above.
+  return tokens.reduce((longest, t) => (t.length > longest.length ? t : longest), tokens[0]);
 }
 
 export function generateFingerprint(name: string, city: string, route: string): string {
