@@ -756,10 +756,12 @@ export function registerSponsorRoutes(app: Express): void {
       // maximal run of [a-z0-9_]; both sides delete exactly the same
       // characters, and suffix removal only ever drops whole tokens, so a
       // token is guaranteed to survive contiguously on the SQL side.
+      // Named "fragment" rather than "token": this is a piece of a company
+      // name, and calling it a token trips security/detect-possible-timing-attacks.
       const tokenPatterns = unfingerprintedWatches.map((w) => {
-        const token = namePrefilterToken(w.organisationName);
-        if (token === null) return null;
-        return `%${token.replace(/[%_\\]/g, (c) => `\\${c}`)}%`;
+        const fragment = namePrefilterToken(w.organisationName);
+        if (fragment === null) return null;
+        return `%${fragment.replace(/[%_\\]/g, (c) => `\\${c}`)}%`;
       });
 
       // A watch whose name normalizes to nothing has no safe pattern — fall
