@@ -761,7 +761,9 @@ export function registerSponsorRoutes(app: Express): void {
       const tokenPatterns = unfingerprintedWatches.map((w) => {
         const fragment = namePrefilterToken(w.organisationName);
         if (fragment === null) return null;
-        return `%${fragment.replace(/[%_\\]/g, (c) => `\\${c}`)}%`;
+        // Escape LIKE wildcards so a name containing % or _ matches literally.
+        const escaped = fragment.replace(/[%_\\]/g, (c) => "\\" + c);
+        return `%${escaped}%`;
       });
 
       // A watch whose name normalizes to nothing has no safe pattern — fall
