@@ -15,7 +15,7 @@ export interface TierConfig {
 export const TIER_CONFIGS: Record<PlanTier, TierConfig> = {
   free: {
     watchLimit: 1,
-    channels: [],                    // Free = NO notifications
+    channels: ["email"],             // Free = email alerts only, no SMS/WhatsApp
     alertTiming: "next-morning",
     apiAccess: false,
     weeklyReports: false,

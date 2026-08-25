@@ -94,6 +94,27 @@ async function autoCreateWatchFromPayment(userId: string, companyName: string): 
   }
 }
 
+/**
+ * alert_annual/alert_annual_pro are billed once a year but modeled as a Stripe
+ * subscription so the existing customer.subscription.deleted webhook can
+ * auto-downgrade the user back to free at expiry, without a separate cron job.
+ * Checkout's subscription_data has no cancel_at field, so this sets it (plus
+ * packageType metadata, needed by the update/deleted webhook branch) via a
+ * follow-up Subscriptions API call once the subscription id is known.
+ * Best-effort — failures are logged but never break the checkout flow.
+ */
+async function scheduleAnnualPassExpiry(subscriptionId: string | null | undefined, userId: string, packageType: string): Promise<void> {
+  if (!subscriptionId) return;
+  try {
+    await stripe.subscriptions.update(subscriptionId, {
+      cancel_at: Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60,
+      metadata: { userId, packageType },
+    });
+  } catch (err) {
+    logger.error({ err, subscriptionId, userId, packageType }, '[AnnualPass] Failed to schedule expiry — non-fatal');
+  }
+}
+
 const CHECKOUT_HMAC_SECRET = process.env.CHECKOUT_HMAC_SECRET;
 if (!CHECKOUT_HMAC_SECRET) {
   throw new Error("CHECKOUT_HMAC_SECRET is required");
@@ -207,6 +228,9 @@ async function sendSubscriptionNotifications(
     unlimited:            { credits: "Unlimited CoS checks",   watches: "10 companies",  timing: "Immediate",   portal: "/verify" },
     notification_starter: { credits: "—",                      watches: "2 companies",   timing: "Same-day",    portal: "/sponsor-monitor" },
     notification_pro:     { credits: "5 CoS checks/month",     watches: "5 companies",   timing: "Immediate",   portal: "/sponsor-monitor" },
+    alert_annual:         { credits: "—",                      watches: "1 company/yr",  timing: "Same-day",    portal: "/sponsor-monitor" },
+    alert_annual_pro:     { credits: "—",                      watches: "5 companies/yr",timing: "Immediate",   portal: "/sponsor-monitor" },
+    cos_check_single:     { credits: "1 CoS check",             watches: "—",             timing: "—",           portal: "/verify" },
   };
   const details = planDetails[packageType] || { credits: "—", watches: "—", timing: "—", portal: "/" };
 
@@ -371,7 +395,9 @@ export function registerBillingRoutes(app: Express): void {
               if (subPkgType === 'cos_check') {
                 await storage.updateCosCheckSubscription(user.id, true);
               } else {
-                const subStatus = subPkgType === 'starter' ? 'starter' : subPkgType === 'pro' ? 'pro' : 'unlimited';
+                const subStatus = subPkgType === 'starter' || subPkgType === 'alert_annual' ? 'starter'
+                  : subPkgType === 'pro' || subPkgType === 'alert_annual_pro' ? 'pro'
+                  : 'unlimited';
                 await storage.updateUserSubscription(user.id, {
                   subscriptionStatus: subStatus,
                   stripeSubscriptionId: subscription.id,
@@ -475,7 +501,7 @@ export function registerBillingRoutes(app: Express): void {
         const session = event.data.object as any;
         let userId = session.metadata?.userId;
         let packageType = session.metadata?.packageType;
-        let companyName: string | undefined;
+        let companyName: string | undefined = session.metadata?.companyName;
 
         if (!userId && session.client_reference_id) {
           const verified = verifyClientReferenceId(session.client_reference_id);
@@ -570,6 +596,28 @@ export function registerBillingRoutes(app: Express): void {
                 stripeCustomerId: session.customer,
                 updatedAt: new Date(),
               }).where(eq(users.id, userId));
+            } else if (packageType === 'alert_annual') {
+              await tx.update(users).set({
+                subscriptionStatus: 'starter',
+                stripeSubscriptionId: session.subscription,
+                stripeCustomerId: session.customer,
+                notifPrefs: sql`COALESCE(${users.notifPrefs}, ${JSON.stringify(DEFAULT_NOTIF_PREFS)}::jsonb)`,
+                updatedAt: new Date(),
+              }).where(eq(users.id, userId));
+            } else if (packageType === 'alert_annual_pro') {
+              await tx.update(users).set({
+                subscriptionStatus: 'pro',
+                stripeSubscriptionId: session.subscription,
+                stripeCustomerId: session.customer,
+                notifPrefs: sql`COALESCE(${users.notifPrefs}, ${JSON.stringify(DEFAULT_NOTIF_PREFS)}::jsonb)`,
+                updatedAt: new Date(),
+              }).where(eq(users.id, userId));
+            } else if (packageType === 'cos_check_single') {
+              await tx.update(users).set({
+                credits: sql`COALESCE(${users.credits}, 0) + 1`,
+                stripeCustomerId: session.customer,
+                updatedAt: new Date(),
+              }).where(eq(users.id, userId));
             }
             return true;
           }), 'webhook-checkout-session');
@@ -601,6 +649,22 @@ export function registerBillingRoutes(app: Express): void {
               }
             } else if (packageType === 'cos_check') {
               sendSubscriptionNotifications(userId, 'COS Check Subscription', 'cos_check', sessionEmail).catch((err) => logger.error({ err }, '[Subscription] Notification failed'));
+            } else if (packageType === 'alert_annual') {
+              sendSubscriptionNotifications(userId, 'Alert Pass — Annual', 'alert_annual', sessionEmail).catch((err) => logger.error({ err }, '[Subscription] Notification failed'));
+              storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'starter', reason: 'Checkout: Alert Pass Annual', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
+              scheduleAnnualPassExpiry(session.subscription, userId, packageType).catch((err) => logger.error({ err }, '[AnnualPass] webhook alert_annual expiry scheduling failed'));
+              if (companyName) {
+                autoCreateWatchFromPayment(userId, companyName).catch((err) => logger.error({ err }, '[AutoWatch] webhook alert_annual failed'));
+              }
+            } else if (packageType === 'alert_annual_pro') {
+              sendSubscriptionNotifications(userId, 'Alert Pass — Pro Annual', 'alert_annual_pro', sessionEmail).catch((err) => logger.error({ err }, '[Subscription] Notification failed'));
+              storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'pro', reason: 'Checkout: Alert Pass Pro Annual', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
+              scheduleAnnualPassExpiry(session.subscription, userId, packageType).catch((err) => logger.error({ err }, '[AnnualPass] webhook alert_annual_pro expiry scheduling failed'));
+              if (companyName) {
+                autoCreateWatchFromPayment(userId, companyName).catch((err) => logger.error({ err }, '[AutoWatch] webhook alert_annual_pro failed'));
+              }
+            } else if (packageType === 'cos_check_single') {
+              sendSubscriptionNotifications(userId, 'CoS Check (single)', 'cos_check_single', sessionEmail).catch((err) => logger.error({ err }, '[Subscription] Notification failed'));
             }
           }
         }
@@ -673,7 +737,7 @@ export function registerBillingRoutes(app: Express): void {
 
   app.post('/api/checkout/credits', isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.id;
-    const { priceId, packageType } = req.body;
+    const { priceId, packageType, companyName } = req.body;
 
     if (!priceId || !packageType) {
       throw new ApiError(400, 'Missing priceId or packageType');
@@ -699,18 +763,26 @@ export function registerBillingRoutes(app: Express): void {
       customerId = customer.id;
     }
 
-    const isSubscription = packageType === 'unlimited';
+    // alert_annual/alert_annual_pro are billed once a year but modeled as a
+    // Stripe subscription with a hard cancel_at 12 months out — this lets the
+    // existing customer.subscription.deleted webhook auto-downgrade the user
+    // back to free at expiry instead of needing a separate cron job.
+    const ANNUAL_PASS_TYPES = ['alert_annual', 'alert_annual_pro'];
+    const isSubscription = packageType === 'unlimited' || ANNUAL_PASS_TYPES.includes(packageType);
     const baseUrl = `${req.protocol}://${req.get('host')}`;
 
-    const session = await stripe.checkout.sessions.create({
+    const commonParams = {
       customer: customerId,
-      payment_method_types: ['card'],
+      payment_method_types: ['card'] as Stripe.Checkout.SessionCreateParams.PaymentMethodType[],
       line_items: [{ price: priceId, quantity: 1 }],
-      mode: isSubscription ? 'subscription' : 'payment',
       success_url: `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/pricing`,
-      metadata: { userId, packageType },
-    });
+      metadata: { userId, packageType, ...(companyName ? { companyName: String(companyName).slice(0, 300) } : {}) },
+    };
+
+    const session = isSubscription
+      ? await stripe.checkout.sessions.create({ ...commonParams, mode: 'subscription' })
+      : await stripe.checkout.sessions.create({ ...commonParams, mode: 'payment' });
 
     success(res, { url: session.url, sessionId: session.id });
   }));
@@ -734,7 +806,7 @@ export function registerBillingRoutes(app: Express): void {
     if (session.payment_status === 'paid') {
       let packageType = session.metadata?.packageType;
       let sessionUserId = session.metadata?.userId;
-      let companyName: string | undefined;
+      let companyName: string | undefined = session.metadata?.companyName;
 
       if (!sessionUserId && session.client_reference_id) {
         const verified = verifyClientReferenceId(session.client_reference_id);
@@ -805,12 +877,38 @@ export function registerBillingRoutes(app: Express): void {
                 notifPrefs: sql`COALESCE(${users.notifPrefs}, ${JSON.stringify(DEFAULT_NOTIF_PREFS)}::jsonb)`,
                 updatedAt: new Date(),
               }).where(eq(users.id, sessionUserId));
+            } else if (packageType === 'alert_annual') {
+              await tx.update(users).set({
+                subscriptionStatus: 'starter',
+                stripeSubscriptionId: session.subscription as string,
+                stripeCustomerId: session.customer as string,
+                notifPrefs: sql`COALESCE(${users.notifPrefs}, ${JSON.stringify(DEFAULT_NOTIF_PREFS)}::jsonb)`,
+                updatedAt: new Date(),
+              }).where(eq(users.id, sessionUserId));
+            } else if (packageType === 'alert_annual_pro') {
+              await tx.update(users).set({
+                subscriptionStatus: 'pro',
+                stripeSubscriptionId: session.subscription as string,
+                stripeCustomerId: session.customer as string,
+                notifPrefs: sql`COALESCE(${users.notifPrefs}, ${JSON.stringify(DEFAULT_NOTIF_PREFS)}::jsonb)`,
+                updatedAt: new Date(),
+              }).where(eq(users.id, sessionUserId));
+            } else if (packageType === 'cos_check_single') {
+              await tx.update(users).set({
+                credits: sql`COALESCE(${users.credits}, 0) + 1`,
+                stripeCustomerId: session.customer as string,
+                updatedAt: new Date(),
+              }).where(eq(users.id, sessionUserId));
             }
             return true;
           }), 'checkout-verify-session');
 
-          if (granted && (packageType === 'notification_starter' || packageType === 'notification_pro') && companyName) {
+          const AUTO_WATCH_TYPES = ['notification_starter', 'notification_pro', 'alert_annual', 'alert_annual_pro'];
+          if (granted && !!packageType && AUTO_WATCH_TYPES.includes(packageType) && companyName) {
             await autoCreateWatchFromPayment(sessionUserId, companyName);
+          }
+          if (granted && (packageType === 'alert_annual' || packageType === 'alert_annual_pro')) {
+            scheduleAnnualPassExpiry(session.subscription as string, sessionUserId, packageType).catch((err) => logger.error({ err }, '[AnnualPass] verify expiry scheduling failed'));
           }
         }
 

@@ -32,6 +32,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CompanyIntelligenceDialog } from "@/components/CompanyIntelligencePanel";
+import AlertAddOnModal from "@/components/AlertAddOnModal";
 
 // Decode a base64url VAPID public key into the Uint8Array that
 // PushManager.subscribe expects as applicationServerKey.
@@ -473,40 +474,32 @@ function StickyAlertBanner() {
 }
 
 function HeroSection({ onScrollToSearch }: { onScrollToSearch: () => void }) {
-  const [, setLocation] = useLocation();
   return (
     <section className="relative overflow-hidden bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-red-900/20 via-transparent to-transparent" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/20 via-transparent to-transparent" />
       <div className="relative max-w-4xl mx-auto px-4 py-16 sm:py-24 text-center">
-        <p className="text-[11px] sm:text-xs font-bold tracking-wide uppercase text-red-400 mb-6">
-          UK Home Office Register Monitor
+        <p className="text-[11px] sm:text-xs font-bold tracking-wide uppercase text-indigo-300 mb-6">
+          Automated UK Sponsor Licence Monitoring
         </p>
         <h1 className="text-3xl md:text-4xl font-bold tracking-tight leading-[1.1] mb-6">
-          You Will Only Know Your Sponsor Was Revoked{" "}
-          <span className="text-red-400">After It Is Too Late</span>
+          Know the Moment Your Sponsor's Licence Status Changes
         </h1>
         <p className="text-base sm:text-lg text-slate-300 max-w-2xl mx-auto mb-10 leading-relaxed">
-          The Home Office updates the register at midnight. They do not email you. By the time the letter arrives, your visa application is already rejected. We check every night and text you instantly.
+          The Home Office updates the sponsor register every night. We check it for you and alert you the moment your employer's status changes — before any letter arrives.
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
           <Button
             size="lg"
-            onClick={() => setLocation("/pricing")}
+            onClick={onScrollToSearch}
             className="bg-white text-slate-900 hover:bg-slate-100 font-bold text-base px-8 py-6 rounded-xl shadow-lg shadow-white/10 w-full sm:w-auto"
           >
             <ShieldCheck className="w-5 h-5 mr-2" />
-            <span>Protect My Job Offer</span>
-            <span className="ml-2 text-sm font-normal text-slate-500">from £24.99/mo</span>
-          </Button>
-          <Button
-            size="lg"
-            variant="ghost"
-            onClick={onScrollToSearch}
-            className="text-slate-400 hover:text-slate-200 hover:bg-white/5 font-medium text-sm px-6 py-6 rounded-xl w-full sm:w-auto border border-slate-700/50"
-          >
-            Or Search Free (No Alerts)
+            <span>Search &amp; Start Monitoring — Free</span>
           </Button>
         </div>
+        <p className="text-xs text-slate-500 mt-6">
+          Free plan monitors 1 company with email alerts, no card required. CheckByAI is not affiliated with the UK Home Office or UKVI.
+        </p>
       </div>
     </section>
   );
@@ -876,8 +869,11 @@ function MobileStickyBar() {
 }
 
 export default function SponsorMonitor() {
-  const urlQ = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("q") || "" : "";
+  const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : new URLSearchParams();
+  const urlQ = urlParams.get("q") || urlParams.get("company") || "";
+  const pendingAddWatchCompany = urlParams.get("addWatch") === "1" ? urlParams.get("company") : null;
   const [searchQuery, setSearchQuery] = useState(urlQ);
+  const [autoAddAttempted, setAutoAddAttempted] = useState(false);
   const [, setLocation] = useLocation();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
@@ -886,6 +882,8 @@ export default function SponsorMonitor() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyTarget, setHistoryTarget] = useState<{ fingerprint: string; name: string } | null>(null);
   const [intelligenceTarget, setIntelligenceTarget] = useState<{ fingerprint: string; name: string } | null>(null);
+  const [alertAddOnOpen, setAlertAddOnOpen] = useState(false);
+  const [alertAddOnCompany, setAlertAddOnCompany] = useState<string>("");
   const searchRef = useRef<HTMLDivElement>(null);
 
   const userPlan = user?.subscriptionStatus || "free";
@@ -1011,15 +1009,15 @@ export default function SponsorMonitor() {
 
   const handleAddWatch = useCallback((company: SponsorSearchResult) => {
     if (!isAuthenticated) {
-      setLocation(`/pricing?company=${encodeURIComponent(company.organisationName)}`);
-      return;
-    }
-    if (isFreeUser) {
-      setLocation(`/pricing?company=${encodeURIComponent(company.organisationName)}`);
+      // No account yet: send through the existing email-OTP login flow (it already
+      // handles CAPTCHA/verification) and come straight back here to finish adding
+      // the watch — free tier allows 1 company, no plan purchase required.
+      const returnTo = `/sponsor-monitor?company=${encodeURIComponent(company.organisationName)}&addWatch=1`;
+      setLocation(`/login?redirect=${encodeURIComponent(returnTo)}`);
       return;
     }
     addWatchMutation.mutate(company);
-  }, [isAuthenticated, isFreeUser, setLocation, addWatchMutation]);
+  }, [isAuthenticated, setLocation, addWatchMutation]);
 
   const openHistory = useCallback((fingerprint: string, name: string) => {
     setHistoryTarget({ fingerprint, name });
@@ -1030,6 +1028,20 @@ export default function SponsorMonitor() {
   const effectiveLoading = isAuthenticated ? searchLoading : freeSearchLoading;
   const effectiveFetching = isAuthenticated ? searchFetching : freeSearchLoading;
   const hasSearchResults = effectiveResults && effectiveResults.length > 0;
+
+  // After returning from the login redirect in handleAddWatch, finish adding
+  // the company the user originally selected — without this they'd land back
+  // on an empty search page and have to redo the whole flow.
+  useEffect(() => {
+    if (!pendingAddWatchCompany || autoAddAttempted || !isAuthenticated || authLoading) return;
+    const match = effectiveResults?.find(
+      (r) => r.organisationName.toLowerCase() === pendingAddWatchCompany.toLowerCase(),
+    );
+    if (match) {
+      setAutoAddAttempted(true);
+      addWatchMutation.mutate(match);
+    }
+  }, [pendingAddWatchCompany, autoAddAttempted, isAuthenticated, authLoading, effectiveResults, addWatchMutation]);
 
   return (
     <PageLayout darkNav>
@@ -1236,8 +1248,12 @@ export default function SponsorMonitor() {
                           </div>
                         </div>
                         <div className="shrink-0">
-                          {isFreeUser ? (
-                            <Button size="sm" onClick={() => setLocation(`/pricing?company=${encodeURIComponent(result.organisationName)}`)} className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 text-xs font-bold">
+                          {!isAuthenticated ? (
+                            <Button size="sm" onClick={() => handleAddWatch(result)} className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 text-xs font-bold">
+                              <Bell className="w-3.5 h-3.5 mr-1" />Get Alerts
+                            </Button>
+                          ) : isFreeUser && !isAdded && activeWatches.length >= 1 ? (
+                            <Button size="sm" onClick={() => { setAlertAddOnCompany(result.organisationName); setAlertAddOnOpen(true); }} className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 text-xs font-bold">
                               <Lock className="w-3.5 h-3.5 mr-1" />Upgrade to Monitor
                             </Button>
                           ) : isAdded ? (
@@ -1278,7 +1294,9 @@ export default function SponsorMonitor() {
                 <CardContent className="py-3 flex items-center gap-3">
                   <Lock className="w-4 h-4 text-amber-600 shrink-0" />
                   <p className="text-sm text-amber-800 dark:text-amber-200">
-                    Free plan: search only. <a href="/pricing" className="underline font-semibold hover:no-underline text-primary">Upgrade to Starter</a> to add companies and receive alerts.
+                    {activeWatches.length > 0
+                      ? <>Free plan: 1 company with email alerts. <a href="/pricing" className="underline font-semibold hover:no-underline text-primary">Upgrade</a> to monitor more with SMS/WhatsApp.</>
+                      : <>Free plan: monitor 1 company with email alerts, no card required. <a href="/pricing" className="underline font-semibold hover:no-underline text-primary">Upgrade</a> for more companies and faster channels.</>}
                   </p>
                 </CardContent>
               </Card>
@@ -1458,6 +1476,13 @@ export default function SponsorMonitor() {
         fingerprint={intelligenceTarget?.fingerprint ?? null}
         companyName={intelligenceTarget?.name ?? ""}
         onClose={() => setIntelligenceTarget(null)}
+      />
+
+      <AlertAddOnModal
+        open={alertAddOnOpen}
+        onOpenChange={setAlertAddOnOpen}
+        companyName={alertAddOnCompany}
+        userEmail={user?.email ?? undefined}
       />
     </PageLayout>
   );

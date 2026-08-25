@@ -58,7 +58,7 @@ export default function CheckoutSuccess() {
     verifySession();
   }, [sessionId, queryClient]);
 
-  const isNotificationPlan = verifyResult?.packageType === 'notification_starter' || verifyResult?.packageType === 'notification_pro';
+  const isNotificationPlan = ['notification_starter', 'notification_pro', 'alert_annual', 'alert_annual_pro'].includes(verifyResult?.packageType ?? '');
 
   const sponsorDashboardUrl = '/pro-dashboard';
 
@@ -78,6 +78,9 @@ export default function CheckoutSuccess() {
       case 'master': return 'Master Package - Expert Review';
       case 'notification_starter': return 'Notification Engine - Starter';
       case 'notification_pro': return 'Notification Engine - Pro (5 CoS checks/month)';
+      case 'alert_annual': return 'Alert Pass - Annual (1 company)';
+      case 'alert_annual_pro': return 'Alert Pass - Pro Annual (5 companies)';
+      case 'cos_check_single': return 'CoS Check (1 verification)';
       default: return 'Package';
     }
   };

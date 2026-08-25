@@ -10,6 +10,7 @@ import { apiRequest, getQueryFn } from '@/lib/queryClient';
 import { unwrapApiEnvelope } from '@/lib/apiEnvelope';
 import SEOHead from '@/components/SEOHead';
 import PageLayout from '@/components/PageLayout';
+import { usePackagePrices } from '@/hooks/usePackagePrices';
 
 interface User {
   id: string;
@@ -30,6 +31,49 @@ interface NotificationPlan {
   notIncluded?: string[];
   icon: typeof Bell;
 }
+
+interface AnnualPlan {
+  name: string;
+  price: string;
+  period: string;
+  description: string;
+  packageType: 'alert_annual' | 'alert_annual_pro';
+  popular?: boolean;
+  features: string[];
+  icon: typeof Bell;
+}
+
+const annualPlans: AnnualPlan[] = [
+  {
+    name: 'Alert Pass — Annual',
+    price: '£9.99',
+    period: '/year',
+    description: 'Low-commitment monitoring for a single employer.',
+    packageType: 'alert_annual',
+    icon: Bell,
+    features: [
+      'Monitor 1 company for 12 months',
+      'Email + WhatsApp alerts',
+      'Same-day alerts (6 PM)',
+      '30-day change history',
+    ],
+  },
+  {
+    name: 'Alert Pass — Pro Annual',
+    price: '£19.99',
+    period: '/year',
+    description: 'Full protection with immediate alerts, billed once a year.',
+    packageType: 'alert_annual_pro',
+    popular: true,
+    icon: Zap,
+    features: [
+      'Monitor up to 5 companies for 12 months',
+      'Email + WhatsApp + SMS',
+      'Immediate alerts',
+      '90-day change history',
+    ],
+  },
+];
 
 const notificationPlans: NotificationPlan[] = [
   {
@@ -169,6 +213,76 @@ function NotificationPlanCard({ plan, index, isLoggedIn, loading, onSelect, high
   );
 }
 
+function AnnualPlanCard({ plan, index, isLoggedIn, loading, onSelect, available }: {
+  plan: AnnualPlan;
+  index: number;
+  isLoggedIn: boolean;
+  loading: string | null;
+  onSelect: (plan: AnnualPlan) => void;
+  available: boolean;
+}) {
+  const [ref, inView] = useInView({ triggerOnce: true, threshold: 0.15 });
+
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y: 32 }}
+      animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 32 }}
+      transition={{ ...spring, delay: index * 0.1 }}
+      whileHover={{ y: -4, transition: { type: "spring", stiffness: 300, damping: 20 } }}
+      className={`relative overflow-hidden flex flex-col theme-card bg-card ${plan.popular ? 'border-primary lg:scale-105 z-10' : ''}`}
+    >
+      {plan.popular && (
+        <div className="absolute top-3 right-3">
+          <span className="editorial-caption bg-primary text-primary-foreground px-2 py-1 rounded-full">Most Popular</span>
+        </div>
+      )}
+      <div className="p-6 pb-4">
+        <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3 bg-primary/20 text-primary">
+          <plan.icon className="w-6 h-6" />
+        </div>
+        <h3 className="text-xl font-bold text-foreground">{plan.name}</h3>
+        <p className="text-muted-foreground text-sm mt-1">{plan.description}</p>
+      </div>
+      <div className="px-6 pb-6 flex-grow">
+        <div className="mb-6">
+          <span className="editorial-heading text-4xl text-foreground">{plan.price}</span>
+          <span className="text-muted-foreground text-sm ml-1">{plan.period}</span>
+        </div>
+        <ul className="space-y-2">
+          {plan.features.map((feature, idx) => (
+            <li key={idx} className="flex items-start gap-2 text-sm text-foreground">
+              <Check className="w-4 h-4 mt-0.5 flex-shrink-0 text-foreground" />
+              <span>{feature}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div className="p-6 pt-0 mt-auto">
+        <motion.button
+          {...tapScale}
+          className="w-full py-3 px-4 font-semibold bg-primary text-primary-foreground hover:bg-primary/90 rounded-full transition-colors disabled:opacity-50"
+          onClick={() => onSelect(plan)}
+          disabled={loading !== null}
+        >
+          {loading === plan.packageType ? (
+            <span className="flex items-center justify-center gap-2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-background"></div>
+              Processing...
+            </span>
+          ) : !isLoggedIn ? (
+            <span className="flex items-center justify-center gap-2"><LogIn className="w-4 h-4" />Login to Subscribe</span>
+          ) : !available ? (
+            'Coming soon'
+          ) : (
+            `Get ${plan.name}`
+          )}
+        </motion.button>
+      </div>
+    </motion.div>
+  );
+}
+
 export default function Pricing() {
   const [, setLocation] = useLocation();
   const search = useSearch();
@@ -178,6 +292,7 @@ export default function Pricing() {
   const { toast } = useToast();
   const [loading, setLoading] = useState<string | null>(null);
   const planCardsRef = useRef<HTMLDivElement>(null);
+  const { getPriceId } = usePackagePrices();
 
   // Scroll to the plan cards when arriving from the landing page with ?plan=
   useEffect(() => {
@@ -239,6 +354,33 @@ export default function Pricing() {
         description: error.message || 'Failed to start checkout. Please try again.',
         variant: 'destructive',
       });
+      setLoading(null);
+    }
+  };
+
+  const handleSelectAnnual = async (plan: AnnualPlan) => {
+    if (!isLoggedIn) {
+      toast({ title: 'Login Required', description: 'Please log in or create an account to subscribe.' });
+      setLocation('/login');
+      return;
+    }
+    const priceId = getPriceId(plan.packageType);
+    if (!priceId) {
+      toast({ title: 'Not available yet', description: 'This plan is not open for checkout yet — please check back shortly.', variant: 'destructive' });
+      return;
+    }
+    setLoading(plan.packageType);
+    try {
+      const res = await apiRequest('POST', '/api/checkout/credits', {
+        priceId,
+        packageType: plan.packageType,
+        ...(companyParam ? { companyName: companyParam } : {}),
+      });
+      const envelope = await res.json();
+      const { url } = unwrapApiEnvelope<{ url: string }>(envelope);
+      window.location.href = url;
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message || 'Failed to start checkout. Please try again.', variant: 'destructive' });
       setLoading(null);
     }
   };
@@ -324,7 +466,7 @@ export default function Pricing() {
             className="text-center mb-12"
           >
             <span className="editorial-caption text-muted-foreground mb-4 inline-block">
-              Notification Engine
+              Sponsor Licence Alerts
             </span>
             {companyParam ? (
               <>
@@ -364,8 +506,25 @@ export default function Pricing() {
             )}
           </motion.div>
 
-          <div className="max-w-3xl mx-auto mb-16">
+          <div className="max-w-3xl mx-auto mb-8">
             <div ref={planCardsRef} className="grid md:grid-cols-2 gap-6">
+              {annualPlans.map((plan, index) => (
+                <AnnualPlanCard
+                  key={plan.packageType}
+                  plan={plan}
+                  index={index}
+                  isLoggedIn={isLoggedIn}
+                  loading={loading}
+                  onSelect={handleSelectAnnual}
+                  available={!!getPriceId(plan.packageType)}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="max-w-3xl mx-auto mb-16">
+            <p className="text-center text-sm text-muted-foreground mb-4">Prefer to pay monthly instead?</p>
+            <div className="grid md:grid-cols-2 gap-6">
               {notificationPlans.map((plan, index) => (
                 <NotificationPlanCard
                   key={plan.packageType}

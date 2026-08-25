@@ -325,6 +325,13 @@
   -webkit-text-fill-color: transparent;
 }
 
+.text-gradient-indigo {
+  background: linear-gradient(90deg, #818cf8, #6366f1);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
 /* ─── Live data badge ────────────────────────────────────────────────────────── */
 .badge-live {
   display: inline-flex;

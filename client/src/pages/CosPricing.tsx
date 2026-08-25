@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
-import { Check, X, Shield, Zap, Clock, LogIn, CreditCard, Infinity, UserCheck, Bell, ArrowRight } from 'lucide-react';
+import { Check, X, Shield, Zap, Clock, LogIn, CreditCard, Infinity, UserCheck, Bell, ArrowRight, FileCheck, Building2, Mail } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useScrollReveal, spring, fadeUp, tapScale } from '@/lib/animations';
 import { useInView } from 'react-intersection-observer';
@@ -10,6 +10,7 @@ import { apiRequest, getQueryFn } from '@/lib/queryClient';
 import { unwrapApiEnvelope } from '@/lib/apiEnvelope';
 import SEOHead from '@/components/SEOHead';
 import PageLayout from '@/components/PageLayout';
+import { usePackagePrices } from '@/hooks/usePackagePrices';
 
 interface User {
   id: string;
@@ -28,13 +29,29 @@ interface PricingPlan {
   features: string[];
   notIncluded?: string[];
   popular?: boolean;
-  packageType: 'starter' | 'pro' | 'unlimited' | 'master';
+  packageType: 'cos_check_single' | 'starter' | 'pro' | 'unlimited' | 'enterprise';
   credits?: number;
   icon: typeof CreditCard;
   bundleBadge?: string;
+  contactSales?: boolean;
 }
 
 const plans: PricingPlan[] = [
+  {
+    name: 'CoS Check (single)',
+    price: '£4.99',
+    priceValue: 499,
+    description: 'Pay only for the document check you need, no subscription.',
+    packageType: 'cos_check_single',
+    credits: 1,
+    icon: FileCheck,
+    features: [
+      '1 verification credit',
+      'AI-powered document analysis',
+      'Forensic metadata extraction',
+      'Instant results',
+    ],
+  },
   {
     name: 'Starter Package',
     price: '£24.99',
@@ -97,31 +114,30 @@ const plans: PricingPlan[] = [
     bundleBadge: 'Includes Notification Engine: 10 companies watchlist',
   },
   {
-    name: 'Master Package',
-    price: '£99.99',
-    priceValue: 9999,
-    description: 'Priority expert human review with 24-hour SLA',
-    packageType: 'master',
-    icon: UserCheck,
+    name: 'Enterprise',
+    price: 'Contact Sales',
+    priceValue: 0,
+    description: 'For HR teams, recruitment agencies and immigration law firms managing multiple sponsored employees.',
+    packageType: 'enterprise',
+    icon: Building2,
+    contactSales: true,
     features: [
-      'Expert human review',
-      '24-hour turnaround guarantee',
-      'Detailed forensic analysis report',
-      'Document authenticity assessment',
-      'Employer verification check',
-      'Technical findings summary',
-      'Email report delivery',
+      'Unlimited CoS checks and company watches',
+      'Expert human review included',
+      'CSV upload and API access',
+      'Weekly reports and webhooks',
+      'Dedicated support',
     ],
-    bundleBadge: 'Bonus: 5-company notifications for 3 months',
   },
 ];
 
-function PricingCard({ plan, index, isLoggedIn, loading, onSelect }: {
+function PricingCard({ plan, index, isLoggedIn, loading, onSelect, available }: {
   plan: PricingPlan;
   index: number;
   isLoggedIn: boolean;
   loading: string | null;
   onSelect: (plan: PricingPlan) => void;
+  available: boolean;
 }) {
   const [ref, inView] = useInView({ triggerOnce: true, threshold: 0.15 });
 
@@ -190,21 +206,6 @@ function PricingCard({ plan, index, isLoggedIn, loading, onSelect }: {
           </div>
         )}
 
-        {plan.packageType === 'master' && (
-          <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-700/50 rounded-lg">
-            <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
-              <strong>Important:</strong> Our expert review is a technical forensic assessment of document authenticity only. It does not constitute immigration advice. For immigration advice, consult an{' '}
-              <a
-                href="https://www.gov.uk/find-immigration-adviser"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline hover:no-underline font-semibold"
-              >
-                OISC-registered adviser or solicitor
-              </a>.
-            </p>
-          </div>
-        )}
       </div>
 
       <div className="p-6 pt-0 mt-auto">
@@ -212,18 +213,22 @@ function PricingCard({ plan, index, isLoggedIn, loading, onSelect }: {
           {...tapScale}
           className="w-full py-3 px-4 font-semibold bg-primary text-primary-foreground hover:bg-primary/90 rounded-full transition-colors disabled:opacity-50"
           onClick={() => onSelect(plan)}
-          disabled={loading !== null}
+          disabled={loading !== null || (!plan.contactSales && isLoggedIn && !available)}
         >
           {loading === plan.packageType ? (
             <span className="flex items-center justify-center gap-2">
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-background"></div>
               Processing...
             </span>
+          ) : plan.contactSales ? (
+            <span className="flex items-center justify-center gap-2"><Mail className="w-4 h-4" />Contact Sales</span>
           ) : !isLoggedIn ? (
             <span className="flex items-center justify-center gap-2">
               <LogIn className="w-4 h-4" />
               Login to Purchase
             </span>
+          ) : !available ? (
+            'Coming soon'
           ) : (
             `Get ${plan.name}`
           )}
@@ -251,15 +256,20 @@ export default function CosPricing() {
   });
 
   const isLoggedIn = !!user?.id;
+  const { getPriceId } = usePackagePrices();
 
   const paymentLinks: Record<string, string> = {
     starter: 'https://buy.stripe.com/3cIeVec9k1pz2uQdIveZ203',
     pro: 'https://buy.stripe.com/fZufZi4GSfgp1qMfQDeZ201',
     unlimited: 'https://buy.stripe.com/dRm3cw7T41pz8Te5bZeZ202',
-    master: 'https://buy.stripe.com/28E28s4GS6JTfhC6g3eZ200',
   };
 
   const handleSelectPlan = async (plan: PricingPlan) => {
+    if (plan.contactSales) {
+      window.location.href = 'mailto:support@checkbyai.net?subject=Enterprise%20Plan%20Enquiry';
+      return;
+    }
+
     if (!isLoggedIn) {
       toast({
         title: 'Login Required',
@@ -270,6 +280,28 @@ export default function CosPricing() {
     }
 
     setLoading(plan.packageType);
+
+    // cos_check_single is a pay-per-use plan with no hand-created Payment
+    // Link — it goes through the dynamic /api/checkout/credits session
+    // instead, same as the annual alert plans on /pricing.
+    if (plan.packageType === 'cos_check_single') {
+      const priceId = getPriceId('cos_check_single');
+      if (!priceId) {
+        toast({ title: 'Not available yet', description: 'This plan is not open for checkout yet — please check back shortly.', variant: 'destructive' });
+        setLoading(null);
+        return;
+      }
+      try {
+        const res = await apiRequest('POST', '/api/checkout/credits', { priceId, packageType: 'cos_check_single' });
+        const envelope = await res.json();
+        const { url } = unwrapApiEnvelope<{ url: string }>(envelope);
+        window.location.href = url;
+      } catch (error: any) {
+        toast({ title: 'Error', description: error.message || 'Failed to start checkout. Please try again.', variant: 'destructive' });
+        setLoading(null);
+      }
+      return;
+    }
 
     const link = paymentLinks[plan.packageType];
     if (!link) {
@@ -323,6 +355,7 @@ export default function CosPricing() {
               "description": "AI-powered Certificate of Sponsorship verification for UK visa applicants. Forensic metadata analysis to detect fake or edited documents.",
               "brand": { "@type": "Brand", "name": "CheckByAI" },
               "offers": [
+                { "@type": "Offer", "name": "CoS Check (single)", "price": "4.99", "priceCurrency": "GBP", "description": "1 verification credit, pay-per-use" },
                 { "@type": "Offer", "name": "Starter", "price": "24.99", "priceCurrency": "GBP", "description": "50 verification credits" },
                 { "@type": "Offer", "name": "Pro", "price": "49.99", "priceCurrency": "GBP", "description": "100 verification credits" },
                 { "@type": "Offer", "name": "Unlimited Monthly", "price": "99.99", "priceCurrency": "GBP", "priceSpecification": { "@type": "UnitPriceSpecification", "price": "99.99", "priceCurrency": "GBP", "unitText": "MONTH" } }
@@ -397,6 +430,7 @@ export default function CosPricing() {
                 isLoggedIn={isLoggedIn}
                 loading={loading}
                 onSelect={handleSelectPlan}
+                available={plan.contactSales || plan.packageType !== 'cos_check_single' || !!getPriceId('cos_check_single')}
               />
             ))}
           </div>

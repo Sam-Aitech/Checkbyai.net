@@ -1,6 +1,7 @@
 import { SiYoutube } from 'react-icons/si';
 import { Link } from 'wouter';
 import logoImg from "@assets/logo_material.png";
+import { COMPANY_DETAILS } from '@/lib/companyDetails';
 
 export default function Footer() {
   return (
@@ -79,7 +80,17 @@ export default function Footer() {
         </div>
 
         <div className="border-t-0 pt-8" style={{ borderTop: '1px solid transparent', backgroundImage: 'linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent)', backgroundSize: '100% 1px', backgroundRepeat: 'no-repeat', backgroundPosition: 'top' }}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+            <div>
+              <h5 className="editorial-caption mb-3 text-white/40">Company Details</h5>
+              <p className="text-xs text-white/40 leading-relaxed">
+                {COMPANY_DETAILS.companyNumber}
+                <br />
+                {COMPANY_DETAILS.registeredOffice}
+                <br />
+                {COMPANY_DETAILS.icoRegistration}
+              </p>
+            </div>
             <div>
               <h5 className="editorial-caption mb-3 text-white/40">Data Protection</h5>
               <p className="text-xs text-white/40 leading-relaxed">
@@ -93,7 +104,7 @@ export default function Footer() {
               <h5 className="editorial-caption mb-3 text-white/40">Legal</h5>
               <p className="text-xs text-white/40 leading-relaxed">
                 This tool provides technical analysis only and does not constitute legal or immigration advice.
-                Processing is carried out under Article 6(1)(f) UK GDPR (legitimate interests) for fraud 
+                Processing is carried out under Article 6(1)(f) UK GDPR (legitimate interests) for fraud
                 prevention purposes. For data subject requests, contact us via the admin portal.
               </p>
             </div>

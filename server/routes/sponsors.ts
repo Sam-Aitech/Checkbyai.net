@@ -567,11 +567,6 @@ export function registerSponsorRoutes(app: Express): void {
     }
     const { organisation_name, town_city, fingerprint: fpParam } = parsed.data;
 
-    const userSub = req.user.subscriptionStatus || "free";
-    if (userSub === "free" || !userSub) {
-      throw new ApiError(403, "Upgrade to Starter plan to add companies to your watchlist. Free users can view search results and history only.");
-    }
-
     const userId = req.user.id;
     const normalized = normalizeName(organisation_name.trim());
 

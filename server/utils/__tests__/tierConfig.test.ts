@@ -51,8 +51,8 @@ describe("getWatchLimit", () => {
 // ── isChannelAllowed ───────────────────────────────────────────────────────────
 
 describe("isChannelAllowed", () => {
-  it("free: no channels allowed", () => {
-    expect(isChannelAllowed("free", "email")).toBe(false);
+  it("free: email allowed, sms/whatsapp blocked", () => {
+    expect(isChannelAllowed("free", "email")).toBe(true);
     expect(isChannelAllowed("free", "sms")).toBe(false);
     expect(isChannelAllowed("free", "whatsapp")).toBe(false);
   });
@@ -79,8 +79,8 @@ describe("isChannelAllowed", () => {
 // ── canReceiveNotifications ────────────────────────────────────────────────────
 
 describe("canReceiveNotifications", () => {
-  it("free → false", () => expect(canReceiveNotifications("free")).toBe(false));
-  it("null → false (treated as free)", () => expect(canReceiveNotifications(null)).toBe(false));
+  it("free → true (email only)", () => expect(canReceiveNotifications("free")).toBe(true));
+  it("null → true (treated as free, email only)", () => expect(canReceiveNotifications(null)).toBe(true));
   it("starter → true", () => expect(canReceiveNotifications("starter")).toBe(true));
   it("pro → true", () => expect(canReceiveNotifications("pro")).toBe(true));
 });
@@ -110,7 +110,7 @@ describe("getTierConfig", () => {
   it("returns the correct config object for each tier", () => {
     const free = getTierConfig("free");
     expect(free.watchLimit).toBe(1);
-    expect(free.channels).toHaveLength(0);
+    expect(free.channels).toEqual(["email"]);
     expect(free.apiAccess).toBe(false);
 
     const enterprise = getTierConfig("enterprise");
@@ -123,7 +123,7 @@ describe("getTierConfig", () => {
   it("unknown status falls back to free config", () => {
     const config = getTierConfig("expired");
     expect(config.watchLimit).toBe(1);
-    expect(config.channels).toHaveLength(0);
+    expect(config.channels).toEqual(["email"]);
   });
 });
 
