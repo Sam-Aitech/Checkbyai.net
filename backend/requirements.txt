@@ -22,7 +22,7 @@ pymupdf>=1.28.2               # PDF parsing (cos_verifier.py, ai_engine.py)
 # ── Machine learning / NLP ────────────────────────────────────────────────────
 scikit-learn>=1.9.0           # TF-IDF cosine similarity (ai_engine.py, cos_verifier.py)
 numpy>=2.4.6
-sentence-transformers>=5.7.0    # optional: semantic embeddings (cos_verifier.py)
+sentence-transformers>=6.0.0    # optional: semantic embeddings (cos_verifier.py)
                               # falls back to TF-IDF when not installed
 
 # ── Database ──────────────────────────────────────────────────────────────────
