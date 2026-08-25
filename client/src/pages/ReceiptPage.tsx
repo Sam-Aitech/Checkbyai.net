@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'wouter';
 import { CheckCircle, XCircle, AlertTriangle, FileText, Hash, Clock, Shield, Copy, Check } from 'lucide-react';
+import { unwrapApiEnvelope } from '@/lib/apiEnvelope';
 
 interface ReceiptData {
   receiptId: string;
@@ -86,7 +87,7 @@ export default function ReceiptPage() {
         }
         return r.json();
       })
-      .then(json => setData(json?.data ?? json))
+      .then(json => setData(unwrapApiEnvelope<ReceiptData>(json)))
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }, [receiptId]);

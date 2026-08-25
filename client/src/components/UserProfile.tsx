@@ -13,6 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Crown, User, LogOut, Settings, LayoutDashboard, CreditCard } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { unwrapApiEnvelope } from "@/lib/apiEnvelope";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 
@@ -41,7 +42,7 @@ export default function UserProfile() {
       setOpeningPortal(true);
       const res = await apiRequest("POST", "/api/billing/portal");
       const envelope = await res.json();
-      const data = envelope?.data ?? envelope;
+      const data = unwrapApiEnvelope<Record<string, any>>(envelope);
       if (data.url) {
         window.location.href = data.url;
       } else {

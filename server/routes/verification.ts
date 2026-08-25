@@ -14,6 +14,7 @@ import { PDFAnalyzer } from "../services/pdfAnalyzer";
 import { COSAuthenticityChecker } from "../services/cosAuthenticityChecker";
 import { getClientIp, hashIpAddress } from "../ipRateLimit";
 import { sanitizeUploadPath, assertSafeUploadFilename, assertPdfMagicBytes } from "../utils/uploadGuard";
+import { combineWithCosVerdict } from "../utils/cosVerdictCombiner";
 import { success } from "../lib/response";
 import { asyncHandler } from "../lib/errorHandler";
 import { ApiError } from "../lib/apiError";
@@ -195,19 +196,17 @@ export function registerVerificationRoutes(app: Express): void {
       analysis = analysisResult;
       analysis.cosCheck = cosCheckResult;
 
-      if (cosCheckResult.verdict === 'GENUINE' && analysisResult.result !== 'genuine') {
-        logger.info(`[COS] cosCheck GENUINE overrides pattern analysis '${analysisResult.result}' — treating as genuine`);
-        result = 'genuine';
-        analysis.result = 'genuine';
-        analysis.confidence = Math.max(analysis.confidence as number, 85);
-      } else if (cosCheckResult.verdict === 'EDITED' && analysisResult.result === 'genuine') {
-        logger.info(`[COS] cosCheck EDITED overrides pattern analysis 'genuine' — treating as suspicious`);
-        result = 'suspicious';
-        analysis.result = 'suspicious';
-        analysis.confidence = Math.min(analysis.confidence as number, 50);
-      } else {
-        result = analysisResult.result;
+      const combined = combineWithCosVerdict(
+        analysisResult.result,
+        analysis.confidence as number,
+        cosCheckResult.verdict,
+      );
+      if (combined.result !== analysisResult.result) {
+        logger.info(`[COS] cosCheck ${cosCheckResult.verdict} overrides pattern analysis '${analysisResult.result}' — treating as ${combined.result}`);
       }
+      result = combined.result;
+      analysis.result = combined.result;
+      analysis.confidence = combined.confidence;
       metadata = {
         format: 'Pdf',
         mimeType: 'application/pdf',

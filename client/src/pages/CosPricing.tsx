@@ -7,6 +7,7 @@ import { useScrollReveal, spring, fadeUp, tapScale } from '@/lib/animations';
 import { useInView } from 'react-intersection-observer';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, getQueryFn } from '@/lib/queryClient';
+import { unwrapApiEnvelope } from '@/lib/apiEnvelope';
 import SEOHead from '@/components/SEOHead';
 import PageLayout from '@/components/PageLayout';
 
@@ -284,7 +285,7 @@ export default function CosPricing() {
     try {
       const res = await apiRequest('POST', '/api/checkout/sign', { packageType: plan.packageType });
       const envelope = await res.json();
-      const { clientReferenceId } = envelope?.data ?? envelope;
+      const { clientReferenceId } = unwrapApiEnvelope<{ clientReferenceId: string }>(envelope);
       const url = `${link}?client_reference_id=${encodeURIComponent(clientReferenceId)}&prefilled_email=${encodeURIComponent(user.email || '')}`;
       window.location.href = url;
     } catch (error: any) {

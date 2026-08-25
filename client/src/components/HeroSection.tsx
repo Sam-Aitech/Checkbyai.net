@@ -2,6 +2,7 @@ import { cn } from '@/lib/utils'
 import { useState, useEffect, useRef, Suspense, lazy } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { STALE_TIMES } from '@/lib/queryDefaults'
+import { unwrapApiEnvelope } from '@/lib/apiEnvelope'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useInView } from 'react-intersection-observer'
 import { Zap, Lock, ArrowRight, Play, Bell, Activity, CheckCircle, XCircle, AlertTriangle, ShieldCheck, Search, Loader2, ChevronDown } from 'lucide-react'
@@ -598,7 +599,8 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
     setHistoricalResults([])
     try {
       const res = await fetch(`/api/sponsors/historical-search?q=${encodeURIComponent(q)}`)
-      const data = await res.json()
+      const envelope = await res.json()
+      const data = unwrapApiEnvelope<{ results?: FreeSearchResult[] }>(envelope)
       if (res.ok) setHistoricalResults(data.results || [])
     } catch {
       // silently swallow — historical search is a best-effort enhancement
@@ -672,7 +674,8 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
     setHasSearched(true);
     try {
       const res = await fetch(`/api/sponsors/free-search?q=${encodeURIComponent(q)}`);
-      const data = await res.json();
+      const envelope = await res.json();
+      const data = unwrapApiEnvelope<{ results?: FreeSearchResult[] }>(envelope);
       if (res.ok) {
         const results = data.results || [];
         setSearchResults(results);

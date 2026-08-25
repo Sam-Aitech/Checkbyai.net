@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { unwrapApiEnvelope } from '@/lib/apiEnvelope';
 
 interface DirectoryResult {
   fingerprint: string;
@@ -106,7 +107,7 @@ export default function SponsorLicenceSearch() {
         credentials: 'include',
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setData(await res.json());
+      setData(unwrapApiEnvelope<DirectoryResponse>(await res.json()));
     } catch {
       setError('The register is temporarily unavailable. Please try again in a moment.');
     } finally {

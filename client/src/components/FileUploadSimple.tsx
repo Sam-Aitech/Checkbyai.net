@@ -1,6 +1,26 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { Link } from 'wouter';
 import { Lock, Crown, CheckCircle, ShieldAlert, LogIn } from 'lucide-react';
+import { unwrapApiEnvelope } from '@/lib/apiEnvelope';
+
+interface AccessDeniedCardProps {
+  title: string;
+  message: string;
+  children: ReactNode;
+}
+
+function AccessDeniedCard({ title, message, children }: AccessDeniedCardProps) {
+  return (
+    <div className="w-full border border-amber-200 dark:border-amber-700/40 rounded-xl p-6 bg-amber-50 dark:bg-amber-900/10 text-center space-y-4">
+      <div className="flex justify-center">
+        <ShieldAlert className="w-10 h-10 text-amber-500" />
+      </div>
+      <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
+      <p className="text-sm text-gray-600 dark:text-gray-400">{message}</p>
+      {children}
+    </div>
+  );
+}
 
 interface VerificationResult {
   type: 'genuine' | 'suspicious' | 'fake';
@@ -168,7 +188,7 @@ export default function FileUploadSimple({
       }
       
       const envelope = await response.json();
-      const data = envelope?.data ?? envelope;
+      const data = unwrapApiEnvelope<Record<string, any>>(envelope);
 
       // Transform backend response
       const typeMapping: Record<string, 'genuine' | 'suspicious' | 'fake'> = {
@@ -218,14 +238,10 @@ export default function FileUploadSimple({
   // a raw error toast that dead-ends anonymous/unentitled users.
   if (accessDenied === 'login') {
     return (
-      <div className="w-full border border-amber-200 dark:border-amber-700/40 rounded-xl p-6 bg-amber-50 dark:bg-amber-900/10 text-center space-y-4">
-        <div className="flex justify-center">
-          <ShieldAlert className="w-10 h-10 text-amber-500" />
-        </div>
-        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Log In to Verify Your Document</h3>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          CoS Check is in closed beta — log in or create an account to run this verification.
-        </p>
+      <AccessDeniedCard
+        title="Log In to Verify Your Document"
+        message="CoS Check is in closed beta — log in or create an account to run this verification."
+      >
         <div className="flex justify-center">
           <Link
             href={`/login?redirect=${encodeURIComponent(window.location.pathname)}`}
@@ -235,20 +251,16 @@ export default function FileUploadSimple({
             Log In / Sign Up
           </Link>
         </div>
-      </div>
+      </AccessDeniedCard>
     );
   }
 
   if (accessDenied === 'upgrade') {
     return (
-      <div className="w-full border border-amber-200 dark:border-amber-700/40 rounded-xl p-6 bg-amber-50 dark:bg-amber-900/10 text-center space-y-4">
-        <div className="flex justify-center">
-          <ShieldAlert className="w-10 h-10 text-amber-500" />
-        </div>
-        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">COS Check Access Required</h3>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          Your account doesn't yet have COS Check access. Upgrade your plan to unlock instant verification.
-        </p>
+      <AccessDeniedCard
+        title="COS Check Access Required"
+        message="Your account doesn't yet have COS Check access. Upgrade your plan to unlock instant verification."
+      >
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Link
             href="/cos-pricing"
@@ -264,7 +276,7 @@ export default function FileUploadSimple({
             Request Access
           </a>
         </div>
-      </div>
+      </AccessDeniedCard>
     );
   }
 

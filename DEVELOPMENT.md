@@ -320,8 +320,10 @@ Specs live in `tests/e2e/`:
 | `journey3-pdf-upload-metadata.spec.ts` | PDF upload + metadata extraction |
 
 > **Status: aspirational.** These three specs carry ~10 assertions between them and are
-> smoke-level, not a safety net. They are not wired into CI. Treat a green E2E run as weak
-> evidence and rely on Vitest plus manual testing for real confidence.
+> smoke-level, not a safety net. CI runs them on PRs into `main`, but only when the
+> `TEST_BASE_URL` repo variable/secret is configured — unset, the step logs a warning and
+> skips (`.github/workflows/ci.yml`). Treat a green E2E run as weak evidence and rely on
+> Vitest plus manual testing for real confidence.
 
 ### SonarCloud Pull Requests
 

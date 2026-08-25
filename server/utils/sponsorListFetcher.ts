@@ -80,12 +80,22 @@ export function normalizeName(name: string): string {
 }
 
 /**
+ * Character class shared with the SQL-side `regexp_replace` in
+ * server/routes/sponsors.ts's prefilter query. Both sides must strip exactly
+ * the same characters for the namePrefilterToken() invariant to hold — a
+ * mismatch here silently drops sponsor watches from the prefilter with no
+ * visible error. Exported (rather than duplicated as a SQL string literal) so
+ * the two can't drift independently.
+ */
+export const SQL_COMPARABLE_CHAR_CLASS = "[^a-z0-9_ ]";
+
+/**
  * SQL-side counterpart of the character stripping inside {@link normalizeName}:
  * `regexp_replace(lower(current_name), '[^a-z0-9_ ]', '', 'g')`.
  * Exported so the prefilter invariant can be asserted in tests.
  */
 export function stripToSqlComparable(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9_ ]/g, "");
+  return name.toLowerCase().replace(new RegExp(SQL_COMPARABLE_CHAR_CLASS, "g"), "");
 }
 
 /**

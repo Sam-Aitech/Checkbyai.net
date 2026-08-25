@@ -6,7 +6,7 @@ import { z } from "zod";
 import { isAuthenticated } from "../auth";
 import { requireRole } from "../middleware/roleGuard";
 import { getWatchLimit as getWatchLimitFromTier, getTierConfig } from "../utils/tierConfig";
-import { normalizeName, generateFingerprint, namePrefilterToken } from "../utils/sponsorListFetcher";
+import { normalizeName, generateFingerprint, namePrefilterToken, SQL_COMPARABLE_CHAR_CLASS } from "../utils/sponsorListFetcher";
 import { ensureIndexReady, isIndexReady, searchSponsors, searchSponsorsFallback, searchRevokedSponsors, getIndexHealth, type PagedSearchResult } from "../utils/sponsorSearch";
 import { recordSearchRequest } from "../services/monitoringService";
 import { generateHeadline, signDigest } from "../services/aiDigest";
@@ -771,7 +771,7 @@ export function registerSponsorRoutes(app: Express): void {
       const canPrefilter = tokenPatterns.every((p) => p !== null);
       const uniquePatterns = [...new Set(tokenPatterns.filter((p): p is string => p !== null))];
 
-      const strippedName = sql`regexp_replace(lower(${sponsorCanonical.currentName}), '[^a-z0-9_ ]', '', 'g')`;
+      const strippedName = sql`regexp_replace(lower(${sponsorCanonical.currentName}), ${SQL_COMPARABLE_CHAR_CLASS}, '', 'g')`;
 
       const baseQuery = db
         .select({

@@ -1,4 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { unwrapApiEnvelope } from "./apiEnvelope";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -40,18 +41,11 @@ export const getQueryFn: <T>(options: {
 
     await throwIfResNotOk(res);
     const json = await res.json();
-    // Unwrap the { success: true, data: ... } envelope this server uses on every
-    // API route.  Return json.data when present so every useQuery call gets the
-    // inner value that TypeScript types already describe.
-    if (
-      json !== null &&
-      typeof json === "object" &&
-      json.success === true &&
-      "data" in json
-    ) {
-      return json.data;
-    }
-    return json;
+    // Cast (not <T>) matches the pre-existing looseness this function relied
+    // on: T is whatever the calling useQuery<...> declares, and on401's
+    // `null` branch above means T is implicitly nullable at call sites that
+    // opt into it — same as when this unwrap was inlined as `json.data`.
+    return unwrapApiEnvelope(json) as any;
   };
 
 export const queryClient = new QueryClient({

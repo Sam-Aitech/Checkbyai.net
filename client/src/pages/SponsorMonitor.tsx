@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { unwrapApiEnvelope } from "@/lib/apiEnvelope";
 import { useLocation, Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -912,7 +913,7 @@ export default function SponsorMonitor() {
       const res = await fetch(`/api/sponsors/search?q=${encodeURIComponent(debouncedQuery.trim())}`, { credentials: "include" });
       const envelope = await res.json().catch(() => ({}));
       if (!res.ok) { throw new Error(envelope.error || envelope.message || "Search failed"); }
-      return envelope.data ?? envelope;
+      return unwrapApiEnvelope<PagedSearchResponse>(envelope);
     },
     enabled: shouldSearch && isAuthenticated,
     staleTime: 30 * 1000,
@@ -938,7 +939,7 @@ export default function SponsorMonitor() {
           setFreeSearchLimitReached(true);
           setFreeSearchResults([]);
         } else if (res.ok) {
-          const data = envelope?.data ?? envelope;
+          const data = unwrapApiEnvelope<{ results?: any[] }>(envelope);
           setFreeSearchResults(data.results || []);
         }
       } catch {

@@ -36,6 +36,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { unwrapApiEnvelope } from "@/lib/apiEnvelope";
 
 // ─── Design tokens (mirrors ProDashboard's T object) ─────────────────────────
 const T = {
@@ -138,7 +139,7 @@ function CompanyHealthPanel({ fingerprint }: { fingerprint: string }) {
     queryFn: async () => {
       const r = await fetch(`/api/sponsors/${encodeURIComponent(fingerprint)}/company-health`, { credentials: "include" });
       if (!r.ok) throw new Error("Failed to fetch company health");
-      return r.json();
+      return unwrapApiEnvelope<CompanyHealthResponse>(await r.json());
     },
     retry: false,
     staleTime: 5 * 60 * 1000,
@@ -372,7 +373,7 @@ function LicenceTimelinePanel({ fingerprint }: { fingerprint: string }) {
     queryFn: async () => {
       const r = await fetch(`/api/sponsors/${encodeURIComponent(fingerprint)}/licence-timeline`, { credentials: "include" });
       if (!r.ok) throw new Error("Failed to fetch licence timeline");
-      return r.json();
+      return unwrapApiEnvelope<LicenceTimelineResponse>(await r.json());
     },
     retry: false,
     staleTime: 5 * 60 * 1000,

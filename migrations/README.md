@@ -17,7 +17,7 @@ never had a corresponding migration (`sponsor_canonical`, `job_locks`,
 ## Existing production DB
 
 Production already has this schema because `server/index.ts` runs boot-time
-DDL patches (`ensureSchema`-style checks around lines 299–410) to paper over
+DDL patches (`applyDataFixbacks()`, around lines 299–410) to paper over
 the drift. Running `db:migrate` there for the first time will try to
 `CREATE TABLE`/`ALTER TABLE` things that already exist and fail, because the
 `__drizzle_migrations` tracking table has never recorded anything.
