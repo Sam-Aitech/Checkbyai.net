@@ -16,35 +16,32 @@ interface Product {
 const products: Product[] = [
   {
     name: 'Starter Package',
-    description: 'Monitor 5 companies with same-day alerts, 50 verification credits included',
+    description: '50 verification credits for occasional use. One-time purchase, credits never expire.',
     priceAmount: 2499, // £24.99 in pence
     currency: 'gbp',
     metadata: {
       packageType: 'starter',
       credits: '50',
     },
-    recurring: { interval: 'month' },
   },
   {
     name: 'Pro Package',
-    description: 'Monitor 20 companies with immediate alerts, 100 verification credits included',
-    priceAmount: 4999, // £49.99 in pence
+    description: '100 verification credits — best value. One-time purchase, credits never expire.',
+    priceAmount: 3999, // £39.99 in pence
     currency: 'gbp',
     metadata: {
       packageType: 'pro',
       credits: '100',
     },
-    recurring: { interval: 'month' },
   },
   {
     name: 'Unlimited Monthly',
-    description: 'Unlimited verifications per month - perfect for businesses',
+    description: 'Unlimited verifications for businesses. One-time purchase, no recurring charge.',
     priceAmount: 9999, // £99.99 in pence
     currency: 'gbp',
     metadata: {
       packageType: 'unlimited',
     },
-    recurring: { interval: 'month' },
   },
   {
     name: 'Master Package - Expert Review',

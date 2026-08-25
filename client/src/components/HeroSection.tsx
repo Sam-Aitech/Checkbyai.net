@@ -105,7 +105,7 @@ function RecentlyRevokedSection() {
                 <h2 className="text-xl font-bold text-foreground">Recently Revoked Licences</h2>
               </div>
               <p className="text-sm text-muted-foreground">
-                Latest removals from the Home Office register — updated nightly.
+                Latest removals from the Home Office register, updated nightly.
                 {!statsLoading && stats?.lastRunDate && (
                   <span className="ml-1 text-muted-foreground/70">
                     Register last checked: {formatRunDate(stats.lastRunDate)}.
@@ -291,7 +291,7 @@ function NightlyStatsBar() {
                 {revoked12Label}
               </p>
               <p className="text-xs text-slate-400 mt-0.5 group-hover:text-slate-300 transition-colors">
-                Licences revoked — 12 months <ArrowRight className="w-3 h-3 inline ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                Licences revoked · 12 months <ArrowRight className="w-3 h-3 inline ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
               </p>
             </Link>
           </div>
@@ -321,11 +321,11 @@ function changeLabel(c: LatestChange): string {
   const date = new Date(c.detectedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
   switch (c.changeType) {
     case "REMOVED_REVOKED":
-      return `'${name}' had its licence revoked — detected ${date}.`;
+      return `'${name}' had its licence revoked, detected ${date}.`;
     case "DOWNGRADED":
-      return `'${name}' was downgraded${c.previousValue && c.newValue ? ` from ${c.previousValue} to ${c.newValue}` : ""} — detected ${date}.`;
+      return `'${name}' was downgraded${c.previousValue && c.newValue ? ` from ${c.previousValue} to ${c.newValue}` : ""}, detected ${date}.`;
     case "UPGRADED":
-      return `'${name}' was upgraded${c.previousValue && c.newValue ? ` from ${c.previousValue} to ${c.newValue}` : ""} — detected ${date}.`;
+      return `'${name}' was upgraded${c.previousValue && c.newValue ? ` from ${c.previousValue} to ${c.newValue}` : ""}, detected ${date}.`;
     default:
       return `Change detected for '${name}' on ${date}.`;
   }
@@ -411,7 +411,7 @@ function UrgencyBanner() {
           <CheckCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
           <p className="text-xs sm:text-sm font-medium">
             <span className="font-bold">{addedCount} new sponsor{addedCount !== 1 ? "s" : ""}</span>{" "}
-            added in the last nightly run — register updated {formatRunDate(lastRunDate)}.
+            added in the last nightly run. Register updated {formatRunDate(lastRunDate)}.
           </p>
         </div>
       </div>
@@ -427,7 +427,7 @@ function UrgencyBanner() {
         <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2 text-center">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-300" aria-hidden="true" />
           <p className="text-xs sm:text-sm font-medium">
-            Register data may be out of date — last checked {formatRunDate(lastRunDate)}. The nightly update may have been delayed.
+            Register data may be out of date, last checked {formatRunDate(lastRunDate)}. The nightly update may have been delayed.
           </p>
         </div>
       </div>
@@ -440,7 +440,7 @@ function UrgencyBanner() {
       <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2 text-center">
         <CheckCircle className="w-3.5 h-3.5 shrink-0 text-emerald-400" aria-hidden="true" />
         <p className="text-xs sm:text-sm font-medium">
-          Register checked {formatRunDate(lastRunDate)} — no changes detected.
+          Register checked {formatRunDate(lastRunDate)}, no changes detected.
         </p>
       </div>
     </div>
@@ -774,7 +774,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                 </motion.h1>
 
                 <motion.p initial={{ opacity: 0, y: 20 }} animate={isLoaded ? { opacity: 1, y: 0 } : {}} transition={{ ...springGentle, delay: 0.35 }} className="text-base text-white/70 max-w-lg leading-relaxed">
-                  The Home Office updates the sponsor register every night. We check it for you and alert you the moment your employer's status changes — Pro subscribers within 30 minutes, Starter subscribers by 6 PM the same day.
+                  The Home Office updates the sponsor register every night. We check it for you and alert you the moment your employer's status changes: Pro subscribers within 30 minutes, Starter subscribers by 6 PM the same day.
                 </motion.p>
 
                 {/* ── Hero search box ───────────────────────────────────── */}
@@ -784,7 +784,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                     <input
                       type="text"
                       ref={searchInputRef}
-                      placeholder="Search any employer — e.g. NHS, Tata, Deloitte…"
+                      placeholder="Search any employer, e.g. NHS, Tata, Deloitte…"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && handleSearchSubmit()}
@@ -813,7 +813,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                     </div>
                   )}
                   {searchUnavailable && (
-                    <p className="text-amber-300 text-xs py-1">Search temporarily unavailable — please try again.</p>
+                    <p className="text-amber-300 text-xs py-1">Search temporarily unavailable. Please try again.</p>
                   )}
                   {!searchLoading && !searchUnavailable && hasSearched && searchResults.length === 0 && !historicalLoading && historicalResults.length === 0 && (
                     <p className="text-white/60 text-xs py-1">No sponsors found. Try a different name.</p>
@@ -867,7 +867,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                     <div className="space-y-1.5">
                       <div className="flex items-center gap-1.5 pt-0.5">
                         <XCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
-                        <p className="text-xs text-red-300 font-semibold">Found in historical register — licence revoked</p>
+                        <p className="text-xs text-red-300 font-semibold">Found in historical register: licence revoked</p>
                       </div>
                       <div className="space-y-1.5 max-h-48 overflow-y-auto pr-0.5">
                         {historicalResults.map((r) => {
@@ -921,8 +921,8 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                     { icon: <HeroAlertIcon className="w-5 h-5 flex-shrink-0" size={20} />, label: "Pro: alerts in 30 min", colorClass: "text-red-200", borderClass: "border-red-500/20 bg-red-500/10 shadow-[0_0_15px_rgba(239,68,68,0.1)]" },
                     { icon: <HeroTrackedIcon className="w-5 h-5 flex-shrink-0" size={20} />, label: "47,823 sponsors tracked", colorClass: "text-indigo-200", borderClass: "border-indigo-500/20 bg-indigo-500/10 shadow-[0_0_15px_rgba(99,102,241,0.1)]" },
                     { icon: <HeroGDPRLockIcon className="w-5 h-5 flex-shrink-0" size={20} />, label: "UK GDPR", colorClass: "text-blue-200", borderClass: "border-blue-500/20 bg-blue-500/10 shadow-[0_0_15px_rgba(59,130,246,0.1)]" },
-                    { icon: <Building2 className="w-5 h-5 flex-shrink-0" />, label: COMPANY_DETAILS.companyNumber, colorClass: "text-slate-200", borderClass: "border-slate-400/20 bg-slate-400/10 shadow-[0_0_15px_rgba(148,163,184,0.1)]" },
-                    { icon: <BadgeCheck className="w-5 h-5 flex-shrink-0" />, label: COMPANY_DETAILS.icoRegistration, colorClass: "text-emerald-200", borderClass: "border-emerald-500/20 bg-emerald-500/10 shadow-[0_0_15px_rgba(16,185,129,0.1)]" },
+                    ...(COMPANY_DETAILS.companyNumber ? [{ icon: <Building2 className="w-5 h-5 flex-shrink-0" />, label: COMPANY_DETAILS.companyNumber, colorClass: "text-slate-200", borderClass: "border-slate-400/20 bg-slate-400/10 shadow-[0_0_15px_rgba(148,163,184,0.1)]" }] : []),
+                    ...(COMPANY_DETAILS.icoRegistration ? [{ icon: <BadgeCheck className="w-5 h-5 flex-shrink-0" />, label: COMPANY_DETAILS.icoRegistration, colorClass: "text-emerald-200", borderClass: "border-emerald-500/20 bg-emerald-500/10 shadow-[0_0_15px_rgba(16,185,129,0.1)]" }] : []),
                   ].map((item, i) => (
                     <div key={i} className="flex items-center gap-2.5 text-white/90 hover:text-white transition-all duration-300 md:hover:-translate-y-0.5 group">
                       <span className={cn(
@@ -1000,7 +1000,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                   <TimelineClockIcon size={30} />
                 </div>
                 <h3 className="text-lg font-bold text-foreground mb-3">The 12-Hour Advantage</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">The register updates at midnight. Letters are posted at 9 AM. Pro subscribers receive a WhatsApp alert at 00:30 — half a day before their employer even knows. Starter subscribers are alerted by 6 PM, still the same day.</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">The register updates at midnight. Letters are posted at 9 AM. Pro subscribers receive a WhatsApp alert at 00:30, half a day before their employer even knows. Starter subscribers are alerted by 6 PM, still the same day.</p>
               </CardContent>
             </Card>
             <Card className="border-slate-200 dark:border-slate-800 glow-amber transition-all duration-300">
@@ -1140,7 +1140,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
             <AccordionItem value="q7" className="border rounded-xl px-4 bg-white dark:bg-slate-900">
               <AccordionTrigger className="text-sm font-semibold text-foreground hover:no-underline py-4">Is there a refund policy?</AccordionTrigger>
               <AccordionContent className="text-sm text-muted-foreground pb-4">
-                Yes. We offer a 30-day money-back guarantee on all plans — no questions asked. If you are not satisfied within the first 30 days, contact us and we will issue a full refund. After 30 days you can cancel anytime; your plan stays active until the end of the billing period.
+                Yes. We offer a 30-day money-back guarantee on all plans, no questions asked. If you are not satisfied within the first 30 days, contact us and we will issue a full refund. After 30 days you can cancel anytime; your plan stays active until the end of the billing period.
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="q8" className="border rounded-xl px-4 bg-white dark:bg-slate-900">
@@ -1195,7 +1195,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
       <section className="bg-slate-950 text-white py-16">
         <div className="max-w-2xl mx-auto px-6 text-center">
           <h2 className="text-2xl sm:text-3xl font-bold mb-3">Stay Ahead of Sponsor Licence Changes</h2>
-          <p className="text-slate-300 mb-8 max-w-lg mx-auto">Get automated alerts the moment a sponsor licence changes status — before it affects your visa, your career, or your future in the UK.</p>
+          <p className="text-slate-300 mb-8 max-w-lg mx-auto">Get automated alerts the moment a sponsor licence changes status, before it affects your visa, your career, or your future in the UK.</p>
           <Link href="/pricing">
             <Button size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-base px-10 py-6 rounded-xl shadow-lg shadow-emerald-500/20">
               <ShieldCheck className="w-5 h-5 mr-2" />Start Monitoring Now

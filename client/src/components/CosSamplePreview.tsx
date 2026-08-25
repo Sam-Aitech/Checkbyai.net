@@ -66,7 +66,7 @@ export default function CosSamplePreview() {
               <li key={check.name} className="flex items-center justify-between text-xs">
                 <span className="text-gray-700 dark:text-gray-300">{check.name}</span>
                 <span className={check.passed ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-red-600 dark:text-red-400 font-medium'}>
-                  {check.passed ? 'Passed' : `Flagged${check.detail ? ` — ${check.detail}` : ''}`}
+                  {check.passed ? 'Passed' : `Flagged${check.detail ? ` (${check.detail})` : ''}`}
                 </span>
               </li>
             ))}

@@ -45,7 +45,7 @@ interface AnnualPlan {
 
 const annualPlans: AnnualPlan[] = [
   {
-    name: 'Alert Pass — Annual',
+    name: 'Alert Pass (Annual)',
     price: '£9.99',
     period: '/year',
     description: 'Low-commitment monitoring for a single employer.',
@@ -59,7 +59,7 @@ const annualPlans: AnnualPlan[] = [
     ],
   },
   {
-    name: 'Alert Pass — Pro Annual',
+    name: 'Alert Pass Pro (Annual)',
     price: '£19.99',
     period: '/year',
     description: 'Full protection with immediate alerts, billed once a year.',
@@ -366,7 +366,7 @@ export default function Pricing() {
     }
     const priceId = getPriceId(plan.packageType);
     if (!priceId) {
-      toast({ title: 'Not available yet', description: 'This plan is not open for checkout yet — please check back shortly.', variant: 'destructive' });
+      toast({ title: 'Not available yet', description: 'This plan is not open for checkout yet. Please check back shortly.', variant: 'destructive' });
       return;
     }
     setLoading(plan.packageType);

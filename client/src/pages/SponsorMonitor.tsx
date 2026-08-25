@@ -485,7 +485,7 @@ function HeroSection({ onScrollToSearch }: { onScrollToSearch: () => void }) {
           Know the Moment Your Sponsor's Licence Status Changes
         </h1>
         <p className="text-base sm:text-lg text-slate-300 max-w-2xl mx-auto mb-10 leading-relaxed">
-          The Home Office updates the sponsor register every night. We check it for you and alert you the moment your employer's status changes — before any letter arrives.
+          The Home Office updates the sponsor register every night. We check it for you and alert you the moment your employer's status changes, before any letter arrives.
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
           <Button
@@ -494,7 +494,7 @@ function HeroSection({ onScrollToSearch }: { onScrollToSearch: () => void }) {
             className="bg-white text-slate-900 hover:bg-slate-100 font-bold text-base px-8 py-6 rounded-xl shadow-lg shadow-white/10 w-full sm:w-auto"
           >
             <ShieldCheck className="w-5 h-5 mr-2" />
-            <span>Search &amp; Start Monitoring — Free</span>
+            <span>Search &amp; Start Monitoring (Free)</span>
           </Button>
         </div>
         <p className="text-xs text-slate-500 mt-6">
@@ -694,9 +694,9 @@ function SocialProof() {
     if (recentChange.changeType === "DOWNGRADED") {
       const from = recentChange.previousValue || "A-Rating";
       const to = recentChange.newValue || "B-Rating";
-      return `'${recentChange.organisationName}' downgraded from ${from} to ${to}${when ? ` — detected ${when}` : ""}.`;
+      return `'${recentChange.organisationName}' downgraded from ${from} to ${to}${when ? `, detected ${when}` : ""}.`;
     }
-    return `'${recentChange.organisationName}' licence revoked${when ? ` — detected ${when}` : ""}.`;
+    return `'${recentChange.organisationName}' licence revoked${when ? `, detected ${when}` : ""}.`;
   })();
 
   return (
@@ -1047,10 +1047,10 @@ export default function SponsorMonitor() {
     <PageLayout darkNav>
       <SEOHead
         title="Is Your Employer's Sponsor Licence Still Valid? | Free Check | CheckByAI"
-        description="Check any UK employer's sponsor licence status for free. Get instant alerts if it's revoked, suspended or downgraded — before it affects your visa."
+        description="Check any UK employer's sponsor licence status for free. Get instant alerts if it's revoked, suspended or downgraded, before it affects your visa."
         canonicalUrl="https://checkbyai.net/sponsor-monitor"
         ogTitle="Is Your Employer's Sponsor Licence Still Valid? | Free Check | CheckByAI"
-        ogDescription="Check any UK employer's sponsor licence status for free. Get instant alerts if it's revoked, suspended or downgraded — before it affects your visa."
+        ogDescription="Check any UK employer's sponsor licence status for free. Get instant alerts if it's revoked, suspended or downgraded, before it affects your visa."
         breadcrumbs={[
           { name: "Home", url: "https://checkbyai.net/" },
           { name: "Sponsor Monitor", url: "https://checkbyai.net/sponsor-monitor" }
@@ -1360,7 +1360,7 @@ export default function SponsorMonitor() {
                             {(watch.currentStatus?.status === "REMOVED_REVOKED" || watch.currentStatus?.status === "NOT_LISTED") && (
                               <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 mt-1">
                                 <Bell className="w-3 h-3 shrink-0" />
-                                Licence revoked — you&apos;ll be alerted if they reapply
+                                Licence revoked, you&apos;ll be alerted if they reapply
                               </p>
                             )}
                             <div className="flex items-center gap-3 mt-2 flex-wrap">
@@ -1397,7 +1397,7 @@ export default function SponsorMonitor() {
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-1.5 ml-5">
                                   {jobAlertPrefMap.get(watch.fingerprint!) ? (
-                                    <span className="text-emerald-600 dark:text-emerald-400 font-medium">✓ Enabled — we'll email you new job openings nightly</span>
+                                    <span className="text-emerald-600 dark:text-emerald-400 font-medium">✓ Enabled: we'll email you new job openings nightly</span>
                                   ) : (
                                     "Get nightly digests of new job openings from LinkedIn, Indeed, CV-Library & more"
                                   )}

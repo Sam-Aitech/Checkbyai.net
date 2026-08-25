@@ -16,8 +16,8 @@ interface AlertAddOnModalProps {
 }
 
 const ANNUAL_PLANS = [
-  { packageType: 'alert_annual', name: 'Alert Pass — Annual', price: '£9.99', period: '/yr', description: '1 company, email + WhatsApp, same-day alerts', icon: Bell },
-  { packageType: 'alert_annual_pro', name: 'Alert Pass — Pro Annual', price: '£19.99', period: '/yr', description: 'Up to 5 companies, immediate alerts + SMS', icon: Zap },
+  { packageType: 'alert_annual', name: 'Alert Pass (Annual)', price: '£9.99', period: '/yr', description: '1 company, email + WhatsApp, same-day alerts', icon: Bell },
+  { packageType: 'alert_annual_pro', name: 'Alert Pass Pro (Annual)', price: '£19.99', period: '/yr', description: 'Up to 5 companies, immediate alerts + SMS', icon: Zap },
 ] as const;
 
 const LEGACY_PLANS = [
@@ -36,7 +36,7 @@ export default function AlertAddOnModal({ open, onOpenChange, companyName, userE
     if (!priceId) {
       toast({
         title: 'Not available yet',
-        description: 'This plan is not open for checkout yet — please check back shortly.',
+        description: 'This plan is not open for checkout yet. Please check back shortly.',
         variant: 'destructive',
       });
       return;

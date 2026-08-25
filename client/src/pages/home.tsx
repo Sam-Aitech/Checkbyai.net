@@ -36,8 +36,8 @@ export default function Home() {
   };
 
   const homePageSEO = {
-    title: "Is Your UK Sponsor Licence Safe? | Instant Revocation Alerts | CheckByAI",
-    description: "Don't get caught out by a sponsor licence revocation. Get instant WhatsApp, email and SMS alerts the moment your employer's licence status changes. Plus verify any Certificate of Sponsorship is genuine.",
+    title: "UK Sponsor Licence Monitoring & CoS Verification | CheckByAI",
+    description: "Search the UK sponsor register free, and get instant alerts the moment your employer's sponsor licence status changes. Plus AI-powered Certificate of Sponsorship verification.",
     keywords: "sponsor licence revoked alert, UK sponsor monitor, certificate of sponsorship verification, sponsor licence check, visa revocation alert, CoS verification, UK immigration",
     canonicalUrl: "https://checkbyai.net/",
     ogImage: "https://checkbyai.net/og-image.png",

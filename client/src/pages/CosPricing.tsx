@@ -56,8 +56,7 @@ const plans: PricingPlan[] = [
     name: 'Starter Package',
     price: '£24.99',
     priceValue: 2499,
-    period: '/month',
-    description: 'Protect your visa with same-day alerts. £239.99 billed annually (20% off).',
+    description: '50 verification credits for occasional use. One-time purchase.',
     packageType: 'starter',
     credits: 50,
     icon: CreditCard,
@@ -74,10 +73,9 @@ const plans: PricingPlan[] = [
   },
   {
     name: 'Pro Package',
-    price: '£49.99',
-    priceValue: 4999,
-    period: '/month',
-    description: 'Complete protection with immediate alerts. £479.99 billed annually (20% off).',
+    price: '£39.99',
+    priceValue: 3999,
+    description: '100 verification credits, best value. One-time purchase.',
     packageType: 'pro',
     credits: 100,
     popular: true,
@@ -98,8 +96,7 @@ const plans: PricingPlan[] = [
     name: 'Unlimited Monthly',
     price: '£99.99',
     priceValue: 9999,
-    period: '/month',
-    description: 'Unlimited verifications for businesses',
+    description: 'Unlimited verifications for businesses. One-time purchase, no recurring charge.',
     packageType: 'unlimited',
     icon: Infinity,
     features: [
@@ -109,7 +106,7 @@ const plans: PricingPlan[] = [
       'Instant results',
       'Priority support',
       'Perfect for high volume',
-      'Cancel anytime',
+      'One-time purchase, no recurring billing',
     ],
     bundleBadge: 'Includes Notification Engine: 10 companies watchlist',
   },
@@ -287,7 +284,7 @@ export default function CosPricing() {
     if (plan.packageType === 'cos_check_single') {
       const priceId = getPriceId('cos_check_single');
       if (!priceId) {
-        toast({ title: 'Not available yet', description: 'This plan is not open for checkout yet — please check back shortly.', variant: 'destructive' });
+        toast({ title: 'Not available yet', description: 'This plan is not open for checkout yet. Please check back shortly.', variant: 'destructive' });
         setLoading(null);
         return;
       }
@@ -356,9 +353,9 @@ export default function CosPricing() {
               "brand": { "@type": "Brand", "name": "CheckByAI" },
               "offers": [
                 { "@type": "Offer", "name": "CoS Check (single)", "price": "4.99", "priceCurrency": "GBP", "description": "1 verification credit, pay-per-use" },
-                { "@type": "Offer", "name": "Starter", "price": "24.99", "priceCurrency": "GBP", "description": "50 verification credits" },
-                { "@type": "Offer", "name": "Pro", "price": "49.99", "priceCurrency": "GBP", "description": "100 verification credits" },
-                { "@type": "Offer", "name": "Unlimited Monthly", "price": "99.99", "priceCurrency": "GBP", "priceSpecification": { "@type": "UnitPriceSpecification", "price": "99.99", "priceCurrency": "GBP", "unitText": "MONTH" } }
+                { "@type": "Offer", "name": "Starter", "price": "24.99", "priceCurrency": "GBP", "description": "50 verification credits, one-time purchase" },
+                { "@type": "Offer", "name": "Pro", "price": "39.99", "priceCurrency": "GBP", "description": "100 verification credits, one-time purchase" },
+                { "@type": "Offer", "name": "Unlimited", "price": "99.99", "priceCurrency": "GBP", "description": "Unlimited verifications, one-time purchase" }
               ]
             },
             {
@@ -389,7 +386,7 @@ export default function CosPricing() {
               CoS Verification Plans
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto editorial-body">
-              Purchase verification credits or subscribe for unlimited access. Credits never expire and can be used anytime.
+              One-time purchase, no subscription. Credits never expire and can be used anytime.
             </p>
             
             {!isLoadingUser && !isLoggedIn && (

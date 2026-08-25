@@ -253,7 +253,7 @@ async function sendSubscriptionNotifications(
   const userHtml = `
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
       <div style="background:linear-gradient(135deg,#059669 0%,#10b981 100%);padding:28px;border-radius:10px 10px 0 0;">
-        <h1 style="color:#fff;margin:0;text-align:center;font-size:20px;">&#10004; You're all set — ${planName}</h1>
+        <h1 style="color:#fff;margin:0;text-align:center;font-size:20px;">&#10004; You're all set: ${planName}</h1>
       </div>
       <div style="background:#fff;padding:28px;border:1px solid #e0e0e0;border-top:none;border-radius:0 0 10px 10px;">
         <p style="color:#333;font-size:15px;margin-top:0;">Thank you for subscribing! Here's what's now unlocked on your account:</p>
@@ -274,7 +274,7 @@ async function sendSubscriptionNotifications(
   if (adminEmail) {
     sends.push(
       sendEmailReliably(
-        { from: "CheckByAI <alerts@checkbyai.net>", to: [adminEmail], subject: `New subscriber: ${planName} — ${userEmail || userId}`, html: adminHtml },
+        { from: "CheckByAI <alerts@checkbyai.net>", to: [adminEmail], subject: `New subscriber: ${planName} (${userEmail || userId})`, html: adminHtml },
         "[Subscription:Admin]",
       ),
     );
@@ -283,7 +283,7 @@ async function sendSubscriptionNotifications(
   if (userEmail) {
     sends.push(
       sendEmailReliably(
-        { from: "CheckByAI <no-reply@checkbyai.net>", to: [userEmail], subject: `Welcome to ${planName} — you're all set`, html: userHtml },
+        { from: "CheckByAI <no-reply@checkbyai.net>", to: [userEmail], subject: `Welcome to ${planName}, you're all set`, html: userHtml },
         "[Subscription:User]",
       ),
     );
@@ -650,14 +650,14 @@ export function registerBillingRoutes(app: Express): void {
             } else if (packageType === 'cos_check') {
               sendSubscriptionNotifications(userId, 'COS Check Subscription', 'cos_check', sessionEmail).catch((err) => logger.error({ err }, '[Subscription] Notification failed'));
             } else if (packageType === 'alert_annual') {
-              sendSubscriptionNotifications(userId, 'Alert Pass — Annual', 'alert_annual', sessionEmail).catch((err) => logger.error({ err }, '[Subscription] Notification failed'));
+              sendSubscriptionNotifications(userId, 'Alert Pass (Annual)', 'alert_annual', sessionEmail).catch((err) => logger.error({ err }, '[Subscription] Notification failed'));
               storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'starter', reason: 'Checkout: Alert Pass Annual', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
               scheduleAnnualPassExpiry(session.subscription, userId, packageType).catch((err) => logger.error({ err }, '[AnnualPass] webhook alert_annual expiry scheduling failed'));
               if (companyName) {
                 autoCreateWatchFromPayment(userId, companyName).catch((err) => logger.error({ err }, '[AutoWatch] webhook alert_annual failed'));
               }
             } else if (packageType === 'alert_annual_pro') {
-              sendSubscriptionNotifications(userId, 'Alert Pass — Pro Annual', 'alert_annual_pro', sessionEmail).catch((err) => logger.error({ err }, '[Subscription] Notification failed'));
+              sendSubscriptionNotifications(userId, 'Alert Pass Pro (Annual)', 'alert_annual_pro', sessionEmail).catch((err) => logger.error({ err }, '[Subscription] Notification failed'));
               storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'pro', reason: 'Checkout: Alert Pass Pro Annual', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
               scheduleAnnualPassExpiry(session.subscription, userId, packageType).catch((err) => logger.error({ err }, '[AnnualPass] webhook alert_annual_pro expiry scheduling failed'));
               if (companyName) {
