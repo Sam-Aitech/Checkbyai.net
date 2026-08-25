@@ -5,6 +5,7 @@ import { Check, CreditCard, Loader2, PartyPopper, ArrowRight, Bell } from 'lucid
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { apiRequest } from '@/lib/queryClient';
+import { unwrapApiEnvelope } from '@/lib/apiEnvelope';
 import PageLayout from '@/components/PageLayout';
 import SEOHead from '@/components/SEOHead';
 
@@ -39,7 +40,8 @@ export default function CheckoutSuccess() {
 
       try {
         const response = await apiRequest('GET', `/api/checkout/verify/${sessionId}`);
-        const data = await response.json();
+        const envelope = await response.json();
+        const data = unwrapApiEnvelope<VerifyResult>(envelope);
         setVerifyResult(data);
         
         if (data.success) {

@@ -64,7 +64,10 @@
 | **Sponsor Watches** | 1 | 2 | 5 | Unlimited | Unlimited |
 | **Notifications** | Daily digest | Email + WhatsApp | All + Immediate | All + Immediate | All + Webhooks |
 | **CoS Check MIS** | — | — | ✅ | ✅ | ✅ |
-| **API Access** | — | — | — | ✅ | ✅ |
+| **API Access** ¹ | — | — | — | Planned | Planned |
+
+¹ No public or partner API is available yet — see the roadmap. Listed here as planned scope
+for these tiers, not a shipped feature.
 
 ---
 
@@ -73,8 +76,9 @@
 ### Prerequisites
 - Node.js 20+
 - PostgreSQL 14+
-- Redis (for BullMQ)
+- Redis (optional — BullMQ job queue)
 - Firecrawl API Key (optional)
+- A POSIX shell (macOS/Linux, WSL, or Git Bash on Windows) — see [Windows](#windows) below
 
 ### Local Development
 ```bash
@@ -82,10 +86,35 @@ git clone https://github.com/Sam-Aitech/Checkbyai.net.git
 cd Checkbyai.net
 npm install
 cp .env.example .env
+# Fill in .env — DATABASE_URL, SESSION_SECRET, PHONE_ENCRYPTION_KEY, IP_HASH_SALT,
+# CHECKOUT_HMAC_SECRET and DIGEST_SIGNING_KEY are all required or the server exits on boot.
+
+npm run setup:binaries   # installs qsv + csvdiff into ./bin (required — see below)
 npm run db:push
 npm run db:migrate
 npm run dev
 ```
+
+App serves frontend and API together on **http://localhost:5000**.
+
+> **`setup:binaries` is not optional.** The sponsor monitor pipeline shells out to `csvdiff`
+> (Go) and `qsv` (Rust). Without `csvdiff` the nightly job aborts at Phase 2; without `qsv`
+> it runs but skips CSV row-count validation. Verify with `npm run check:binaries`.
+
+### Windows
+
+`npm run setup:binaries` invokes `bash`, and the `dev`/`start` scripts use POSIX inline env
+syntax (`NODE_ENV=development tsx ...`), which native `cmd.exe` and PowerShell do not
+support. Run the commands above from **Git Bash or WSL**.
+
+A PowerShell equivalent of the binary installer is available if you prefer it:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/setup-binaries.ps1
+```
+
+You will still need Git Bash or WSL for `npm run dev` / `npm run start`, or set `NODE_ENV`
+in your shell beforehand and invoke `tsx server/index.ts` directly.
 
 ---
 
@@ -99,8 +128,9 @@ npm run dev
 | **Auth** | Passport.js | Secure authentication |
 | **Payments** | Stripe | Subscription billing |
 | **Infrastructure** | Cloudflare (Turnstile/CDN) | Security + CDN |
-| **Email** | Resend / Brevo | Transactional emails |
-| **SMS** | Twilio | SMS notifications |
+| **Email** | Resend (primary) / SendGrid (fallback) | Transactional emails |
+| **SMS** | Brevo | SMS notifications |
+| **WhatsApp** | Twilio | WhatsApp messaging |
 
 ---
 
@@ -108,9 +138,9 @@ npm run dev
 
 ```
 Checkbyai.net/
-├── backend/          # Express API server
+├── backend/          # Python FastAPI sidecar (CoS verification, enrichment, scraping)
 ├── client/           # React frontend
-├── server/           # Server entry point
+├── server/           # Node.js/Express API server (main application)
 ├── shared/           # Shared types and utilities
 ├── migrations/       # Database migrations
 ├── scripts/          # Utility scripts

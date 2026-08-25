@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { unwrapApiEnvelope } from "@/lib/apiEnvelope";
 import FileUploadSimple from "@/components/FileUploadSimple";
 import { CompanyIntelligenceDialog } from "@/components/CompanyIntelligencePanel";
 import { Switch } from "@/components/ui/switch";
@@ -355,8 +356,9 @@ function MonitorTab({ user }: { user: any }) {
     queryFn: async () => {
       const r = await fetch(`/api/sponsors/search?q=${encodeURIComponent(dq.trim())}`, { credentials:"include" });
       if(!r.ok) throw new Error();
-      const data = await r.json();
-      return data.results ?? data;
+      const envelope = await r.json();
+      const data = unwrapApiEnvelope<{ results?: SponsorSearchResult[] }>(envelope);
+      return data.results ?? [];
     },
     retry:false,
   });

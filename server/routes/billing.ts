@@ -141,8 +141,20 @@ function verifyClientReferenceId(clientRefId: string): { userId: string; package
   }
 }
 
-async function tryClaimSession(sessionId: string): Promise<boolean> {
-  const result = await db.execute(
+// The transaction-scoped executor `db.transaction(async (tx) => ...)` hands its
+// callback — same query-builder surface as `db` itself, just bound to one tx.
+type DbOrTx = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * Claims a checkout session for processing. Pass a transaction executor so the
+ * claim commits or rolls back atomically with the credit/subscription grant it
+ * gates — claiming via the bare `db` executor ahead of a *separate* grant
+ * transaction is what let a mid-grant failure leave a session "claimed" with
+ * no credits ever granted: Stripe's retry then saw the claim, skipped the
+ * grant, and returned 200, silently swallowing the failure.
+ */
+async function tryClaimSession(sessionId: string, executor: DbOrTx = db): Promise<boolean> {
+  const result = await executor.execute(
     sql`INSERT INTO processed_checkouts (session_id) VALUES (${sessionId}) ON CONFLICT (session_id) DO NOTHING RETURNING id`
   );
   return (result as any).rowCount > 0;
@@ -341,6 +353,7 @@ export function registerBillingRoutes(app: Express): void {
       return res.status(400).send('Webhook signature verification failed');
     }
 
+    try {
     switch (event.type) {
       case 'customer.subscription.updated':
       case 'customer.subscription.deleted': {
@@ -475,12 +488,41 @@ export function registerBillingRoutes(app: Express): void {
           }
         }
 
-        if (userId && packageType && session.payment_status === 'paid' && await tryClaimSession(session.id)) {
+        if (userId && packageType && session.payment_status === 'paid') {
           const sessionEmail = session.customer_details?.email || session.customer_email || undefined;
           const prevUser = await storage.getUser(userId);
           const prevStatus = prevUser?.subscriptionStatus || 'free';
-          if (packageType === 'starter') {
-            await withRetry(() => db.transaction(async (tx) => {
+
+          if (packageType === 'master') {
+            // Not run inside a transaction with the claim — createPaidSubmission
+            // goes through the repository layer's own `db`, not a shared `tx`.
+            // Lower risk than the credit/subscription grants below: a duplicate
+            // attempt after a claim/insert race hits no additive state (unlike
+            // `credits: COALESCE(...) + N`), so at worst it's a redundant row,
+            // not a silent double-grant or a silently-skipped one.
+            if (await tryClaimSession(session.id)) {
+              await storage.createPaidSubmission({
+                email: session.customer_details?.email || '',
+                packageType: 'full',
+                paymentStatus: 'paid',
+                stripeSessionId: session.id,
+                priority: true,
+                phoneConsultationRequested: true,
+              });
+            }
+            break;
+          }
+
+          // Claim + grant run in one transaction so they commit or roll back
+          // together. Previously the claim landed via a separate `db` call
+          // before this transaction started: if the grant then threw, Stripe's
+          // retry saw the session already claimed, skipped re-granting, and
+          // got a 200 back — the customer paid and silently received nothing.
+          const granted = await withRetry(() => db.transaction(async (tx) => {
+            if (!(await tryClaimSession(session.id, tx))) {
+              return false; // already processed by a prior successful delivery
+            }
+            if (packageType === 'starter') {
               await tx.update(users).set({
                 credits: sql`COALESCE(${users.credits}, 0) + 50`,
                 subscriptionStatus: 'starter',
@@ -488,11 +530,7 @@ export function registerBillingRoutes(app: Express): void {
                 stripeCustomerId: session.customer,
                 updatedAt: new Date(),
               }).where(eq(users.id, userId));
-            }), 'webhook-checkout-starter');
-            sendSubscriptionNotifications(userId, 'CoS Check Starter', 'starter', sessionEmail).catch((err) => logger.error({ err }, '[Subscription] Notification failed'));
-            storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'starter', reason: 'Checkout: CoS Check Starter', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
-          } else if (packageType === 'pro') {
-            await withRetry(() => db.transaction(async (tx) => {
+            } else if (packageType === 'pro') {
               await tx.update(users).set({
                 credits: sql`COALESCE(${users.credits}, 0) + 100`,
                 subscriptionStatus: 'pro',
@@ -500,31 +538,14 @@ export function registerBillingRoutes(app: Express): void {
                 stripeCustomerId: session.customer,
                 updatedAt: new Date(),
               }).where(eq(users.id, userId));
-            }), 'webhook-checkout-pro');
-            sendSubscriptionNotifications(userId, 'CoS Check Pro', 'pro', sessionEmail).catch((err) => logger.error({ err }, '[Subscription] Notification failed'));
-            storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'pro', reason: 'Checkout: CoS Check Pro', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
-          } else if (packageType === 'unlimited') {
-            await withRetry(() => db.transaction(async (tx) => {
+            } else if (packageType === 'unlimited') {
               await tx.update(users).set({
                 subscriptionStatus: 'unlimited',
                 stripeSubscriptionId: session.subscription,
                 stripeCustomerId: session.customer,
                 updatedAt: new Date(),
               }).where(eq(users.id, userId));
-            }), 'webhook-checkout-unlimited');
-            sendSubscriptionNotifications(userId, 'CoS Check Unlimited', 'unlimited', sessionEmail).catch((err) => logger.error({ err }, '[Subscription] Notification failed'));
-            storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'unlimited', reason: 'Checkout: CoS Check Unlimited', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
-          } else if (packageType === 'master') {
-            await storage.createPaidSubmission({
-              email: session.customer_details?.email || '',
-              packageType: 'full',
-              paymentStatus: 'paid',
-              stripeSessionId: session.id,
-              priority: true,
-              phoneConsultationRequested: true,
-            });
-          } else if (packageType === 'notification_starter') {
-            await withRetry(() => db.transaction(async (tx) => {
+            } else if (packageType === 'notification_starter') {
               await tx.update(users).set({
                 subscriptionStatus: 'starter',
                 stripeSubscriptionId: session.subscription,
@@ -532,14 +553,7 @@ export function registerBillingRoutes(app: Express): void {
                 notifPrefs: sql`COALESCE(${users.notifPrefs}, ${JSON.stringify(DEFAULT_NOTIF_PREFS)}::jsonb)`,
                 updatedAt: new Date(),
               }).where(eq(users.id, userId));
-            }), 'webhook-checkout-notification-starter');
-            sendSubscriptionNotifications(userId, 'Notification Engine Starter', 'notification_starter', sessionEmail).catch((err) => logger.error({ err }, '[Subscription] Notification failed'));
-            storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'starter', reason: 'Checkout: Sponsor Monitor Starter', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
-            if (companyName) {
-              autoCreateWatchFromPayment(userId, companyName).catch((err) => logger.error({ err }, '[AutoWatch] webhook starter failed'));
-            }
-          } else if (packageType === 'notification_pro') {
-            await withRetry(() => db.transaction(async (tx) => {
+            } else if (packageType === 'notification_pro') {
               await tx.update(users).set({
                 credits: sql`COALESCE(${users.credits}, 0) + 5`,
                 subscriptionStatus: 'pro',
@@ -548,14 +562,7 @@ export function registerBillingRoutes(app: Express): void {
                 notifPrefs: sql`COALESCE(${users.notifPrefs}, ${JSON.stringify(DEFAULT_NOTIF_PREFS)}::jsonb)`,
                 updatedAt: new Date(),
               }).where(eq(users.id, userId));
-            }), 'webhook-checkout-notification-pro');
-            sendSubscriptionNotifications(userId, 'Notification Engine Pro', 'notification_pro', sessionEmail).catch((err) => logger.error({ err }, '[Subscription] Notification failed'));
-            storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'pro', reason: 'Checkout: Sponsor Monitor Pro', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
-            if (companyName) {
-              autoCreateWatchFromPayment(userId, companyName).catch((err) => logger.error({ err }, '[AutoWatch] webhook pro failed'));
-            }
-          } else if (packageType === 'cos_check') {
-            await withRetry(() => db.transaction(async (tx) => {
+            } else if (packageType === 'cos_check') {
               await tx.update(users).set({
                 cosCheckSubscription: true,
                 cosCheckApproved: true,
@@ -563,12 +570,46 @@ export function registerBillingRoutes(app: Express): void {
                 stripeCustomerId: session.customer,
                 updatedAt: new Date(),
               }).where(eq(users.id, userId));
-            }), 'webhook-checkout-cos-check');
-            sendSubscriptionNotifications(userId, 'COS Check Subscription', 'cos_check', sessionEmail).catch((err) => logger.error({ err }, '[Subscription] Notification failed'));
+            }
+            return true;
+          }), 'webhook-checkout-session');
+
+          // Side effects are deliberately outside the transaction — best-effort,
+          // already fire-and-forget with their own `.catch()` — and only run
+          // once the grant actually committed.
+          if (granted) {
+            if (packageType === 'starter') {
+              sendSubscriptionNotifications(userId, 'CoS Check Starter', 'starter', sessionEmail).catch((err) => logger.error({ err }, '[Subscription] Notification failed'));
+              storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'starter', reason: 'Checkout: CoS Check Starter', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
+            } else if (packageType === 'pro') {
+              sendSubscriptionNotifications(userId, 'CoS Check Pro', 'pro', sessionEmail).catch((err) => logger.error({ err }, '[Subscription] Notification failed'));
+              storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'pro', reason: 'Checkout: CoS Check Pro', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
+            } else if (packageType === 'unlimited') {
+              sendSubscriptionNotifications(userId, 'CoS Check Unlimited', 'unlimited', sessionEmail).catch((err) => logger.error({ err }, '[Subscription] Notification failed'));
+              storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'unlimited', reason: 'Checkout: CoS Check Unlimited', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
+            } else if (packageType === 'notification_starter') {
+              sendSubscriptionNotifications(userId, 'Notification Engine Starter', 'notification_starter', sessionEmail).catch((err) => logger.error({ err }, '[Subscription] Notification failed'));
+              storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'starter', reason: 'Checkout: Sponsor Monitor Starter', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
+              if (companyName) {
+                autoCreateWatchFromPayment(userId, companyName).catch((err) => logger.error({ err }, '[AutoWatch] webhook starter failed'));
+              }
+            } else if (packageType === 'notification_pro') {
+              sendSubscriptionNotifications(userId, 'Notification Engine Pro', 'notification_pro', sessionEmail).catch((err) => logger.error({ err }, '[Subscription] Notification failed'));
+              storage.logSubscriptionChange({ userId, changedBy: 'stripe', source: 'stripe_webhook', previousStatus: prevStatus, newStatus: 'pro', reason: 'Checkout: Sponsor Monitor Pro', metadata: { stripeEventId: event.id, sessionId: session.id } }).catch((err) => { logger.error({ err }, "Failed to log subscription change"); });
+              if (companyName) {
+                autoCreateWatchFromPayment(userId, companyName).catch((err) => logger.error({ err }, '[AutoWatch] webhook pro failed'));
+              }
+            } else if (packageType === 'cos_check') {
+              sendSubscriptionNotifications(userId, 'COS Check Subscription', 'cos_check', sessionEmail).catch((err) => logger.error({ err }, '[Subscription] Notification failed'));
+            }
           }
         }
         break;
       }
+    }
+    } catch (err: unknown) {
+      logger.error({ err: err instanceof Error ? err.message : err, eventType: event.type, eventId: event.id }, 'Webhook handler failed processing event');
+      return res.status(500).send('Webhook handler error');
     }
 
     res.json({ received: true });
@@ -705,37 +746,8 @@ export function registerBillingRoutes(app: Express): void {
       }
 
       if (sessionUserId && sessionUserId === req.user.id) {
-        if (await tryClaimSession(sessionId)) {
-          if (packageType === 'starter') {
-            await withRetry(() => db.transaction(async (tx) => {
-              await tx.update(users).set({
-                credits: sql`COALESCE(${users.credits}, 0) + 50`,
-                subscriptionStatus: 'starter',
-                stripeSubscriptionId: session.subscription as string,
-                stripeCustomerId: session.customer as string,
-                updatedAt: new Date(),
-              }).where(eq(users.id, sessionUserId));
-            }), 'checkout-verify-starter');
-          } else if (packageType === 'pro') {
-            await withRetry(() => db.transaction(async (tx) => {
-              await tx.update(users).set({
-                credits: sql`COALESCE(${users.credits}, 0) + 100`,
-                subscriptionStatus: 'pro',
-                stripeSubscriptionId: session.subscription as string,
-                stripeCustomerId: session.customer as string,
-                updatedAt: new Date(),
-              }).where(eq(users.id, sessionUserId));
-            }), 'checkout-verify-pro');
-          } else if (packageType === 'unlimited') {
-            await withRetry(() => db.transaction(async (tx) => {
-              await tx.update(users).set({
-                subscriptionStatus: 'unlimited',
-                stripeSubscriptionId: session.subscription as string,
-                stripeCustomerId: session.customer as string,
-                updatedAt: new Date(),
-              }).where(eq(users.id, sessionUserId));
-            }), 'checkout-verify-unlimited');
-          } else if (packageType === 'master') {
+        if (packageType === 'master') {
+          if (await tryClaimSession(sessionId)) {
             await storage.createPaidSubmission({
               email: session.customer_details?.email || req.user.email || '',
               packageType: 'full',
@@ -744,8 +756,39 @@ export function registerBillingRoutes(app: Express): void {
               priority: true,
               phoneConsultationRequested: true,
             });
-          } else if (packageType === 'notification_starter') {
-            await withRetry(() => db.transaction(async (tx) => {
+          }
+        } else {
+          // Claim + grant in one transaction — see tryClaimSession's docstring.
+          // Reloading this page after a failed grant must not silently report
+          // stale pre-grant credits as "payment successful."
+          const granted = await withRetry(() => db.transaction(async (tx) => {
+            if (!(await tryClaimSession(sessionId, tx))) {
+              return false;
+            }
+            if (packageType === 'starter') {
+              await tx.update(users).set({
+                credits: sql`COALESCE(${users.credits}, 0) + 50`,
+                subscriptionStatus: 'starter',
+                stripeSubscriptionId: session.subscription as string,
+                stripeCustomerId: session.customer as string,
+                updatedAt: new Date(),
+              }).where(eq(users.id, sessionUserId));
+            } else if (packageType === 'pro') {
+              await tx.update(users).set({
+                credits: sql`COALESCE(${users.credits}, 0) + 100`,
+                subscriptionStatus: 'pro',
+                stripeSubscriptionId: session.subscription as string,
+                stripeCustomerId: session.customer as string,
+                updatedAt: new Date(),
+              }).where(eq(users.id, sessionUserId));
+            } else if (packageType === 'unlimited') {
+              await tx.update(users).set({
+                subscriptionStatus: 'unlimited',
+                stripeSubscriptionId: session.subscription as string,
+                stripeCustomerId: session.customer as string,
+                updatedAt: new Date(),
+              }).where(eq(users.id, sessionUserId));
+            } else if (packageType === 'notification_starter') {
               await tx.update(users).set({
                 subscriptionStatus: 'starter',
                 stripeSubscriptionId: session.subscription as string,
@@ -753,12 +796,7 @@ export function registerBillingRoutes(app: Express): void {
                 notifPrefs: sql`COALESCE(${users.notifPrefs}, ${JSON.stringify(DEFAULT_NOTIF_PREFS)}::jsonb)`,
                 updatedAt: new Date(),
               }).where(eq(users.id, sessionUserId));
-            }), 'checkout-verify-notification-starter');
-            if (companyName) {
-              await autoCreateWatchFromPayment(sessionUserId, companyName);
-            }
-          } else if (packageType === 'notification_pro') {
-            await withRetry(() => db.transaction(async (tx) => {
+            } else if (packageType === 'notification_pro') {
               await tx.update(users).set({
                 credits: sql`COALESCE(${users.credits}, 0) + 5`,
                 subscriptionStatus: 'pro',
@@ -767,10 +805,12 @@ export function registerBillingRoutes(app: Express): void {
                 notifPrefs: sql`COALESCE(${users.notifPrefs}, ${JSON.stringify(DEFAULT_NOTIF_PREFS)}::jsonb)`,
                 updatedAt: new Date(),
               }).where(eq(users.id, sessionUserId));
-            }), 'checkout-verify-notification-pro');
-            if (companyName) {
-              await autoCreateWatchFromPayment(sessionUserId, companyName);
             }
+            return true;
+          }), 'checkout-verify-session');
+
+          if (granted && (packageType === 'notification_starter' || packageType === 'notification_pro') && companyName) {
+            await autoCreateWatchFromPayment(sessionUserId, companyName);
           }
         }
 
@@ -800,6 +840,12 @@ export function registerBillingRoutes(app: Express): void {
   });
 
   app.get('/api/stripe/publishable-key', stripeKeyLimiter, asyncHandler(async (req, res) => {
+    if (process.env.STRIPE_PUBLISHABLE_KEY) {
+      success(res, { publishableKey: process.env.STRIPE_PUBLISHABLE_KEY });
+      return;
+    }
+    // Replit-hosted deployments without STRIPE_PUBLISHABLE_KEY set fall back
+    // to the Replit connector (Railway/Docker/etc. must set the env var above).
     const { getStripePublishableKey } = await import('../stripeClient');
     const key = await getStripePublishableKey();
     success(res, { publishableKey: key });

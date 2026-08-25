@@ -14,6 +14,7 @@ import { PDFAnalyzer } from "../services/pdfAnalyzer";
 import { COSAuthenticityChecker } from "../services/cosAuthenticityChecker";
 import { getClientIp, hashIpAddress } from "../ipRateLimit";
 import { sanitizeUploadPath, assertSafeUploadFilename, assertPdfMagicBytes } from "../utils/uploadGuard";
+import { combineWithCosVerdict } from "../utils/cosVerdictCombiner";
 import { success } from "../lib/response";
 import { asyncHandler } from "../lib/errorHandler";
 import { ApiError } from "../lib/apiError";
@@ -50,7 +51,7 @@ export const upload = multer({
 export function registerVerificationRoutes(app: Express): void {
   app.post('/api/verify', verifyLimiter, upload.single('file'), asyncHandler(async (req: any, res) => {
     if (!req.isAuthenticated()) {
-      throw new ApiError(403, 'CoS Check is currently in closed beta. Please log in and request access.');
+      throw new ApiError(403, 'CoS Check is currently in closed beta. Please log in and request access.', 'beta_login_required');
     }
 
     const betaUserId = req.user.id;
@@ -65,7 +66,7 @@ export function registerVerificationRoutes(app: Express): void {
     const hasAdminApproval = betaUser.cosCheckApproved === true;
 
     if (!isAdminUser && !hasCosSubscription && !hasPaidPlanWithCos && !hasAdminApproval) {
-      throw new ApiError(403, 'Your account is pending COS Check access. Please contact support or upgrade your subscription.');
+      throw new ApiError(403, 'Your account is pending COS Check access. Please contact support or upgrade your subscription.', 'cos_access_denied');
     }
 
     if (!req.file) {
@@ -195,14 +196,17 @@ export function registerVerificationRoutes(app: Express): void {
       analysis = analysisResult;
       analysis.cosCheck = cosCheckResult;
 
-      if (cosCheckResult.verdict === 'GENUINE' && analysisResult.result !== 'genuine') {
-        logger.info(`[COS] cosCheck GENUINE overrides pattern analysis '${analysisResult.result}' — treating as genuine`);
-        result = 'genuine';
-        analysis.result = 'genuine';
-        analysis.confidence = Math.max(analysis.confidence as number, 85);
-      } else {
-        result = analysisResult.result;
+      const combined = combineWithCosVerdict(
+        analysisResult.result,
+        analysis.confidence as number,
+        cosCheckResult.verdict,
+      );
+      if (combined.result !== analysisResult.result) {
+        logger.info(`[COS] cosCheck ${cosCheckResult.verdict} overrides pattern analysis '${analysisResult.result}' — treating as ${combined.result}`);
       }
+      result = combined.result;
+      analysis.result = combined.result;
+      analysis.confidence = combined.confidence;
       metadata = {
         format: 'Pdf',
         mimeType: 'application/pdf',

@@ -4,25 +4,21 @@ import { sql } from 'drizzle-orm';
 
 async function main() {
   try {
-    console.log('Finding and terminating sessions holding the advisory lock...');
+    console.log('Clearing stuck job_locks entries...');
     const result = await db.execute(sql`
-      SELECT pg_terminate_backend(pid)
-      FROM pg_stat_activity
-      WHERE pid IN (
-        SELECT pid FROM pg_locks WHERE locktype = 'advisory' AND objid = 7483920
-      )
+      DELETE FROM job_locks WHERE job_name = 'sponsorMonitorJob'
     `);
-    console.log('Result:', result.rows);
-    
+    console.log('Cleared lock rows:', result.rowCount ?? result.rows?.length ?? 0);
+
     // Also update any stuck 'running' jobs in the DB to 'failed'
     const updateResult = await db.execute(sql`
-      UPDATE monitor_job_runs 
-      SET status = 'failed', 
-          "errorMessage" = 'Manually cleared stuck lock', 
-          "completedAt" = NOW() 
+      UPDATE monitor_job_runs
+      SET status = 'failed',
+          error_message = 'Manually cleared stuck lock',
+          completed_at = NOW()
       WHERE status = 'running'
     `);
-    console.log('Updated stuck runs in DB.');
+    console.log('Updated stuck runs in DB:', updateResult.rowCount ?? 0);
 
     process.exit(0);
   } catch (error) {

@@ -269,11 +269,12 @@ Tests use [Vitest](https://vitest.dev/). Configuration is in `vitest.config.ts`.
 
 ### Test Location
 
-Tests live alongside source files as `*.test.ts`:
+Tests live in `__tests__/` directories alongside the code they cover, named `*.test.ts`:
 
 ```
-server/utils/sponsorStateMachine.test.ts
-server/utils/csvArchiver.test.ts
+server/utils/__tests__/lockManager.test.ts
+server/services/__tests__/cosVerdict.test.ts
+server/routes/__tests__/ops.test.ts
 ```
 
 ### Writing Tests
@@ -298,6 +299,31 @@ describe('myFunction', () => {
 - Auth middleware behaviour
 - Tier config access gates
 - COS scoring logic
+
+### End-to-End (Playwright)
+
+```bash
+npm run playwright:install            # one-time: fetch the Chromium binary
+TEST_BASE_URL=http://localhost:5000 npm run test:e2e
+```
+
+`TEST_BASE_URL` is **mandatory** — `playwright.config.ts` throws immediately if it is unset.
+The suite drives a real browser against a running server, so it needs `npm run dev` (or a
+deployed instance) plus a migrated, seeded database. It will not run in isolation.
+
+Specs live in `tests/e2e/`:
+
+| Spec | Covers |
+|---|---|
+| `journey1-free-cos-verification.spec.ts` | Anonymous CoS verification path |
+| `journey2-paid-submission-idor.spec.ts` | IDOR check on paid submissions |
+| `journey3-pdf-upload-metadata.spec.ts` | PDF upload + metadata extraction |
+
+> **Status: aspirational.** These three specs carry ~10 assertions between them and are
+> smoke-level, not a safety net. CI runs them on PRs into `main`, but only when the
+> `TEST_BASE_URL` repo variable/secret is configured — unset, the step logs a warning and
+> skips (`.github/workflows/ci.yml`). Treat a green E2E run as weak evidence and rely on
+> Vitest plus manual testing for real confidence.
 
 ### SonarCloud Pull Requests
 

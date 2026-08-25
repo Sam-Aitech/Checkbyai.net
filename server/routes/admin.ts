@@ -137,7 +137,11 @@ export function registerAdminRoutes(app: Express): void {
       res.json({ id: patternId, message: 'Trusted pattern created successfully', aiInstructions: !!aiInstructions });
     } catch (error) {
       logger.error({ err: error }, "Error creating trusted pattern:");
-      res.status(500).json({ message: "Failed to create trusted pattern" });
+      const statusCode = (error as any)?.statusCode || 500;
+      const message = statusCode === 500
+        ? "Failed to create trusted pattern"
+        : (error as Error).message;
+      res.status(statusCode).json({ message });
     } finally {
       if (safeFilePath) {
         try {
@@ -189,7 +193,11 @@ export function registerAdminRoutes(app: Express): void {
       });
     } catch (error) {
       logger.error({ err: error }, "Error extracting metadata:");
-      res.status(500).json({ message: "Failed to extract metadata" });
+      const statusCode = (error as any)?.statusCode || 500;
+      const message = statusCode === 500
+        ? "Failed to extract metadata"
+        : (error as Error).message;
+      res.status(statusCode).json({ message });
     } finally {
       if (safeFilePath) {
         try {

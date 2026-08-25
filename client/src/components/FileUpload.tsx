@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, FileText, AlertCircle, Loader2, Lock } from 'lucide-react';
+import { unwrapApiEnvelope } from '@/lib/apiEnvelope';
 
 interface FileUploadProps {
   onFileUpload: (file: File) => void;
@@ -94,7 +95,8 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
         throw new Error(errorData.error || errorData.message || `Verification failed (${response.status})`);
       }
 
-      const data = await response.json();
+      const envelope = await response.json();
+      const data = unwrapApiEnvelope<Record<string, any>>(envelope);
 
       const typeMapping: Record<string, 'genuine' | 'suspicious' | 'fake'> = {
         'genuine': 'genuine',

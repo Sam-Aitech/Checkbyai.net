@@ -7,6 +7,7 @@ import { useScrollReveal, spring, fadeUp, tapScale } from '@/lib/animations';
 import { useInView } from 'react-intersection-observer';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, getQueryFn } from '@/lib/queryClient';
+import { unwrapApiEnvelope } from '@/lib/apiEnvelope';
 import SEOHead from '@/components/SEOHead';
 import PageLayout from '@/components/PageLayout';
 
@@ -252,8 +253,8 @@ export default function CosPricing() {
   const isLoggedIn = !!user?.id;
 
   const paymentLinks: Record<string, string> = {
-    starter: 'https://buy.stripe.com/8x24gAb5g6JTglG5bZeZ204',
-    pro: 'https://buy.stripe.com/aFa00kflwd8h4CYcEreZ205',
+    starter: 'https://buy.stripe.com/3cIeVec9k1pz2uQdIveZ203',
+    pro: 'https://buy.stripe.com/fZufZi4GSfgp1qMfQDeZ201',
     unlimited: 'https://buy.stripe.com/dRm3cw7T41pz8Te5bZeZ202',
     master: 'https://buy.stripe.com/28E28s4GS6JTfhC6g3eZ200',
   };
@@ -283,7 +284,8 @@ export default function CosPricing() {
 
     try {
       const res = await apiRequest('POST', '/api/checkout/sign', { packageType: plan.packageType });
-      const { clientReferenceId } = await res.json();
+      const envelope = await res.json();
+      const { clientReferenceId } = unwrapApiEnvelope<{ clientReferenceId: string }>(envelope);
       const url = `${link}?client_reference_id=${encodeURIComponent(clientReferenceId)}&prefilled_email=${encodeURIComponent(user.email || '')}`;
       window.location.href = url;
     } catch (error: any) {

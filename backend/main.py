@@ -105,13 +105,18 @@ class PerformanceDatabase:
             return self.stats_cache
         
         # Calculate fresh stats
+        total_results = len(self.verification_results)
+        completed = len([r for r in self.verification_results.values()
+                         if r.get('type') is not None])
         stats = {
             'trustedPatterns': len(self.trusted_patterns),
-            'verificationsToday': len([r for r in self.verification_results.values() 
+            'verificationsToday': len([r for r in self.verification_results.values()
                                      if r.get('timestamp', '').startswith(datetime.now().strftime('%Y-%m-%d'))]),
-            'suspiciousDocs': len([r for r in self.verification_results.values() 
+            'suspiciousDocs': len([r for r in self.verification_results.values()
                                  if r.get('type') in ['Edited', 'Fake']]),
-            'successRate': '99.8%'  # Based on our test results
+            # Share of submitted documents that produced a verdict rather than
+            # erroring out. Not an accuracy figure.
+            'successRate': f'{round(completed / total_results * 100, 1)}%' if total_results else '0%'
         }
         
         # Cache the results

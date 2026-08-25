@@ -334,13 +334,22 @@ export async function setupAuth(app: Express) {
     }
   });
 
+  // Lets the login page know whether to show the Google button — Google
+  // OAuth is optional and hidden client-side when not configured.
+  app.get("/api/auth/providers", (req, res) => {
+    res.json({
+      success: true,
+      data: { google: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) },
+    });
+  });
+
   // Google OAuth routes
   if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-    app.get("/api/auth/google", 
+    app.get("/api/auth/google",
       passport.authenticate("google", { scope: ["profile", "email"] })
     );
 
-    app.get("/api/auth/google/callback", 
+    app.get("/api/auth/google/callback",
       passport.authenticate("google", { failureRedirect: "/login?error=auth_failed" }),
       (req, res) => {
         res.redirect("/sponsor-monitor");

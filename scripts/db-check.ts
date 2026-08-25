@@ -13,7 +13,7 @@ async function main() {
       recordCount: csvArchive.recordCount,
       syncStatus: csvArchive.syncStatus,
       isValid: csvArchive.isValid,
-      createdAt: csvArchive.createdAt,
+      downloadedAt: csvArchive.downloadedAt,
     }).from(csvArchive).orderBy(desc(csvArchive.snapshotDate)).limit(10);
     console.table(archives);
 

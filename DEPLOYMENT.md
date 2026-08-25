@@ -334,9 +334,36 @@ server {
 }
 ```
 
-### Docker (Coming Soon)
+### Docker
 
-A Dockerfile is in progress — see [GitHub Issues](https://github.com/Sam-Aitech/Checkbyai.net/issues) for status.
+A multi-stage `Dockerfile` and a `docker-compose.yml` (app + PostgreSQL 16 + Redis 7) are included.
+
+**Compose (local/self-hosted full stack):**
+
+```bash
+docker compose up --build
+```
+
+Compose provisions PostgreSQL and Redis and wires `DATABASE_URL`/`REDIS_*` automatically.
+Remaining secrets are read from your shell environment or a `.env` file in the project
+root — at minimum `SESSION_SECRET`, `PHONE_ENCRYPTION_KEY`, `IP_HASH_SALT`,
+`CHECKOUT_HMAC_SECRET`, and `DIGEST_SIGNING_KEY` must be set or the server exits on boot.
+
+**Standalone image (external managed DB):**
+
+```bash
+docker build -t checkbyai .
+docker run -p 5000:5000 --env-file .env checkbyai
+```
+
+Image details: runs as non-root user `checkbyai`, exposes port 5000, has a `HEALTHCHECK`
+against `/api/health`, and starts via `npm run start:with-migrate` (applies pending
+migrations before boot).
+
+> **Note:** The `bin/` directory (qsv, csvdiff) is created empty in the image — these
+> binaries are not baked in. Run `npm run setup:binaries` inside the container, or mount
+> a pre-populated volume, before the sponsor monitor job can complete Phase 2. Compose
+> persists this via the `app-bin` volume.
 
 ---
 

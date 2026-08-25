@@ -2,6 +2,7 @@ import { cn } from '@/lib/utils'
 import { useState, useEffect, useRef, Suspense, lazy } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { STALE_TIMES } from '@/lib/queryDefaults'
+import { unwrapApiEnvelope } from '@/lib/apiEnvelope'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useInView } from 'react-intersection-observer'
 import { Zap, Lock, ArrowRight, Play, Bell, Activity, CheckCircle, XCircle, AlertTriangle, ShieldCheck, Search, Loader2, ChevronDown } from 'lucide-react'
@@ -560,7 +561,7 @@ function clientSearch(q: string, limit = 20): FreeSearchResult[] {
   return hits
     .sort((a, b) => b.score - a.score || a.e.n.localeCompare(b.e.n))
     .slice(0, limit)
-    .map(({ e }) => ({
+    .map(({ e, score }) => ({
       id:               e.id,
       fingerprint:      String(e.id),
       organisationName: e.n,
@@ -568,7 +569,7 @@ function clientSearch(q: string, limit = 20): FreeSearchResult[] {
       typeRating:       e.t,
       route:            e.r,
       status:           e.s,
-      matchScore:       100,
+      matchScore:       score === 2 ? 100 : 60, // startsWith vs plain substring
       grantedAt:        null,
       isNew:            e.s === "NEWLY_GRANTED",
     }));
@@ -598,7 +599,8 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
     setHistoricalResults([])
     try {
       const res = await fetch(`/api/sponsors/historical-search?q=${encodeURIComponent(q)}`)
-      const data = await res.json()
+      const envelope = await res.json()
+      const data = unwrapApiEnvelope<{ results?: FreeSearchResult[] }>(envelope)
       if (res.ok) setHistoricalResults(data.results || [])
     } catch {
       // silently swallow — historical search is a best-effort enhancement
@@ -672,7 +674,8 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
     setHasSearched(true);
     try {
       const res = await fetch(`/api/sponsors/free-search?q=${encodeURIComponent(q)}`);
-      const data = await res.json();
+      const envelope = await res.json();
+      const data = unwrapApiEnvelope<{ results?: FreeSearchResult[] }>(envelope);
       if (res.ok) {
         const results = data.results || [];
         setSearchResults(results);

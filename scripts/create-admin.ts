@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import bcrypt from 'bcrypt';
 import { db } from '../server/db';
 import { users } from '../shared/schema';

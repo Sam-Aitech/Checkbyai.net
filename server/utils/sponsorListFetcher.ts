@@ -79,6 +79,46 @@ export function normalizeName(name: string): string {
     .trim();
 }
 
+/**
+ * Character class shared with the SQL-side `regexp_replace` in
+ * server/routes/sponsors.ts's prefilter query. Both sides must strip exactly
+ * the same characters for the namePrefilterToken() invariant to hold — a
+ * mismatch here silently drops sponsor watches from the prefilter with no
+ * visible error. Exported (rather than duplicated as a SQL string literal) so
+ * the two can't drift independently.
+ */
+export const SQL_COMPARABLE_CHAR_CLASS = "[^a-z0-9_ ]";
+
+/**
+ * SQL-side counterpart of the character stripping inside {@link normalizeName}:
+ * `regexp_replace(lower(current_name), '[^a-z0-9_ ]', '', 'g')`.
+ * Exported so the prefilter invariant can be asserted in tests.
+ */
+export function stripToSqlComparable(name: string): string {
+  return name.toLowerCase().replace(new RegExp(SQL_COMPARABLE_CHAR_CLASS, "g"), "");
+}
+
+/**
+ * Picks the most selective token of a normalized company name, for use as a
+ * `LIKE %token%` prefilter against {@link stripToSqlComparable}.
+ *
+ * Matching the *whole* normalized name is unsafe: normalizeName() deletes
+ * characters, so "Smith & Jones Ltd" normalizes to "smith jones", which is not
+ * a substring of the raw name. A single token is safe — both sides delete
+ * exactly the same characters, and suffix removal only ever drops whole
+ * tokens, so any token survives contiguously on the SQL side.
+ *
+ * Returns null when the name normalizes to nothing, in which case callers must
+ * not prefilter (there is no safe pattern).
+ */
+export function namePrefilterToken(name: string): string | null {
+  const tokens = normalizeName(name).split(" ").filter(Boolean);
+  if (tokens.length === 0) return null;
+  // Seeded with tokens[0] so reduce() can never throw on an empty array,
+  // independently of the guard above.
+  return tokens.reduce((longest, t) => (t.length > longest.length ? t : longest), tokens[0]);
+}
+
 export function generateFingerprint(name: string, city: string, route: string): string {
   const normalizedName = normalizeName(name);
   const normalizedCity = normalizeName(city);

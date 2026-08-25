@@ -6,6 +6,7 @@ import {
   Building2, FileCheck
 } from 'lucide-react';
 import { useLocation } from 'wouter';
+import { unwrapApiEnvelope } from '@/lib/apiEnvelope';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -541,7 +542,8 @@ export default function SimpleAdmin() {
       ]);
       
       if (statsRes.ok) {
-        setStats(await statsRes.json());
+        const envelope = await statsRes.json();
+        setStats(unwrapApiEnvelope(envelope));
       }
       if (patternsRes.ok) {
         setPatterns(await patternsRes.json());

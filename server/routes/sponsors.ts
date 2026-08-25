@@ -1,12 +1,12 @@
 import type { Express } from "express";
 import { db } from "../db";
-import { sql, eq, and, desc, inArray, gte } from "drizzle-orm";
+import { sql, eq, and, or, desc, inArray, gte } from "drizzle-orm";
 import { sponsorCanonical, sponsorChanges, companyWatches, sponsorWatches, dailyDigest } from "@shared/schema";
 import { z } from "zod";
 import { isAuthenticated } from "../auth";
 import { requireRole } from "../middleware/roleGuard";
 import { getWatchLimit as getWatchLimitFromTier, getTierConfig } from "../utils/tierConfig";
-import { normalizeName, generateFingerprint } from "../utils/sponsorListFetcher";
+import { normalizeName, generateFingerprint, namePrefilterToken, SQL_COMPARABLE_CHAR_CLASS } from "../utils/sponsorListFetcher";
 import { ensureIndexReady, isIndexReady, searchSponsors, searchSponsorsFallback, searchRevokedSponsors, getIndexHealth, type PagedSearchResult } from "../utils/sponsorSearch";
 import { recordSearchRequest } from "../services/monitoringService";
 import { generateHeadline, signDigest } from "../services/aiDigest";
@@ -744,7 +744,36 @@ export function registerSponsorRoutes(app: Express): void {
 
     let allCanonicalRows: { fingerprint: string; currentName: string; townCity: string | null; typeRating: string | null; route: string | null; status: string }[] = [];
     if (unfingerprintedWatches.length > 0) {
-      allCanonicalRows = await db
+      // Pre-filter in SQL instead of loading the entire ~140k-row table into
+      // memory. The exact normalizeName() comparison below still decides the
+      // match; this only has to avoid discarding a true candidate.
+      //
+      // Matching on the whole normalized name would be WRONG: normalizeName()
+      // deletes characters (`&`, apostrophes), so "Smith & Jones Ltd"
+      // normalizes to "smith jones" which is not a substring of the raw
+      // "smith & jones ltd". Instead match a single normalized *token*
+      // against the raw name with the same characters stripped. A token is a
+      // maximal run of [a-z0-9_]; both sides delete exactly the same
+      // characters, and suffix removal only ever drops whole tokens, so a
+      // token is guaranteed to survive contiguously on the SQL side.
+      // Named "fragment" rather than "token": this is a piece of a company
+      // name, and calling it a token trips security/detect-possible-timing-attacks.
+      const tokenPatterns = unfingerprintedWatches.map((w) => {
+        const fragment = namePrefilterToken(w.organisationName);
+        if (fragment === null) return null;
+        // Escape LIKE wildcards so a name containing % or _ matches literally.
+        const escaped = fragment.replace(/[%_\\]/g, (c) => "\\" + c);
+        return `%${escaped}%`;
+      });
+
+      // A watch whose name normalizes to nothing has no safe pattern — fall
+      // back to an unfiltered read rather than silently dropping it.
+      const canPrefilter = tokenPatterns.every((p) => p !== null);
+      const uniquePatterns = [...new Set(tokenPatterns.filter((p): p is string => p !== null))];
+
+      const strippedName = sql`regexp_replace(lower(${sponsorCanonical.currentName}), ${SQL_COMPARABLE_CHAR_CLASS}, '', 'g')`;
+
+      const baseQuery = db
         .select({
           fingerprint: sponsorCanonical.fingerprint,
           currentName: sponsorCanonical.currentName,
@@ -754,6 +783,10 @@ export function registerSponsorRoutes(app: Express): void {
           status: sponsorCanonical.status,
         })
         .from(sponsorCanonical);
+
+      allCanonicalRows = canPrefilter
+        ? await baseQuery.where(or(...uniquePatterns.map((p) => sql`${strippedName} LIKE ${p}`)))
+        : await baseQuery;
     }
 
     const orgNames = [...new Set(watches.map((w) => w.organisationName).filter(Boolean))];

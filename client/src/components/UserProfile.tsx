@@ -13,6 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Crown, User, LogOut, Settings, LayoutDashboard, CreditCard } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { unwrapApiEnvelope } from "@/lib/apiEnvelope";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 
@@ -40,11 +41,12 @@ export default function UserProfile() {
     try {
       setOpeningPortal(true);
       const res = await apiRequest("POST", "/api/billing/portal");
-      const data = await res.json();
+      const envelope = await res.json();
+      const data = unwrapApiEnvelope<Record<string, any>>(envelope);
       if (data.url) {
         window.location.href = data.url;
       } else {
-        throw new Error(data.message || "No portal URL returned");
+        throw new Error(envelope.error || data.message || "No portal URL returned");
       }
     } catch (error: any) {
       toast({

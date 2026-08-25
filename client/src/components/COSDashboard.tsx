@@ -134,6 +134,7 @@ export default function COSDashboard() {
 
   // Demo animation handler
   const startDemo = () => {
+    setShowDemo(true);
     setDemoStep(0);
     setIsAnimating(true);
     
