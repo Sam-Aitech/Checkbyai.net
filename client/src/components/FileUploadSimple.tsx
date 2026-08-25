@@ -9,7 +9,7 @@ interface AccessDeniedCardProps {
   children: ReactNode;
 }
 
-function AccessDeniedCard({ title, message, children }: AccessDeniedCardProps) {
+function AccessDeniedCard({ title, message, children }: Readonly<AccessDeniedCardProps>) {
   return (
     <div className="w-full border border-amber-200 dark:border-amber-700/40 rounded-xl p-6 bg-amber-50 dark:bg-amber-900/10 text-center space-y-4">
       <div className="flex justify-center">
