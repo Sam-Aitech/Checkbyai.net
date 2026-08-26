@@ -5,7 +5,7 @@ import { STALE_TIMES } from '@/lib/queryDefaults'
 import { unwrapApiEnvelope } from '@/lib/apiEnvelope'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useInView } from 'react-intersection-observer'
-import { Zap, Lock, ArrowRight, Play, Bell, Activity, CheckCircle, XCircle, AlertTriangle, ShieldCheck, Search, Loader2, ChevronDown } from 'lucide-react'
+import { Zap, Lock, ArrowRight, Play, Bell, Activity, CheckCircle, XCircle, AlertTriangle, ShieldCheck, Search, Loader2, ChevronDown, Building2, BadgeCheck } from 'lucide-react'
 import { ShieldMonitorIcon, DocumentVerifyIcon, TimelineClockIcon, EarlyWarningIcon,
   HeroAlertIcon,
   HeroTrackedIcon,
@@ -14,6 +14,7 @@ import { ShieldMonitorIcon, DocumentVerifyIcon, TimelineClockIcon, EarlyWarningI
   UKLockIcon
 } from './icons/CheckByAIIcons';
 import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
@@ -21,6 +22,8 @@ import { Link, useLocation } from 'wouter'
 import logoImg from "@assets/logo_material.png";
 import Footer from '@/components/Footer'
 import LandingDigest from '@/components/LandingDigest'
+import CosSamplePreview from '@/components/CosSamplePreview'
+import { COMPANY_DETAILS } from '@/lib/companyDetails'
 
 const AnimatedBackground = lazy(() => import('./AnimatedBackground'))
 const Enhanced3DDemo = lazy(() => import('./Enhanced3DDemo'))
@@ -102,7 +105,7 @@ function RecentlyRevokedSection() {
                 <h2 className="text-xl font-bold text-foreground">Recently Revoked Licences</h2>
               </div>
               <p className="text-sm text-muted-foreground">
-                Latest removals from the Home Office register — updated nightly.
+                Latest removals from the Home Office register, updated nightly.
                 {!statsLoading && stats?.lastRunDate && (
                   <span className="ml-1 text-muted-foreground/70">
                     Register last checked: {formatRunDate(stats.lastRunDate)}.
@@ -288,7 +291,7 @@ function NightlyStatsBar() {
                 {revoked12Label}
               </p>
               <p className="text-xs text-slate-400 mt-0.5 group-hover:text-slate-300 transition-colors">
-                Licences revoked — 12 months <ArrowRight className="w-3 h-3 inline ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                Licences revoked · 12 months <ArrowRight className="w-3 h-3 inline ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
               </p>
             </Link>
           </div>
@@ -318,11 +321,11 @@ function changeLabel(c: LatestChange): string {
   const date = new Date(c.detectedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
   switch (c.changeType) {
     case "REMOVED_REVOKED":
-      return `'${name}' had its licence revoked — detected ${date}.`;
+      return `'${name}' had its licence revoked, detected ${date}.`;
     case "DOWNGRADED":
-      return `'${name}' was downgraded${c.previousValue && c.newValue ? ` from ${c.previousValue} to ${c.newValue}` : ""} — detected ${date}.`;
+      return `'${name}' was downgraded${c.previousValue && c.newValue ? ` from ${c.previousValue} to ${c.newValue}` : ""}, detected ${date}.`;
     case "UPGRADED":
-      return `'${name}' was upgraded${c.previousValue && c.newValue ? ` from ${c.previousValue} to ${c.newValue}` : ""} — detected ${date}.`;
+      return `'${name}' was upgraded${c.previousValue && c.newValue ? ` from ${c.previousValue} to ${c.newValue}` : ""}, detected ${date}.`;
     default:
       return `Change detected for '${name}' on ${date}.`;
   }
@@ -373,13 +376,13 @@ function UrgencyBanner() {
 
   if (removedCount > 0) {
     return (
-      <div className="bg-red-700 text-white">
+      <div className="bg-red-800 text-white">
         <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2.5 text-center">
-          <span className="urgency-dot shrink-0" aria-hidden="true" />
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
           <p className="text-xs sm:text-sm font-medium">
-            <span className="font-bold">URGENT:</span>{" "}
-            {removedCount} sponsor licence{removedCount !== 1 ? "s" : ""} revoked in the last nightly run.{" "}
-            <Link href="/sponsor-monitor" className="underline underline-offset-2 font-bold">Are you monitoring your employer?</Link>
+            <span className="font-bold">{removedCount} sponsor licence{removedCount !== 1 ? "s" : ""} revoked</span>{" "}
+            in the last nightly register update.{" "}
+            <Link href="/sponsor-monitor" className="underline underline-offset-2 font-bold">Check if your employer is affected →</Link>
           </p>
         </div>
       </div>
@@ -408,7 +411,7 @@ function UrgencyBanner() {
           <CheckCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
           <p className="text-xs sm:text-sm font-medium">
             <span className="font-bold">{addedCount} new sponsor{addedCount !== 1 ? "s" : ""}</span>{" "}
-            added in the last nightly run — register updated {formatRunDate(lastRunDate)}.
+            added in the last nightly run. Register updated {formatRunDate(lastRunDate)}.
           </p>
         </div>
       </div>
@@ -424,7 +427,7 @@ function UrgencyBanner() {
         <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2 text-center">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-300" aria-hidden="true" />
           <p className="text-xs sm:text-sm font-medium">
-            Register data may be out of date — last checked {formatRunDate(lastRunDate)}. The nightly update may have been delayed.
+            Register data may be out of date, last checked {formatRunDate(lastRunDate)}. The nightly update may have been delayed.
           </p>
         </div>
       </div>
@@ -437,7 +440,7 @@ function UrgencyBanner() {
       <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2 text-center">
         <CheckCircle className="w-3.5 h-3.5 shrink-0 text-emerald-400" aria-hidden="true" />
         <p className="text-xs sm:text-sm font-medium">
-          Register checked {formatRunDate(lastRunDate)} — no changes detected.
+          Register checked {formatRunDate(lastRunDate)}, no changes detected.
         </p>
       </div>
     </div>
@@ -585,6 +588,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
   const [showDemo, setShowDemo] = useState(false)
   const [, setLocation] = useLocation()
   const [searchQuery, setSearchQuery] = useState("")
+  const [alertMeOnSubmit, setAlertMeOnSubmit] = useState(false)
   const [searchResults, setSearchResults] = useState<FreeSearchResult[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
@@ -658,6 +662,12 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
   const handleSearchSubmit = async () => {
     const q = searchQuery.trim();
     if (q.length < 3) return;
+    // "Alert me" is on: hand off to Sponsor Monitor, which owns real watch
+    // creation and auth/freemium handling — the hero stays a pure discovery surface.
+    if (alertMeOnSubmit) {
+      setLocation(`/sponsor-monitor?q=${encodeURIComponent(q)}&alert=1`);
+      return;
+    }
     // If the client index is already loaded, the useEffect already populated results
     if (_clientIndex !== null) {
       const results = clientSearch(q);
@@ -742,7 +752,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
               </div>
 
               <div className="flex items-center gap-2">
-                <Link href="/pricing" className="hidden sm:flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-full shadow-lg shadow-emerald-500/20 transition-all">
+                <Link href="/pricing" className="hidden sm:flex items-center gap-1.5 px-4 py-2 text-sm text-white/70 hover:text-white font-medium rounded-full hover:bg-white/10 transition-all duration-200">
                   <Bell className="w-3.5 h-3.5" />Get Alerts
                 </Link>
                 <Link href="/login" className="px-4 py-2 text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-all">Sign In</Link>
@@ -752,21 +762,19 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
             <div className="grid lg:grid-cols-2 gap-16 items-center min-h-[70vh] py-8">
               <div className="space-y-7">
                 <motion.div initial={{ opacity: 0, x: -20 }} animate={isLoaded ? { opacity: 1, x: 0 } : {}} transition={{ ...springGentle, delay: 0.1 }}>
-                  <span className="inline-flex items-center gap-2 text-red-300 text-xs font-bold bg-red-500/20 px-4 py-2 rounded-full backdrop-blur-sm tracking-wider uppercase">
-                    <Activity className="w-3.5 h-3.5 animate-pulse" />
-                    UK Home Office Register Monitor
+                  <span className="inline-flex items-center gap-2 text-indigo-200 text-xs font-bold bg-indigo-500/20 px-4 py-2 rounded-full backdrop-blur-sm tracking-wider uppercase">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    Automated UK Sponsor Licence Monitoring
                   </span>
                 </motion.div>
 
                 <motion.h1 initial={{ opacity: 0, y: 30 }} animate={isLoaded ? { opacity: 1, y: 0 } : {}} transition={{ ...spring, delay: 0.2 }} className="text-4xl sm:text-5xl lg:text-[3.4rem] editorial-heading text-white leading-[1.1]">
-                  Your Sponsor Was Revoked{' '}
-                  <span className="text-gradient-red">Last Night.</span>
-                  <br />
-                  <span className="text-white/80">Nobody Told You.</span>
+                  Automated UK Sponsor Licence{' '}
+                  <span className="text-gradient-indigo">& Integrity Monitoring</span>
                 </motion.h1>
 
                 <motion.p initial={{ opacity: 0, y: 20 }} animate={isLoaded ? { opacity: 1, y: 0 } : {}} transition={{ ...springGentle, delay: 0.35 }} className="text-base text-white/70 max-w-lg leading-relaxed">
-                  The Home Office updates the register at midnight. They do not email you. We check every night — Pro subscribers are alerted within 30 minutes. Starter subscribers by 6 PM, same day, before any letter arrives.
+                  The Home Office updates the sponsor register every night. We check it for you and alert you the moment your employer's status changes: Pro subscribers within 30 minutes, Starter subscribers by 6 PM the same day.
                 </motion.p>
 
                 {/* ── Hero search box ───────────────────────────────────── */}
@@ -776,7 +784,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                     <input
                       type="text"
                       ref={searchInputRef}
-                      placeholder="Search any employer — e.g. NHS, Tata, Deloitte…"
+                      placeholder="Search any employer, e.g. NHS, Tata, Deloitte…"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && handleSearchSubmit()}
@@ -787,10 +795,16 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                       disabled={searchQuery.trim().length < 3 || searchLoading}
                       className="absolute right-2 top-1/2 -translate-y-1/2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-white rounded-lg px-4 h-10 text-sm font-semibold transition-colors flex items-center gap-1.5"
                     >
-                      {searchLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Search className="w-3.5 h-3.5" />Search</>}
+                      {searchLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : alertMeOnSubmit ? <><Bell className="w-3.5 h-3.5" />Search &amp; Alert Me</> : <><Search className="w-3.5 h-3.5" />Search</>}
                     </button>
                   </div>
-                  <p className="text-xs text-white/50">Free, unlimited searches. No login required. 124,000+ licensed sponsors.</p>
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <p className="text-xs text-white/50">Free, unlimited searches. No login required. 124,000+ licensed sponsors.</p>
+                    <label className="flex items-center gap-2 text-xs text-white/70 cursor-pointer select-none">
+                      <Switch checked={alertMeOnSubmit} onCheckedChange={setAlertMeOnSubmit} className="scale-90" />
+                      Also alert me when this employer's licence changes
+                    </label>
+                  </div>
 
                   {/* Hero search results */}
                   {searchLoading && (
@@ -799,7 +813,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                     </div>
                   )}
                   {searchUnavailable && (
-                    <p className="text-amber-300 text-xs py-1">Search temporarily unavailable — please try again.</p>
+                    <p className="text-amber-300 text-xs py-1">Search temporarily unavailable. Please try again.</p>
                   )}
                   {!searchLoading && !searchUnavailable && hasSearched && searchResults.length === 0 && !historicalLoading && historicalResults.length === 0 && (
                     <p className="text-white/60 text-xs py-1">No sponsors found. Try a different name.</p>
@@ -853,7 +867,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                     <div className="space-y-1.5">
                       <div className="flex items-center gap-1.5 pt-0.5">
                         <XCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
-                        <p className="text-xs text-red-300 font-semibold">Found in historical register — licence revoked</p>
+                        <p className="text-xs text-red-300 font-semibold">Found in historical register: licence revoked</p>
                       </div>
                       <div className="space-y-1.5 max-h-48 overflow-y-auto pr-0.5">
                         {historicalResults.map((r) => {
@@ -893,18 +907,13 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                   )}
                 </motion.div>
 
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <Button variant="outline" size="sm" className="border-white/30 text-white hover:bg-white/10 rounded-full px-5 font-semibold transition-all duration-200 bg-transparent text-xs" onClick={onStartVerification}>
-                    <Play className="mr-1.5 w-3.5 h-3.5" />
-                    Verify a Document
-                  </Button>
-                  <Link href="/pricing?plan=starter">
-                    <Button size="sm" className="bg-emerald-500 hover:bg-emerald-600 text-white px-5 rounded-full font-bold shadow-lg shadow-emerald-500/20 transition-all duration-200 w-full sm:w-auto text-xs">
-                      <Bell className="mr-1.5 w-3.5 h-3.5" />
-                      Get Licence Alerts
-                      <span className="ml-1.5 font-normal text-emerald-200">from £24.99/mo</span>
-                    </Button>
-                  </Link>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-x-4 gap-y-2">
+                  <p className="text-xs text-white/60">
+                    CheckByAI is an independent monitoring service and is not affiliated with the UK Home Office or UKVI.
+                  </p>
+                  <a href="#cos-verification" className="text-xs text-white/70 hover:text-white underline underline-offset-2 whitespace-nowrap">
+                    Need to verify a CoS document instead? →
+                  </a>
                 </div>
 
                 <motion.div initial={{ opacity: 0 }} animate={isLoaded ? { opacity: 1 } : {}} transition={{ ...springGentle, delay: 0.6 }} className="flex items-center gap-4 sm:gap-6 pt-1 flex-wrap">
@@ -912,6 +921,8 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                     { icon: <HeroAlertIcon className="w-5 h-5 flex-shrink-0" size={20} />, label: "Pro: alerts in 30 min", colorClass: "text-red-200", borderClass: "border-red-500/20 bg-red-500/10 shadow-[0_0_15px_rgba(239,68,68,0.1)]" },
                     { icon: <HeroTrackedIcon className="w-5 h-5 flex-shrink-0" size={20} />, label: "47,823 sponsors tracked", colorClass: "text-indigo-200", borderClass: "border-indigo-500/20 bg-indigo-500/10 shadow-[0_0_15px_rgba(99,102,241,0.1)]" },
                     { icon: <HeroGDPRLockIcon className="w-5 h-5 flex-shrink-0" size={20} />, label: "UK GDPR", colorClass: "text-blue-200", borderClass: "border-blue-500/20 bg-blue-500/10 shadow-[0_0_15px_rgba(59,130,246,0.1)]" },
+                    ...(COMPANY_DETAILS.companyNumber ? [{ icon: <Building2 className="w-5 h-5 flex-shrink-0" />, label: COMPANY_DETAILS.companyNumber, colorClass: "text-slate-200", borderClass: "border-slate-400/20 bg-slate-400/10 shadow-[0_0_15px_rgba(148,163,184,0.1)]" }] : []),
+                    ...(COMPANY_DETAILS.icoRegistration ? [{ icon: <BadgeCheck className="w-5 h-5 flex-shrink-0" />, label: COMPANY_DETAILS.icoRegistration, colorClass: "text-emerald-200", borderClass: "border-emerald-500/20 bg-emerald-500/10 shadow-[0_0_15px_rgba(16,185,129,0.1)]" }] : []),
                   ].map((item, i) => (
                     <div key={i} className="flex items-center gap-2.5 text-white/90 hover:text-white transition-all duration-300 md:hover:-translate-y-0.5 group">
                       <span className={cn(
@@ -989,7 +1000,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                   <TimelineClockIcon size={30} />
                 </div>
                 <h3 className="text-lg font-bold text-foreground mb-3">The 12-Hour Advantage</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">The register updates at midnight. Letters are posted at 9 AM. Pro subscribers receive a WhatsApp alert at 00:30 — half a day before their employer even knows. Starter subscribers are alerted by 6 PM, still the same day.</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">The register updates at midnight. Letters are posted at 9 AM. Pro subscribers receive a WhatsApp alert at 00:30, half a day before their employer even knows. Starter subscribers are alerted by 6 PM, still the same day.</p>
               </CardContent>
             </Card>
             <Card className="border-slate-200 dark:border-slate-800 glow-amber transition-all duration-300">
@@ -1129,7 +1140,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
             <AccordionItem value="q7" className="border rounded-xl px-4 bg-white dark:bg-slate-900">
               <AccordionTrigger className="text-sm font-semibold text-foreground hover:no-underline py-4">Is there a refund policy?</AccordionTrigger>
               <AccordionContent className="text-sm text-muted-foreground pb-4">
-                Yes. We offer a 30-day money-back guarantee on all plans — no questions asked. If you are not satisfied within the first 30 days, contact us and we will issue a full refund. After 30 days you can cancel anytime; your plan stays active until the end of the billing period.
+                Yes. We offer a 30-day money-back guarantee on all plans, no questions asked. If you are not satisfied within the first 30 days, contact us and we will issue a full refund. After 30 days you can cancel anytime; your plan stays active until the end of the billing period.
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="q8" className="border rounded-xl px-4 bg-white dark:bg-slate-900">
@@ -1142,7 +1153,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
         </div>
       </section>
 
-      <section className="py-16 sm:py-20 bg-background border-t border-border/50">
+      <section id="cos-verification" className="py-16 sm:py-20 bg-background border-t border-border/50 scroll-mt-20">
         <div className="max-w-5xl mx-auto px-6 sm:px-8 lg:px-12">
           <div className="text-center max-w-2xl mx-auto mb-14">
             <span className="editorial-caption text-primary block mb-4">Also Available</span>
@@ -1153,6 +1164,8 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
               Received a Certificate of Sponsorship from a prospective employer? Upload the PDF to assess whether the document appears unaltered or has been modified. No personal data is retained at any stage.
             </p>
           </div>
+
+          <CosSamplePreview />
 
           <div className="grid md:grid-cols-3 gap-6 mb-10">
             <FeatureCard icon={<ShieldMonitorIcon size={30} />} title="Home Office Compliance" description="Our tool cross-references your Certificate of Sponsorship against known Home Office document structure and formatting standards. Results are indicative only and do not constitute legal verification." index={0} />
@@ -1170,6 +1183,9 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                 <Play className="mr-2 w-4 h-4" />Watch Demo
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground mt-4">
+              CheckByAI is an independent verification service and is not affiliated with the UK Home Office or UKVI.
+            </p>
           </div>
         </div>
       </section>
@@ -1178,14 +1194,14 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
 
       <section className="bg-slate-950 text-white py-16">
         <div className="max-w-2xl mx-auto px-6 text-center">
-          <h2 className="text-2xl sm:text-3xl font-bold mb-3">Do Not Wait For The Letter</h2>
-          <p className="text-slate-300 mb-8 max-w-lg mx-auto">Get instant alerts when a sponsor licence changes. Protect your visa, your career, and your future in the UK.</p>
+          <h2 className="text-2xl sm:text-3xl font-bold mb-3">Stay Ahead of Sponsor Licence Changes</h2>
+          <p className="text-slate-300 mb-8 max-w-lg mx-auto">Get automated alerts the moment a sponsor licence changes status, before it affects your visa, your career, or your future in the UK.</p>
           <Link href="/pricing">
             <Button size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-base px-10 py-6 rounded-xl shadow-lg shadow-emerald-500/20">
               <ShieldCheck className="w-5 h-5 mr-2" />Start Monitoring Now
             </Button>
           </Link>
-          <p className="text-xs text-slate-500 mt-4">From 82p per day. Cancel anytime.</p>
+          <p className="text-xs text-slate-500 mt-4">Free to start. Cancel anytime.</p>
         </div>
       </section>
 

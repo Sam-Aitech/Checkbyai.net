@@ -4,6 +4,9 @@ import session from "express-session";
 import type { Express, RequestHandler } from "express";
 import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
+import { db } from "./db";
+import { notificationPreferences } from "@shared/schema";
+import { eq } from "drizzle-orm";
 import crypto from "crypto";
 import { otpLimiter, otpEmailLimiter } from "./middleware/rateLimiter";
 import { getAppUrl } from "./utils/appUrl";
@@ -447,9 +450,25 @@ export async function setupAuth(app: Express) {
 
       // Mark user as verified
       const verifiedUser = await storage.verifyUser(email);
-      
+
       if (!verifiedUser) {
         return res.status(500).json({ message: "Failed to verify user" });
+      }
+
+      // First-time email-OTP users have no notification_preferences row, which
+      // would silently block them from ever receiving email alerts (free tier
+      // included) even though their email is already verified. Default one in.
+      const existingPrefs = await db
+        .select({ id: notificationPreferences.id })
+        .from(notificationPreferences)
+        .where(eq(notificationPreferences.userId, verifiedUser.id))
+        .limit(1);
+      if (existingPrefs.length === 0) {
+        await db.insert(notificationPreferences).values({
+          userId: verifiedUser.id,
+          emailEnabled: true,
+          email: verifiedUser.email,
+        });
       }
 
       // Create session

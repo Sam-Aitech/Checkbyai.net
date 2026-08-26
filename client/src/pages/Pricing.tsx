@@ -10,6 +10,7 @@ import { apiRequest, getQueryFn } from '@/lib/queryClient';
 import { unwrapApiEnvelope } from '@/lib/apiEnvelope';
 import SEOHead from '@/components/SEOHead';
 import PageLayout from '@/components/PageLayout';
+import { usePackagePrices } from '@/hooks/usePackagePrices';
 
 interface User {
   id: string;
@@ -19,17 +20,57 @@ interface User {
   subscriptionStatus?: string;
 }
 
-interface NotificationPlan {
+interface PlanCardData {
   name: string;
   price: string;
   period: string;
   description: string;
-  packageType: 'notification_starter' | 'notification_pro';
+  packageType: string;
   popular?: boolean;
   features: string[];
   notIncluded?: string[];
   icon: typeof Bell;
 }
+
+interface NotificationPlan extends PlanCardData {
+  packageType: 'notification_starter' | 'notification_pro';
+}
+
+interface AnnualPlan extends PlanCardData {
+  packageType: 'alert_annual' | 'alert_annual_pro';
+}
+
+const annualPlans: AnnualPlan[] = [
+  {
+    name: 'Alert Pass (Annual)',
+    price: '£9.99',
+    period: '/year',
+    description: 'Low-commitment monitoring for a single employer.',
+    packageType: 'alert_annual',
+    icon: Bell,
+    features: [
+      'Monitor 1 company for 12 months',
+      'Email + WhatsApp alerts',
+      'Same-day alerts (6 PM)',
+      '30-day change history',
+    ],
+  },
+  {
+    name: 'Alert Pass Pro (Annual)',
+    price: '£19.99',
+    period: '/year',
+    description: 'Full protection with immediate alerts, billed once a year.',
+    packageType: 'alert_annual_pro',
+    popular: true,
+    icon: Zap,
+    features: [
+      'Monitor up to 5 companies for 12 months',
+      'Email + WhatsApp + SMS',
+      'Immediate alerts',
+      '90-day change history',
+    ],
+  },
+];
 
 const notificationPlans: NotificationPlan[] = [
   {
@@ -71,13 +112,14 @@ const notificationPlans: NotificationPlan[] = [
   },
 ];
 
-function NotificationPlanCard({ plan, index, isLoggedIn, loading, onSelect, highlighted }: {
-  plan: NotificationPlan;
+function PlanCard<T extends PlanCardData>({ plan, index, isLoggedIn, loading, onSelect, highlighted, available = true }: {
+  plan: T;
   index: number;
   isLoggedIn: boolean;
   loading: string | null;
-  onSelect: (plan: NotificationPlan) => void;
+  onSelect: (plan: T) => void;
   highlighted?: boolean;
+  available?: boolean;
 }) {
   const [ref, inView] = useInView({ triggerOnce: true, threshold: 0.15 });
 
@@ -160,6 +202,8 @@ function NotificationPlanCard({ plan, index, isLoggedIn, loading, onSelect, high
               <LogIn className="w-4 h-4" />
               Login to Subscribe
             </span>
+          ) : !available ? (
+            'Coming soon'
           ) : (
             `Get ${plan.name}`
           )}
@@ -178,6 +222,7 @@ export default function Pricing() {
   const { toast } = useToast();
   const [loading, setLoading] = useState<string | null>(null);
   const planCardsRef = useRef<HTMLDivElement>(null);
+  const { getPriceId } = usePackagePrices();
 
   // Scroll to the plan cards when arriving from the landing page with ?plan=
   useEffect(() => {
@@ -239,6 +284,33 @@ export default function Pricing() {
         description: error.message || 'Failed to start checkout. Please try again.',
         variant: 'destructive',
       });
+      setLoading(null);
+    }
+  };
+
+  const handleSelectAnnual = async (plan: AnnualPlan) => {
+    if (!isLoggedIn) {
+      toast({ title: 'Login Required', description: 'Please log in or create an account to subscribe.' });
+      setLocation('/login');
+      return;
+    }
+    const priceId = getPriceId(plan.packageType);
+    if (!priceId) {
+      toast({ title: 'Not available yet', description: 'This plan is not open for checkout yet. Please check back shortly.', variant: 'destructive' });
+      return;
+    }
+    setLoading(plan.packageType);
+    try {
+      const res = await apiRequest('POST', '/api/checkout/credits', {
+        priceId,
+        packageType: plan.packageType,
+        ...(companyParam ? { companyName: companyParam } : {}),
+      });
+      const envelope = await res.json();
+      const { url } = unwrapApiEnvelope<{ url: string }>(envelope);
+      window.location.href = url;
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message || 'Failed to start checkout. Please try again.', variant: 'destructive' });
       setLoading(null);
     }
   };
@@ -324,7 +396,7 @@ export default function Pricing() {
             className="text-center mb-12"
           >
             <span className="editorial-caption text-muted-foreground mb-4 inline-block">
-              Notification Engine
+              Sponsor Licence Alerts
             </span>
             {companyParam ? (
               <>
@@ -364,10 +436,27 @@ export default function Pricing() {
             )}
           </motion.div>
 
-          <div className="max-w-3xl mx-auto mb-16">
+          <div className="max-w-3xl mx-auto mb-8">
             <div ref={planCardsRef} className="grid md:grid-cols-2 gap-6">
+              {annualPlans.map((plan, index) => (
+                <PlanCard
+                  key={plan.packageType}
+                  plan={plan}
+                  index={index}
+                  isLoggedIn={isLoggedIn}
+                  loading={loading}
+                  onSelect={handleSelectAnnual}
+                  available={!!getPriceId(plan.packageType)}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="max-w-3xl mx-auto mb-16">
+            <p className="text-center text-sm text-muted-foreground mb-4">Prefer to pay monthly instead?</p>
+            <div className="grid md:grid-cols-2 gap-6">
               {notificationPlans.map((plan, index) => (
-                <NotificationPlanCard
+                <PlanCard
                   key={plan.packageType}
                   plan={plan}
                   index={index}
