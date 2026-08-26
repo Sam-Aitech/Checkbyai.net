@@ -20,27 +20,24 @@ interface User {
   subscriptionStatus?: string;
 }
 
-interface NotificationPlan {
+interface PlanCardData {
   name: string;
   price: string;
   period: string;
   description: string;
-  packageType: 'notification_starter' | 'notification_pro';
+  packageType: string;
   popular?: boolean;
   features: string[];
   notIncluded?: string[];
   icon: typeof Bell;
 }
 
-interface AnnualPlan {
-  name: string;
-  price: string;
-  period: string;
-  description: string;
+interface NotificationPlan extends PlanCardData {
+  packageType: 'notification_starter' | 'notification_pro';
+}
+
+interface AnnualPlan extends PlanCardData {
   packageType: 'alert_annual' | 'alert_annual_pro';
-  popular?: boolean;
-  features: string[];
-  icon: typeof Bell;
 }
 
 const annualPlans: AnnualPlan[] = [
@@ -115,13 +112,14 @@ const notificationPlans: NotificationPlan[] = [
   },
 ];
 
-function NotificationPlanCard({ plan, index, isLoggedIn, loading, onSelect, highlighted }: {
-  plan: NotificationPlan;
+function PlanCard<T extends PlanCardData>({ plan, index, isLoggedIn, loading, onSelect, highlighted, available = true }: {
+  plan: T;
   index: number;
   isLoggedIn: boolean;
   loading: string | null;
-  onSelect: (plan: NotificationPlan) => void;
+  onSelect: (plan: T) => void;
   highlighted?: boolean;
+  available?: boolean;
 }) {
   const [ref, inView] = useInView({ triggerOnce: true, threshold: 0.15 });
 
@@ -204,74 +202,6 @@ function NotificationPlanCard({ plan, index, isLoggedIn, loading, onSelect, high
               <LogIn className="w-4 h-4" />
               Login to Subscribe
             </span>
-          ) : (
-            `Get ${plan.name}`
-          )}
-        </motion.button>
-      </div>
-    </motion.div>
-  );
-}
-
-function AnnualPlanCard({ plan, index, isLoggedIn, loading, onSelect, available }: {
-  plan: AnnualPlan;
-  index: number;
-  isLoggedIn: boolean;
-  loading: string | null;
-  onSelect: (plan: AnnualPlan) => void;
-  available: boolean;
-}) {
-  const [ref, inView] = useInView({ triggerOnce: true, threshold: 0.15 });
-
-  return (
-    <motion.div
-      ref={ref}
-      initial={{ opacity: 0, y: 32 }}
-      animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 32 }}
-      transition={{ ...spring, delay: index * 0.1 }}
-      whileHover={{ y: -4, transition: { type: "spring", stiffness: 300, damping: 20 } }}
-      className={`relative overflow-hidden flex flex-col theme-card bg-card ${plan.popular ? 'border-primary lg:scale-105 z-10' : ''}`}
-    >
-      {plan.popular && (
-        <div className="absolute top-3 right-3">
-          <span className="editorial-caption bg-primary text-primary-foreground px-2 py-1 rounded-full">Most Popular</span>
-        </div>
-      )}
-      <div className="p-6 pb-4">
-        <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3 bg-primary/20 text-primary">
-          <plan.icon className="w-6 h-6" />
-        </div>
-        <h3 className="text-xl font-bold text-foreground">{plan.name}</h3>
-        <p className="text-muted-foreground text-sm mt-1">{plan.description}</p>
-      </div>
-      <div className="px-6 pb-6 flex-grow">
-        <div className="mb-6">
-          <span className="editorial-heading text-4xl text-foreground">{plan.price}</span>
-          <span className="text-muted-foreground text-sm ml-1">{plan.period}</span>
-        </div>
-        <ul className="space-y-2">
-          {plan.features.map((feature, idx) => (
-            <li key={idx} className="flex items-start gap-2 text-sm text-foreground">
-              <Check className="w-4 h-4 mt-0.5 flex-shrink-0 text-foreground" />
-              <span>{feature}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-      <div className="p-6 pt-0 mt-auto">
-        <motion.button
-          {...tapScale}
-          className="w-full py-3 px-4 font-semibold bg-primary text-primary-foreground hover:bg-primary/90 rounded-full transition-colors disabled:opacity-50"
-          onClick={() => onSelect(plan)}
-          disabled={loading !== null}
-        >
-          {loading === plan.packageType ? (
-            <span className="flex items-center justify-center gap-2">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-background"></div>
-              Processing...
-            </span>
-          ) : !isLoggedIn ? (
-            <span className="flex items-center justify-center gap-2"><LogIn className="w-4 h-4" />Login to Subscribe</span>
           ) : !available ? (
             'Coming soon'
           ) : (
@@ -509,7 +439,7 @@ export default function Pricing() {
           <div className="max-w-3xl mx-auto mb-8">
             <div ref={planCardsRef} className="grid md:grid-cols-2 gap-6">
               {annualPlans.map((plan, index) => (
-                <AnnualPlanCard
+                <PlanCard
                   key={plan.packageType}
                   plan={plan}
                   index={index}
@@ -526,7 +456,7 @@ export default function Pricing() {
             <p className="text-center text-sm text-muted-foreground mb-4">Prefer to pay monthly instead?</p>
             <div className="grid md:grid-cols-2 gap-6">
               {notificationPlans.map((plan, index) => (
-                <NotificationPlanCard
+                <PlanCard
                   key={plan.packageType}
                   plan={plan}
                   index={index}

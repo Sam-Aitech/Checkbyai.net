@@ -189,6 +189,44 @@ async function isSessionProcessed(sessionId: string): Promise<boolean> {
   return !!row;
 }
 
+/**
+ * Applies the entitlement grant for one packageType, run inside the caller's
+ * claim transaction. Shared by the checkout.session.completed webhook and
+ * GET /api/checkout/verify/:sessionId — both grant the same packageTypes from
+ * a paid Stripe Checkout Session, differing only in where userId/session come
+ * from (webhook metadata vs. signed client_reference_id).
+ */
+async function applyPackageGrant(
+  tx: DbOrTx,
+  userId: string,
+  packageType: string | undefined,
+  stripeSubscriptionId: string | null,
+  stripeCustomerId: string | null,
+): Promise<void> {
+  const base = { stripeSubscriptionId, stripeCustomerId, updatedAt: new Date() };
+  const withNotifPrefs = { notifPrefs: sql`COALESCE(${users.notifPrefs}, ${JSON.stringify(DEFAULT_NOTIF_PREFS)}::jsonb)` };
+
+  if (packageType === 'starter') {
+    await tx.update(users).set({ ...base, credits: sql`COALESCE(${users.credits}, 0) + 50`, subscriptionStatus: 'starter' }).where(eq(users.id, userId));
+  } else if (packageType === 'pro') {
+    await tx.update(users).set({ ...base, credits: sql`COALESCE(${users.credits}, 0) + 100`, subscriptionStatus: 'pro' }).where(eq(users.id, userId));
+  } else if (packageType === 'unlimited') {
+    await tx.update(users).set({ ...base, subscriptionStatus: 'unlimited' }).where(eq(users.id, userId));
+  } else if (packageType === 'notification_starter') {
+    await tx.update(users).set({ ...base, ...withNotifPrefs, subscriptionStatus: 'starter' }).where(eq(users.id, userId));
+  } else if (packageType === 'notification_pro') {
+    await tx.update(users).set({ ...base, ...withNotifPrefs, credits: sql`COALESCE(${users.credits}, 0) + 5`, subscriptionStatus: 'pro' }).where(eq(users.id, userId));
+  } else if (packageType === 'alert_annual') {
+    await tx.update(users).set({ ...base, ...withNotifPrefs, subscriptionStatus: 'starter' }).where(eq(users.id, userId));
+  } else if (packageType === 'alert_annual_pro') {
+    await tx.update(users).set({ ...base, ...withNotifPrefs, subscriptionStatus: 'pro' }).where(eq(users.id, userId));
+  } else if (packageType === 'cos_check_single') {
+    await tx.update(users).set({ credits: sql`COALESCE(${users.credits}, 0) + 1`, stripeCustomerId, updatedAt: new Date() }).where(eq(users.id, userId));
+  } else if (packageType === 'cos_check') {
+    await tx.update(users).set({ cosCheckSubscription: true, cosCheckApproved: true, ipExempt: true, stripeCustomerId, updatedAt: new Date() }).where(eq(users.id, userId));
+  }
+}
+
 export async function cleanupOldProcessedCheckouts(): Promise<void> {
   const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000);
   await db.delete(processedCheckouts).where(lt(processedCheckouts.processedAt, cutoff));
@@ -548,77 +586,7 @@ export function registerBillingRoutes(app: Express): void {
             if (!(await tryClaimSession(session.id, tx))) {
               return false; // already processed by a prior successful delivery
             }
-            if (packageType === 'starter') {
-              await tx.update(users).set({
-                credits: sql`COALESCE(${users.credits}, 0) + 50`,
-                subscriptionStatus: 'starter',
-                stripeSubscriptionId: session.subscription,
-                stripeCustomerId: session.customer,
-                updatedAt: new Date(),
-              }).where(eq(users.id, userId));
-            } else if (packageType === 'pro') {
-              await tx.update(users).set({
-                credits: sql`COALESCE(${users.credits}, 0) + 100`,
-                subscriptionStatus: 'pro',
-                stripeSubscriptionId: session.subscription,
-                stripeCustomerId: session.customer,
-                updatedAt: new Date(),
-              }).where(eq(users.id, userId));
-            } else if (packageType === 'unlimited') {
-              await tx.update(users).set({
-                subscriptionStatus: 'unlimited',
-                stripeSubscriptionId: session.subscription,
-                stripeCustomerId: session.customer,
-                updatedAt: new Date(),
-              }).where(eq(users.id, userId));
-            } else if (packageType === 'notification_starter') {
-              await tx.update(users).set({
-                subscriptionStatus: 'starter',
-                stripeSubscriptionId: session.subscription,
-                stripeCustomerId: session.customer,
-                notifPrefs: sql`COALESCE(${users.notifPrefs}, ${JSON.stringify(DEFAULT_NOTIF_PREFS)}::jsonb)`,
-                updatedAt: new Date(),
-              }).where(eq(users.id, userId));
-            } else if (packageType === 'notification_pro') {
-              await tx.update(users).set({
-                credits: sql`COALESCE(${users.credits}, 0) + 5`,
-                subscriptionStatus: 'pro',
-                stripeSubscriptionId: session.subscription,
-                stripeCustomerId: session.customer,
-                notifPrefs: sql`COALESCE(${users.notifPrefs}, ${JSON.stringify(DEFAULT_NOTIF_PREFS)}::jsonb)`,
-                updatedAt: new Date(),
-              }).where(eq(users.id, userId));
-            } else if (packageType === 'cos_check') {
-              await tx.update(users).set({
-                cosCheckSubscription: true,
-                cosCheckApproved: true,
-                ipExempt: true,
-                stripeCustomerId: session.customer,
-                updatedAt: new Date(),
-              }).where(eq(users.id, userId));
-            } else if (packageType === 'alert_annual') {
-              await tx.update(users).set({
-                subscriptionStatus: 'starter',
-                stripeSubscriptionId: session.subscription,
-                stripeCustomerId: session.customer,
-                notifPrefs: sql`COALESCE(${users.notifPrefs}, ${JSON.stringify(DEFAULT_NOTIF_PREFS)}::jsonb)`,
-                updatedAt: new Date(),
-              }).where(eq(users.id, userId));
-            } else if (packageType === 'alert_annual_pro') {
-              await tx.update(users).set({
-                subscriptionStatus: 'pro',
-                stripeSubscriptionId: session.subscription,
-                stripeCustomerId: session.customer,
-                notifPrefs: sql`COALESCE(${users.notifPrefs}, ${JSON.stringify(DEFAULT_NOTIF_PREFS)}::jsonb)`,
-                updatedAt: new Date(),
-              }).where(eq(users.id, userId));
-            } else if (packageType === 'cos_check_single') {
-              await tx.update(users).set({
-                credits: sql`COALESCE(${users.credits}, 0) + 1`,
-                stripeCustomerId: session.customer,
-                updatedAt: new Date(),
-              }).where(eq(users.id, userId));
-            }
+            await applyPackageGrant(tx, userId, packageType, session.subscription ?? null, session.customer ?? null);
             return true;
           }), 'webhook-checkout-session');
 
@@ -837,69 +805,7 @@ export function registerBillingRoutes(app: Express): void {
             if (!(await tryClaimSession(sessionId, tx))) {
               return false;
             }
-            if (packageType === 'starter') {
-              await tx.update(users).set({
-                credits: sql`COALESCE(${users.credits}, 0) + 50`,
-                subscriptionStatus: 'starter',
-                stripeSubscriptionId: session.subscription as string,
-                stripeCustomerId: session.customer as string,
-                updatedAt: new Date(),
-              }).where(eq(users.id, sessionUserId));
-            } else if (packageType === 'pro') {
-              await tx.update(users).set({
-                credits: sql`COALESCE(${users.credits}, 0) + 100`,
-                subscriptionStatus: 'pro',
-                stripeSubscriptionId: session.subscription as string,
-                stripeCustomerId: session.customer as string,
-                updatedAt: new Date(),
-              }).where(eq(users.id, sessionUserId));
-            } else if (packageType === 'unlimited') {
-              await tx.update(users).set({
-                subscriptionStatus: 'unlimited',
-                stripeSubscriptionId: session.subscription as string,
-                stripeCustomerId: session.customer as string,
-                updatedAt: new Date(),
-              }).where(eq(users.id, sessionUserId));
-            } else if (packageType === 'notification_starter') {
-              await tx.update(users).set({
-                subscriptionStatus: 'starter',
-                stripeSubscriptionId: session.subscription as string,
-                stripeCustomerId: session.customer as string,
-                notifPrefs: sql`COALESCE(${users.notifPrefs}, ${JSON.stringify(DEFAULT_NOTIF_PREFS)}::jsonb)`,
-                updatedAt: new Date(),
-              }).where(eq(users.id, sessionUserId));
-            } else if (packageType === 'notification_pro') {
-              await tx.update(users).set({
-                credits: sql`COALESCE(${users.credits}, 0) + 5`,
-                subscriptionStatus: 'pro',
-                stripeSubscriptionId: session.subscription as string,
-                stripeCustomerId: session.customer as string,
-                notifPrefs: sql`COALESCE(${users.notifPrefs}, ${JSON.stringify(DEFAULT_NOTIF_PREFS)}::jsonb)`,
-                updatedAt: new Date(),
-              }).where(eq(users.id, sessionUserId));
-            } else if (packageType === 'alert_annual') {
-              await tx.update(users).set({
-                subscriptionStatus: 'starter',
-                stripeSubscriptionId: session.subscription as string,
-                stripeCustomerId: session.customer as string,
-                notifPrefs: sql`COALESCE(${users.notifPrefs}, ${JSON.stringify(DEFAULT_NOTIF_PREFS)}::jsonb)`,
-                updatedAt: new Date(),
-              }).where(eq(users.id, sessionUserId));
-            } else if (packageType === 'alert_annual_pro') {
-              await tx.update(users).set({
-                subscriptionStatus: 'pro',
-                stripeSubscriptionId: session.subscription as string,
-                stripeCustomerId: session.customer as string,
-                notifPrefs: sql`COALESCE(${users.notifPrefs}, ${JSON.stringify(DEFAULT_NOTIF_PREFS)}::jsonb)`,
-                updatedAt: new Date(),
-              }).where(eq(users.id, sessionUserId));
-            } else if (packageType === 'cos_check_single') {
-              await tx.update(users).set({
-                credits: sql`COALESCE(${users.credits}, 0) + 1`,
-                stripeCustomerId: session.customer as string,
-                updatedAt: new Date(),
-              }).where(eq(users.id, sessionUserId));
-            }
+            await applyPackageGrant(tx, sessionUserId, packageType, (session.subscription as string) ?? null, (session.customer as string) ?? null);
             return true;
           }), 'checkout-verify-session');
 
