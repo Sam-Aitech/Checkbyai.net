@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Bell, Zap, Loader2, ChevronDown, Mail } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import { unwrapApiEnvelope } from '@/lib/apiEnvelope';
