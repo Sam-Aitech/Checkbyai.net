@@ -115,6 +115,13 @@ async function scheduleAnnualPassExpiry(subscriptionId: string | null | undefine
   }
 }
 
+/** Maps a Stripe subscription's packageType metadata to the subscriptionStatus it grants. */
+function subStatusForSubscriptionPackage(subPkgType: string | undefined): 'starter' | 'pro' | 'unlimited' {
+  if (subPkgType === 'starter' || subPkgType === 'alert_annual') return 'starter';
+  if (subPkgType === 'pro' || subPkgType === 'alert_annual_pro') return 'pro';
+  return 'unlimited';
+}
+
 const CHECKOUT_HMAC_SECRET = process.env.CHECKOUT_HMAC_SECRET;
 if (!CHECKOUT_HMAC_SECRET) {
   throw new Error("CHECKOUT_HMAC_SECRET is required");
@@ -433,9 +440,7 @@ export function registerBillingRoutes(app: Express): void {
               if (subPkgType === 'cos_check') {
                 await storage.updateCosCheckSubscription(user.id, true);
               } else {
-                const subStatus = subPkgType === 'starter' || subPkgType === 'alert_annual' ? 'starter'
-                  : subPkgType === 'pro' || subPkgType === 'alert_annual_pro' ? 'pro'
-                  : 'unlimited';
+                const subStatus = subStatusForSubscriptionPackage(subPkgType);
                 await storage.updateUserSubscription(user.id, {
                   subscriptionStatus: subStatus,
                   stripeSubscriptionId: subscription.id,

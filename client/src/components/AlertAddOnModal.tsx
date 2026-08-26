@@ -24,7 +24,7 @@ const LEGACY_PLANS = [
   { packageType: 'notification_pro', name: 'Pro (monthly)', price: '£49.99', period: '/mo' },
 ] as const;
 
-export default function AlertAddOnModal({ open, onOpenChange, companyName, userEmail }: AlertAddOnModalProps) {
+export default function AlertAddOnModal({ open, onOpenChange, companyName, userEmail }: Readonly<AlertAddOnModalProps>) {
   const { toast } = useToast();
   const { getPriceId } = usePackagePrices();
   const [loadingType, setLoadingType] = useState<string | null>(null);
@@ -78,6 +78,7 @@ export default function AlertAddOnModal({ open, onOpenChange, companyName, userE
         <div className="space-y-3">
           {ANNUAL_PLANS.map((plan) => (
             <button
+              type="button"
               key={plan.packageType}
               onClick={() => startAnnualCheckout(plan.packageType)}
               disabled={loadingType !== null}
@@ -96,6 +97,7 @@ export default function AlertAddOnModal({ open, onOpenChange, companyName, userE
           ))}
 
           <button
+            type="button"
             onClick={() => setShowMonthly((v) => !v)}
             className="w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground py-1"
           >
@@ -106,6 +108,7 @@ export default function AlertAddOnModal({ open, onOpenChange, companyName, userE
             <div className="space-y-2 pt-1">
               {LEGACY_PLANS.map((plan) => (
                 <button
+                  type="button"
                   key={plan.packageType}
                   onClick={() => startLegacyCheckout(plan.packageType)}
                   disabled={loadingType !== null}

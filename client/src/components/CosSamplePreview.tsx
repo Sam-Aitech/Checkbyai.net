@@ -32,6 +32,11 @@ const SAMPLE_CHECKS = [
   { name: 'Editing Tools', passed: false, detail: 'Adobe Photoshop' },
 ];
 
+function formatCheckStatus(check: { passed: boolean; detail?: string }): string {
+  if (check.passed) return 'Passed';
+  return check.detail ? `Flagged (${check.detail})` : 'Flagged';
+}
+
 export default function CosSamplePreview() {
   return (
     <div className="mt-10 mb-2 grid lg:grid-cols-2 gap-8 items-start">
@@ -66,7 +71,7 @@ export default function CosSamplePreview() {
               <li key={check.name} className="flex items-center justify-between text-xs">
                 <span className="text-gray-700 dark:text-gray-300">{check.name}</span>
                 <span className={check.passed ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-red-600 dark:text-red-400 font-medium'}>
-                  {check.passed ? 'Passed' : `Flagged${check.detail ? ` (${check.detail})` : ''}`}
+                  {formatCheckStatus(check)}
                 </span>
               </li>
             ))}
