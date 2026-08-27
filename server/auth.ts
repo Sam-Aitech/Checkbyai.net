@@ -272,7 +272,12 @@ export async function setupAuth(app: Express) {
 
   // Google OAuth Strategy
   if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-    const appUrl = process.env.APP_URL || (process.env.REPLIT_DOMAINS?.split(',')[0] ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}` : null);
+    const configuredAppUrl = process.env.APP_URL?.trim().replace(/\/+$/, "");
+    const replitDomain = process.env.REPLIT_DOMAINS
+      ?.split(",")
+      .map((domain) => domain.trim())
+      .find(Boolean);
+    const appUrl = configuredAppUrl || (replitDomain ? `https://${replitDomain}` : null);
     if (!appUrl) {
       logger.warn('[Auth] APP_URL and REPLIT_DOMAINS are both missing — Google OAuth callback may not work correctly');
     }
@@ -280,11 +285,20 @@ export async function setupAuth(app: Express) {
     const fullCallbackURL = currentDomain.includes('localhost') 
       ? `http://${currentDomain}/api/auth/google/callback`
       : `${currentDomain}/api/auth/google/callback`;
+
+    logger.info(
+      {
+        callbackUrl: fullCallbackURL,
+        callbackUrlSource: configuredAppUrl ? "APP_URL" : replitDomain ? "REPLIT_DOMAINS" : "fallback",
+      },
+      "[Auth] Google OAuth configured",
+    );
     
     passport.use(new GoogleStrategy({
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: fullCallbackURL
+      callbackURL: fullCallbackURL,
+      state: true,
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
@@ -352,12 +366,58 @@ export async function setupAuth(app: Express) {
       passport.authenticate("google", { scope: ["profile", "email"] })
     );
 
-    app.get("/api/auth/google/callback",
-      passport.authenticate("google", { failureRedirect: "/login?error=auth_failed" }),
-      (req, res) => {
-        res.redirect("/sponsor-monitor");
+    app.get("/api/auth/google/callback", (req, res, next) => {
+      const providerError = typeof req.query.error === "string" ? req.query.error : null;
+      if (providerError) {
+        logger.warn(
+          {
+            providerError,
+            errorDescription: typeof req.query.error_description === "string"
+              ? req.query.error_description
+              : undefined,
+          },
+          "[Auth] Google rejected the OAuth request",
+        );
+        const errorCode = providerError === "access_denied"
+          ? "google_access_denied"
+          : "google_auth_failed";
+        return res.redirect(`/login?error=${errorCode}`);
       }
-    );
+
+      passport.authenticate("google", (error: unknown, user: any, info: unknown) => {
+        if (error) {
+          logger.error(
+            {
+              err: error instanceof Error ? error.message : String(error),
+              info: typeof info === "string" ? info : undefined,
+            },
+            "[Auth] Google OAuth callback failed",
+          );
+          return res.redirect("/login?error=google_auth_failed");
+        }
+
+        if (!user) {
+          logger.warn(
+            { info: typeof info === "string" ? info : undefined },
+            "[Auth] Google OAuth returned no user",
+          );
+          return res.redirect("/login?error=google_auth_failed");
+        }
+
+        req.logIn(user, (loginError) => {
+          if (loginError) {
+            logger.error(
+              {
+                err: loginError instanceof Error ? loginError.message : String(loginError),
+              },
+              "[Auth] Failed to create Google OAuth session",
+            );
+            return res.redirect("/login?error=google_auth_failed");
+          }
+          return res.redirect("/sponsor-monitor");
+        });
+      })(req, res, next);
+    });
   }
 
   // Email OTP: Send verification code
