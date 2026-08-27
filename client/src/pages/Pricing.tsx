@@ -123,7 +123,7 @@ function PlanCard<T extends PlanCardData>({ plan, index, isLoggedIn, loading, on
   index: number;
   isLoggedIn: boolean;
   loading: string | null;
-  onSelect: (plan: T) => void;
+  onSelect: (plan: T, skipLoginCheck?: boolean) => void;
   highlighted?: boolean;
   available?: boolean;
 }>) {
@@ -248,8 +248,8 @@ export default function Pricing() {
     notification_pro: 'https://buy.stripe.com/aFa00kflwd8h4CYcEreZ205',
   };
 
-  const handleSelectNotification = async (plan: NotificationPlan) => {
-    if (!isLoggedIn) {
+  const handleSelectNotification = async (plan: NotificationPlan, skipLoginCheck = false) => {
+    if (!isLoggedIn && !skipLoginCheck) {
       toast({
         title: 'Login Required',
         description: 'Please log in or create an account to subscribe.',
@@ -290,8 +290,8 @@ export default function Pricing() {
     }
   };
 
-  const handleSelectAnnual = async (plan: AnnualPlan) => {
-    if (!isLoggedIn) {
+  const handleSelectAnnual = async (plan: AnnualPlan, skipLoginCheck = false) => {
+    if (!isLoggedIn && !skipLoginCheck) {
       toast({ title: 'Login Required', description: 'Please log in or create an account to subscribe.' });
       setLocation('/login');
       return;
