@@ -691,12 +691,13 @@ function SocialProof() {
     const when = recentChange.detectedAt
       ? new Date(recentChange.detectedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
       : null;
+    const detectedSuffix = when ? `, detected ${when}` : "";
     if (recentChange.changeType === "DOWNGRADED") {
       const from = recentChange.previousValue || "A-Rating";
       const to = recentChange.newValue || "B-Rating";
-      return `'${recentChange.organisationName}' downgraded from ${from} to ${to}${when ? `, detected ${when}` : ""}.`;
+      return `'${recentChange.organisationName}' downgraded from ${from} to ${to}${detectedSuffix}.`;
     }
-    return `'${recentChange.organisationName}' licence revoked${when ? `, detected ${when}` : ""}.`;
+    return `'${recentChange.organisationName}' licence revoked${detectedSuffix}.`;
   })();
 
   return (
@@ -865,6 +866,40 @@ function MobileStickyBar() {
         <X className="w-4 h-4" />
       </button>
     </div>
+  );
+}
+
+function SearchResultActionButton({ result, isAuthenticated, isFreeUser, isAtWatchLimit, isAdded, isAdding, onAddWatch, onUpgradeClick }: Readonly<{
+  result: SponsorSearchResult;
+  isAuthenticated: boolean;
+  isFreeUser: boolean;
+  isAtWatchLimit: boolean;
+  isAdded: boolean;
+  isAdding: boolean;
+  onAddWatch: (result: SponsorSearchResult) => void;
+  onUpgradeClick: (organisationName: string) => void;
+}>) {
+  if (!isAuthenticated) {
+    return (
+      <Button size="sm" onClick={() => onAddWatch(result)} className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 text-xs font-bold">
+        <Bell className="w-3.5 h-3.5 mr-1" />Get Alerts
+      </Button>
+    );
+  }
+  if (isFreeUser && !isAdded && isAtWatchLimit) {
+    return (
+      <Button size="sm" onClick={() => onUpgradeClick(result.organisationName)} className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 text-xs font-bold">
+        <Lock className="w-3.5 h-3.5 mr-1" />Upgrade to Monitor
+      </Button>
+    );
+  }
+  if (isAdded) {
+    return <Button size="sm" variant="secondary" disabled><Shield className="w-4 h-4 mr-1" />Watching</Button>;
+  }
+  return (
+    <Button size="sm" variant="default" disabled={isAdding} onClick={() => onAddWatch(result)}>
+      {isAdding ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Plus className="w-4 h-4 mr-1" />}Add to Watchlist
+    </Button>
   );
 }
 
@@ -1248,21 +1283,16 @@ export default function SponsorMonitor() {
                           </div>
                         </div>
                         <div className="shrink-0">
-                          {!isAuthenticated ? (
-                            <Button size="sm" onClick={() => handleAddWatch(result)} className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 text-xs font-bold">
-                              <Bell className="w-3.5 h-3.5 mr-1" />Get Alerts
-                            </Button>
-                          ) : isFreeUser && !isAdded && activeWatches.length >= 1 ? (
-                            <Button size="sm" onClick={() => { setAlertAddOnCompany(result.organisationName); setAlertAddOnOpen(true); }} className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 text-xs font-bold">
-                              <Lock className="w-3.5 h-3.5 mr-1" />Upgrade to Monitor
-                            </Button>
-                          ) : isAdded ? (
-                            <Button size="sm" variant="secondary" disabled><Shield className="w-4 h-4 mr-1" />Watching</Button>
-                          ) : (
-                            <Button size="sm" variant="default" disabled={isAdding} onClick={() => handleAddWatch(result)}>
-                              {isAdding ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Plus className="w-4 h-4 mr-1" />}Add to Watchlist
-                            </Button>
-                          )}
+                          <SearchResultActionButton
+                            result={result}
+                            isAuthenticated={isAuthenticated}
+                            isFreeUser={isFreeUser}
+                            isAtWatchLimit={activeWatches.length >= 1}
+                            isAdded={isAdded}
+                            isAdding={isAdding}
+                            onAddWatch={handleAddWatch}
+                            onUpgradeClick={(organisationName) => { setAlertAddOnCompany(organisationName); setAlertAddOnOpen(true); }}
+                          />
                         </div>
                       </div>
                     </CardContent>

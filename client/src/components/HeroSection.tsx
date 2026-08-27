@@ -322,13 +322,23 @@ function changeLabel(c: LatestChange): string {
   switch (c.changeType) {
     case "REMOVED_REVOKED":
       return `'${name}' had its licence revoked, detected ${date}.`;
-    case "DOWNGRADED":
-      return `'${name}' was downgraded${c.previousValue && c.newValue ? ` from ${c.previousValue} to ${c.newValue}` : ""}, detected ${date}.`;
-    case "UPGRADED":
-      return `'${name}' was upgraded${c.previousValue && c.newValue ? ` from ${c.previousValue} to ${c.newValue}` : ""}, detected ${date}.`;
+    case "DOWNGRADED": {
+      const ratingChange = c.previousValue && c.newValue ? ` from ${c.previousValue} to ${c.newValue}` : "";
+      return `'${name}' was downgraded${ratingChange}, detected ${date}.`;
+    }
+    case "UPGRADED": {
+      const ratingChange = c.previousValue && c.newValue ? ` from ${c.previousValue} to ${c.newValue}` : "";
+      return `'${name}' was upgraded${ratingChange}, detected ${date}.`;
+    }
     default:
       return `Change detected for '${name}' on ${date}.`;
   }
+}
+
+function heroSearchButtonLabel(searchLoading: boolean, alertMeOnSubmit: boolean) {
+  if (searchLoading) return <Loader2 className="w-4 h-4 animate-spin" />;
+  if (alertMeOnSubmit) return <><Bell className="w-3.5 h-3.5" />Search &amp; Alert Me</>;
+  return <><Search className="w-3.5 h-3.5" />Search</>;
 }
 
 function LatestChangeToast() {
@@ -795,7 +805,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                       disabled={searchQuery.trim().length < 3 || searchLoading}
                       className="absolute right-2 top-1/2 -translate-y-1/2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-white rounded-lg px-4 h-10 text-sm font-semibold transition-colors flex items-center gap-1.5"
                     >
-                      {searchLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : alertMeOnSubmit ? <><Bell className="w-3.5 h-3.5" />Search &amp; Alert Me</> : <><Search className="w-3.5 h-3.5" />Search</>}
+                      {heroSearchButtonLabel(searchLoading, alertMeOnSubmit)}
                     </button>
                   </div>
                   <div className="flex items-center justify-between gap-3 flex-wrap">

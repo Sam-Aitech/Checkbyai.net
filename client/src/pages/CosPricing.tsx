@@ -128,14 +128,38 @@ const plans: PricingPlan[] = [
   },
 ];
 
-function PricingCard({ plan, index, isLoggedIn, loading, onSelect, available }: {
+function getPricingCardButtonContent(plan: PricingPlan, loading: string | null, isLoggedIn: boolean, available: boolean) {
+  if (loading === plan.packageType) {
+    return (
+      <span className="flex items-center justify-center gap-2">
+        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-background"></div>
+        Processing...
+      </span>
+    );
+  }
+  if (plan.contactSales) {
+    return <span className="flex items-center justify-center gap-2"><Mail className="w-4 h-4" />Contact Sales</span>;
+  }
+  if (!isLoggedIn) {
+    return (
+      <span className="flex items-center justify-center gap-2">
+        <LogIn className="w-4 h-4" />
+        Login to Purchase
+      </span>
+    );
+  }
+  if (!available) return 'Coming soon';
+  return `Get ${plan.name}`;
+}
+
+function PricingCard({ plan, index, isLoggedIn, loading, onSelect, available }: Readonly<{
   plan: PricingPlan;
   index: number;
   isLoggedIn: boolean;
   loading: string | null;
   onSelect: (plan: PricingPlan) => void;
   available: boolean;
-}) {
+}>) {
   const [ref, inView] = useInView({ triggerOnce: true, threshold: 0.15 });
 
   return (
@@ -212,23 +236,7 @@ function PricingCard({ plan, index, isLoggedIn, loading, onSelect, available }: 
           onClick={() => onSelect(plan)}
           disabled={loading !== null || (!plan.contactSales && isLoggedIn && !available)}
         >
-          {loading === plan.packageType ? (
-            <span className="flex items-center justify-center gap-2">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-background"></div>
-              Processing...
-            </span>
-          ) : plan.contactSales ? (
-            <span className="flex items-center justify-center gap-2"><Mail className="w-4 h-4" />Contact Sales</span>
-          ) : !isLoggedIn ? (
-            <span className="flex items-center justify-center gap-2">
-              <LogIn className="w-4 h-4" />
-              Login to Purchase
-            </span>
-          ) : !available ? (
-            'Coming soon'
-          ) : (
-            `Get ${plan.name}`
-          )}
+          {getPricingCardButtonContent(plan, loading, isLoggedIn, available)}
         </motion.button>
       </div>
     </motion.div>

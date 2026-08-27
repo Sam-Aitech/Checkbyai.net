@@ -1,16 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation, useSearch } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
-import { Check, X, Shield, Zap, Clock, LogIn, Bell, Eye, MessageSquare, ArrowRight } from 'lucide-react';
+import { Check, X, Shield, Zap, Bell, Eye, MessageSquare, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useScrollReveal, spring, fadeUp, tapScale } from '@/lib/animations';
 import { useInView } from 'react-intersection-observer';
 import { useToast } from '@/hooks/use-toast';
-import { apiRequest, getQueryFn } from '@/lib/queryClient';
+import { apiRequest, getQueryFn, queryClient } from '@/lib/queryClient';
 import { unwrapApiEnvelope } from '@/lib/apiEnvelope';
 import SEOHead from '@/components/SEOHead';
 import PageLayout from '@/components/PageLayout';
 import { usePackagePrices } from '@/hooks/usePackagePrices';
+import InlineEmailCheckout from '@/components/InlineEmailCheckout';
 
 interface User {
   id: string;
@@ -112,16 +113,23 @@ const notificationPlans: NotificationPlan[] = [
   },
 ];
 
-function PlanCard<T extends PlanCardData>({ plan, index, isLoggedIn, loading, onSelect, highlighted, available = true }: {
+function getIconWrapClass(planName: string): string {
+  if (planName.includes("Starter")) return "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400";
+  if (planName.includes("Pro")) return "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400";
+  return "bg-primary/20 text-primary";
+}
+
+function PlanCard<T extends PlanCardData>({ plan, index, isLoggedIn, loading, onSelect, highlighted, available = true }: Readonly<{
   plan: T;
   index: number;
   isLoggedIn: boolean;
   loading: string | null;
-  onSelect: (plan: T) => void;
+  onSelect: (plan: T, skipLoginCheck?: boolean) => void;
   highlighted?: boolean;
   available?: boolean;
-}) {
+}>) {
   const [ref, inView] = useInView({ triggerOnce: true, threshold: 0.15 });
+  const [capturing, setCapturing] = useState(false);
 
   return (
     <motion.div
@@ -144,11 +152,7 @@ function PlanCard<T extends PlanCardData>({ plan, index, isLoggedIn, loading, on
       )}
 
       <div className="p-6 pb-4">
-        <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 ${
-          plan.name.includes("Starter") ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400" :
-          plan.name.includes("Pro") ? "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400" :
-          "bg-primary/20 text-primary"
-        }`}>
+        <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 ${getIconWrapClass(plan.name)}`}>
           <plan.icon className="w-6 h-6" />
         </div>
         <h3 className="text-xl font-bold text-foreground">
@@ -186,28 +190,31 @@ function PlanCard<T extends PlanCardData>({ plan, index, isLoggedIn, loading, on
       </div>
 
       <div className="p-6 pt-0 mt-auto">
-        <motion.button
-          {...tapScale}
-          className="w-full py-3 px-4 font-semibold bg-primary text-primary-foreground hover:bg-primary/90 rounded-full transition-colors disabled:opacity-50"
-          onClick={() => onSelect(plan)}
-          disabled={loading !== null}
-        >
-          {loading === plan.packageType ? (
-            <span className="flex items-center justify-center gap-2">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-background"></div>
-              Processing...
-            </span>
-          ) : !isLoggedIn ? (
-            <span className="flex items-center justify-center gap-2">
-              <LogIn className="w-4 h-4" />
-              Login to Subscribe
-            </span>
-          ) : !available ? (
-            'Coming soon'
-          ) : (
-            `Get ${plan.name}`
-          )}
-        </motion.button>
+        {!isLoggedIn && capturing ? (
+          <InlineEmailCheckout
+            onVerified={() => { setCapturing(false); onSelect(plan, true); }}
+            onCancel={() => setCapturing(false)}
+          />
+        ) : (
+          <motion.button
+            {...tapScale}
+            className="w-full py-3 px-4 font-semibold bg-primary text-primary-foreground hover:bg-primary/90 rounded-full transition-colors disabled:opacity-50"
+            onClick={() => (isLoggedIn ? onSelect(plan) : setCapturing(true))}
+            disabled={loading !== null}
+            data-testid="pricing-plan-cta"
+          >
+            {loading === plan.packageType ? (
+              <span className="flex items-center justify-center gap-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-background"></div>
+                Processing...
+              </span>
+            ) : !available ? (
+              'Coming soon'
+            ) : (
+              `Get ${plan.name}`
+            )}
+          </motion.button>
+        )}
       </div>
     </motion.div>
   );
@@ -223,6 +230,7 @@ export default function Pricing() {
   const [loading, setLoading] = useState<string | null>(null);
   const planCardsRef = useRef<HTMLDivElement>(null);
   const { getPriceId } = usePackagePrices();
+  const [cadence, setCadence] = useState<'annual' | 'monthly'>(planParam ? 'monthly' : 'annual');
 
   // Scroll to the plan cards when arriving from the landing page with ?plan=
   useEffect(() => {
@@ -246,8 +254,8 @@ export default function Pricing() {
     notification_pro: 'https://buy.stripe.com/aFa00kflwd8h4CYcEreZ205',
   };
 
-  const handleSelectNotification = async (plan: NotificationPlan) => {
-    if (!isLoggedIn) {
+  const handleSelectNotification = async (plan: NotificationPlan, skipLoginCheck = false) => {
+    if (!isLoggedIn && !skipLoginCheck) {
       toast({
         title: 'Login Required',
         description: 'Please log in or create an account to subscribe.',
@@ -276,7 +284,8 @@ export default function Pricing() {
       });
       const envelope = await res.json();
       const { clientReferenceId } = unwrapApiEnvelope<{ clientReferenceId: string }>(envelope);
-      const url = `${link}?client_reference_id=${encodeURIComponent(clientReferenceId)}&prefilled_email=${encodeURIComponent(user?.email || '')}`;
+      const freshUser = queryClient.getQueryData<User>(['/api/auth/user']);
+      const url = `${link}?client_reference_id=${encodeURIComponent(clientReferenceId)}&prefilled_email=${encodeURIComponent(freshUser?.email || user?.email || '')}`;
       window.location.href = url;
     } catch (error: any) {
       toast({
@@ -288,8 +297,8 @@ export default function Pricing() {
     }
   };
 
-  const handleSelectAnnual = async (plan: AnnualPlan) => {
-    if (!isLoggedIn) {
+  const handleSelectAnnual = async (plan: AnnualPlan, skipLoginCheck = false) => {
+    if (!isLoggedIn && !skipLoginCheck) {
       toast({ title: 'Login Required', description: 'Please log in or create an account to subscribe.' });
       setLocation('/login');
       return;
@@ -421,13 +430,6 @@ export default function Pricing() {
               </>
             )}
             
-            {!isLoadingUser && !isLoggedIn && (
-              <div className="mt-6 inline-flex items-center gap-2 bg-muted text-foreground border border-border rounded-xl px-4 py-2">
-                <LogIn className="w-4 h-4" />
-                <span>Please <button onClick={() => setLocation('/login')} className="underline font-semibold hover:no-underline">log in</button> to subscribe</span>
-              </div>
-            )}
-            
             {!isLoadingUser && isLoggedIn && (
               <div className="mt-6 inline-flex items-center gap-2 bg-muted text-foreground border border-border rounded-xl px-4 py-2">
                 <Check className="w-4 h-4" />
@@ -437,36 +439,68 @@ export default function Pricing() {
           </motion.div>
 
           <div className="max-w-3xl mx-auto mb-8">
-            <div ref={planCardsRef} className="grid md:grid-cols-2 gap-6">
-              {annualPlans.map((plan, index) => (
-                <PlanCard
-                  key={plan.packageType}
-                  plan={plan}
-                  index={index}
-                  isLoggedIn={isLoggedIn}
-                  loading={loading}
-                  onSelect={handleSelectAnnual}
-                  available={!!getPriceId(plan.packageType)}
-                />
-              ))}
+            <div className="flex justify-center mb-8">
+              <div className="inline-flex items-center gap-1 bg-muted rounded-full p-1">
+                <button
+                  type="button"
+                  onClick={() => setCadence('annual')}
+                  aria-pressed={cadence === 'annual'}
+                  data-testid="cadence-toggle-annual"
+                  className={`px-5 py-2 text-sm font-semibold rounded-full transition-colors ${
+                    cadence === 'annual' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Annual
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCadence('monthly')}
+                  aria-pressed={cadence === 'monthly'}
+                  data-testid="cadence-toggle-monthly"
+                  className={`px-5 py-2 text-sm font-semibold rounded-full transition-colors ${
+                    cadence === 'monthly' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Monthly
+                </button>
+              </div>
             </div>
-          </div>
 
-          <div className="max-w-3xl mx-auto mb-16">
-            <p className="text-center text-sm text-muted-foreground mb-4">Prefer to pay monthly instead?</p>
-            <div className="grid md:grid-cols-2 gap-6">
-              {notificationPlans.map((plan, index) => (
-                <PlanCard
-                  key={plan.packageType}
-                  plan={plan}
-                  index={index}
-                  isLoggedIn={isLoggedIn}
-                  loading={loading}
-                  onSelect={handleSelectNotification}
-                  highlighted={!!planParam && plan.packageType === `notification_${planParam}`}
-                />
-              ))}
-            </div>
+            {cadence === 'annual' ? (
+              <div ref={planCardsRef} className="grid md:grid-cols-2 gap-6">
+                {annualPlans.map((plan, index) => (
+                  <PlanCard
+                    key={plan.packageType}
+                    plan={plan}
+                    index={index}
+                    isLoggedIn={isLoggedIn}
+                    loading={loading}
+                    onSelect={handleSelectAnnual}
+                    available={!!getPriceId(plan.packageType)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div ref={planCardsRef} className="grid md:grid-cols-2 gap-6">
+                {notificationPlans.map((plan, index) => (
+                  <PlanCard
+                    key={plan.packageType}
+                    plan={plan}
+                    index={index}
+                    isLoggedIn={isLoggedIn}
+                    loading={loading}
+                    onSelect={handleSelectNotification}
+                    highlighted={!!planParam && plan.packageType === `notification_${planParam}`}
+                  />
+                ))}
+              </div>
+            )}
+
+            <p className="text-center text-xs text-muted-foreground mt-4">
+              {cadence === 'annual'
+                ? 'Annual plans monitor fewer companies per tier in exchange for a lower yearly price. Switch to Monthly for higher company limits.'
+                : 'Monthly plans cost more per year but monitor more companies per tier. Switch to Annual for the lowest entry price.'}
+            </p>
           </div>
 
           <motion.div
