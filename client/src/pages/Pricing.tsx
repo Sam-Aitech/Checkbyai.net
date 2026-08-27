@@ -11,6 +11,7 @@ import { unwrapApiEnvelope } from '@/lib/apiEnvelope';
 import SEOHead from '@/components/SEOHead';
 import PageLayout from '@/components/PageLayout';
 import { usePackagePrices } from '@/hooks/usePackagePrices';
+import InlineEmailCheckout from '@/components/InlineEmailCheckout';
 
 interface User {
   id: string;
@@ -128,6 +129,7 @@ function PlanCard<T extends PlanCardData>({ plan, index, isLoggedIn, loading, on
   available?: boolean;
 }>) {
   const [ref, inView] = useInView({ triggerOnce: true, threshold: 0.15 });
+  const [capturing, setCapturing] = useState(false);
 
   return (
     <motion.div
@@ -188,28 +190,33 @@ function PlanCard<T extends PlanCardData>({ plan, index, isLoggedIn, loading, on
       </div>
 
       <div className="p-6 pt-0 mt-auto">
-        <motion.button
-          {...tapScale}
-          className="w-full py-3 px-4 font-semibold bg-primary text-primary-foreground hover:bg-primary/90 rounded-full transition-colors disabled:opacity-50"
-          onClick={() => onSelect(plan)}
-          disabled={loading !== null}
-        >
-          {loading === plan.packageType ? (
-            <span className="flex items-center justify-center gap-2">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-background"></div>
-              Processing...
-            </span>
-          ) : !isLoggedIn ? (
-            <span className="flex items-center justify-center gap-2">
-              <LogIn className="w-4 h-4" />
-              Login to Subscribe
-            </span>
-          ) : !available ? (
-            'Coming soon'
-          ) : (
-            `Get ${plan.name}`
-          )}
-        </motion.button>
+        {!isLoggedIn && capturing ? (
+          <InlineEmailCheckout
+            onVerified={() => { setCapturing(false); onSelect(plan, true); }}
+            onCancel={() => setCapturing(false)}
+          />
+        ) : (
+          <motion.button
+            {...tapScale}
+            className="w-full py-3 px-4 font-semibold bg-primary text-primary-foreground hover:bg-primary/90 rounded-full transition-colors disabled:opacity-50"
+            onClick={() => (isLoggedIn ? onSelect(plan) : setCapturing(true))}
+            disabled={loading !== null}
+            data-testid="pricing-plan-cta"
+          >
+            {loading === plan.packageType ? (
+              <span className="flex items-center justify-center gap-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-background"></div>
+                Processing...
+              </span>
+            ) : !isLoggedIn ? (
+              `Get ${plan.name}`
+            ) : !available ? (
+              'Coming soon'
+            ) : (
+              `Get ${plan.name}`
+            )}
+          </motion.button>
+        )}
       </div>
     </motion.div>
   );
