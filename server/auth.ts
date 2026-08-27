@@ -518,17 +518,30 @@ export async function setupAuth(app: Express) {
       // First-time email-OTP users have no notification_preferences row, which
       // would silently block them from ever receiving email alerts (free tier
       // included) even though their email is already verified. Default one in.
-      const existingPrefs = await db
-        .select({ id: notificationPreferences.id })
-        .from(notificationPreferences)
-        .where(eq(notificationPreferences.userId, verifiedUser.id))
-        .limit(1);
-      if (existingPrefs.length === 0) {
-        await db.insert(notificationPreferences).values({
-          userId: verifiedUser.id,
-          emailEnabled: true,
-          email: verifiedUser.email,
-        });
+      // Preference provisioning is non-critical to authentication: a schema
+      // mismatch or transient database error must not turn a valid code into a
+      // failed login. The next preferences request can retry after the schema
+      // is repaired.
+      try {
+        const existingPrefs = await db
+          .select({ id: notificationPreferences.id })
+          .from(notificationPreferences)
+          .where(eq(notificationPreferences.userId, verifiedUser.id))
+          .limit(1);
+        if (existingPrefs.length === 0) {
+          await db.insert(notificationPreferences).values({
+            userId: verifiedUser.id,
+            emailEnabled: true,
+            email: verifiedUser.email,
+          });
+        }
+      } catch (preferenceError) {
+        logger.warn(
+          {
+            errorType: preferenceError instanceof Error ? preferenceError.name : typeof preferenceError,
+          },
+          "[Auth] Default notification preferences could not be provisioned; continuing login",
+        );
       }
 
       // Create session
