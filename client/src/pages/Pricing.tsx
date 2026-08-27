@@ -232,6 +232,7 @@ export default function Pricing() {
   const [loading, setLoading] = useState<string | null>(null);
   const planCardsRef = useRef<HTMLDivElement>(null);
   const { getPriceId } = usePackagePrices();
+  const [cadence, setCadence] = useState<'annual' | 'monthly'>(planParam ? 'monthly' : 'annual');
 
   // Scroll to the plan cards when arriving from the landing page with ?plan=
   useEffect(() => {
@@ -446,36 +447,68 @@ export default function Pricing() {
           </motion.div>
 
           <div className="max-w-3xl mx-auto mb-8">
-            <div ref={planCardsRef} className="grid md:grid-cols-2 gap-6">
-              {annualPlans.map((plan, index) => (
-                <PlanCard
-                  key={plan.packageType}
-                  plan={plan}
-                  index={index}
-                  isLoggedIn={isLoggedIn}
-                  loading={loading}
-                  onSelect={handleSelectAnnual}
-                  available={!!getPriceId(plan.packageType)}
-                />
-              ))}
+            <div className="flex justify-center mb-8">
+              <div className="inline-flex items-center gap-1 bg-muted rounded-full p-1">
+                <button
+                  type="button"
+                  onClick={() => setCadence('annual')}
+                  aria-pressed={cadence === 'annual'}
+                  data-testid="cadence-toggle-annual"
+                  className={`px-5 py-2 text-sm font-semibold rounded-full transition-colors ${
+                    cadence === 'annual' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Annual
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCadence('monthly')}
+                  aria-pressed={cadence === 'monthly'}
+                  data-testid="cadence-toggle-monthly"
+                  className={`px-5 py-2 text-sm font-semibold rounded-full transition-colors ${
+                    cadence === 'monthly' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Monthly
+                </button>
+              </div>
             </div>
-          </div>
 
-          <div className="max-w-3xl mx-auto mb-16">
-            <p className="text-center text-sm text-muted-foreground mb-4">Prefer to pay monthly instead?</p>
-            <div className="grid md:grid-cols-2 gap-6">
-              {notificationPlans.map((plan, index) => (
-                <PlanCard
-                  key={plan.packageType}
-                  plan={plan}
-                  index={index}
-                  isLoggedIn={isLoggedIn}
-                  loading={loading}
-                  onSelect={handleSelectNotification}
-                  highlighted={!!planParam && plan.packageType === `notification_${planParam}`}
-                />
-              ))}
-            </div>
+            {cadence === 'annual' ? (
+              <div ref={planCardsRef} className="grid md:grid-cols-2 gap-6">
+                {annualPlans.map((plan, index) => (
+                  <PlanCard
+                    key={plan.packageType}
+                    plan={plan}
+                    index={index}
+                    isLoggedIn={isLoggedIn}
+                    loading={loading}
+                    onSelect={handleSelectAnnual}
+                    available={!!getPriceId(plan.packageType)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div ref={planCardsRef} className="grid md:grid-cols-2 gap-6">
+                {notificationPlans.map((plan, index) => (
+                  <PlanCard
+                    key={plan.packageType}
+                    plan={plan}
+                    index={index}
+                    isLoggedIn={isLoggedIn}
+                    loading={loading}
+                    onSelect={handleSelectNotification}
+                    highlighted={!!planParam && plan.packageType === `notification_${planParam}`}
+                  />
+                ))}
+              </div>
+            )}
+
+            <p className="text-center text-xs text-muted-foreground mt-4">
+              {cadence === 'annual'
+                ? 'Annual plans monitor fewer companies per tier in exchange for a lower yearly price. Switch to Monthly for higher company limits.'
+                : 'Monthly plans cost more per year but monitor more companies per tier. Switch to Annual for the lowest entry price.'}
+            </p>
           </div>
 
           <motion.div
