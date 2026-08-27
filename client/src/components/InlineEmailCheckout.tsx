@@ -14,7 +14,7 @@ interface InlineEmailCheckoutProps {
   onCancel: () => void;
 }
 
-export default function InlineEmailCheckout({ onVerified, onCancel }: InlineEmailCheckoutProps) {
+export default function InlineEmailCheckout({ onVerified, onCancel }: Readonly<InlineEmailCheckoutProps>) {
   const { toast } = useToast();
   const [step, setStep] = useState<"email" | "otp">("email");
   const [email, setEmail] = useState("");
@@ -28,7 +28,7 @@ export default function InlineEmailCheckout({ onVerified, onCancel }: InlineEmai
     e.preventDefault();
     setError(null);
 
-    if (!email || !email.includes("@")) {
+    if (!email?.includes("@")) {
       setError("Please enter a valid email address");
       return;
     }
@@ -63,7 +63,7 @@ export default function InlineEmailCheckout({ onVerified, onCancel }: InlineEmai
     e.preventDefault();
     setError(null);
 
-    if (!code || code.length !== 6) {
+    if (code?.length !== 6) {
       setError("Enter the 6-digit code from your email");
       return;
     }
