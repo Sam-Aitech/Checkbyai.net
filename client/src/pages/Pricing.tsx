@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation, useSearch } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
-import { Check, X, Shield, Zap, Clock, LogIn, Bell, Eye, MessageSquare, ArrowRight } from 'lucide-react';
+import { Check, X, Shield, Zap, Clock, Bell, Eye, MessageSquare, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useScrollReveal, spring, fadeUp, tapScale } from '@/lib/animations';
 import { useInView } from 'react-intersection-observer';
 import { useToast } from '@/hooks/use-toast';
-import { apiRequest, getQueryFn } from '@/lib/queryClient';
+import { apiRequest, getQueryFn, queryClient } from '@/lib/queryClient';
 import { unwrapApiEnvelope } from '@/lib/apiEnvelope';
 import SEOHead from '@/components/SEOHead';
 import PageLayout from '@/components/PageLayout';
@@ -208,8 +208,6 @@ function PlanCard<T extends PlanCardData>({ plan, index, isLoggedIn, loading, on
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-background"></div>
                 Processing...
               </span>
-            ) : !isLoggedIn ? (
-              `Get ${plan.name}`
             ) : !available ? (
               'Coming soon'
             ) : (
@@ -286,7 +284,8 @@ export default function Pricing() {
       });
       const envelope = await res.json();
       const { clientReferenceId } = unwrapApiEnvelope<{ clientReferenceId: string }>(envelope);
-      const url = `${link}?client_reference_id=${encodeURIComponent(clientReferenceId)}&prefilled_email=${encodeURIComponent(user?.email || '')}`;
+      const freshUser = queryClient.getQueryData<User>(['/api/auth/user']);
+      const url = `${link}?client_reference_id=${encodeURIComponent(clientReferenceId)}&prefilled_email=${encodeURIComponent(freshUser?.email || user?.email || '')}`;
       window.location.href = url;
     } catch (error: any) {
       toast({
@@ -429,13 +428,6 @@ export default function Pricing() {
                   Get alerted the moment your sponsor's licence status changes. Never be caught off guard by a revocation or suspension.
                 </p>
               </>
-            )}
-            
-            {!isLoadingUser && !isLoggedIn && (
-              <div className="mt-6 inline-flex items-center gap-2 bg-muted text-foreground border border-border rounded-xl px-4 py-2">
-                <LogIn className="w-4 h-4" />
-                <span>Please <button onClick={() => setLocation('/login')} className="underline font-semibold hover:no-underline">log in</button> to subscribe</span>
-              </div>
             )}
             
             {!isLoadingUser && isLoggedIn && (

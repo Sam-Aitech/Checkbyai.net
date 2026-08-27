@@ -113,6 +113,7 @@ export default function InlineEmailCheckout({ onVerified, onCancel }: InlineEmai
                 onChange={(e) => setEmail(e.target.value)}
                 className="pl-10 rounded-xl"
                 autoFocus
+                aria-label="Email address"
                 data-testid="inline-checkout-email"
               />
             </div>
@@ -166,6 +167,7 @@ export default function InlineEmailCheckout({ onVerified, onCancel }: InlineEmai
               onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
               className="rounded-xl text-center tracking-[0.3em] font-mono"
               autoFocus
+              aria-label="Verification code"
               data-testid="inline-checkout-code"
             />
 
@@ -185,6 +187,7 @@ export default function InlineEmailCheckout({ onVerified, onCancel }: InlineEmai
                 variant="outline"
                 className="rounded-full"
                 onClick={() => { setStep("email"); setCode(""); setError(null); }}
+                aria-label="Change email"
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>

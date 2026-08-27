@@ -21,22 +21,45 @@ test.describe("Pricing inline checkout (logged-out)", () => {
 
   test("completes the email -> OTP -> checkout handoff without leaving the page", async ({ page }) => {
     let checkoutCalled = false;
+    let verified = false;
 
+    await page.route("**/api/auth/user", (route) =>
+      verified
+        ? route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({ id: "test-user", email: "e2e@example.com" }),
+          })
+        : route.fulfill({ status: 401, contentType: "application/json", body: JSON.stringify({ message: "Unauthorized" }) })
+    );
     await page.route("**/api/auth/email/send-otp", (route) =>
       route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ message: "sent" }) })
     );
-    await page.route("**/api/auth/email/verify-otp", (route) =>
-      route.fulfill({
+    await page.route("**/api/auth/email/verify-otp", (route) => {
+      verified = true;
+      return route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({ message: "ok", user: { id: "test-user", email: "e2e@example.com" } }),
-      })
-    );
-    await page.route("**/api/auth/user", (route) =>
+      });
+    });
+    await page.route("**/api/packages", (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ id: "test-user", email: "e2e@example.com" }),
+        body: JSON.stringify({
+          success: true,
+          data: {
+            packages: [
+              {
+                id: "prod_test_alert_annual",
+                name: "Alert Pass (Annual)",
+                metadata: { packageType: "alert_annual" },
+                prices: [{ id: "price_test_alert_annual", unit_amount: 999, currency: "gbp", recurring: { interval: "year" }, metadata: { packageType: "alert_annual" } }],
+              },
+            ],
+          },
+        }),
       })
     );
     await page.route("**/api/checkout/credits", (route) => {
@@ -47,6 +70,9 @@ test.describe("Pricing inline checkout (logged-out)", () => {
         body: JSON.stringify({ success: true, data: { url: "https://checkout.stripe.com/test-session" } }),
       });
     });
+    await page.route("https://checkout.stripe.com/**", (route) =>
+      route.fulfill({ status: 200, contentType: "text/html", body: "<html><body>stripe checkout stub</body></html>" })
+    );
 
     await page.goto("/pricing");
     await page.getByTestId("pricing-plan-cta").first().click();
@@ -71,6 +97,25 @@ test.describe("Pricing checkout (already logged in)", () => {
         body: JSON.stringify({ id: "existing-user", email: "existing@example.com" }),
       })
     );
+    await page.route("**/api/packages", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          success: true,
+          data: {
+            packages: [
+              {
+                id: "prod_test_alert_annual",
+                name: "Alert Pass (Annual)",
+                metadata: { packageType: "alert_annual" },
+                prices: [{ id: "price_test_alert_annual", unit_amount: 999, currency: "gbp", recurring: { interval: "year" }, metadata: { packageType: "alert_annual" } }],
+              },
+            ],
+          },
+        }),
+      })
+    );
     let checkoutCalled = false;
     await page.route("**/api/checkout/credits", (route) => {
       checkoutCalled = true;
@@ -80,6 +125,9 @@ test.describe("Pricing checkout (already logged in)", () => {
         body: JSON.stringify({ success: true, data: { url: "https://checkout.stripe.com/test-session" } }),
       });
     });
+    await page.route("https://checkout.stripe.com/**", (route) =>
+      route.fulfill({ status: 200, contentType: "text/html", body: "<html><body>stripe checkout stub</body></html>" })
+    );
 
     await page.goto("/pricing");
     await page.getByTestId("pricing-plan-cta").first().click();
