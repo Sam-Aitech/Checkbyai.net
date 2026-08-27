@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Mail, ArrowLeft, CheckCircle } from "lucide-react";
+import { Loader2, Mail, ArrowLeft, CheckCircle, AlertCircle } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
 import SEOHead from "@/components/SEOHead";
 import { motion, AnimatePresence } from "framer-motion";
@@ -98,6 +98,12 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const turnstileRef = useRef<any>(null);
+  const oauthError = new URLSearchParams(search).get("error");
+  const oauthErrorMessage = oauthError === "google_access_denied"
+    ? "Google did not allow this account to sign in. If this is a managed or testing Google app, the account must be approved by the app owner."
+    : oauthError === "google_auth_failed" || oauthError === "auth_failed"
+      ? "Google sign-in could not be completed. Please try again or use email verification."
+      : null;
 
   const { data: authProviders } = useQuery<{ google: boolean }>({
     queryKey: ["/api/auth/providers"],
@@ -299,6 +305,15 @@ export default function LoginPage() {
             </p>
           </div>
           <div className="p-6 space-y-6">
+            {oauthErrorMessage && (
+              <div
+                role="alert"
+                className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
+              >
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{oauthErrorMessage}</span>
+              </div>
+            )}
             <AnimatePresence mode="wait">
               {step === "email" ? (
                 <motion.div
