@@ -2,6 +2,10 @@ import { test, expect } from "@playwright/test";
 
 test.describe("Pricing inline checkout (logged-out)", () => {
   test("clicking a plan CTA reveals inline email capture instead of navigating to /login", async ({ page }) => {
+    await page.route("**/api/auth/user", (route) =>
+      route.fulfill({ status: 401, contentType: "application/json", body: JSON.stringify({ message: "Unauthorized" }) })
+    );
+
     await page.goto("/pricing");
 
     const cta = page.getByTestId("pricing-plan-cta").first();
