@@ -20,6 +20,27 @@ import { asyncHandler } from "../lib/errorHandler";
 import { ApiError } from "../lib/apiError";
 import { logger } from "../utils/logger";
 
+function buildAdminOverrideAnalysis(status: 'fake' | 'approved', reason: string) {
+  const isFake = status === 'fake';
+  return {
+    result: isFake ? 'fake' : 'genuine',
+    confidence: 99,
+    details: {
+      summary: `This document was previously reviewed by an administrator and confirmed ${isFake ? 'fake' : 'genuine'}. ${reason}`,
+    },
+    checks: [
+      {
+        name: 'Admin Human Review Override',
+        passed: !isFake,
+        severity: isFake ? 'critical' : 'info',
+        message: isFake
+          ? `A human administrator has reviewed this exact document and determined it is NOT genuine. Reason: ${reason}`
+          : `A human administrator has reviewed this exact document and confirmed it IS genuine. ${reason}`,
+      },
+    ],
+  };
+}
+
 function generateReceiptId(): string {
   const random1 = crypto.randomBytes(4).toString('hex').toUpperCase();
   const random2 = crypto.randomBytes(4).toString('hex').toUpperCase();
@@ -132,32 +153,31 @@ export function registerVerificationRoutes(app: Express): void {
     const receiptId = generateReceiptId();
 
     const priorAdminFlag = await storage.getAdminFlaggedVerificationByHash(documentHash);
+    const priorAdminApproval = priorAdminFlag ? undefined : await storage.getAdminApprovedVerificationByHash(documentHash);
 
     let result: string;
     let analysis: any;
     let metadata: any;
     let isAdminOverride = false;
+    let adminOverrideStatus: 'fake' | 'approved' | null = null;
+    let adminOverrideSource: typeof priorAdminFlag | typeof priorAdminApproval;
 
     if (priorAdminFlag) {
       isAdminOverride = true;
+      adminOverrideStatus = 'fake';
+      adminOverrideSource = priorAdminFlag;
       result = 'fake';
       const reason = priorAdminFlag.adminFeedback || 'Flagged as fake by a human reviewer.';
-      analysis = {
-        result: 'fake',
-        confidence: 99,
-        details: {
-          summary: `This document was previously reviewed by an administrator and confirmed fake. ${reason}`,
-        },
-        checks: [
-          {
-            name: 'Admin Human Review Override',
-            passed: false,
-            severity: 'critical',
-            message: `A human administrator has reviewed this exact document and determined it is NOT genuine. Reason: ${reason}`,
-          },
-        ],
-      };
+      analysis = buildAdminOverrideAnalysis('fake', reason);
       metadata = (priorAdminFlag.metadata as any) || {};
+    } else if (priorAdminApproval) {
+      isAdminOverride = true;
+      adminOverrideStatus = 'approved';
+      adminOverrideSource = priorAdminApproval;
+      result = 'genuine';
+      const reason = priorAdminApproval.adminFeedback || 'Confirmed genuine by a human reviewer.';
+      analysis = buildAdminOverrideAnalysis('approved', reason);
+      metadata = (priorAdminApproval.metadata as any) || {};
     } else {
       const pdfAnalyzer = new PDFAnalyzer();
       // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
@@ -255,17 +275,17 @@ export function registerVerificationRoutes(app: Express): void {
         filename: path.basename(req.file!.originalname),
         result,
         confidence: Math.floor(analysis.confidence),
-        metadata: isAdminOverride ? (priorAdminFlag!.metadata ?? {}) : metadata,
+        metadata: isAdminOverride ? (adminOverrideSource!.metadata ?? {}) : metadata,
         analysisDetails: analysis,
         ipAddress: req.ip,
         receiptId,
         documentHash,
       };
       if (isAdminOverride) {
-        insertValues.adminStatus = 'fake';
-        insertValues.adminFeedback = priorAdminFlag!.adminFeedback;
-        insertValues.adminReviewedBy = priorAdminFlag!.adminReviewedBy;
-        insertValues.adminReviewedAt = priorAdminFlag!.adminReviewedAt;
+        insertValues.adminStatus = adminOverrideStatus;
+        insertValues.adminFeedback = adminOverrideSource!.adminFeedback;
+        insertValues.adminReviewedBy = adminOverrideSource!.adminReviewedBy;
+        insertValues.adminReviewedAt = adminOverrideSource!.adminReviewedAt;
       }
       const [verification] = await tx.insert(verificationResults).values(insertValues).returning();
       return verification.id;

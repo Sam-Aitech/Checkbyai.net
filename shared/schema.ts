@@ -168,6 +168,7 @@ export const verificationResults = pgTable(
     index("idx_verification_result_date").on(table.result, table.verifiedAt),
     index("idx_verification_admin_status").on(table.adminStatus),
     index("idx_verification_user_verified").on(table.userId, table.verifiedAt),
+    index("idx_verification_document_hash").on(table.documentHash),
     // NOTE: GIN indexes on metadata/analysis_details JSONB columns are defined in
     // migrations/0001_gin_indexes_jsonb.sql. They reduce admin HITL query cost
     // from O(N) full scan to O(log N) for JSONB key-path lookups.
@@ -806,6 +807,29 @@ export const subscriptionAuditLog = pgTable(
   ]
 );
 
+// Verification audit log — tracks every admin override/delete on a verification result
+export const verificationAuditLog = pgTable(
+  "verification_audit_log",
+  {
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+    verificationId: integer("verification_id").notNull().references(() => verificationResults.id, { onDelete: "cascade" }),
+    actorId: varchar("actor_id").notNull().references(() => users.id),
+    action: varchar("action").notNull(), // 'approve_genuine' | 'mark_fake' | 'delete' | 'restore'
+    previousAdminStatus: varchar("previous_admin_status"),
+    newAdminStatus: varchar("new_admin_status"),
+    previousDeletedAt: timestamp("previous_deleted_at"),
+    newDeletedAt: timestamp("new_deleted_at"),
+    reason: text("reason"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_verif_audit_verification_id").on(table.verificationId),
+    index("idx_verif_audit_actor_id").on(table.actorId),
+    index("idx_verif_audit_created").on(table.createdAt),
+  ]
+);
+
 // Type exports
 export type DailyDigest = typeof dailyDigest.$inferSelect;
 export type AiGenerationLog = typeof aiGenerationLogs.$inferSelect;
@@ -829,6 +853,7 @@ export type NotifLogEntry = typeof notifLog.$inferSelect;
 export type CsvArchiveEntry = typeof csvArchive.$inferSelect;
 export type DiffResultEntry = typeof diffResults.$inferSelect;
 export type SubscriptionAuditLogEntry = typeof subscriptionAuditLog.$inferSelect;
+export type VerificationAuditLogEntry = typeof verificationAuditLog.$inferSelect;
 export type JobTriggerAuditEntry = typeof jobTriggerAudit.$inferSelect;
 export type ShadowRunResultEntry = typeof shadowRunResults.$inferSelect;
 export type ShadowParityReportEntry = typeof shadowParityReports.$inferSelect;

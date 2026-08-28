@@ -1,4 +1,4 @@
-import { verificationResults, users, trustedPatterns, type VerificationResult } from "@shared/schema";
+import { verificationResults, verificationAuditLog, users, trustedPatterns, type VerificationResult, type VerificationAuditLogEntry } from "@shared/schema";
 import { db } from "../db";
 import { eq, desc, gte, count, sql, isNull, and, getTableColumns, inArray } from "drizzle-orm";
 
@@ -61,6 +61,53 @@ export class VerificationRepository {
       .orderBy(desc(verificationResults.adminReviewedAt))
       .limit(1);
     return result;
+  }
+
+  async getAdminApprovedVerificationByHash(documentHash: string): Promise<VerificationResult | undefined> {
+    const [result] = await db
+      .select()
+      .from(verificationResults)
+      .where(
+        sql`${verificationResults.documentHash} = ${documentHash}
+            AND ${verificationResults.adminStatus} = 'approved'
+            AND ${verificationResults.deletedAt} IS NULL`
+      )
+      .orderBy(desc(verificationResults.adminReviewedAt))
+      .limit(1);
+    return result;
+  }
+
+  async logVerificationAudit(entry: {
+    verificationId: number;
+    actorId: string;
+    action: 'approve_genuine' | 'mark_fake' | 'delete' | 'restore';
+    previousAdminStatus?: string | null;
+    newAdminStatus?: string | null;
+    previousDeletedAt?: Date | null;
+    newDeletedAt?: Date | null;
+    reason?: string | null;
+    metadata?: Record<string, unknown>;
+  }): Promise<void> {
+    await db.insert(verificationAuditLog).values({
+      verificationId: entry.verificationId,
+      actorId: entry.actorId,
+      action: entry.action,
+      previousAdminStatus: entry.previousAdminStatus ?? null,
+      newAdminStatus: entry.newAdminStatus ?? null,
+      previousDeletedAt: entry.previousDeletedAt ?? null,
+      newDeletedAt: entry.newDeletedAt ?? null,
+      reason: entry.reason ?? null,
+      metadata: entry.metadata ?? {},
+    });
+  }
+
+  async getVerificationAuditLog(verificationId: number, limit: number = 20): Promise<VerificationAuditLogEntry[]> {
+    return await db
+      .select()
+      .from(verificationAuditLog)
+      .where(eq(verificationAuditLog.verificationId, verificationId))
+      .orderBy(desc(verificationAuditLog.createdAt))
+      .limit(limit);
   }
 
   async getRecentActivity(limit: number = 20): Promise<VerificationResult[]> {
@@ -226,8 +273,8 @@ export class VerificationRepository {
       .limit(limit);
   }
 
-  async deleteVerificationLog(id: number): Promise<void> {
-    await db.update(verificationResults).set({ deletedAt: new Date() }).where(eq(verificationResults.id, id));
+  async deleteVerificationLog(id: number, deletedAt: Date = new Date()): Promise<void> {
+    await db.update(verificationResults).set({ deletedAt }).where(eq(verificationResults.id, id));
   }
 
   async getVerificationLogsWithHITL(page: number, limit: number, adminStatus?: string): Promise<{

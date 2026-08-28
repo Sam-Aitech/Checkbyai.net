@@ -17,6 +17,7 @@ import type {
   InsertSponsorWatch,
   NotifPrefs,
   SubscriptionAuditLogEntry,
+  VerificationAuditLogEntry,
   SupportTicket,
   InsertSupportTicket,
 } from "@shared/schema";
@@ -77,6 +78,7 @@ export interface IStorage {
   getVerificationsByUserId(userId: string, limit?: number): Promise<VerificationResult[]>;
   getVerificationByReceiptId(receiptId: string): Promise<VerificationResult | undefined>;
   getAdminFlaggedVerificationByHash(documentHash: string): Promise<VerificationResult | undefined>;
+  getAdminApprovedVerificationByHash(documentHash: string): Promise<VerificationResult | undefined>;
   getRecentActivity(limit?: number): Promise<VerificationResult[]>;
   getVerificationById(id: number): Promise<VerificationResult | undefined>;
   getPaginatedVerificationLogs(options: { page: number; limit: number; status?: string; startDate?: string; endDate?: string; search?: string; period?: string }): Promise<{ data: (VerificationResult & { userEmail?: string | null })[]; total: number; page: number; limit: number; totalPages: number }>;
@@ -101,7 +103,9 @@ export interface IStorage {
   getSubscriptionAuditLog(userId: string, limit?: number): Promise<SubscriptionAuditLogEntry[]>;
   updateVerificationFeedback(id: number, data: { adminStatus: string; adminFeedback?: string | null; adminReviewedBy: string; adminReviewedAt: Date; accuracyScore?: number | null }): Promise<VerificationResult>;
   getAdminFakeKnowledge(limit?: number): Promise<VerificationResult[]>;
-  deleteVerificationLog(id: number): Promise<void>;
+  deleteVerificationLog(id: number, deletedAt?: Date): Promise<void>;
+  logVerificationAudit(entry: { verificationId: number; actorId: string; action: 'approve_genuine' | 'mark_fake' | 'delete' | 'restore'; previousAdminStatus?: string | null; newAdminStatus?: string | null; previousDeletedAt?: Date | null; newDeletedAt?: Date | null; reason?: string | null; metadata?: Record<string, unknown> }): Promise<void>;
+  getVerificationAuditLog(verificationId: number, limit?: number): Promise<VerificationAuditLogEntry[]>;
   getVerificationLogsWithHITL(page: number, limit: number, adminStatus?: string): Promise<{ data: VerificationResult[]; total: number; page: number; limit: number; totalPages: number }>;
   createSponsorWatch(userId: string, data: InsertSponsorWatch): Promise<SponsorWatch>;
   getSponsorWatchesByUserId(userId: string, status?: string): Promise<SponsorWatch[]>;
@@ -149,13 +153,16 @@ class DatabaseStorage implements IStorage {
   getVerificationsByUserId(userId: string, limit?: number) { return verificationRepository.getVerificationsByUserId(userId, limit); }
   getVerificationByReceiptId(receiptId: string) { return verificationRepository.getVerificationByReceiptId(receiptId); }
   getAdminFlaggedVerificationByHash(documentHash: string) { return verificationRepository.getAdminFlaggedVerificationByHash(documentHash); }
+  getAdminApprovedVerificationByHash(documentHash: string) { return verificationRepository.getAdminApprovedVerificationByHash(documentHash); }
   getRecentActivity(limit?: number) { return verificationRepository.getRecentActivity(limit); }
   getVerificationById(id: number) { return verificationRepository.getVerificationById(id); }
   getPaginatedVerificationLogs(options: { page: number; limit: number; status?: string; startDate?: string; endDate?: string; search?: string; period?: string }) { return verificationRepository.getPaginatedVerificationLogs(options); }
   getStats() { return verificationRepository.getStats(); }
   updateVerificationFeedback(id: number, data: { adminStatus: string; adminFeedback?: string | null; adminReviewedBy: string; adminReviewedAt: Date; accuracyScore?: number | null }) { return verificationRepository.updateVerificationFeedback(id, data); }
   getAdminFakeKnowledge(limit?: number) { return verificationRepository.getAdminFakeKnowledge(limit); }
-  deleteVerificationLog(id: number) { return verificationRepository.deleteVerificationLog(id); }
+  deleteVerificationLog(id: number, deletedAt?: Date) { return verificationRepository.deleteVerificationLog(id, deletedAt); }
+  logVerificationAudit(entry: { verificationId: number; actorId: string; action: 'approve_genuine' | 'mark_fake' | 'delete' | 'restore'; previousAdminStatus?: string | null; newAdminStatus?: string | null; previousDeletedAt?: Date | null; newDeletedAt?: Date | null; reason?: string | null; metadata?: Record<string, unknown> }) { return verificationRepository.logVerificationAudit(entry); }
+  getVerificationAuditLog(verificationId: number, limit?: number) { return verificationRepository.getVerificationAuditLog(verificationId, limit); }
   getVerificationLogsWithHITL(page: number, limit: number, adminStatus?: string) { return verificationRepository.getVerificationLogsWithHITL(page, limit, adminStatus); }
 
   getTrustedPatterns() { return trustedPatternRepository.getTrustedPatterns(); }
