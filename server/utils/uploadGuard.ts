@@ -80,6 +80,7 @@ const PDF_MAGIC_BYTES = Buffer.from("%PDF-");
  */
 export async function assertPdfMagicBytes(filePath: string): Promise<void> {
   const safePath = sanitizeUploadPath(filePath);
+  // codeql[js/path-injection] - safePath is validated by sanitizeUploadPath() on the line above
   const handle = await fs.promises.open(safePath, "r");
   try {
     const buffer = Buffer.alloc(PDF_MAGIC_BYTES.length);
