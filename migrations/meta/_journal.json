@@ -15,6 +15,20 @@
       "when": 1787592599134,
       "tag": "0024_catchup",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787850473848,
+      "tag": "0025_verification_audit_log",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1787851024071,
+      "tag": "0026_verification_document_hash_index",
+      "breakpoints": true
     }
   ]
 }

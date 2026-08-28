@@ -1909,6 +1909,21 @@ Format your response in clear, professional markdown.`;
         accuracyScore: adminStatus === 'fake' ? 0 : (accuracyScore || null),
       });
 
+      if (adminStatus === 'approved' || adminStatus === 'fake') {
+        try {
+          await storage.logVerificationAudit({
+            verificationId: id,
+            actorId: req.user.id,
+            action: adminStatus === 'fake' ? 'mark_fake' : 'approve_genuine',
+            previousAdminStatus: verification.adminStatus,
+            newAdminStatus: adminStatus,
+            reason: adminFeedback || null,
+          });
+        } catch (auditError) {
+          logger.error({ err: auditError }, 'Failed to write verification audit log (non-fatal):');
+        }
+      }
+
       if (adminStatus === 'fake' && adminFeedback?.trim()) {
         try {
           const overrideDate = new Date().toISOString().split('T')[0];
@@ -1949,11 +1964,35 @@ Format your response in clear, professional markdown.`;
       if (isNaN(id)) return res.status(400).json({ message: 'Invalid ID' });
       const log = await storage.getVerificationById(id);
       if (!log) return res.status(404).json({ message: 'Log not found' });
-      await storage.deleteVerificationLog(id);
+      const deletedAt = new Date();
+      await storage.deleteVerificationLog(id, deletedAt);
+      try {
+        await storage.logVerificationAudit({
+          verificationId: id,
+          actorId: req.user.id,
+          action: 'delete',
+          previousDeletedAt: log.deletedAt,
+          newDeletedAt: deletedAt,
+        });
+      } catch (auditError) {
+        logger.error({ err: auditError }, 'Failed to write verification audit log (non-fatal):');
+      }
       res.json({ message: 'Log deleted' });
     } catch (error) {
       logger.error({ err: error }, 'Error deleting verification log:');
       res.status(500).json({ message: 'Failed to delete log' });
+    }
+  });
+
+  app.get('/api/admin/logs/:id/audit', requireRole("admin"), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: 'Invalid ID' });
+      const auditLog = await storage.getVerificationAuditLog(id);
+      res.json(auditLog);
+    } catch (error) {
+      logger.error({ err: error }, 'Error fetching verification audit log:');
+      res.status(500).json({ message: 'Failed to fetch verification audit log' });
     }
   });
 

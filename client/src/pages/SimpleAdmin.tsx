@@ -456,7 +456,12 @@ export default function SimpleAdmin() {
   const [feedbackReasoning, setFeedbackReasoning] = useState('');
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [deleteConfirmLog, setDeleteConfirmLog] = useState<VerificationLog | null>(null);
-  
+
+  // Recent Activity widget state
+  const [recentActivity, setRecentActivity] = useState<VerificationLog[]>([]);
+  const [recentActivityLoading, setRecentActivityLoading] = useState(false);
+  const [deleteConfirmActivity, setDeleteConfirmActivity] = useState<VerificationLog | null>(null);
+
   // Sponsor Monitor state
   const [sponsorStatus, setSponsorStatus] = useState<any>(null);
   const [sponsorStatusLoading, setSponsorStatusLoading] = useState(false);
@@ -584,11 +589,26 @@ export default function SimpleAdmin() {
     }
   }, [logsPage, logsFilter, logsSearch, logsStartDate, logsEndDate, logsPeriod]);
 
+  const loadRecentActivity = useCallback(async () => {
+    setRecentActivityLoading(true);
+    try {
+      const res = await fetch('/api/admin/recent-activity', { credentials: 'include' });
+      if (res.ok) {
+        setRecentActivity(await res.json());
+      }
+    } catch (error) {
+      console.error('Failed to load recent activity:', error);
+    } finally {
+      setRecentActivityLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (isAuthenticated && activeTab === 'logs') {
       loadLogs();
+      loadRecentActivity();
     }
-  }, [isAuthenticated, loadLogs, activeTab]);
+  }, [isAuthenticated, loadLogs, loadRecentActivity, activeTab]);
 
   const loadUsers = useCallback(async () => {
     setUsersLoading(true);
@@ -1282,7 +1302,9 @@ export default function SimpleAdmin() {
       if (res.ok) {
         toast({ title: 'Log deleted' });
         setDeleteConfirmLog(null);
+        setDeleteConfirmActivity(null);
         loadLogs();
+        loadRecentActivity();
       } else {
         const err = await res.json();
         toast({ title: 'Failed to delete', description: err.message, variant: 'destructive' });
@@ -1965,6 +1987,88 @@ export default function SimpleAdmin() {
 
           {/* ── Phase 3: Verification Logs Explorer ── */}
           <TabsContent value="logs">
+            <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm mb-6">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-gray-900 dark:text-white flex items-center gap-2">
+                      <Clock className="w-5 h-5" />
+                      Recent Activity
+                    </CardTitle>
+                    <CardDescription className="text-gray-500 dark:text-slate-400">
+                      Last {recentActivity.length} verifications
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={loadRecentActivity}
+                    disabled={recentActivityLoading}
+                    aria-label="Refresh recent activity"
+                    title="Refresh recent activity"
+                    className="border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${recentActivityLoading ? 'animate-spin' : ''}`} />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {recentActivity.length === 0 ? (
+                  <p className="text-sm text-gray-500 dark:text-slate-400">No recent activity.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-200 dark:border-slate-700">
+                          <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-slate-400">Time</th>
+                          <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-slate-400">Document</th>
+                          <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-slate-400">Result</th>
+                          <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-slate-400">Confidence</th>
+                          <th className="text-right py-2 px-3 font-medium text-gray-500 dark:text-slate-400">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {recentActivity.map((activity) => (
+                          <tr key={activity.id} className="border-b border-gray-100 dark:border-slate-700/50 hover:bg-gray-50 dark:hover:bg-slate-700/30">
+                            <td className="py-2 px-3 text-gray-600 dark:text-slate-400 whitespace-nowrap">
+                              {new Date(activity.verifiedAt).toLocaleString()}
+                            </td>
+                            <td className="py-2 px-3 text-gray-900 dark:text-white max-w-xs truncate" title={activity.filename}>
+                              {activity.filename}
+                            </td>
+                            <td className="py-2 px-3">
+                              <Badge
+                                className={
+                                  activity.result === 'genuine' ? 'bg-green-500/20 text-green-400 border-green-500' :
+                                  activity.result === 'suspicious' ? 'bg-amber-500/20 text-amber-400 border-amber-500' :
+                                  'bg-red-500/20 text-red-400 border-red-500'
+                                }
+                              >
+                                {activity.result.toUpperCase()}
+                              </Badge>
+                            </td>
+                            <td className="py-2 px-3 text-gray-600 dark:text-slate-400">{activity.confidence}%</td>
+                            <td className="py-2 px-3 text-right">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setDeleteConfirmActivity(activity)}
+                                aria-label={`Delete ${activity.filename}`}
+                                title="Delete this activity entry"
+                                className="text-gray-500 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
               <CardHeader>
                 <div className="flex flex-col gap-4">
@@ -4121,6 +4225,36 @@ export default function SimpleAdmin() {
             <Button
               variant="destructive"
               onClick={() => deleteConfirmLog && handleDeleteLog(deleteConfirmLog)}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Delete permanently
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog — Recent Activity widget */}
+      <Dialog open={!!deleteConfirmActivity} onOpenChange={() => setDeleteConfirmActivity(null)}>
+        <DialogContent className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-400">
+              <Trash2 className="w-5 h-5" />
+              Delete verification log
+            </DialogTitle>
+            <DialogDescription className="text-gray-500 dark:text-slate-400">
+              This will permanently remove the log for{' '}
+              <strong className="text-gray-900 dark:text-white">{deleteConfirmActivity?.filename}</strong>.
+              This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteConfirmActivity(null)}
+              className="border-gray-300 dark:border-slate-600 text-gray-700 dark:text-slate-300">
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteConfirmActivity && handleDeleteLog(deleteConfirmActivity)}
               className="bg-red-600 hover:bg-red-700 text-white"
             >
               Delete permanently
