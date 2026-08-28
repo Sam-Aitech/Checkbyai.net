@@ -79,7 +79,8 @@ const PDF_MAGIC_BYTES = Buffer.from("%PDF-");
  * Throws Error with statusCode=400 when the file does not start with %PDF-.
  */
 export async function assertPdfMagicBytes(filePath: string): Promise<void> {
-  const handle = await fs.promises.open(filePath, "r");
+  const safePath = path.join(UPLOADS_DIR, path.basename(sanitizeUploadPath(filePath)));
+  const handle = await fs.promises.open(safePath, "r");
   try {
     const buffer = Buffer.alloc(PDF_MAGIC_BYTES.length);
     const { bytesRead } = await handle.read(buffer, 0, PDF_MAGIC_BYTES.length, 0);
