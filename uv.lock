@@ -3161,7 +3161,7 @@ wheels = [
 
 [[package]]
 name = "scrapling"
-version = "0.4.14"
+version = "0.4.15"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cssselect" },
@@ -3171,9 +3171,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "w3lib" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/66/63/6fa90c739cb74a63bcc10cac1c9302474754e324da22d695d02c08ab716d/scrapling-0.4.14.tar.gz", hash = "sha256:d5b5f28ce0119b3620d653fb1c4b4655adb50d12b47273f3e76e69e3d3b36159", size = 171798, upload-time = "2026-08-10T22:27:44.017Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9a/39/74b4c84e1492e483331631272ef881ea96f9933fa7153fe5a85043b8f737/scrapling-0.4.15.tar.gz", hash = "sha256:72406900f437316209dd05d9853dae04420f1cab0e11071604bb4588b6e2f713", size = 178459, upload-time = "2026-08-23T19:43:49.292Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b8/f3/44415358a97765ffcb5cce2e9f048444ec3d2fecefdb41afadda6241267f/scrapling-0.4.14-py3-none-any.whl", hash = "sha256:eef9d9ed239c978bb5f894701c3ce68f6e7dcaab2a5df70035001bd7e8a54fc2", size = 173649, upload-time = "2026-08-10T22:27:42.659Z" },
+    { url = "https://files.pythonhosted.org/packages/87/68/bdccc7c459eb90d442cbc89a028c893381cf363165c7c58f024307b8d9ed/scrapling-0.4.15-py3-none-any.whl", hash = "sha256:ae66bde9f63afb793ad6f93bd76b451e29f1631347465a553c4e7765c0ecc1f2", size = 180463, upload-time = "2026-08-23T19:43:47.569Z" },
 ]
 
 [[package]]
