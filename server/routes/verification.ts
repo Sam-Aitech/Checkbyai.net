@@ -335,7 +335,8 @@ export function registerVerificationRoutes(app: Express): void {
       try { await fs.promises.unlink(safeFilePath); } catch {} // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
       return;
     }
-    success(res, { receiptId, documentHash, result, confidence: analysis.confidence, details: analysis.details, checks: analysis.checks || [], forensicAnalysis: analysis.details?.forensicAnalysis || null, adminOverride: isAdminOverride, metadata: isAdminOverride ? {} : metadata, cosCheck: analysis.cosCheck ?? null, timestamp: new Date().toISOString(), queued: true });
+    // isAdminOverride is always false here — the branch above returns whenever it's true.
+    success(res, { receiptId, documentHash, result, confidence: analysis.confidence, details: analysis.details, checks: analysis.checks || [], forensicAnalysis: analysis.details?.forensicAnalysis || null, adminOverride: false, metadata, cosCheck: analysis.cosCheck ?? null, timestamp: new Date().toISOString(), queued: true });
     try { await fs.promises.unlink(safeFilePath); } catch {} // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
   }));
 
