@@ -1,14 +1,13 @@
 import crypto from "node:crypto";
 import type { NotificationChannel, ChannelPayload, SendResult } from "./types";
 import { logger } from "../../utils/logger";
+import { jitterDelay, parseRetryAfter } from "../../utils/jitterRetry";
+import { waitForBucket } from "../../utils/tokenBucket";
+import { getRedis } from "../../utils/redisClient";
 
 const log = logger.child({ module: "Channel:Webhook" });
 
-// Quick in-process backoff only. This runs INLINE inside notifyUsersOfEvent (awaited
-// via p-limit), so long delays here would stall the whole monitor job — previously
-// 5m/15m/60m could block a user task for ~80 minutes. Durable long-interval retries
-// belong in a queue (follow-up); here we cap total blocking to a few seconds.
-const RETRY_DELAYS_MS = [1000, 3000];
+const MAX_ATTEMPTS = 3;
 
 // SSRF guard: block delivery to loopback / private / link-local / metadata hosts.
 // Webhook URLs are user-supplied (enterprise), so an attacker could otherwise point
@@ -70,6 +69,8 @@ async function attemptDelivery(
   bodyJson: string,
   headers: Record<string, string>,
 ): Promise<SendResult> {
+  const host = (()=>{ try{ return new URL(webhookUrl).hostname; } catch{ return "global"; }})();
+  await waitForBucket("webhook", host);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
   try {
@@ -78,6 +79,8 @@ async function attemptDelivery(
       const providerMessageId = res.headers.get("X-Request-Id") ?? res.headers.get("x-request-id") ?? undefined;
       return { success: true, providerMessageId };
     }
+    const retryAfter = parseRetryAfter(res.headers.get("retry-after"));
+    if (retryAfter) await new Promise(r=>setTimeout(r, retryAfter));
     return { success: false, error: `HTTP ${res.status}: ${await res.text().catch(() => "no body")}` };
   } finally {
     clearTimeout(timeout);
@@ -89,41 +92,33 @@ export const webhookChannel: NotificationChannel = {
 
   async send(payload: ChannelPayload): Promise<SendResult> {
     const webhookUrl = payload.recipient;
-    if (!webhookUrl?.startsWith("https://")) {
-      return { success: false, error: "Invalid webhook URL (must be HTTPS)" };
-    }
-
+    if (!webhookUrl?.startsWith("https://")) return { success: false, error: "Invalid webhook URL (must be HTTPS)" };
     let parsedHost: string;
-    try {
-      parsedHost = new URL(webhookUrl).hostname;
-    } catch {
-      return { success: false, error: "Invalid webhook URL" };
-    }
+    try { parsedHost = new URL(webhookUrl).hostname; } catch { return { success: false, error: "Invalid webhook URL" }; }
     if (isBlockedWebhookHost(parsedHost)) {
       log.warn({ webhookUrl }, "Webhook delivery blocked — internal/private host");
       return { success: false, error: "Webhook URL targets a disallowed (internal/private) host" };
     }
-
+    const snap = payload.snapshotDate || new Date().toISOString().slice(0,10);
+    const key = `${payload.userId}:${payload.changeId ?? 0}:webhook:${snap}`;
+    const idem = crypto.createHash("sha256").update(key).digest("hex").slice(0,32);
+    const r = getRedis();
+    if (r) { try{ if(await r.get(`idem:notif:${idem}`)) return { success: true, providerMessageId: `idem:${idem}` }; }catch{} }
     const bodyJson = JSON.stringify(buildBody(payload));
     const headers = buildHeaders(bodyJson);
-
     let lastError: string | undefined;
-    for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       try {
         const result = await attemptDelivery(webhookUrl, bodyJson, headers);
-        if (result.success) return result;
+        if (result.success) { if(r) try{ await r.set(`idem:notif:${idem}`,"1","EX",86400); }catch{} return result; }
         lastError = result.error;
         log.warn({ webhookUrl, attempt, error: lastError }, "Webhook delivery failed");
       } catch (err: unknown) {
         lastError = err instanceof Error ? err.message : String(err);
         log.error({ err: lastError, webhookUrl, attempt }, "Webhook delivery threw");
       }
-
-      if (attempt < RETRY_DELAYS_MS.length) {
-        await new Promise(r => setTimeout(r, RETRY_DELAYS_MS[attempt]));
-      }
+      if (attempt < MAX_ATTEMPTS - 1) await new Promise(rr => setTimeout(rr, jitterDelay(attempt, 1000, 30000)));
     }
-
-    return { success: false, error: `Webhook delivery failed after ${RETRY_DELAYS_MS.length + 1} attempts: ${lastError}` };
+    return { success: false, error: `Webhook delivery failed after ${MAX_ATTEMPTS} attempts: ${lastError}` };
   },
 };

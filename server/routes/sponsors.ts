@@ -391,11 +391,16 @@ export function registerSponsorRoutes(app: Express): void {
     const limit  = dirParsed.data.limit;
     const offset = (page - 1) * limit;
 
-    const nameFilter   = name   ? sql`AND current_name ILIKE ${"%" + name + "%"}`     : sql``;
-    const statusFilter = status ? sql`AND status = ${status}`                          : sql``;
-    const townFilter   = town   ? sql`AND town_city ILIKE ${"%" + town + "%"}`         : sql``;
-    const routeFilter  = route  ? sql`AND route ILIKE ${"%" + route + "%"}`            : sql``;
     const letterFilter = letter ? sql`AND current_name ILIKE ${letter.toUpperCase() + "%"}` : sql``;
+    const statusFilter = status ? sql`AND status = ${status}` : sql``;
+
+    const hasTrigramQuery = !!(name || town || route);
+    const nameTrgm   = name  ? sql`AND (current_name % ${name} OR array_to_string(historical_names,' ') % ${name})` : sql``;
+    const townTrgm   = town  ? sql`AND town_city % ${town}` : sql``;
+    const routeTrgm  = route ? sql`AND route % ${route}` : sql``;
+    const nameIlike  = name  ? sql`AND current_name ILIKE ${"%" + name + "%"}` : sql``;
+    const townIlike  = town  ? sql`AND town_city ILIKE ${"%" + town + "%"}` : sql``;
+    const routeIlike = route ? sql`AND route ILIKE ${"%" + route + "%"}` : sql``;
 
     type DirectoryStats = { active: number; newlyGranted: number; removedThisWeek: number; gracePeriod: number };
     type DirectoryResponse = { results: unknown[]; total: number; page: number; totalPages: number; limit: number; stats: DirectoryStats };
@@ -410,8 +415,56 @@ export function registerSponsorRoutes(app: Express): void {
 
     let stats = await cacheGet<DirectoryStats>("sponsors:stats");
 
-    const [rows, countRows] = await Promise.all([
-      db.execute(sql`
+    const buildTrigramQueries = () => {
+      const similarityExpr = sql`GREATEST(
+        ${name ? sql`similarity(current_name, ${name})` : sql`0`},
+        ${name ? sql`similarity(array_to_string(historical_names,' '), ${name})` : sql`0`},
+        ${town ? sql`similarity(town_city, ${town})` : sql`0`},
+        ${route ? sql`similarity(route, ${route})` : sql`0`}
+      )`;
+      const orderBy = hasTrigramQuery
+        ? sql`ORDER BY ${similarityExpr} DESC, current_name ASC`
+        : sql`ORDER BY CASE status WHEN 'NEWLY_GRANTED' THEN 0 WHEN 'ACTIVE' THEN 1 WHEN 'GRACE_PERIOD' THEN 2 ELSE 3 END, current_name ASC`;
+      return {
+        data: sql`
+        SELECT
+          id,
+          fingerprint,
+          current_name   AS "organisationName",
+          town_city      AS "townCity",
+          county,
+          type_rating    AS "typeRating",
+          route,
+          status,
+          granted_at     AS "grantedAt",
+          removed_at     AS "removedAt",
+          first_seen     AS "firstSeen",
+          ${hasTrigramQuery ? sql`${similarityExpr} AS match_score` : sql`0 AS match_score`}
+        FROM sponsor_canonical
+        WHERE 1=1
+          ${nameTrgm}
+          ${statusFilter}
+          ${townTrgm}
+          ${routeTrgm}
+          ${letterFilter}
+        ${orderBy}
+        LIMIT ${limit} OFFSET ${offset}
+      `,
+        count: sql`
+        SELECT COUNT(*)::int AS total
+        FROM sponsor_canonical
+        WHERE 1=1
+          ${nameTrgm}
+          ${statusFilter}
+          ${townTrgm}
+          ${routeTrgm}
+          ${letterFilter}
+      `,
+      };
+    };
+
+    const buildIlikeQueries = () => ({
+      data: sql`
         SELECT
           id,
           fingerprint,
@@ -426,10 +479,10 @@ export function registerSponsorRoutes(app: Express): void {
           first_seen     AS "firstSeen"
         FROM sponsor_canonical
         WHERE 1=1
-          ${nameFilter}
+          ${nameIlike}
           ${statusFilter}
-          ${townFilter}
-          ${routeFilter}
+          ${townIlike}
+          ${routeIlike}
           ${letterFilter}
         ORDER BY
           CASE status
@@ -440,18 +493,34 @@ export function registerSponsorRoutes(app: Express): void {
           END,
           current_name ASC
         LIMIT ${limit} OFFSET ${offset}
-      `),
-      db.execute(sql`
+      `,
+      count: sql`
         SELECT COUNT(*)::int AS total
         FROM sponsor_canonical
         WHERE 1=1
-          ${nameFilter}
+          ${nameIlike}
           ${statusFilter}
-          ${townFilter}
-          ${routeFilter}
+          ${townIlike}
+          ${routeIlike}
           ${letterFilter}
-      `),
-    ]);
+      `,
+    });
+
+    let rows: any, countRows: any;
+    try {
+      const q = hasTrigramQuery ? buildTrigramQueries() : buildIlikeQueries();
+      [rows, countRows] = await Promise.all([db.execute(q.data), db.execute(q.count)]);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const isTrgmMissing = msg.includes("pg_trgm") || msg.includes("similarity") || (err as any)?.code === "42883";
+      if (hasTrigramQuery && isTrgmMissing) {
+        logger.warn("[Directory] pg_trgm unavailable, falling back to ILIKE");
+        const q = buildIlikeQueries();
+        [rows, countRows] = await Promise.all([db.execute(q.data), db.execute(q.count)]);
+      } else {
+        throw err;
+      }
+    }
 
     if (!stats) {
       const statsRows = await db.execute(sql`
@@ -493,6 +562,9 @@ export function registerSponsorRoutes(app: Express): void {
     if (!fingerprint || typeof fingerprint !== 'string') {
       throw new ApiError(400, "Fingerprint is required.");
     }
+    const page = Math.max(1, parseInt(req.query.page as string || "1", 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string || "50", 10) || 50));
+    const offset = (page - 1) * limit;
 
     const canonical = await db
       .select({
@@ -517,8 +589,8 @@ export function registerSponsorRoutes(app: Express): void {
     const record = canonical[0];
     const allNames = [record.currentName, ...(record.historicalNames || [])];
 
-    const changes = await db
-      .select({
+    const [changes, countRows] = await Promise.all([
+      db.select({
         id: sponsorChanges.id,
         detectedAt: sponsorChanges.detectedAt,
         changeType: sponsorChanges.changeType,
@@ -526,11 +598,10 @@ export function registerSponsorRoutes(app: Express): void {
         previousValue: sponsorChanges.previousValue,
         newValue: sponsorChanges.newValue,
         snapshotDate: sponsorChanges.snapshotDate,
-      })
-      .from(sponsorChanges)
-      .where(inArray(sponsorChanges.organisationName, allNames))
-      .orderBy(desc(sponsorChanges.detectedAt))
-      .limit(100);
+      }).from(sponsorChanges).where(inArray(sponsorChanges.organisationName, allNames)).orderBy(desc(sponsorChanges.detectedAt)).limit(limit).offset(offset),
+      db.select({ count: sql<number>`count(*)::int` }).from(sponsorChanges).where(inArray(sponsorChanges.organisationName, allNames)),
+    ]);
+    const total = (countRows[0] as any)?.count ?? 0;
 
     const history = changes.map(c => ({
       id: c.id,
@@ -553,6 +624,10 @@ export function registerSponsorRoutes(app: Express): void {
       lastSeen: record.lastSeen,
       historicalNames: record.historicalNames || [],
       history,
+      page,
+      limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
     });
   }));
 
@@ -921,7 +996,15 @@ export function registerSponsorRoutes(app: Express): void {
   }));
 
   app.get('/api/sponsor-changes', changesRateLimit, asyncHandler(async (req, res) => {
-    const changesCached = await cacheGet<{ changes: unknown[]; grouped: unknown; totalCount: number }>("sponsors:changes");
+    const pageParam = req.query.page as string | undefined;
+    const limitParam = req.query.limit as string | undefined;
+    const hasPagination = pageParam !== undefined || limitParam !== undefined;
+    const page = Math.max(1, parseInt(pageParam || "1", 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(limitParam || "50", 10) || 50));
+    const offset = (page - 1) * limit;
+
+    const cacheKey = hasPagination ? `sponsors:changes:p:${page}:l:${limit}` : "sponsors:changes";
+    const changesCached = await cacheGet<any>(cacheKey);
     if (changesCached) {
       res.set("Cache-Control", "public, max-age=60");
       success(res, changesCached);
@@ -929,6 +1012,35 @@ export function registerSponsorRoutes(app: Express): void {
     }
 
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const baseWhere = and(gte(sponsorChanges.detectedAt, sevenDaysAgo), eq(sponsorChanges.isTest, false));
+
+    if (hasPagination) {
+      const [changes, countRows] = await Promise.all([
+        db.select({
+          id: sponsorChanges.id,
+          organisationName: sponsorChanges.organisationName,
+          changeType: sponsorChanges.changeType,
+          previousValue: sponsorChanges.previousValue,
+          newValue: sponsorChanges.newValue,
+          detectedAt: sponsorChanges.detectedAt,
+          snapshotDate: sponsorChanges.snapshotDate,
+        }).from(sponsorChanges).where(baseWhere).orderBy(desc(sponsorChanges.detectedAt)).limit(limit).offset(offset),
+        db.select({ count: sql<number>`count(*)::int` }).from(sponsorChanges).where(baseWhere),
+      ]);
+      const total = (countRows[0] as any)?.count ?? 0;
+      const grouped: Record<string, typeof changes> = {};
+      for (const change of changes) {
+        const dateKey = change.snapshotDate || (change.detectedAt ? new Date(change.detectedAt).toISOString().split('T')[0] : 'unknown');
+        if (!grouped[dateKey]) grouped[dateKey] = [];
+        grouped[dateKey].push(change);
+      }
+      const pagedResponse = { changes, grouped, totalCount: total, page, limit, totalPages: Math.max(1, Math.ceil(total / limit)) };
+      await cacheSet(cacheKey, pagedResponse, 60);
+      res.set("Cache-Control", "public, max-age=60");
+      success(res, pagedResponse);
+      return;
+    }
+
     const changes = await db
       .select({
         id: sponsorChanges.id,
@@ -940,7 +1052,7 @@ export function registerSponsorRoutes(app: Express): void {
         snapshotDate: sponsorChanges.snapshotDate,
       })
       .from(sponsorChanges)
-      .where(and(gte(sponsorChanges.detectedAt, sevenDaysAgo), eq(sponsorChanges.isTest, false)))
+      .where(baseWhere)
       .orderBy(desc(sponsorChanges.detectedAt))
       .limit(500);
 

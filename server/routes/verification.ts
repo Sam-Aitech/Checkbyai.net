@@ -19,6 +19,7 @@ import { success } from "../lib/response";
 import { asyncHandler } from "../lib/errorHandler";
 import { ApiError } from "../lib/apiError";
 import { logger } from "../utils/logger";
+import { isQueueAvailable, getPdfVerifyQueue } from "../services/jobQueue";
 
 function buildAdminOverrideAnalysis(status: 'fake' | 'approved', reason: string) {
   const isFake = status === 'fake';
@@ -48,9 +49,13 @@ function generateReceiptId(): string {
 }
 
 async function generateDocumentHash(filePath: string): Promise<string> {
-  // codeql[js/path-injection] - filePath is validated by sanitizeUploadPath before being passed here
-  const fileBuffer = await fs.promises.readFile(filePath);
-  return crypto.createHash('sha256').update(fileBuffer).digest('hex');
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash('sha256');
+    const stream = fs.createReadStream(filePath);
+    stream.on('data', (d) => hash.update(d));
+    stream.on('end', () => resolve(hash.digest('hex')));
+    stream.on('error', reject);
+  });
 }
 
 // Configure multer for file uploads with security limits
@@ -70,6 +75,31 @@ export const upload = multer({
 });
 
 export function registerVerificationRoutes(app: Express): void {
+  app.get('/api/verify/status/:jobId', isAuthenticated, asyncHandler(async (req: any, res) => {
+    const { jobId } = req.params;
+    if (!jobId) throw new ApiError(400, "jobId required");
+    const queue = getPdfVerifyQueue();
+    if (!queue) {
+      const v = await storage.getVerificationByReceiptId(jobId).catch(() => null);
+      if (v) success(res, { status: "completed", progress: 100, verificationId: v.id, receiptId: v.receiptId, result: v.result });
+      else success(res, { status: "not_found" });
+      return;
+    }
+    const job = await queue.getJob(jobId);
+    if (!job) {
+      const byReceipt = await storage.getVerificationByReceiptId(jobId).catch(() => null);
+      if (byReceipt) success(res, { status: "completed", progress: 100, verificationId: byReceipt.id, receiptId: byReceipt.receiptId, result: byReceipt.result });
+      else success(res, { status: "not_found" });
+      return;
+    }
+    const state = await job.getState();
+    const progress = (job.progress as number) || 0;
+    if (state === "completed") success(res, { status: "completed", progress: 100, jobId, returnvalue: job.returnvalue });
+    else if (state === "failed") success(res, { status: "failed", progress, failedReason: job.failedReason });
+    else if (state === "active") success(res, { status: "active", progress });
+    else success(res, { status: state, progress });
+  }));
+
   app.post('/api/verify', verifyLimiter, upload.single('file'), asyncHandler(async (req: any, res) => {
     if (!req.isAuthenticated()) {
       throw new ApiError(403, 'CoS Check is currently in closed beta. Please log in and request access.', 'beta_login_required');
@@ -179,139 +209,95 @@ export function registerVerificationRoutes(app: Express): void {
       analysis = buildAdminOverrideAnalysis('approved', reason);
       metadata = (priorAdminApproval.metadata as any) || {};
     } else {
+      const pdfQueue = getPdfVerifyQueue();
+      const shouldQueue = isQueueAvailable() && !!pdfQueue && !isAdminOverride;
+      if (shouldQueue) {
+        const jobId = `verify-${documentHash.slice(0,16)}-${userId}`;
+        try {
+          const job = await pdfQueue!.add('verify', {
+            userId, filePath: safeFilePath, originalname: req.file!.originalname, documentHash, receiptId, ipAddress: req.ip ?? null, useCredits, useDailyLimit
+          }, { jobId, attempts: 3, backoff: { type: 'exponential', delay: 5000 }, removeOnComplete: { age: 86400, count: 5000 }, removeOnFail: { age: 604800, count: 5000 } });
+          res.status(202);
+          success(res, { jobId: job.id, receiptId, documentHash, status: 'accepted', mode: 'bullmq' });
+          req.on('close', () => {
+            if (!res.writableEnded) {
+              pdfQueue!.getJob(job.id!).then(j => j?.remove().catch(()=>{})).catch(()=>{});
+              fs.promises.unlink(safeFilePath).catch(()=>{});
+            }
+          });
+          return;
+        } catch (e) {
+          logger.warn({ err: e }, "[Verify] queue add failed, falling back to inline");
+        }
+      }
       const pdfAnalyzer = new PDFAnalyzer();
-      // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
-      const fileBuffer = await fs.promises.readFile(safeFilePath);
-      const pdfBinary = fileBuffer.toString('binary');
-
+      const pdfBinary = await fs.promises.readFile(safeFilePath).then(b => b.toString('binary')).catch(()=> "");
       const [extractedMetadata, trustedPatterns] = await Promise.all([
-        pdfAnalyzer.extractMetadata(safeFilePath), // codeql[js/path-injection] - safeFilePath validated by sanitizeUploadPath
+        pdfAnalyzer.extractMetadata(safeFilePath),
         storage.getTrustedPatterns(),
       ]);
-
       const [activeRules, hitlFakes] = await Promise.all([
         storage.getActiveGlobalAiRules().catch(() => []),
         storage.getAdminFakeKnowledge(20).catch(() => []),
       ]);
-
       const adminContext = {
-        globalRules: activeRules.map((r: any) => ({
-          category: r.category,
-          ruleText: r.ruleText,
-          priority: r.priority,
-        })),
-        hitlKnowledge: hitlFakes.map((v: any) => ({
-          filename: v.filename,
-          result: v.result,
-          confidence: v.confidence,
-          adminFeedback: v.adminFeedback,
-          metadata: v.metadata,
-        })),
+        globalRules: activeRules.map((r: any) => ({ category: r.category, ruleText: r.ruleText, priority: r.priority })),
+        hitlKnowledge: hitlFakes.map((v: any) => ({ filename: v.filename, result: v.result, confidence: v.confidence, adminFeedback: v.adminFeedback, metadata: v.metadata })),
       };
-
       const [analysisResult, cosCheckResult] = await Promise.all([
         pdfAnalyzer.analyzeAgainstTrustedPatterns(extractedMetadata, trustedPatterns, adminContext),
         Promise.resolve(new COSAuthenticityChecker().check(pdfBinary, extractedMetadata)),
       ]);
       analysis = analysisResult;
       analysis.cosCheck = cosCheckResult;
-
-      const combined = combineWithCosVerdict(
-        analysisResult.result,
-        analysis.confidence as number,
-        cosCheckResult.verdict,
-      );
-      if (combined.result !== analysisResult.result) {
-        logger.info(`[COS] cosCheck ${cosCheckResult.verdict} overrides pattern analysis '${analysisResult.result}' — treating as ${combined.result}`);
-      }
+      const combined = combineWithCosVerdict(analysisResult.result, analysis.confidence as number, cosCheckResult.verdict);
+      if (combined.result !== analysisResult.result) logger.info(`[COS] cosCheck ${cosCheckResult.verdict} overrides pattern analysis '${analysisResult.result}' — treating as ${combined.result}`);
       result = combined.result;
       analysis.result = combined.result;
       analysis.confidence = combined.confidence;
       metadata = {
-        format: 'Pdf',
-        mimeType: 'application/pdf',
-        pdfVersion: extractedMetadata.pdfVersion || null,
-        title: extractedMetadata.title || null,
-        author: extractedMetadata.author || null,
-        subject: extractedMetadata.subject || null,
-        creator: extractedMetadata.creator || null,
-        producer: extractedMetadata.producer || null,
-        creationDate: extractedMetadata.creationDate || null,
-        modificationDate: extractedMetadata.modificationDate || null,
-        pageCount: extractedMetadata.pages || null,
-        wordCount: extractedMetadata.wordCount || null,
-        characterCount: extractedMetadata.characterCount || null,
-        fontCount: extractedMetadata.fontCount || 0,
-        fileSize: extractedMetadata.fileSize || null,
-        isEncrypted: extractedMetadata.isEncrypted ?? false,
-        hasDigitalSignature: extractedMetadata.hasDigitalSignature ?? false,
-        xmp_tags: extractedMetadata.xmp_tags || {},
-        fonts: extractedMetadata.fonts || [],
+        format: 'Pdf', mimeType: 'application/pdf', pdfVersion: extractedMetadata.pdfVersion || null, title: extractedMetadata.title || null,
+        author: extractedMetadata.author || null, subject: extractedMetadata.subject || null, creator: extractedMetadata.creator || null,
+        producer: extractedMetadata.producer || null, creationDate: extractedMetadata.creationDate || null, modificationDate: extractedMetadata.modificationDate || null,
+        pageCount: extractedMetadata.pages || null, wordCount: extractedMetadata.wordCount || null, characterCount: extractedMetadata.characterCount || null,
+        fontCount: extractedMetadata.fontCount || 0, fileSize: extractedMetadata.fileSize || null, isEncrypted: extractedMetadata.isEncrypted ?? false,
+        hasDigitalSignature: extractedMetadata.hasDigitalSignature ?? false, xmp_tags: extractedMetadata.xmp_tags || {}, fonts: extractedMetadata.fonts || [],
       };
     }
 
-    const verificationId = await withRetry(() => db.transaction(async (tx) => {
-      if (useCredits && userId) {
-        await tx.update(users).set({
-          credits: sql`GREATEST(COALESCE(${users.credits}, 0) - 1, 0)`,
-          updatedAt: new Date(),
-        }).where(eq(users.id, userId));
-      } else if (useDailyLimit && userId) {
-        const today = new Date().toISOString().split('T')[0];
-        const [currentUser] = await tx.select({
-          dailyVerificationsUsed: users.dailyVerificationsUsed,
-          lastVerificationDate: users.lastVerificationDate,
-        }).from(users).where(eq(users.id, userId));
-        const usageToday = currentUser?.lastVerificationDate === today
-          ? (currentUser.dailyVerificationsUsed || 0) + 1 : 1;
-        await tx.update(users).set({
-          dailyVerificationsUsed: usageToday,
-          lastVerificationDate: today,
-          updatedAt: new Date(),
-        }).where(eq(users.id, userId));
-      }
-      const insertValues: any = {
-        userId,
-        filename: path.basename(req.file!.originalname),
-        result,
-        confidence: Math.floor(analysis.confidence),
-        metadata: isAdminOverride ? (adminOverrideSource!.metadata ?? {}) : metadata,
-        analysisDetails: analysis,
-        ipAddress: req.ip,
-        receiptId,
-        documentHash,
-      };
-      if (isAdminOverride) {
-        insertValues.adminStatus = adminOverrideStatus;
-        insertValues.adminFeedback = adminOverrideSource!.adminFeedback;
-        insertValues.adminReviewedBy = adminOverrideSource!.adminReviewedBy;
-        insertValues.adminReviewedAt = adminOverrideSource!.adminReviewedAt;
-      }
-      const [verification] = await tx.insert(verificationResults).values(insertValues).returning();
-      return verification.id;
-    }), 'verify-result');
-
-    success(res, {
-      id: verificationId,
-      receiptId,
-      documentHash,
-      result,
-      confidence: analysis.confidence,
-      details: analysis.details,
-      checks: analysis.checks || [],
-      forensicAnalysis: analysis.details?.forensicAnalysis || null,
-      adminOverride: isAdminOverride,
-      metadata: isAdminOverride ? {} : metadata,
-      cosCheck: analysis.cosCheck ?? null,
-      timestamp: new Date().toISOString()
-    });
-
-    try {
-      // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
-      await fs.promises.unlink(safeFilePath);
-    } catch (err) {
-      // Silently fail if file already deleted
+    if (isAdminOverride || !isQueueAvailable() || !getPdfVerifyQueue()) {
+      const verificationId = await withRetry(() => db.transaction(async (tx) => {
+        if (useCredits && userId) {
+          await tx.update(users).set({ credits: sql`GREATEST(COALESCE(${users.credits}, 0) - 1, 0)`, updatedAt: new Date() }).where(eq(users.id, userId));
+        } else if (useDailyLimit && userId) {
+          const today = new Date().toISOString().split('T')[0];
+          const [currentUser] = await tx.select({ dailyVerificationsUsed: users.dailyVerificationsUsed, lastVerificationDate: users.lastVerificationDate }).from(users).where(eq(users.id, userId));
+          const usageToday = currentUser?.lastVerificationDate === today ? (currentUser.dailyVerificationsUsed || 0) + 1 : 1;
+          await tx.update(users).set({ dailyVerificationsUsed: usageToday, lastVerificationDate: today, updatedAt: new Date() }).where(eq(users.id, userId));
+        }
+        const insertValues: any = {
+          userId, filename: path.basename(req.file!.originalname), result, confidence: Math.floor(analysis.confidence),
+          metadata: isAdminOverride ? (adminOverrideSource!.metadata ?? {}) : metadata, analysisDetails: analysis, ipAddress: req.ip, receiptId, documentHash,
+        };
+        if (isAdminOverride) {
+          insertValues.adminStatus = adminOverrideStatus;
+          insertValues.adminFeedback = adminOverrideSource!.adminFeedback;
+          insertValues.adminReviewedBy = adminOverrideSource!.adminReviewedBy;
+          insertValues.adminReviewedAt = adminOverrideSource!.adminReviewedAt;
+        }
+        const [verification] = await tx.insert(verificationResults).values(insertValues).returning();
+        return verification.id;
+      }), 'verify-result');
+      success(res, {
+        id: verificationId, receiptId, documentHash, result, confidence: analysis.confidence, details: analysis.details,
+        checks: analysis.checks || [], forensicAnalysis: analysis.details?.forensicAnalysis || null, adminOverride: isAdminOverride,
+        metadata: isAdminOverride ? {} : metadata, cosCheck: analysis.cosCheck ?? null, timestamp: new Date().toISOString()
+      });
+      try { await fs.promises.unlink(safeFilePath); } catch {}
+      return;
     }
+    success(res, { receiptId, documentHash, result, confidence: analysis.confidence, details: analysis.details, checks: analysis.checks || [], forensicAnalysis: analysis.details?.forensicAnalysis || null, adminOverride: isAdminOverride, metadata: isAdminOverride ? {} : metadata, cosCheck: analysis.cosCheck ?? null, timestamp: new Date().toISOString(), queued: true });
+    try { await fs.promises.unlink(safeFilePath); } catch {}
   }));
 
   app.get('/api/receipt/:receiptId', asyncHandler(async (req, res) => {

@@ -1,8 +1,11 @@
+import crypto from "node:crypto";
 import { db } from "../db";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { companyWatches, sponsorChanges, users, notifLog } from "@shared/schema";
 import { logger } from "../utils/logger";
 import { TIER_CONFIGS, type PlanTier } from "@shared/planTiers";
+import { waitForBucket } from "../utils/tokenBucket";
+import { jitterDelay, parseRetryAfter } from "../utils/jitterRetry";
 
 // Tiers whose TierConfig marks them as getting the enriched (Company
 // Intelligence) notification treatment — pro/unlimited/enterprise today.
@@ -202,77 +205,58 @@ export async function processConsolidatedNotifications(
   for (const chunk of chunks) {
     const batchPayload = chunk.map(([_, data]) => {
       const { subject, html } = renderConsolidatedEmail(data.changes);
-      return {
-        from: "Sponsor Monitor <alerts@checkbyai.net>",
-        to: [data.email],
-        subject,
-        html,
-      };
+      return { from: "Sponsor Monitor <alerts@checkbyai.net>", to: [data.email], subject, html };
     });
-
-    try {
-      const response = await fetch("https://api.resend.com/emails/batch", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
-        },
-        body: JSON.stringify({ emails: batchPayload }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Resend batch API responded with status ${response.status}`);
-      }
-
-      const resendRes: any = await response.json();
-      const resendList = resendRes.data || [];
-
-      const logsToInsert: any[] = [];
-      chunk.forEach(([userId, data], idx) => {
-        const resendItem = resendList[idx];
-        const success = !!resendItem?.id;
-        if (success) sentCount++; else failedCount++;
-
-        data.changes.forEach((ch) => {
-          logsToInsert.push({
-            userId,
-            changeId: ch.changeId,
-            eventType: "consolidated_digest",
-            channel: "email",
-            companyName: ch.organisationName,
-            success,
-            providerMessageId: resendItem?.id || null,
-            errorDetails: success ? null : "Resend delivery item failed",
+    const idemKey = crypto.createHash("sha256").update(JSON.stringify(chunk.map(([u,d])=> `${u}:${d.changes.map(c=>c.changeId).join(',')}`))).digest("hex").slice(0,32);
+    let lastErr: string | null = null;
+    let batchSuccess = false;
+    for (let attempt=0; attempt<3; attempt++) {
+      await waitForBucket("resend", "global");
+      try {
+        const response = await fetch("https://api.resend.com/emails/batch", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
+            "Idempotency-Key": idemKey,
+          },
+          body: JSON.stringify({ emails: batchPayload }),
+        });
+        if (!response.ok) {
+          const ra = parseRetryAfter(response.headers.get("retry-after"));
+          if (ra) await new Promise(r=> setTimeout(r, ra));
+          lastErr = `Resend batch ${response.status}: ${await response.text().catch(()=>"no body")}`;
+          if (response.status === 429 || response.status >= 500) { if (attempt < 2) { await new Promise(r=>setTimeout(r, jitterDelay(attempt,1000,30000))); continue; } }
+          throw new Error(lastErr);
+        }
+        const resendRes: any = await response.json();
+        const resendList = resendRes.data || [];
+        const logsToInsert: any[] = [];
+        chunk.forEach(([userId, data], idx) => {
+          const resendItem = resendList[idx];
+          const success = !!resendItem?.id;
+          if (success) sentCount++; else failedCount++;
+          data.changes.forEach((ch) => {
+            logsToInsert.push({ userId, changeId: ch.changeId, eventType: "consolidated_digest", channel: "email", companyName: ch.organisationName, success, providerMessageId: resendItem?.id || null, errorDetails: success ? null : "Resend delivery item failed" });
           });
         });
-      });
-
-      if (logsToInsert.length > 0) {
-        await db.insert(notifLog).values(logsToInsert);
+        if (logsToInsert.length > 0) await db.insert(notifLog).values(logsToInsert);
+        batchSuccess = true;
+        break;
+      } catch (err: unknown) {
+        lastErr = err instanceof Error ? err.message : String(err);
+        logger.warn({ err: lastErr, attempt }, "[ConsolidatedNotificationEngine] batch attempt failed");
+        if (attempt < 2) await new Promise(r=> setTimeout(r, jitterDelay(attempt,1000,30000)));
       }
-    } catch (err: unknown) {
-      logger.error({ err }, "[ConsolidatedNotificationEngine] Batch delivery failed");
-      const errStr = err instanceof Error ? err.message : String(err);
-      
+    }
+    if (!batchSuccess) {
+      logger.error({ err: lastErr }, "[ConsolidatedNotificationEngine] Batch delivery failed after retries");
       const failedLogs: any[] = [];
       chunk.forEach(([userId, data]) => {
         failedCount += data.changes.length;
-        data.changes.forEach((ch) => {
-          failedLogs.push({
-            userId,
-            changeId: ch.changeId,
-            eventType: "consolidated_digest",
-            channel: "email",
-            companyName: ch.organisationName,
-            success: false,
-            errorDetails: errStr,
-          });
-        });
+        data.changes.forEach((ch) => { failedLogs.push({ userId, changeId: ch.changeId, eventType: "consolidated_digest", channel: "email", companyName: ch.organisationName, success: false, errorDetails: lastErr }); });
       });
-
-      if (failedLogs.length > 0) {
-        await db.insert(notifLog).values(failedLogs);
-      }
+      if (failedLogs.length > 0) await db.insert(notifLog).values(failedLogs);
     }
   }
 

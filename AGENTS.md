@@ -88,6 +88,35 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 - SSR runs at request time → users see content immediately → React replaces on JS load.
 - No new dependencies; uses existing `react-helmet-async` (already in deps) for head management if needed.
 
+#### Phase 5 — Performance Optimization (DB, Compute, Notifications, Frontend)
+
+**Goal:** Production-grade performance across data layer, compute pipelines, notification engine, and frontend bundle with zero breaking changes.
+
+**Database Layer & Full-Text Search**
+- `server/db.ts: max 10` (was 20), `statement_timeout 30s`, `idle_in_transaction_session_timeout 10s` — prevents pool exhaustion at 5-10 HPA replicas on Neon pooled endpoints.
+- Migration `0027_trgm_perf_indexes.sql` (CONCURRENTLY, non-blocking): `pg_trgm` extension, GIN `idx_sc_trgm_hist` on `array_to_string(historical_names)`, `idx_sc_trgm_route`, `idx_changes_trgm_org`, `idx_changes_detected_desc`, plus name/city GIN.
+- `server/routes/sponsors.ts: /sponsors/directory` refactored from `ILIKE '%…%'` SeqScan to trigram `current_name % $q` + `similarity()` ranking with `GREATEST()` fallback to ILIKE on `42883`.
+- `server/utils/redisClient.ts`: ephemeral per-pod LRU (5k entries / 50MB / 5m TTL) as circuit-breaker when Redis down; read-through on `cacheGet`, write-through on `cacheSet`, `cacheFlushPattern` evicts both tiers. Cold restart mitigated by pg_trgm.
+- Pagination: `GET /api/sponsor-changes?page&limit` and `GET /api/sponsors/:fp/history?page&limit` with `totalPages`; legacy 500/100 defaults preserved.
+
+**Compute Offloading & PDF Forensics**
+- `server/services/jobQueue.ts`: new `PDF_VERIFY_QUEUE='pdf-verify'` (concurrency 2, `attempts 3`, exponential 5s, `jobId=verify-${hash16}-${userId}`).
+- `server/workers/pdfVerifyWorker.ts` (isolated BullMQ worker process, not `worker_threads`): `extractMetadata` + `trustedPatterns` + `COSCheck` + `combineWithCosVerdict` off main loop; progress 5→100, `emitToUser VERIFICATION_COMPLETE`.
+- `server/routes/verification.ts`: streaming `createReadStream` SHA-256, `GET /api/verify/status/:jobId`, `POST /api/verify` returns `202 {jobId, status:'accepted', mode:'bullmq'}` when queued (fallback to inline `200` when Redis down or admin-override cache-hit), `req.on('close')` aborts.
+
+**Notification Dispatch Engine**
+- `server/utils/tokenBucket.ts`: Redis Lua token-bucket (`resend 2/s burst10`, `twilio 1/s burst1` per sending number, `brevo 10/s`, `webhook 5/s` per host).
+- `server/utils/jitterRetry.ts`: `jitterDelay = base*2^attempt + random*1000` capped 30s, `parseRetryAfter`.
+- `server/utils/notifIdempotency.ts`: `sha256(userId:changeId:channel:snapshotDate)` + Redis `SET NX EX 86400` + `Idempotency-Key` header.
+- `server/services/notificationChannels/*`: email/webhook/sms/whatsapp use token-bucket, jitter 1s→30s, 3 attempts, 429 detection, idempotency guard. Webhook `retry-after` respected. Email `Resend Idempotency-Key`.
+- `server/services/consolidatedNotificationEngine.ts`: batch `emails/batch` now gated by token-bucket + jitter 3×, `Idempotency-Key` per chunk, `idx_notif_log_idem` partial unique on `notif_log` (`success=true`).
+- Migration `0028_notif_idempotency.sql`: `CREATE UNIQUE INDEX CONCURRENTLY idx_notif_log_idem`.
+
+**Frontend Bundle & Virtualization**
+- `vite.config.ts`: `manualChunks` (`vendor`, `query`, `motion`, `radix`, `three`, `charts`), `chunkSizeWarningLimit 800`.
+- `client/src/pages/SponsorDirectory.tsx`: `memo(StatusBadge/StatCard)`, `useVirtualizer` (64px, overscan 8, 640px viewport) for 50-row pages.
+- `client/src/pages/VerificationHistory.tsx`: `memo(VerificationCard)`, `useVirtualizer` (160px, 720px viewport), animation delay clamped to 0.3s.
+
 ### Remaining (Not Yet Scoped)
 - Fuse.js search index versioning for instant CDV cache bust on rebuild.
 - React Query `gcTime` reduction for sponsor pages (currently default 5min).

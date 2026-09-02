@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useRef, memo } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { motion, AnimatePresence } from "framer-motion";
 import { useInView } from "react-intersection-observer";
 import {
@@ -84,7 +85,7 @@ function SkeletonCard() {
   );
 }
 
-function VerificationCard({ v, index }: { v: Verification; index: number }) {
+const VerificationCard = memo(function VerificationCard({ v, index }: { v: Verification; index: number }) {
   const [expanded, setExpanded] = useState(false);
   const { toast } = useToast();
   const config = resultConfig[v.result] || resultConfig.fake;
@@ -110,10 +111,10 @@ function VerificationCard({ v, index }: { v: Verification; index: number }) {
 
   return (
     <motion.div
-      ref={ref}
+      ref={ref as any}
       initial={{ opacity: 0, y: 20 }}
       animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-      transition={{ ...spring, delay: index * 0.08 }}
+      transition={{ ...spring, delay: Math.min(index * 0.02, 0.3) }}
     >
       <div className="border border-border rounded-xl bg-card p-5 transition-shadow hover:shadow-md">
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
@@ -231,8 +232,7 @@ function VerificationCard({ v, index }: { v: Verification; index: number }) {
       </div>
     </motion.div>
   );
-}
-
+});
 export default function VerificationHistory() {
   const { data: user, isLoading: userLoading } = useQuery<any>({
     queryKey: ["/api/auth/user"],
@@ -243,6 +243,8 @@ export default function VerificationHistory() {
     enabled: !!user,
   });
 
+  const parentRef = useRef<HTMLDivElement>(null);
+  const rowVirtualizer = useVirtualizer({ count: verifications?.length ?? 0, getScrollElement: () => parentRef.current, estimateSize: () => 160, overscan: 5 });
   const [headerRef, headerInView] = useInView({ triggerOnce: true, threshold: 0.1 });
 
   const genuineCount = verifications?.filter((v) => v.result === "genuine").length ?? 0;
@@ -368,10 +370,17 @@ export default function VerificationHistory() {
               </div>
             </div>
 
-            <div className="space-y-4">
-              {verifications.map((v, index) => (
-                <VerificationCard key={v.id} v={v} index={index} />
-              ))}
+            <div ref={parentRef} className="max-h-[720px] overflow-auto">
+              <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative' }}>
+                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                  const v = verifications![virtualRow.index];
+                  return (
+                    <div key={v.id} ref={rowVirtualizer.measureElement} data-index={virtualRow.index} style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${virtualRow.start}px)`, paddingBottom: '12px' }}>
+                      <VerificationCard v={v} index={virtualRow.index} />
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </>
         ) : (

@@ -6,6 +6,7 @@ import * as Sentry from '@sentry/node';
 export const SPONSOR_REFRESH_JOB = 'sponsor-refresh';
 export const SCRAPING_JOB = 'scraping-job';
 export const NOTIFICATION_JOB = 'notification-dispatch';
+export const PDF_VERIFY_JOB = 'pdf-verify';
 
 // Plain connection options — passed directly to BullMQ so it creates its own
 // internal ioredis instance. Avoids the type-mismatch caused by bullmq bundling
@@ -20,6 +21,7 @@ const redisOpts = {
 let redisAvailable  = false;
 let sponsorQueue:  Queue | null = null;
 let notificationQueue: Queue | null = null;
+let pdfVerifyQueue: Queue | null = null;
 
 async function runJobWithSentryTrace<T>(
   job: Job,
@@ -75,6 +77,8 @@ export function getSponsorRefreshQueue(): Queue | null { return sponsorQueue; }
  */
 export function getNotificationQueue(): Queue | null { return notificationQueue; }
 
+export function getPdfVerifyQueue(): Queue | null { return pdfVerifyQueue; }
+
 /**
  * Probe Redis with a standalone IORedis connection, then create BullMQ
  * queues + workers only when the ping succeeds.
@@ -121,6 +125,7 @@ const defaultJobOptions = {
 
 sponsorQueue = new Queue(SPONSOR_REFRESH_JOB, { connection: redisOpts, defaultJobOptions });
 notificationQueue = new Queue(NOTIFICATION_JOB, { connection: redisOpts, defaultJobOptions });
+pdfVerifyQueue = new Queue(PDF_VERIFY_JOB, { connection: redisOpts, defaultJobOptions });
 }
 
 /** Registers BullMQ workers. No-op if Redis was unavailable at startup. */
@@ -160,14 +165,18 @@ export function setupWorkers(): void {
         return notifyUsersOfEvent(job.data);
       });
     },
-    // concurrency:1 default would process one change at a time; bump so a
-    // backlog of queued changes drains in parallel. Kept modest (3) because
-    // notifyUsersOfEvent() itself fans out per-user via p-limit(10) — at
-    // concurrency:8 that's up to 80 concurrent DB ops against a pool max of
-    // 20 (server/db.ts), shared with web requests and the sponsor-refresh
-    // worker. 3 * 10 = 30 worst-case, acceptable since most of those ops are
-    // short reads/writes, not held-open transactions.
     { connection: redisOpts, concurrency: 3 }
+  );
+
+  new Worker(
+    PDF_VERIFY_JOB,
+    async (job: Job) => {
+      return runJobWithSentryTrace(job, PDF_VERIFY_JOB, async () => {
+        const { processPdfVerifyJob } = await import('../workers/pdfVerifyWorker');
+        return processPdfVerifyJob(job);
+      });
+    },
+    { connection: redisOpts, concurrency: 2 }
   );
 
   logger.info('[JobQueue] BullMQ workers registered.');
