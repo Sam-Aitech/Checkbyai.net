@@ -519,9 +519,9 @@ export default function Pricing() {
                 <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4">
                   <Bell className="w-6 h-6 text-foreground" />
                 </div>
-                <h3 className="font-semibold text-foreground mb-2">Instant Alerts</h3>
+                <h3 className="font-semibold text-foreground mb-2">Automated Alerts</h3>
                 <p className="text-sm text-muted-foreground">
-                  Get notified the moment something changes
+                  Get notified when something changes — no manual checking
                 </p>
               </div>
 
