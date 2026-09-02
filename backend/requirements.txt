@@ -31,7 +31,7 @@ psycopg2-binary>=2.9.12        # direct PostgreSQL writes in sponsor_etl_cron.py
 # sqlite3                     # stdlib — was used by sponsor_etl.py (now retired)
 
 # ── Validation ────────────────────────────────────────────────────────────────
-pydantic>=2.11.7              # request/response models
+pydantic>=2.13.4              # request/response models
 
 # ── Enrichment ────────────────────────────────────────────────────────────────
 rapidfuzz>=3.0.0              # fuzzy string matching (enrichment_router.py)
