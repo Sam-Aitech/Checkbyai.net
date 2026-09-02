@@ -1,6 +1,8 @@
 import type { NotificationChannel, ChannelPayload, SendResult } from "./types";
 import { sendSMS } from "../messaging";
 import { logger } from "../../utils/logger";
+import { sendWithBucketRetry } from "../../utils/sendWithBucketRetry";
+import { withIdempotency } from "../../utils/notifIdempotency";
 
 const log = logger.child({ module: "Channel:SMS" });
 
@@ -22,24 +24,15 @@ function getLabel(changeType: string, prev?: string | null, next?: string | null
   }
 }
 
+function sendWithRetry(payload: ChannelPayload): Promise<SendResult> {
+  const message = buildMessage(payload);
+  // SMS goes through Brevo in this codebase, not Twilio — see server/services/messaging.ts.
+  return sendWithBucketRetry("brevo", "global", () => sendSMS(payload.recipient, message), log, "SMS");
+}
+
 export const smsChannel: NotificationChannel = {
   name: "sms",
-
-  async send(payload: ChannelPayload): Promise<SendResult> {
-    const message = buildMessage(payload);
-
-    try {
-      const result = await sendSMS(payload.recipient, message);
-      if (!result.success) {
-        log.warn({ error: result.error, recipient: payload.recipient },
-          "SMS send failed");
-      }
-      return result;
-    } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      log.error({ err: errMsg, recipient: payload.recipient },
-        "SMS send threw");
-      return { success: false, error: errMsg };
-    }
+  send(payload: ChannelPayload): Promise<SendResult> {
+    return withIdempotency(payload, "sms", () => sendWithRetry(payload));
   },
 };

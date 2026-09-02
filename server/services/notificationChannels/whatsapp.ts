@@ -1,6 +1,8 @@
 import type { NotificationChannel, ChannelPayload, SendResult } from "./types";
 import { sendWhatsApp } from "../messaging";
 import { logger } from "../../utils/logger";
+import { sendWithBucketRetry } from "../../utils/sendWithBucketRetry";
+import { withIdempotency } from "../../utils/notifIdempotency";
 
 const log = logger.child({ module: "Channel:WhatsApp" });
 
@@ -37,24 +39,15 @@ function getLabel(changeType: string, prev?: string | null, next?: string | null
   }
 }
 
+function sendWithRetry(payload: ChannelPayload): Promise<SendResult> {
+  const from = process.env.TWILIO_WHATSAPP_NUMBER || "global";
+  const message = buildMessage(payload);
+  return sendWithBucketRetry("twilio", from, () => sendWhatsApp(payload.recipient, message), log, "WhatsApp");
+}
+
 export const whatsAppChannel: NotificationChannel = {
   name: "whatsapp",
-
-  async send(payload: ChannelPayload): Promise<SendResult> {
-    const message = buildMessage(payload);
-
-    try {
-      const result = await sendWhatsApp(payload.recipient, message);
-      if (!result.success) {
-        log.warn({ error: result.error, recipient: payload.recipient },
-          "WhatsApp send failed");
-      }
-      return result;
-    } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      log.error({ err: errMsg, recipient: payload.recipient },
-        "WhatsApp send threw");
-      return { success: false, error: errMsg };
-    }
+  send(payload: ChannelPayload): Promise<SendResult> {
+    return withIdempotency(payload, "whatsapp", () => sendWithRetry(payload));
   },
 };

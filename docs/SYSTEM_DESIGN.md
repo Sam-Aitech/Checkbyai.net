@@ -33,7 +33,7 @@ checkbyai.net is a monolithic Node.js/Express application that serves both the A
 │                 │                                                   │
 │  ┌──────────────▼──────────────────────────────────────────────┐   │
 │  │              Neon Serverless PostgreSQL (DATABASE_URL)       │   │
-│  │  Pool: max=10  idleTimeout=30s  connTimeout=10s             │   │
+│  │  Pool: max=10  idleTimeout=30s  connTimeout=15s  stmtTimeout=30s  idleTx=10s │   │
 │  └─────────────────────────────────────────────────────────────┘   │
 └────────────────────────────────────────────────────────────────────┘
 
@@ -335,6 +335,18 @@ data/archives/
 **qsv binary (dathere/qsv):** Used for CSV structural validation (`qsv validate`) and record counting (`qsv count`). If binary not installed, validation is skipped and counting falls back to streaming csv-parse. Hard abort if record count < 100,000.
 
 **csvdiff binary (aswinkarthik/csvdiff):** Takes two fingerprinted CSVs and outputs JSON `{Additions, Deletions, Modifications}` keyed by `fingerprint` column. This replaces the old in-memory reconcile() function (~459 lines deleted).
+
+### 3.6 Performance Layer (2026-03)
+
+**DB:** `pg_trgm` GIN (`current_name`, `town_city`, `route`, `array_to_string(historical_names)`, `sponsor_changes.organisation_name`), B-tree composite `status+name/town/type`, `changes(detected_at DESC WHERE is_test=false)` — non-concurrent (`drizzle-kit migrate` transaction-wraps every pending migration, which rejects `CONCURRENTLY`; see migrations/README.md). Pool `max=10` + `statement_timeout 30s` + `idle_in_transaction 10s` for 5-10 HPA replicas on Neon pooled endpoint. Directory search uses `%` + `similarity()` ranking with ILIKE fallback. Pagination via `LIMIT/OFFSET` + `COUNT`.
+
+**Cache:** Redis primary + ephemeral per-pod LRU (5k/50MB/5m) read-through/write-through, survives Redis outage; Fuse.js in-memory search remains primary.
+
+**Compute:** PDF forensics offloaded to BullMQ `pdf-verify` worker (concurrency 2, `jobId=verify-{hash}-{userId}`), streaming `createReadStream` hash, `202 Accepted` + `GET /api/verify/status/:jobId` + Socket.IO `VERIFICATION_COMPLETE`, isolated process scales independently.
+
+**Notifications:** Redis Lua token-bucket (Resend 2/s burst10, Twilio 1/s per number, Brevo 10/s, webhook 5/s), `jitterDelay` exponential + `Retry-After`, `Idempotency-Key` SHA256 + `UNIQUE WHERE success=true` on `notif_log`, consolidated batch gated + jitter 3×.
+
+**Frontend:** Vite `manualChunks` (vendor/query/motion/radix/three/charts), `React.lazy` + `Suspense` for heavy routes, `@tanstack/react-virtual` (SponsorDirectory 64px, VerificationHistory 160px), `memo` for high-churn components.
 
 ---
 

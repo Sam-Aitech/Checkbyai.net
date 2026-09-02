@@ -30,6 +30,19 @@ export default defineConfig({
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
     target: "esnext",
+    chunkSizeWarningLimit: 800,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ["react", "react-dom", "wouter"],
+          query: ["@tanstack/react-query", "@tanstack/react-virtual"],
+          motion: ["framer-motion"],
+          radix: ["@radix-ui/react-dialog", "@radix-ui/react-dropdown-menu", "@radix-ui/react-tabs", "@radix-ui/react-toast", "@radix-ui/react-select"],
+          three: ["three", "@react-three/fiber", "@react-three/drei", "@react-spring/web"],
+          charts: ["recharts", "embla-carousel-react"],
+        },
+      },
+    },
   },
   optimizeDeps: {
     esbuildOptions: {

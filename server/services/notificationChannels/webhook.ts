@@ -1,14 +1,13 @@
 import crypto from "node:crypto";
 import type { NotificationChannel, ChannelPayload, SendResult } from "./types";
 import { logger } from "../../utils/logger";
+import { jitterDelay, parseRetryAfter } from "../../utils/jitterRetry";
+import { waitForBucket } from "../../utils/tokenBucket";
+import { withIdempotency } from "../../utils/notifIdempotency";
 
 const log = logger.child({ module: "Channel:Webhook" });
 
-// Quick in-process backoff only. This runs INLINE inside notifyUsersOfEvent (awaited
-// via p-limit), so long delays here would stall the whole monitor job — previously
-// 5m/15m/60m could block a user task for ~80 minutes. Durable long-interval retries
-// belong in a queue (follow-up); here we cap total blocking to a few seconds.
-const RETRY_DELAYS_MS = [1000, 3000];
+const MAX_ATTEMPTS = 3;
 
 // SSRF guard: block delivery to loopback / private / link-local / metadata hosts.
 // Webhook URLs are user-supplied (enterprise), so an attacker could otherwise point
@@ -70,6 +69,8 @@ async function attemptDelivery(
   bodyJson: string,
   headers: Record<string, string>,
 ): Promise<SendResult> {
+  const host = (()=>{ try{ return new URL(webhookUrl).hostname; } catch{ return "global"; }})();
+  await waitForBucket("webhook", host);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
   try {
@@ -78,52 +79,47 @@ async function attemptDelivery(
       const providerMessageId = res.headers.get("X-Request-Id") ?? res.headers.get("x-request-id") ?? undefined;
       return { success: true, providerMessageId };
     }
+    const retryAfter = parseRetryAfter(res.headers.get("retry-after"));
+    if (retryAfter) await new Promise(r=>setTimeout(r, retryAfter));
     return { success: false, error: `HTTP ${res.status}: ${await res.text().catch(() => "no body")}` };
   } finally {
     clearTimeout(timeout);
   }
 }
 
+async function sendWithRetry(payload: ChannelPayload, webhookUrl: string): Promise<SendResult> {
+  const bodyJson = JSON.stringify(buildBody(payload));
+  const headers = buildHeaders(bodyJson);
+  let lastError: string | undefined;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    try {
+      const result = await attemptDelivery(webhookUrl, bodyJson, headers);
+      if (result.success) return result;
+      lastError = result.error;
+      log.warn({ webhookUrl, attempt, error: lastError }, "Webhook delivery failed");
+    } catch (err: unknown) {
+      lastError = err instanceof Error ? err.message : String(err);
+      log.error({ err: lastError, webhookUrl, attempt }, "Webhook delivery threw");
+    }
+    if (attempt < MAX_ATTEMPTS - 1) await new Promise(rr => setTimeout(rr, jitterDelay(attempt, 1000, 30000)));
+  }
+  return { success: false, error: `Webhook delivery failed after ${MAX_ATTEMPTS} attempts: ${lastError}` };
+}
+
 export const webhookChannel: NotificationChannel = {
   name: "webhook",
 
-  async send(payload: ChannelPayload): Promise<SendResult> {
+  send(payload: ChannelPayload): Promise<SendResult> {
     const webhookUrl = payload.recipient;
-    if (!webhookUrl?.startsWith("https://")) {
-      return { success: false, error: "Invalid webhook URL (must be HTTPS)" };
-    }
-
+    if (!webhookUrl?.startsWith("https://")) return Promise.resolve({ success: false, error: "Invalid webhook URL (must be HTTPS)" });
     let parsedHost: string;
-    try {
-      parsedHost = new URL(webhookUrl).hostname;
-    } catch {
-      return { success: false, error: "Invalid webhook URL" };
-    }
+    try { parsedHost = new URL(webhookUrl).hostname; } catch { return Promise.resolve({ success: false, error: "Invalid webhook URL" }); }
     if (isBlockedWebhookHost(parsedHost)) {
       log.warn({ webhookUrl }, "Webhook delivery blocked — internal/private host");
-      return { success: false, error: "Webhook URL targets a disallowed (internal/private) host" };
+      return Promise.resolve({ success: false, error: "Webhook URL targets a disallowed (internal/private) host" });
     }
-
-    const bodyJson = JSON.stringify(buildBody(payload));
-    const headers = buildHeaders(bodyJson);
-
-    let lastError: string | undefined;
-    for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
-      try {
-        const result = await attemptDelivery(webhookUrl, bodyJson, headers);
-        if (result.success) return result;
-        lastError = result.error;
-        log.warn({ webhookUrl, attempt, error: lastError }, "Webhook delivery failed");
-      } catch (err: unknown) {
-        lastError = err instanceof Error ? err.message : String(err);
-        log.error({ err: lastError, webhookUrl, attempt }, "Webhook delivery threw");
-      }
-
-      if (attempt < RETRY_DELAYS_MS.length) {
-        await new Promise(r => setTimeout(r, RETRY_DELAYS_MS[attempt]));
-      }
-    }
-
-    return { success: false, error: `Webhook delivery failed after ${RETRY_DELAYS_MS.length + 1} attempts: ${lastError}` };
+    // Validation happens before the idempotency claim — no point claiming a
+    // key for a request that's going to be rejected regardless.
+    return withIdempotency(payload, "webhook", () => sendWithRetry(payload, webhookUrl));
   },
 };

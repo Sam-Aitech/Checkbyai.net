@@ -13,12 +13,10 @@ if (!process.env.DATABASE_URL) {
 
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  // Increased pool size to 20 to support concurrent background reconciliation
-  // and real-time user verification requests without saturating.
-  max: 20,
-  // Release idle connections quickly so Neon can auto-pause between cron runs.
+  max: 10,
   idleTimeoutMillis: 30_000,
-  // Increased timeout slightly to allow for heavy background operations.
   connectionTimeoutMillis: 15_000,
-});
+  statement_timeout: 30_000,
+  idle_in_transaction_session_timeout: 10_000,
+} as any);
 export const db = drizzle({ client: pool, schema });

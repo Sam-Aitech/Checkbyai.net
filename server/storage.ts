@@ -77,6 +77,7 @@ export interface IStorage {
   createVerificationResult(filename: string, result: string, confidence: number, metadata: any, analysisDetails: any, ipAddress?: string, userId?: string, receiptId?: string, documentHash?: string): Promise<number>;
   getVerificationsByUserId(userId: string, limit?: number): Promise<VerificationResult[]>;
   getVerificationByReceiptId(receiptId: string): Promise<VerificationResult | undefined>;
+  getVerificationByDocHashPrefixAndUser(documentHashPrefix: string, userId: string): Promise<VerificationResult | undefined>;
   getAdminFlaggedVerificationByHash(documentHash: string): Promise<VerificationResult | undefined>;
   getAdminApprovedVerificationByHash(documentHash: string): Promise<VerificationResult | undefined>;
   getRecentActivity(limit?: number): Promise<VerificationResult[]>;
@@ -152,6 +153,7 @@ class DatabaseStorage implements IStorage {
   createVerificationResult(filename: string, result: string, confidence: number, metadata: any, analysisDetails: any, ipAddress?: string, userId?: string, receiptId?: string, documentHash?: string) { return verificationRepository.createVerificationResult(filename, result, confidence, metadata, analysisDetails, ipAddress, userId, receiptId, documentHash); }
   getVerificationsByUserId(userId: string, limit?: number) { return verificationRepository.getVerificationsByUserId(userId, limit); }
   getVerificationByReceiptId(receiptId: string) { return verificationRepository.getVerificationByReceiptId(receiptId); }
+  getVerificationByDocHashPrefixAndUser(documentHashPrefix: string, userId: string) { return verificationRepository.getVerificationByDocHashPrefixAndUser(documentHashPrefix, userId); }
   getAdminFlaggedVerificationByHash(documentHash: string) { return verificationRepository.getAdminFlaggedVerificationByHash(documentHash); }
   getAdminApprovedVerificationByHash(documentHash: string) { return verificationRepository.getAdminApprovedVerificationByHash(documentHash); }
   getRecentActivity(limit?: number) { return verificationRepository.getRecentActivity(limit); }
