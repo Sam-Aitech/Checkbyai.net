@@ -1,8 +1,7 @@
 import type { NotificationChannel, ChannelPayload, SendResult } from "./types";
 import { sendWhatsApp } from "../messaging";
 import { logger } from "../../utils/logger";
-import { jitterDelay } from "../../utils/jitterRetry";
-import { waitForBucket } from "../../utils/tokenBucket";
+import { sendWithBucketRetry } from "../../utils/sendWithBucketRetry";
 import { withIdempotency } from "../../utils/notifIdempotency";
 
 const log = logger.child({ module: "Channel:WhatsApp" });
@@ -40,25 +39,10 @@ function getLabel(changeType: string, prev?: string | null, next?: string | null
   }
 }
 
-async function sendWithRetry(payload: ChannelPayload): Promise<SendResult> {
+function sendWithRetry(payload: ChannelPayload): Promise<SendResult> {
   const from = process.env.TWILIO_WHATSAPP_NUMBER || "global";
   const message = buildMessage(payload);
-  for (let attempt = 0; attempt < 3; attempt++) {
-    await waitForBucket("twilio", from);
-    try {
-      const result = await sendWhatsApp(payload.recipient, message);
-      if (result.success) return result;
-      const is429 = result.error?.includes("429") || result.error?.includes("rate");
-      if (!is429 || attempt === 2) return result;
-      log.warn({ error: result.error, attempt }, "WhatsApp retrying");
-    } catch (err: unknown) {
-      const m = err instanceof Error ? err.message : String(err);
-      if (attempt === 2) return { success: false, error: m };
-      log.warn({ err: m, attempt }, "WhatsApp threw retrying");
-    }
-    await new Promise((rr) => setTimeout(rr, jitterDelay(attempt, 1000, 30000)));
-  }
-  return { success: false, error: "WhatsApp exhausted retries" };
+  return sendWithBucketRetry("twilio", from, () => sendWhatsApp(payload.recipient, message), log, "WhatsApp");
 }
 
 export const whatsAppChannel: NotificationChannel = {

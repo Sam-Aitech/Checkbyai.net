@@ -1,8 +1,7 @@
 import type { NotificationChannel, ChannelPayload, SendResult } from "./types";
 import { sendSMS } from "../messaging";
 import { logger } from "../../utils/logger";
-import { jitterDelay } from "../../utils/jitterRetry";
-import { waitForBucket } from "../../utils/tokenBucket";
+import { sendWithBucketRetry } from "../../utils/sendWithBucketRetry";
 import { withIdempotency } from "../../utils/notifIdempotency";
 
 const log = logger.child({ module: "Channel:SMS" });
@@ -25,25 +24,10 @@ function getLabel(changeType: string, prev?: string | null, next?: string | null
   }
 }
 
-async function sendWithRetry(payload: ChannelPayload): Promise<SendResult> {
+function sendWithRetry(payload: ChannelPayload): Promise<SendResult> {
   const message = buildMessage(payload);
-  for (let attempt = 0; attempt < 3; attempt++) {
-    // SMS goes through Brevo in this codebase, not Twilio — see server/services/messaging.ts.
-    await waitForBucket("brevo", "global");
-    try {
-      const result = await sendSMS(payload.recipient, message);
-      if (result.success) return result;
-      const is429 = result.error?.includes("429") || result.error?.includes("rate");
-      if (!is429 || attempt === 2) return result;
-      log.warn({ error: result.error, attempt }, "SMS retrying");
-    } catch (err: unknown) {
-      const m = err instanceof Error ? err.message : String(err);
-      if (attempt === 2) return { success: false, error: m };
-      log.warn({ err: m, attempt }, "SMS threw retrying");
-    }
-    await new Promise((rr) => setTimeout(rr, jitterDelay(attempt, 1000, 30000)));
-  }
-  return { success: false, error: "SMS exhausted retries" };
+  // SMS goes through Brevo in this codebase, not Twilio — see server/services/messaging.ts.
+  return sendWithBucketRetry("brevo", "global", () => sendSMS(payload.recipient, message), log, "SMS");
 }
 
 export const smsChannel: NotificationChannel = {
