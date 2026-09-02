@@ -1,7 +1,18 @@
 import { db } from "../db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import { companyWatches, sponsorChanges, users, notifLog } from "@shared/schema";
 import { logger } from "../utils/logger";
+import { TIER_CONFIGS, type PlanTier } from "@shared/planTiers";
+
+// Tiers whose TierConfig marks them as getting the enriched (Company
+// Intelligence) notification treatment — pro/unlimited/enterprise today.
+// Derived from shared/planTiers.ts rather than hand-listed so this can't
+// drift from the entitlement source of truth: this query previously only
+// matched subscriptionStatus === 'pro' literally, silently excluding
+// Unlimited and Enterprise subscribers from every automated digest despite
+// them paying for (and being promised) the same notification tier.
+export const ENRICHED_DIGEST_STATUSES = (Object.keys(TIER_CONFIGS) as PlanTier[])
+  .filter((tier) => TIER_CONFIGS[tier].enrichedNotifications);
 
 export interface PendingRow {
   userId: string;
@@ -71,7 +82,7 @@ export async function fetchPendingNotifications(): Promise<PendingRow[]> {
     .where(
       and(
         eq(companyWatches.isActive, true),
-        eq(users.subscriptionStatus, "pro"),
+        inArray(users.subscriptionStatus, ENRICHED_DIGEST_STATUSES),
         eq(sponsorChanges.isTest, false),
         sql`${notifLog.id} IS NULL`
       )

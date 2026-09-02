@@ -3,6 +3,7 @@
 export {
   type PlanTier,
   type TierConfig,
+  type NotificationChannel,
   TIER_CONFIGS,
   TIER_LABELS,
   ALERT_TIMING_COPY,
@@ -15,5 +16,6 @@ export {
   hasJobAlerts,
   canReceiveNotifications,
   isPaidTier,
+  isUnlimitedWatchTier,
   getDeliverAfter,
 } from "@shared/planTiers";

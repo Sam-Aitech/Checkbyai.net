@@ -471,7 +471,7 @@ function StickyAlertBanner() {
         <Activity className="w-4 h-4 shrink-0 animate-pulse" />
         <p className="text-xs sm:text-sm font-medium">
           <span className="font-bold">URGENT:</span>{" "}
-          {`${count} sponsor ${licenceWord} revoked${dateLabel ? ` on ${dateLabel}` : " in the last check"}. Subscribe to get instant alerts.`}
+          {`${count} sponsor ${licenceWord} revoked${dateLabel ? ` on ${dateLabel}` : " in the last check"}. Subscribe to get alerted.`}
         </p>
         <button onClick={() => setDismissed(true)} className="hidden sm:flex absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-white/10 rounded transition-colors" aria-label="Close banner">
           <X className="w-4 h-4" />
@@ -648,7 +648,7 @@ function FeatureBlocks() {
               <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-4"><Timer className="w-5 h-5 text-red-600" /></div>
               <h3 className="text-lg font-bold text-foreground mb-2">The 12-Hour Advantage</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                When a licence is revoked, we check the register at ~00:30 UTC. Letters are posted the next morning. Pro subscribers get a WhatsApp alert within minutes of that check. You have half a day to pivot before your employer even knows.
+                When a licence is revoked, we check the register at ~00:30 UTC. Letters are posted the next morning. Pro subscribers get a WhatsApp alert by 07:00 UTC. You have hours to pivot before your employer even knows.
               </p>
             </CardContent>
           </Card>
@@ -1128,7 +1128,7 @@ export default function SponsorMonitor() {
     <PageLayout darkNav>
       <SEOHead
         title="Is Your Employer's Sponsor Licence Still Valid? | Free Check | CheckByAI"
-        description="Check any UK employer's sponsor licence status for free. Get instant alerts if it's revoked, suspended or downgraded, before it affects your visa."
+        description="Check any UK employer's sponsor licence status for free. Get alerted if it's revoked, suspended or downgraded, before it affects your visa."
         canonicalUrl="https://checkbyai.net/sponsor-monitor"
         ogTitle="Is Your Employer's Sponsor Licence Still Valid? | Free Check | CheckByAI"
         ogDescription="Check any UK employer's sponsor licence status for free. Get instant alerts if it's revoked, suspended or downgraded, before it affects your visa."
@@ -1142,7 +1142,7 @@ export default function SponsorMonitor() {
             {
               "@type": "WebApplication",
               "name": "UK Sponsor Licence Monitor",
-              "description": "Search and monitor the UK Home Office Register of Licensed Sponsors. Get instant alerts when sponsor licences are revoked.",
+              "description": "Search and monitor the UK Home Office Register of Licensed Sponsors. Get alerted when sponsor licences are revoked.",
               "url": "https://checkbyai.net/sponsor-monitor",
               "applicationCategory": "BusinessApplication",
               "operatingSystem": "Web",
@@ -1160,7 +1160,7 @@ export default function SponsorMonitor() {
                 {
                   "@type": "Question",
                   "name": "What does it mean if a sponsor licence is revoked?",
-                  "acceptedAnswer": { "@type": "Answer", "text": "If your employer's sponsor licence is revoked by the Home Office, your visa may be curtailed. You typically have 60 days to find a new sponsor or make alternative arrangements. CheckByAI sends instant alerts so you can act immediately." }
+                  "acceptedAnswer": { "@type": "Answer", "text": "If your employer's sponsor licence is revoked by the Home Office, your visa may be curtailed. You typically have 60 days to find a new sponsor or make alternative arrangements. CheckByAI sends alerts so you can act quickly." }
                 },
                 {
                   "@type": "Question",
@@ -1520,7 +1520,7 @@ export default function SponsorMonitor() {
         <div className="max-w-2xl mx-auto px-4 text-center">
           <h2 className="text-2xl sm:text-3xl font-bold mb-3">Do Not Wait For The Letter</h2>
           <p className="text-slate-300 mb-8 max-w-lg mx-auto">
-            Get instant alerts when a sponsor licence changes. Protect your visa, your career, and your future in the UK.
+            Get alerted when a sponsor licence changes. Protect your visa, your career, and your future in the UK.
           </p>
           <Button onClick={() => setLocation("/pricing")} size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-base px-10 py-6 rounded-xl shadow-lg shadow-emerald-500/20">
             <ShieldCheck className="w-5 h-5 mr-2" />Start Monitoring Now
@@ -1668,7 +1668,7 @@ function NotificationSettings({ user }: { user: any }) {
         <p className="text-xs text-muted-foreground">
           <span className="font-medium text-foreground">Alert timing:</span> {alertTiming}
           {resolvedTier === "free" && <span>, <a href="/pricing" className="underline hover:no-underline text-primary">upgrade for faster alerts</a></span>}
-          {resolvedTier === "starter" && <span>, <a href="/pricing" className="underline hover:no-underline text-primary">upgrade to Pro for immediate alerts</a></span>}
+          {resolvedTier === "starter" && <span>, <a href="/pricing" className="underline hover:no-underline text-primary">upgrade to Pro for twice-daily alerts</a></span>}
         </p>
       </div>
       <Card>
@@ -1681,7 +1681,7 @@ function NotificationSettings({ user }: { user: any }) {
             {user?.email && <p className="text-xs text-muted-foreground ml-7">Alerts will be sent to {user.email}</p>}
           </div>
           <div className="border-t border-border/50" />
-          <PhoneVerificationField channel="whatsapp" label="WhatsApp Notifications" icon={MessageSquare} enabled={whatsappEnabled} onToggle={(v) => { setWhatsappEnabled(v); markDirty(); }} phoneNumber={whatsappNumber} onPhoneChange={(v) => { setWhatsappNumber(v); markDirty(); }} verified={prefs?.whatsappVerified ?? false} channelAllowed={isChannelAllowed(user?.subscriptionStatus, "whatsapp")} requiredPlan="Pro" />
+          <PhoneVerificationField channel="whatsapp" label="WhatsApp Notifications" icon={MessageSquare} enabled={whatsappEnabled} onToggle={(v) => { setWhatsappEnabled(v); markDirty(); }} phoneNumber={whatsappNumber} onPhoneChange={(v) => { setWhatsappNumber(v); markDirty(); }} verified={prefs?.whatsappVerified ?? false} channelAllowed={isChannelAllowed(user?.subscriptionStatus, "whatsapp")} requiredPlan="Starter" />
           <div className="border-t border-border/50" />
           <PhoneVerificationField channel="sms" label="SMS Notifications" icon={Phone} enabled={smsEnabled} onToggle={(v) => { setSmsEnabled(v); markDirty(); }} phoneNumber={smsNumber} onPhoneChange={(v) => { setSmsNumber(v); markDirty(); }} verified={prefs?.smsVerified ?? false} channelAllowed={isChannelAllowed(user?.subscriptionStatus, "sms")} requiredPlan="Pro" />
           {pushSupported.current && (

@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { apiRequest } from '@/lib/queryClient';
 import { unwrapApiEnvelope } from '@/lib/apiEnvelope';
+import { isPaidTier, isUnlimitedWatchTier } from '@shared/planTiers';
 import PageLayout from '@/components/PageLayout';
 import SEOHead from '@/components/SEOHead';
 
@@ -159,12 +160,12 @@ export default function CheckoutSuccess() {
                   </div>
                 )}
 
-                {verifyResult.subscriptionStatus && ['starter', 'pro', 'unlimited', 'enterprise'].includes(verifyResult.subscriptionStatus) && (
+                {verifyResult.subscriptionStatus && isPaidTier(verifyResult.subscriptionStatus) && (
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Status:</span>
                     <span className="text-emerald-500 font-semibold flex items-center gap-1">
                       <Check className="w-4 h-4" />
-                      {verifyResult.subscriptionStatus === 'unlimited' || verifyResult.subscriptionStatus === 'enterprise' ? 'Unlimited Access Active' : `${verifyResult.subscriptionStatus.charAt(0).toUpperCase() + verifyResult.subscriptionStatus.slice(1)} Plan Active`}
+                      {isUnlimitedWatchTier(verifyResult.subscriptionStatus) ? 'Unlimited Access Active' : `${verifyResult.subscriptionStatus.charAt(0).toUpperCase() + verifyResult.subscriptionStatus.slice(1)} Plan Active`}
                     </span>
                   </div>
                 )}

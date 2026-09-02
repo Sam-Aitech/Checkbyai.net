@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { STALE_TIMES } from "@/lib/queryDefaults";
 
@@ -27,6 +28,17 @@ export function useDailyDigest() {
     refetchInterval: STALE_TIMES.INFREQUENT,
     refetchOnWindowFocus: true,
   });
+
+  // Without this, a fetch failure (e.g. Redis outage on the server) renders
+  // identically to a legitimate "no digest generated yet" response — both
+  // leave `data` undefined, so !data?.available is true either way. Log so a
+  // backend regression is at least visible somewhere instead of silently
+  // looking like a quiet news day.
+  useEffect(() => {
+    if (query.isError) {
+      console.error("[useDailyDigest] Failed to load /api/daily-digest/current:", query.error);
+    }
+  }, [query.isError, query.error]);
 
   const counts = {
     added: query.data?.counts?.added ?? 0,

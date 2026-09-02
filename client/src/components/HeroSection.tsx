@@ -744,7 +744,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                   label="Monitor"
                   items={[
                     { href: "/sponsors",        label: "Sponsor Register",  desc: "Search 124,000+ licensed sponsors" },
-                    { href: "/sponsor-monitor", label: "Sponsor Monitor",   desc: "Instant alerts when a licence changes" },
+                    { href: "/sponsor-monitor", label: "Sponsor Monitor",   desc: "Get alerted when a licence changes" },
                     { href: "/sponsor-changes", label: "Licence Changes",   desc: "Recent additions and revocations" },
                   ]}
                 />
@@ -784,7 +784,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                 </motion.h1>
 
                 <motion.p initial={{ opacity: 0, y: 20 }} animate={isLoaded ? { opacity: 1, y: 0 } : {}} transition={{ ...springGentle, delay: 0.35 }} className="text-base text-white/70 max-w-lg leading-relaxed">
-                  We check the sponsor register every weeknight at ~00:30 UTC and alert you the moment your employer's status changes: Pro subscribers within minutes, Starter subscribers by 18:00 UTC the same day.
+                  We check the sponsor register every weeknight at ~00:30 UTC and alert you when your employer's status changes: Pro subscribers twice daily at 07:00 and 19:00 UTC, Starter subscribers by 18:00 UTC the same day.
                 </motion.p>
 
                 {/* ── Hero search box ───────────────────────────────────── */}
@@ -1010,7 +1010,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                   <TimelineClockIcon size={30} />
                 </div>
                 <h3 className="text-lg font-bold text-foreground mb-3">The 12-Hour Advantage</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">We check the register at ~00:30 UTC. Letters are posted at 9 AM. Pro subscribers receive a WhatsApp alert within minutes, half a day before their employer even knows. Starter subscribers are alerted by 18:00 UTC, still the same day.</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">We check the register at ~00:30 UTC. Letters are posted at 9 AM. Pro subscribers receive a WhatsApp alert by 07:00 UTC, well before their employer's letter arrives. Starter subscribers are alerted by 18:00 UTC, still the same day.</p>
               </CardContent>
             </Card>
             <Card className="border-slate-200 dark:border-slate-800 glow-amber transition-all duration-300">
@@ -1102,7 +1102,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />Monitor 5 companies</li>
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />Email + WhatsApp + SMS</li>
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />90-day history</li>
-                  <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />Instant alerts (within minutes)</li>
+                  <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />Twice-daily alerts (07:00 & 19:00 UTC)</li>
                 </ul>
                 <Link href="/pricing?plan=pro"><Button variant="outline" className="w-full font-bold py-5 text-base">Get Pro Protection</Button></Link>
               </CardContent>
@@ -1132,7 +1132,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
             <AccordionItem value="q4" className="border rounded-xl px-4 bg-white dark:bg-slate-900">
               <AccordionTrigger className="text-sm font-semibold text-foreground hover:no-underline py-4">What is the difference between Starter and Pro?</AccordionTrigger>
               <AccordionContent className="text-sm text-muted-foreground pb-4">
-                Starter (£24.99/mo) monitors 2 companies and sends Email + WhatsApp alerts by 18:00 UTC on the day a change is detected. Pro (£49.99/mo) monitors 5 companies, adds SMS, delivers alerts within minutes of the ~00:30 UTC nightly register check, and includes 5 Certificate of Sponsorship checks per month. Both plans can be cancelled anytime.
+                Starter (£24.99/mo) monitors 2 companies and sends Email + WhatsApp alerts by 18:00 UTC on the day a change is detected. Pro (£49.99/mo) monitors 5 companies, adds SMS, delivers alerts twice daily at 07:00 and 19:00 UTC, and includes 5 Certificate of Sponsorship checks per month. Both plans can be cancelled anytime.
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="q5" className="border rounded-xl px-4 bg-white dark:bg-slate-900">

@@ -1,6 +1,6 @@
 import { storage } from "../storage";
 import { ApiError } from "../lib/apiError";
-import { getWatchLimit as getWatchLimitFromTier, getTierConfig } from "../utils/tierConfig";
+import { getWatchLimit as getWatchLimitFromTier, getTierConfig, isPaidTier, isUnlimitedWatchTier } from "../utils/tierConfig";
 
 export class SubscriptionService {
   getWatchLimit(subscriptionStatus: string | null): number {
@@ -14,13 +14,13 @@ export class SubscriptionService {
   hasUnlimitedAccess(user: { role?: string | null; cosCheckSubscription?: boolean | null; subscriptionStatus?: string | null; verificationLimit?: number | null }): boolean {
     if (user.role === "admin") return true;
     if (user.cosCheckSubscription) return true;
-    if (user.subscriptionStatus === "unlimited" || user.subscriptionStatus === "enterprise") return true;
+    if (isUnlimitedWatchTier(user.subscriptionStatus)) return true;
     if (user.verificationLimit === -1) return true;
     return false;
   }
 
   hasPaidPlan(subscriptionStatus: string | null | undefined): boolean {
-    return ["starter", "pro", "unlimited", "enterprise"].includes(subscriptionStatus || "");
+    return isPaidTier(subscriptionStatus);
   }
 
   async requireActiveSubscription(userId: string): Promise<void> {

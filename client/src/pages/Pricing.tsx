@@ -60,14 +60,14 @@ const annualPlans: AnnualPlan[] = [
     name: 'Alert Pass Pro (Annual)',
     price: '£19.99',
     period: '/year',
-    description: 'Full protection with immediate alerts, billed once a year.',
+    description: 'Full protection with twice-daily alerts, billed once a year.',
     packageType: 'alert_annual_pro',
     popular: true,
     icon: Zap,
     features: [
       'Monitor up to 5 companies for 12 months',
       'Email + WhatsApp + SMS',
-      'Instant alerts (within minutes)',
+      'Twice-daily alerts (07:00 & 19:00 UTC)',
       '90-day change history',
     ],
   },
@@ -90,7 +90,7 @@ const notificationPlans: NotificationPlan[] = [
     ],
     notIncluded: [
       'SMS notifications',
-      'Instant alerts (within minutes)',
+      'Twice-daily alerts (07:00 & 19:00 UTC)',
       'CoS verification checks',
     ],
   },
@@ -98,14 +98,14 @@ const notificationPlans: NotificationPlan[] = [
     name: 'Pro',
     price: '£49.99',
     period: '/month',
-    description: 'Full protection with immediate alerts and CoS checks.',
+    description: 'Full protection with twice-daily alerts and CoS checks.',
     packageType: 'notification_pro',
     popular: true,
     icon: Zap,
     features: [
       'Monitor up to 5 companies',
       'Email + WhatsApp + SMS',
-      'Instant alerts (within minutes)',
+      'Twice-daily alerts (07:00 & 19:00 UTC)',
       '90-day change history',
       '5 CoS verification checks per month',
       'Priority support',
@@ -331,10 +331,10 @@ export default function Pricing() {
     <PageLayout>
       <SEOHead
         title="Protect Your Visa | Sponsor Licence Alerts from £24.99/mo | CheckByAI"
-        description="Never be blindsided by a sponsor licence revocation. Get instant WhatsApp and email alerts. Starter £24.99/mo (2 companies), Pro £49.99/mo (5 companies, SMS + immediate alerts)."
+        description="Never be blindsided by a sponsor licence revocation. Get WhatsApp and email alerts. Starter £24.99/mo (2 companies), Pro £49.99/mo (5 companies, SMS + twice-daily alerts)."
         canonicalUrl="https://checkbyai.net/pricing"
         ogTitle="Protect Your Visa | Sponsor Alerts from £24.99/mo"
-        ogDescription="Instant alerts when your employer's sponsor licence changes. Don't risk your visa status."
+        ogDescription="Get alerted when your employer's sponsor licence changes. Don't risk your visa status."
         keywords="sponsor licence alerts pricing, UK visa monitoring subscription, sponsor revocation alert plans, WhatsApp sponsor alerts"
         breadcrumbs={[
           { name: "Home", url: "https://checkbyai.net/" },
@@ -377,7 +377,7 @@ export default function Pricing() {
                 {
                   "@type": "Question",
                   "name": "What's the difference between Starter and Pro plans?",
-                  "acceptedAnswer": { "@type": "Answer", "text": "The Starter plan (£24.99/mo) monitors up to 2 companies with email and WhatsApp alerts delivered same-day at 18:00 UTC. The Pro plan (£49.99/mo) monitors up to 5 companies with instant alerts (within minutes of detection) via email, WhatsApp, and SMS, plus 5 CoS verification checks per month." }
+                  "acceptedAnswer": { "@type": "Answer", "text": "The Starter plan (£24.99/mo) monitors up to 2 companies with email and WhatsApp alerts delivered same-day at 18:00 UTC. The Pro plan (£49.99/mo) monitors up to 5 companies with alerts delivered twice daily at 07:00 and 19:00 UTC via email, WhatsApp, and SMS, plus 5 CoS verification checks per month." }
                 },
                 {
                   "@type": "Question",
@@ -387,7 +387,7 @@ export default function Pricing() {
                 {
                   "@type": "Question",
                   "name": "How are alerts delivered?",
-                  "acceptedAnswer": { "@type": "Answer", "text": "Starter plan subscribers receive alerts via email and WhatsApp at 18:00 UTC on the day a change is detected. Pro plan subscribers receive instant alerts via email, WhatsApp, and SMS within minutes of detection." }
+                  "acceptedAnswer": { "@type": "Answer", "text": "Starter plan subscribers receive alerts via email and WhatsApp at 18:00 UTC on the day a change is detected. Pro plan subscribers receive alerts via email, WhatsApp, and SMS twice daily at 07:00 and 19:00 UTC." }
                 }
               ]
             }
@@ -414,7 +414,7 @@ export default function Pricing() {
                   <span className="text-primary">{companyParam}</span>
                 </h1>
                 <p className="text-xl text-muted-foreground max-w-2xl mx-auto editorial-body">
-                  Choose a plan to get instant alerts when{' '}
+                  Choose a plan to get alerted when{' '}
                   <strong className="text-foreground">{companyParam}</strong>'s
                   sponsor licence status changes.
                 </p>

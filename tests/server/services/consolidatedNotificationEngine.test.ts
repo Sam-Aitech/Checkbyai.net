@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { groupNotificationsByUser, renderConsolidatedEmail, processConsolidatedNotifications } from "../../../server/services/consolidatedNotificationEngine";
+import { groupNotificationsByUser, renderConsolidatedEmail, processConsolidatedNotifications, ENRICHED_DIGEST_STATUSES } from "../../../server/services/consolidatedNotificationEngine";
 import { db } from "../../../server/db";
 
 vi.mock("../../../server/db", () => ({
@@ -132,5 +132,23 @@ describe("consolidatedNotificationEngine - Delivery Orchestration", () => {
     expect(mockFetch).toHaveBeenCalled();
     expect(db.insert).toHaveBeenCalled();
     expect(result.sentCount).toBe(1);
+  });
+});
+
+describe("consolidatedNotificationEngine - Tier Coverage", () => {
+  // Regression guard: fetchPendingNotifications() used to filter on the
+  // literal string subscriptionStatus === 'pro', which silently excluded
+  // Unlimited and Enterprise subscribers from every automated digest despite
+  // them paying for (and being promised) the same notification tier.
+  // ENRICHED_DIGEST_STATUSES is what that query now filters on.
+  it("includes pro, unlimited, and enterprise", () => {
+    expect(ENRICHED_DIGEST_STATUSES).toContain("pro");
+    expect(ENRICHED_DIGEST_STATUSES).toContain("unlimited");
+    expect(ENRICHED_DIGEST_STATUSES).toContain("enterprise");
+  });
+
+  it("excludes free and starter", () => {
+    expect(ENRICHED_DIGEST_STATUSES).not.toContain("free");
+    expect(ENRICHED_DIGEST_STATUSES).not.toContain("starter");
   });
 });
