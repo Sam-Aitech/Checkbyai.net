@@ -205,7 +205,9 @@ export function registerSponsorRoutes(app: Express): void {
   }));
 
   app.get('/api/daily-digest/current', asyncHandler(async (_req: any, res) => {
-    const cacheKey = 'sponsors:daily-digest:current';
+    // Versioned so a future response-shape change can never be served stale
+    // out of a cache entry written by the previous shape.
+    const cacheKey = 'sponsors:daily-digest:current:v2';
     const cached = await cacheGet(cacheKey);
     if (cached) {
       success(res, cached);

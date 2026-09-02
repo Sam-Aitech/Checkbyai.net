@@ -16,9 +16,10 @@ import { apiRequest } from "@/lib/queryClient";
 import { unwrapApiEnvelope } from "@/lib/apiEnvelope";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
+import { TIER_LABELS } from "@shared/planTiers";
 
 export default function UserProfile() {
-  const { user, isAuthenticated, isPro, isAdmin } = useAuth();
+  const { user, isAuthenticated, isPro, isAdmin, tier } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [openingPortal, setOpeningPortal] = useState(false);
@@ -75,7 +76,7 @@ export default function UserProfile() {
       {isPro && (
         <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
           <Crown className="h-3 w-3 mr-1" />
-          Pro
+          {TIER_LABELS[tier]}
         </Badge>
       )}
       {isAdmin && (

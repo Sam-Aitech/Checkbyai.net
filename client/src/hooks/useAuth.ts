@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import type { User } from "@shared/schema";
+import { resolveTier, isPaidTier, type PlanTier } from "@shared/planTiers";
 
 export function useAuth() {
   const { data: user, isLoading, error } = useQuery<User>({
@@ -14,12 +15,14 @@ export function useAuth() {
 
   // Consider 401 as "not authenticated" rather than an error
   const isAuthenticated = !!user && !error;
-  
+  const tier: PlanTier = resolveTier(user?.subscriptionStatus);
+
   return {
     user,
     isLoading: isLoading && !error, // Don't show loading if we know it's a 401
     isAuthenticated,
     isAdmin: user?.role === 'admin',
-    isPro: ['starter', 'pro', 'unlimited', 'enterprise', 'notification_starter', 'notification_pro'].includes(user?.subscriptionStatus || ''),
+    tier,
+    isPro: isAuthenticated && isPaidTier(user?.subscriptionStatus),
   };
 }

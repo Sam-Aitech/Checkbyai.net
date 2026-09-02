@@ -124,7 +124,7 @@ export default function Home() {
               "name": "How quickly does CheckByAI detect sponsor licence changes?",
               "acceptedAnswer": {
                 "@type": "Answer",
-                "text": "CheckByAI monitors the Home Office Register of Licensed Sponsors daily. Pro plan subscribers receive alerts within minutes of detection. Starter plan subscribers receive same-day alerts at 6 PM UTC."
+                "text": "CheckByAI checks the Home Office Register of Licensed Sponsors on weeknights. Pro plan subscribers receive alerts within minutes of detection. Starter plan subscribers receive same-day alerts at 18:00 UTC."
               }
             },
             {

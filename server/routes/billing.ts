@@ -827,6 +827,7 @@ export function registerBillingRoutes(app: Express): void {
         const user = await storage.getUser(sessionUserId);
 
         success(res, {
+          success: true,
           packageType,
           credits,
           subscriptionStatus: user?.subscriptionStatus,

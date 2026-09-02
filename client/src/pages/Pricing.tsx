@@ -52,7 +52,7 @@ const annualPlans: AnnualPlan[] = [
     features: [
       'Monitor 1 company for 12 months',
       'Email + WhatsApp alerts',
-      'Same-day alerts (6 PM)',
+      'Same-day alerts (18:00 UTC)',
       '30-day change history',
     ],
   },
@@ -67,7 +67,7 @@ const annualPlans: AnnualPlan[] = [
     features: [
       'Monitor up to 5 companies for 12 months',
       'Email + WhatsApp + SMS',
-      'Immediate alerts',
+      'Instant alerts (within minutes)',
       '90-day change history',
     ],
   },
@@ -84,13 +84,13 @@ const notificationPlans: NotificationPlan[] = [
     features: [
       'Monitor up to 2 companies',
       'Email + WhatsApp alerts',
-      'Same-day alerts (6 PM)',
+      'Same-day alerts (18:00 UTC)',
       '30-day change history',
       'Monitoring dashboard',
     ],
     notIncluded: [
       'SMS notifications',
-      'Immediate alerts',
+      'Instant alerts (within minutes)',
       'CoS verification checks',
     ],
   },
@@ -105,7 +105,7 @@ const notificationPlans: NotificationPlan[] = [
     features: [
       'Monitor up to 5 companies',
       'Email + WhatsApp + SMS',
-      'Immediate alerts',
+      'Instant alerts (within minutes)',
       '90-day change history',
       '5 CoS verification checks per month',
       'Priority support',
@@ -346,7 +346,7 @@ export default function Pricing() {
             {
               "@type": "Product",
               "name": "CheckByAI Notification Engine - Starter",
-              "description": "UK sponsor licence monitoring with email and WhatsApp alerts for up to 2 companies. Same-day alerts at 6 PM UTC.",
+              "description": "UK sponsor licence monitoring with email and WhatsApp alerts for up to 2 companies. Same-day alerts at 18:00 UTC.",
               "brand": { "@type": "Brand", "name": "CheckByAI" },
               "offers": {
                 "@type": "Offer",
@@ -377,7 +377,7 @@ export default function Pricing() {
                 {
                   "@type": "Question",
                   "name": "What's the difference between Starter and Pro plans?",
-                  "acceptedAnswer": { "@type": "Answer", "text": "The Starter plan (£24.99/mo) monitors up to 2 companies with email and WhatsApp alerts delivered same-day at 6 PM. The Pro plan (£49.99/mo) monitors up to 5 companies with immediate alerts via email, WhatsApp, and SMS, plus 5 CoS verification checks per month." }
+                  "acceptedAnswer": { "@type": "Answer", "text": "The Starter plan (£24.99/mo) monitors up to 2 companies with email and WhatsApp alerts delivered same-day at 18:00 UTC. The Pro plan (£49.99/mo) monitors up to 5 companies with instant alerts (within minutes of detection) via email, WhatsApp, and SMS, plus 5 CoS verification checks per month." }
                 },
                 {
                   "@type": "Question",
@@ -387,7 +387,7 @@ export default function Pricing() {
                 {
                   "@type": "Question",
                   "name": "How are alerts delivered?",
-                  "acceptedAnswer": { "@type": "Answer", "text": "Starter plan subscribers receive alerts via email and WhatsApp at 6 PM UTC on the day a change is detected. Pro plan subscribers receive immediate alerts via email, WhatsApp, and SMS within minutes of detection." }
+                  "acceptedAnswer": { "@type": "Answer", "text": "Starter plan subscribers receive alerts via email and WhatsApp at 18:00 UTC on the day a change is detected. Pro plan subscribers receive instant alerts via email, WhatsApp, and SMS within minutes of detection." }
                 }
               ]
             }

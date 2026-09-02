@@ -784,7 +784,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                 </motion.h1>
 
                 <motion.p initial={{ opacity: 0, y: 20 }} animate={isLoaded ? { opacity: 1, y: 0 } : {}} transition={{ ...springGentle, delay: 0.35 }} className="text-base text-white/70 max-w-lg leading-relaxed">
-                  The Home Office updates the sponsor register every night. We check it for you and alert you the moment your employer's status changes: Pro subscribers within 30 minutes, Starter subscribers by 6 PM the same day.
+                  We check the sponsor register every weeknight at ~00:30 UTC and alert you the moment your employer's status changes: Pro subscribers within minutes, Starter subscribers by 18:00 UTC the same day.
                 </motion.p>
 
                 {/* ── Hero search box ───────────────────────────────────── */}
@@ -1010,7 +1010,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                   <TimelineClockIcon size={30} />
                 </div>
                 <h3 className="text-lg font-bold text-foreground mb-3">The 12-Hour Advantage</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">The register updates at midnight. Letters are posted at 9 AM. Pro subscribers receive a WhatsApp alert at 00:30, half a day before their employer even knows. Starter subscribers are alerted by 6 PM, still the same day.</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">We check the register at ~00:30 UTC. Letters are posted at 9 AM. Pro subscribers receive a WhatsApp alert within minutes, half a day before their employer even knows. Starter subscribers are alerted by 18:00 UTC, still the same day.</p>
               </CardContent>
             </Card>
             <Card className="border-slate-200 dark:border-slate-800 glow-amber transition-all duration-300">
@@ -1046,7 +1046,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                 </div>
                 <div>
                   <blockquote className="text-foreground text-sm sm:text-base italic leading-relaxed mb-3">
-                    "I got the alert at midnight. My employer got the suspension email at 9 AM. I had already applied for a new job. That subscription saved my 5-year UK career."
+                    "I got the alert just after midnight. My employer got the suspension email at 9 AM. I had already applied for a new job. That subscription saved my 5-year UK career."
                   </blockquote>
                   <p className="text-xs text-muted-foreground font-medium">Rahul K., Skilled Worker Visa Holder</p>
                 </div>
@@ -1087,7 +1087,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />Monitor 2 companies</li>
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />Email + WhatsApp alerts</li>
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />30-day history</li>
-                  <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />Same-day alerts (6 PM)</li>
+                  <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />Same-day alerts (18:00 UTC)</li>
                 </ul>
                 <Link href="/pricing?plan=starter"><Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-5 text-base shadow-md"><Zap className="w-4 h-4 mr-2" />Get Same-Day Alerts</Button></Link>
               </CardContent>
@@ -1102,7 +1102,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />Monitor 5 companies</li>
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />Email + WhatsApp + SMS</li>
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />90-day history</li>
-                  <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />Immediate alerts</li>
+                  <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />Instant alerts (within minutes)</li>
                 </ul>
                 <Link href="/pricing?plan=pro"><Button variant="outline" className="w-full font-bold py-5 text-base">Get Pro Protection</Button></Link>
               </CardContent>
@@ -1132,7 +1132,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
             <AccordionItem value="q4" className="border rounded-xl px-4 bg-white dark:bg-slate-900">
               <AccordionTrigger className="text-sm font-semibold text-foreground hover:no-underline py-4">What is the difference between Starter and Pro?</AccordionTrigger>
               <AccordionContent className="text-sm text-muted-foreground pb-4">
-                Starter (£24.99/mo) monitors 2 companies and sends Email + WhatsApp alerts by 6 PM on the day a change is detected. Pro (£49.99/mo) monitors 5 companies, adds SMS, delivers alerts within 30 minutes of the nightly register check, and includes 5 Certificate of Sponsorship checks per month. Both plans can be cancelled anytime.
+                Starter (£24.99/mo) monitors 2 companies and sends Email + WhatsApp alerts by 18:00 UTC on the day a change is detected. Pro (£49.99/mo) monitors 5 companies, adds SMS, delivers alerts within minutes of the ~00:30 UTC nightly register check, and includes 5 Certificate of Sponsorship checks per month. Both plans can be cancelled anytime.
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="q5" className="border rounded-xl px-4 bg-white dark:bg-slate-900">
