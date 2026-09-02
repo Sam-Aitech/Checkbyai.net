@@ -3,7 +3,7 @@ import { sendWhatsApp } from "../messaging";
 import { logger } from "../../utils/logger";
 import { jitterDelay } from "../../utils/jitterRetry";
 import { waitForBucket } from "../../utils/tokenBucket";
-import { buildIdempotencyKey, claimIdempotency, releaseIdempotency } from "../../utils/notifIdempotency";
+import { withIdempotency } from "../../utils/notifIdempotency";
 
 const log = logger.child({ module: "Channel:WhatsApp" });
 
@@ -40,42 +40,30 @@ function getLabel(changeType: string, prev?: string | null, next?: string | null
   }
 }
 
+async function sendWithRetry(payload: ChannelPayload): Promise<SendResult> {
+  const from = process.env.TWILIO_WHATSAPP_NUMBER || "global";
+  const message = buildMessage(payload);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await waitForBucket("twilio", from);
+    try {
+      const result = await sendWhatsApp(payload.recipient, message);
+      if (result.success) return result;
+      const is429 = result.error?.includes("429") || result.error?.includes("rate");
+      if (!is429 || attempt === 2) return result;
+      log.warn({ error: result.error, attempt }, "WhatsApp retrying");
+    } catch (err: unknown) {
+      const m = err instanceof Error ? err.message : String(err);
+      if (attempt === 2) return { success: false, error: m };
+      log.warn({ err: m, attempt }, "WhatsApp threw retrying");
+    }
+    await new Promise((rr) => setTimeout(rr, jitterDelay(attempt, 1000, 30000)));
+  }
+  return { success: false, error: "WhatsApp exhausted retries" };
+}
+
 export const whatsAppChannel: NotificationChannel = {
   name: "whatsapp",
-  async send(payload: ChannelPayload): Promise<SendResult> {
-    const snap = payload.snapshotDate || new Date().toISOString().slice(0, 10);
-    const idem = payload.userId && payload.changeId
-      ? buildIdempotencyKey(payload.userId, payload.changeId, "whatsapp", snap)
-      : null;
-    // Atomic claim, not a GET-then-SET: two concurrent invocations of the
-    // same notification can't both pass this check before either writes.
-    if (idem && !(await claimIdempotency(idem))) {
-      return { success: true, providerMessageId: `idem:${idem}` };
-    }
-    const from = process.env.TWILIO_WHATSAPP_NUMBER || "global";
-    const message = buildMessage(payload);
-    for (let attempt = 0; attempt < 3; attempt++) {
-      await waitForBucket("twilio", from);
-      try {
-        const result = await sendWhatsApp(payload.recipient, message);
-        if (result.success) return result;
-        const is429 = result.error?.includes("429") || result.error?.includes("rate");
-        if (!is429 || attempt === 2) {
-          if (idem) await releaseIdempotency(idem);
-          return result;
-        }
-        log.warn({ error: result.error, attempt }, "WhatsApp retrying");
-      } catch (err: unknown) {
-        const m = err instanceof Error ? err.message : String(err);
-        if (attempt === 2) {
-          if (idem) await releaseIdempotency(idem);
-          return { success: false, error: m };
-        }
-        log.warn({ err: m, attempt }, "WhatsApp threw retrying");
-      }
-      await new Promise((rr) => setTimeout(rr, jitterDelay(attempt, 1000, 30000)));
-    }
-    if (idem) await releaseIdempotency(idem);
-    return { success: false, error: "WhatsApp exhausted retries" };
+  send(payload: ChannelPayload): Promise<SendResult> {
+    return withIdempotency(payload, "whatsapp", () => sendWithRetry(payload));
   },
 };

@@ -1,30 +1,41 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { jitterDelay, parseRetryAfter } from "../jitterRetry";
+
+// node:crypto's named exports aren't configurable under Vitest's ESM
+// handling, so vi.spyOn(crypto, "randomInt") throws "Cannot redefine
+// property" — mock the module instead, keeping every other export real via
+// importOriginal.
+const mockRandomInt = vi.fn();
+vi.mock("node:crypto", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:crypto")>();
+  return { ...actual, randomInt: (...args: unknown[]) => mockRandomInt(...args) };
+});
+
+const { jitterDelay, parseRetryAfter } = await import("../jitterRetry");
 
 describe("jitterDelay", () => {
   afterEach(() => {
-    vi.restoreAllMocks();
+    mockRandomInt.mockReset();
   });
 
   it("grows exponentially with attempt number", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0);
+    mockRandomInt.mockReturnValue(0);
     expect(jitterDelay(0, 1000, 30000)).toBe(1000);
     expect(jitterDelay(1, 1000, 30000)).toBe(2000);
     expect(jitterDelay(2, 1000, 30000)).toBe(4000);
   });
 
-  it("adds up to 1000ms of jitter on top of the exponential base", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
+  it("adds the jittered value on top of the exponential base", () => {
+    mockRandomInt.mockReturnValue(500);
     expect(jitterDelay(0, 1000, 30000)).toBe(1500);
   });
 
   it("never exceeds the cap even at a high attempt number", () => {
-    vi.spyOn(Math, "random").mockReturnValue(1);
+    mockRandomInt.mockReturnValue(999);
     expect(jitterDelay(10, 1000, 30000)).toBe(30000);
   });
 
   it("respects a custom base and cap", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0);
+    mockRandomInt.mockReturnValue(0);
     expect(jitterDelay(0, 500, 2000)).toBe(500);
     expect(jitterDelay(5, 500, 2000)).toBe(2000);
   });

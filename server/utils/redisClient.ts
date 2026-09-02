@@ -63,7 +63,7 @@ function lruFlushPattern(pattern: CachePatternPrefix): number {
   // carries no ReDoS/injection risk despite the pattern not being a literal
   // at this call site.
   // eslint-disable-next-line security/detect-non-literal-regexp
-  const re = new RegExp("^" + pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "$");
+  const re = new RegExp("^" + pattern.replace(/[.+?^${}()|[\]\\]/g, String.raw`\$&`).replace(/\*/g, ".*") + "$");
   let n = 0;
   for (const k of lruStore.keys()) {
     if (re.test(k)) {

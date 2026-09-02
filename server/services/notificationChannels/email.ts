@@ -4,7 +4,7 @@ import { logger } from "../../utils/logger";
 import { sendAdminAlert } from "../../utils/adminAlert";
 import { jitterDelay, parseRetryAfter } from "../../utils/jitterRetry";
 import { waitForBucket } from "../../utils/tokenBucket";
-import { buildIdempotencyKey, claimIdempotency, releaseIdempotency } from "../../utils/notifIdempotency";
+import { buildIdempotencyKey, withIdempotency } from "../../utils/notifIdempotency";
 
 const log = logger.child({ module: "Channel:Email" });
 
@@ -16,6 +16,10 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// Deterministic and cheap to recompute — withIdempotency() builds its own
+// copy of this same key for the claim/release dance; this local copy is
+// only for the Resend Idempotency-Key HTTP header, which no other channel
+// needs.
 function idempotencyKeyFor(payload: ChannelPayload): string | null {
   if (!payload.changeId || !payload.userId) return null;
   const snap = payload.snapshotDate || new Date().toISOString().slice(0, 10);
@@ -115,42 +119,33 @@ async function sendWithProvider(
   return { success: false, error: lastError };
 }
 
+async function sendViaAllProviders(payload: ChannelPayload): Promise<SendResult> {
+  const idem = idempotencyKeyFor(payload);
+  const { subject, html } = buildEmail(payload.changeType, payload.organisationName, payload.previousValue, payload.newValue);
+  const providers = getProviders();
+  if (providers.length === 0) {
+    return { success: false, error: "No email providers configured (set RESEND_API_KEY or SENDGRID_API_KEY)" };
+  }
+  let lastError: string | undefined;
+  for (const provider of providers) {
+    const result = await sendWithProvider(provider, payload.recipient, subject, html, idem ?? undefined);
+    if (result.success) return result;
+    lastError = result.error;
+  }
+
+  sendAdminAlert(
+    "ALERT: All email providers exhausted",
+    `<p>Failed to deliver notification to ${payload.recipient} after all providers and retries.</p>
+     <p><strong>Event:</strong> ${payload.eventType} — ${payload.companyName}</p>
+     <p><strong>Last error:</strong> ${lastError ?? "Unknown"}</p>`,
+  ).catch(() => {});
+
+  return { success: false, error: `All providers exhausted: ${lastError ?? "Unknown"}` };
+}
+
 export const emailChannel: NotificationChannel = {
   name: "email",
-
-  async send(payload: ChannelPayload): Promise<SendResult> {
-    const idem = idempotencyKeyFor(payload);
-    // Atomic claim, not a GET-then-SET: two concurrent invocations of the
-    // same notification can't both pass this check before either writes,
-    // which is exactly how a duplicate email got sent before this fix.
-    if (idem && !(await claimIdempotency(idem))) {
-      return { success: true, providerMessageId: `idem:${idem}` };
-    }
-    const { subject, html } = buildEmail(payload.changeType, payload.organisationName, payload.previousValue, payload.newValue);
-    const providers = getProviders();
-    if (providers.length === 0) {
-      if (idem) await releaseIdempotency(idem);
-      return { success: false, error: "No email providers configured (set RESEND_API_KEY or SENDGRID_API_KEY)" };
-    }
-    let lastError: string | undefined;
-    for (const provider of providers) {
-      const result = await sendWithProvider(provider, payload.recipient, subject, html, idem ?? undefined);
-      if (result.success) return result;
-      lastError = result.error;
-    }
-
-    // Release the claim so a legitimate retry (BullMQ retry, manual resend)
-    // isn't blocked for the rest of the 24h claim TTL by a send that never
-    // actually went out.
-    if (idem) await releaseIdempotency(idem);
-
-    sendAdminAlert(
-      "ALERT: All email providers exhausted",
-      `<p>Failed to deliver notification to ${payload.recipient} after all providers and retries.</p>
-       <p><strong>Event:</strong> ${payload.eventType} — ${payload.companyName}</p>
-       <p><strong>Last error:</strong> ${lastError ?? "Unknown"}</p>`,
-    ).catch(() => {});
-
-    return { success: false, error: `All providers exhausted: ${lastError ?? "Unknown"}` };
+  send(payload: ChannelPayload): Promise<SendResult> {
+    return withIdempotency(payload, "email", () => sendViaAllProviders(payload));
   },
 };

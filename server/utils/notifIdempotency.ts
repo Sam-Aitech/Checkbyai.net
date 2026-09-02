@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { getRedis } from "./redisClient";
+import type { ChannelPayload, SendResult } from "../services/notificationChannels/types";
 
 export function buildIdempotencyKey(userId: string, changeId: number | string, channel: string, snapshotDate: string): string {
   return crypto.createHash("sha256").update(`${userId}:${changeId}:${channel}:${snapshotDate}`).digest("hex");
@@ -37,4 +38,34 @@ export async function releaseIdempotency(key: string): Promise<void> {
   try {
     await redis.del(`idem:notif:${key}`);
   } catch { /* claim expires on its own TTL */ }
+}
+
+/**
+ * Wraps a channel's send in the claim/release dance so email/sms/webhook/
+ * whatsapp don't each hand-roll the identical few lines (that duplication
+ * was flagged independently by two review passes on this PR, and one of
+ * the earlier hand-rolled copies is exactly what caused the idempotency
+ * race this module exists to close).
+ *
+ * Short-circuits with a synthetic success if another concurrent call
+ * already claimed this notification; otherwise runs `sendFn`, releasing
+ * the claim on failure so a legitimate retry isn't blocked for the rest of
+ * the claim's TTL.
+ */
+export async function withIdempotency(
+  payload: ChannelPayload,
+  channel: string,
+  sendFn: () => Promise<SendResult>,
+): Promise<SendResult> {
+  const idem = payload.userId && payload.changeId
+    ? buildIdempotencyKey(payload.userId, payload.changeId, channel, payload.snapshotDate || new Date().toISOString().slice(0, 10))
+    : null;
+  if (idem && !(await claimIdempotency(idem))) {
+    return { success: true, providerMessageId: `idem:${idem}` };
+  }
+  const result = await sendFn();
+  if (!result.success && idem) {
+    await releaseIdempotency(idem);
+  }
+  return result;
 }

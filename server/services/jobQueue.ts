@@ -23,6 +23,11 @@ let redisAvailable  = false;
 let sponsorQueue:  Queue | null = null;
 let notificationQueue: Queue | null = null;
 let pdfVerifyQueue: Queue<PdfVerifyJobData> | null = null;
+// Tracked so shutdownWorkers() can close them gracefully instead of the
+// process just being killed mid-job — previously `new Worker(...)` was
+// called for its listener-registration side effect and the instance
+// discarded, with no way to stop accepting new jobs during a deploy/restart.
+const activeWorkers: Worker[] = [];
 
 async function runJobWithSentryTrace<T>(
   job: Job,
@@ -136,7 +141,7 @@ export function setupWorkers(): void {
     return;
   }
 
-  new Worker(
+  activeWorkers.push(new Worker(
     SPONSOR_REFRESH_JOB,
     async (job: Job) => {
       return runJobWithSentryTrace(job, SPONSOR_REFRESH_JOB, async () => {
@@ -145,9 +150,9 @@ export function setupWorkers(): void {
       });
     },
     { connection: redisOpts }
-  );
+  ));
 
-  new Worker(
+  activeWorkers.push(new Worker(
     SCRAPING_JOB,
     async (job: Job) => {
       return runJobWithSentryTrace(job, SCRAPING_JOB, async () => {
@@ -156,9 +161,9 @@ export function setupWorkers(): void {
       });
     },
     { connection: redisOpts }
-  );
+  ));
 
-  new Worker(
+  activeWorkers.push(new Worker(
     NOTIFICATION_JOB,
     async (job: Job) => {
       return runJobWithSentryTrace(job, NOTIFICATION_JOB, async () => {
@@ -167,9 +172,9 @@ export function setupWorkers(): void {
       });
     },
     { connection: redisOpts, concurrency: 3 }
-  );
+  ));
 
-  new Worker<PdfVerifyJobData>(
+  activeWorkers.push(new Worker<PdfVerifyJobData>(
     PDF_VERIFY_JOB,
     async (job) => {
       return runJobWithSentryTrace(job, PDF_VERIFY_JOB, async () => {
@@ -178,7 +183,13 @@ export function setupWorkers(): void {
       });
     },
     { connection: redisOpts, concurrency: 2 }
-  );
+  ));
 
   logger.info('[JobQueue] BullMQ workers registered.');
+}
+
+/** Gracefully closes all registered BullMQ workers — call on process shutdown. */
+export async function shutdownWorkers(): Promise<void> {
+  await Promise.all(activeWorkers.map((w) => w.close().catch(() => {})));
+  activeWorkers.length = 0;
 }

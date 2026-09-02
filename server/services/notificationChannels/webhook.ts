@@ -3,7 +3,7 @@ import type { NotificationChannel, ChannelPayload, SendResult } from "./types";
 import { logger } from "../../utils/logger";
 import { jitterDelay, parseRetryAfter } from "../../utils/jitterRetry";
 import { waitForBucket } from "../../utils/tokenBucket";
-import { buildIdempotencyKey, claimIdempotency, releaseIdempotency } from "../../utils/notifIdempotency";
+import { withIdempotency } from "../../utils/notifIdempotency";
 
 const log = logger.child({ module: "Channel:Webhook" });
 
@@ -87,43 +87,39 @@ async function attemptDelivery(
   }
 }
 
+async function sendWithRetry(payload: ChannelPayload, webhookUrl: string): Promise<SendResult> {
+  const bodyJson = JSON.stringify(buildBody(payload));
+  const headers = buildHeaders(bodyJson);
+  let lastError: string | undefined;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    try {
+      const result = await attemptDelivery(webhookUrl, bodyJson, headers);
+      if (result.success) return result;
+      lastError = result.error;
+      log.warn({ webhookUrl, attempt, error: lastError }, "Webhook delivery failed");
+    } catch (err: unknown) {
+      lastError = err instanceof Error ? err.message : String(err);
+      log.error({ err: lastError, webhookUrl, attempt }, "Webhook delivery threw");
+    }
+    if (attempt < MAX_ATTEMPTS - 1) await new Promise(rr => setTimeout(rr, jitterDelay(attempt, 1000, 30000)));
+  }
+  return { success: false, error: `Webhook delivery failed after ${MAX_ATTEMPTS} attempts: ${lastError}` };
+}
+
 export const webhookChannel: NotificationChannel = {
   name: "webhook",
 
-  async send(payload: ChannelPayload): Promise<SendResult> {
+  send(payload: ChannelPayload): Promise<SendResult> {
     const webhookUrl = payload.recipient;
-    if (!webhookUrl?.startsWith("https://")) return { success: false, error: "Invalid webhook URL (must be HTTPS)" };
+    if (!webhookUrl?.startsWith("https://")) return Promise.resolve({ success: false, error: "Invalid webhook URL (must be HTTPS)" });
     let parsedHost: string;
-    try { parsedHost = new URL(webhookUrl).hostname; } catch { return { success: false, error: "Invalid webhook URL" }; }
+    try { parsedHost = new URL(webhookUrl).hostname; } catch { return Promise.resolve({ success: false, error: "Invalid webhook URL" }); }
     if (isBlockedWebhookHost(parsedHost)) {
       log.warn({ webhookUrl }, "Webhook delivery blocked — internal/private host");
-      return { success: false, error: "Webhook URL targets a disallowed (internal/private) host" };
+      return Promise.resolve({ success: false, error: "Webhook URL targets a disallowed (internal/private) host" });
     }
-    const snap = payload.snapshotDate || new Date().toISOString().slice(0, 10);
-    const idem = payload.userId && payload.changeId
-      ? buildIdempotencyKey(payload.userId, payload.changeId, "webhook", snap)
-      : null;
-    // Atomic claim, not a GET-then-SET: two concurrent invocations of the
-    // same notification can't both pass this check before either writes.
-    if (idem && !(await claimIdempotency(idem))) {
-      return { success: true, providerMessageId: `idem:${idem}` };
-    }
-    const bodyJson = JSON.stringify(buildBody(payload));
-    const headers = buildHeaders(bodyJson);
-    let lastError: string | undefined;
-    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-      try {
-        const result = await attemptDelivery(webhookUrl, bodyJson, headers);
-        if (result.success) return result;
-        lastError = result.error;
-        log.warn({ webhookUrl, attempt, error: lastError }, "Webhook delivery failed");
-      } catch (err: unknown) {
-        lastError = err instanceof Error ? err.message : String(err);
-        log.error({ err: lastError, webhookUrl, attempt }, "Webhook delivery threw");
-      }
-      if (attempt < MAX_ATTEMPTS - 1) await new Promise(rr => setTimeout(rr, jitterDelay(attempt, 1000, 30000)));
-    }
-    if (idem) await releaseIdempotency(idem);
-    return { success: false, error: `Webhook delivery failed after ${MAX_ATTEMPTS} attempts: ${lastError}` };
+    // Validation happens before the idempotency claim — no point claiming a
+    // key for a request that's going to be rejected regardless.
+    return withIdempotency(payload, "webhook", () => sendWithRetry(payload, webhookUrl));
   },
 };
