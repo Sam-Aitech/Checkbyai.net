@@ -338,7 +338,7 @@ data/archives/
 
 ### 3.6 Performance Layer (2026-03)
 
-**DB:** `pg_trgm` GIN (`current_name`, `town_city`, `route`, `array_to_string(historical_names)`, `sponsor_changes.organisation_name`), B-tree composite `status+name/town/type`, `changes(detected_at DESC WHERE is_test=false)`, all `CONCURRENTLY`. Pool `max=10` + `statement_timeout 30s` + `idle_in_transaction 10s` for 5-10 HPA replicas on Neon pooled endpoint. Directory search uses `%` + `similarity()` ranking with ILIKE fallback. Pagination via `LIMIT/OFFSET` + `COUNT`.
+**DB:** `pg_trgm` GIN (`current_name`, `town_city`, `route`, `array_to_string(historical_names)`, `sponsor_changes.organisation_name`), B-tree composite `status+name/town/type`, `changes(detected_at DESC WHERE is_test=false)` — non-concurrent (`drizzle-kit migrate` transaction-wraps every pending migration, which rejects `CONCURRENTLY`; see migrations/README.md). Pool `max=10` + `statement_timeout 30s` + `idle_in_transaction 10s` for 5-10 HPA replicas on Neon pooled endpoint. Directory search uses `%` + `similarity()` ranking with ILIKE fallback. Pagination via `LIMIT/OFFSET` + `COUNT`.
 
 **Cache:** Redis primary + ephemeral per-pod LRU (5k/50MB/5m) read-through/write-through, survives Redis outage; Fuse.js in-memory search remains primary.
 

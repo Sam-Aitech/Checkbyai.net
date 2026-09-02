@@ -94,7 +94,7 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 
 **Database Layer & Full-Text Search**
 - `server/db.ts: max 10` (was 20), `statement_timeout 30s`, `idle_in_transaction_session_timeout 10s` — prevents pool exhaustion at 5-10 HPA replicas on Neon pooled endpoints.
-- Migration `0027_trgm_perf_indexes.sql` (CONCURRENTLY, non-blocking): `pg_trgm` extension, GIN `idx_sc_trgm_hist` on `array_to_string(historical_names)`, `idx_sc_trgm_route`, `idx_changes_trgm_org`, `idx_changes_detected_desc`, plus name/city GIN.
+- Migration `0027_trgm_perf_indexes.sql` (non-concurrent — see migrations/README.md for why `CONCURRENTLY` isn't usable under this project's `drizzle-kit migrate`): `pg_trgm` extension, GIN `idx_sc_trgm_hist` on `array_to_string(historical_names)`, `idx_sc_trgm_route`, `idx_changes_trgm_org`, `idx_changes_detected_desc`, plus name/city GIN.
 - `server/routes/sponsors.ts: /sponsors/directory` refactored from `ILIKE '%…%'` SeqScan to trigram `current_name % $q` + `similarity()` ranking with `GREATEST()` fallback to ILIKE on `42883`.
 - `server/utils/redisClient.ts`: ephemeral per-pod LRU (5k entries / 50MB / 5m TTL) as circuit-breaker when Redis down; read-through on `cacheGet`, write-through on `cacheSet`, `cacheFlushPattern` evicts both tiers. Cold restart mitigated by pg_trgm.
 - Pagination: `GET /api/sponsor-changes?page&limit` and `GET /api/sponsors/:fp/history?page&limit` with `totalPages`; legacy 500/100 defaults preserved.
@@ -110,7 +110,7 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 - `server/utils/notifIdempotency.ts`: `sha256(userId:changeId:channel:snapshotDate)` + Redis `SET NX EX 86400` + `Idempotency-Key` header.
 - `server/services/notificationChannels/*`: email/webhook/sms/whatsapp use token-bucket, jitter 1s→30s, 3 attempts, 429 detection, idempotency guard. Webhook `retry-after` respected. Email `Resend Idempotency-Key`.
 - `server/services/consolidatedNotificationEngine.ts`: batch `emails/batch` now gated by token-bucket + jitter 3×, `Idempotency-Key` per chunk, `idx_notif_log_idem` partial unique on `notif_log` (`success=true`).
-- Migration `0028_notif_idempotency.sql`: `CREATE UNIQUE INDEX CONCURRENTLY idx_notif_log_idem`.
+- Migration `0028_notif_idempotency.sql`: `CREATE UNIQUE INDEX idx_notif_log_idem` (non-concurrent, same reason as 0027).
 
 **Frontend Bundle & Virtualization**
 - `vite.config.ts`: `manualChunks` (`vendor`, `query`, `motion`, `radix`, `three`, `charts`), `chunkSizeWarningLimit 800`.

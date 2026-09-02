@@ -2,6 +2,7 @@ import { Queue, Worker, Job } from 'bullmq';
 import { logger } from '../utils/logger';
 import IORedis from 'ioredis';
 import * as Sentry from '@sentry/node';
+import type { PdfVerifyJobData } from '../workers/pdfVerifyWorker';
 
 export const SPONSOR_REFRESH_JOB = 'sponsor-refresh';
 export const SCRAPING_JOB = 'scraping-job';
@@ -21,7 +22,7 @@ const redisOpts = {
 let redisAvailable  = false;
 let sponsorQueue:  Queue | null = null;
 let notificationQueue: Queue | null = null;
-let pdfVerifyQueue: Queue | null = null;
+let pdfVerifyQueue: Queue<PdfVerifyJobData> | null = null;
 
 async function runJobWithSentryTrace<T>(
   job: Job,
@@ -77,7 +78,7 @@ export function getSponsorRefreshQueue(): Queue | null { return sponsorQueue; }
  */
 export function getNotificationQueue(): Queue | null { return notificationQueue; }
 
-export function getPdfVerifyQueue(): Queue | null { return pdfVerifyQueue; }
+export function getPdfVerifyQueue(): Queue<PdfVerifyJobData> | null { return pdfVerifyQueue; }
 
 /**
  * Probe Redis with a standalone IORedis connection, then create BullMQ
@@ -125,7 +126,7 @@ const defaultJobOptions = {
 
 sponsorQueue = new Queue(SPONSOR_REFRESH_JOB, { connection: redisOpts, defaultJobOptions });
 notificationQueue = new Queue(NOTIFICATION_JOB, { connection: redisOpts, defaultJobOptions });
-pdfVerifyQueue = new Queue(PDF_VERIFY_JOB, { connection: redisOpts, defaultJobOptions });
+pdfVerifyQueue = new Queue<PdfVerifyJobData>(PDF_VERIFY_JOB, { connection: redisOpts, defaultJobOptions });
 }
 
 /** Registers BullMQ workers. No-op if Redis was unavailable at startup. */
@@ -168,9 +169,9 @@ export function setupWorkers(): void {
     { connection: redisOpts, concurrency: 3 }
   );
 
-  new Worker(
+  new Worker<PdfVerifyJobData>(
     PDF_VERIFY_JOB,
-    async (job: Job) => {
+    async (job) => {
       return runJobWithSentryTrace(job, PDF_VERIFY_JOB, async () => {
         const { processPdfVerifyJob } = await import('../workers/pdfVerifyWorker');
         return processPdfVerifyJob(job);

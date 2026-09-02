@@ -3,12 +3,16 @@ import { logger } from "./logger";
 
 export interface BucketConfig { refillPerSecond: number; capacity: number; }
 
-export const BUCKETS: Record<string, BucketConfig> = {
+// `satisfies` (not `: Record<string, BucketConfig>`) keeps the literal key
+// union so `acquire`/`waitForBucket` can type `bucket` as `keyof typeof
+// BUCKETS` — an unregistered bucket name becomes a compile error instead of
+// silently disabling rate limiting for that call at runtime.
+export const BUCKETS = {
   resend: { refillPerSecond: 2, capacity: 10 },
   twilio: { refillPerSecond: 1, capacity: 1 },
   brevo: { refillPerSecond: 10, capacity: 20 },
   webhook: { refillPerSecond: 5, capacity: 10 },
-};
+} satisfies Record<string, BucketConfig>;
 
 const LUA = `
 local key = KEYS[1]
@@ -39,14 +43,19 @@ else
 end
 `;
 
-export async function acquire(bucket: string, keySuffix = "global", tokens = 1): Promise<{ allowed: boolean; retryAfterMs?: number }> {
+export async function acquire(bucket: keyof typeof BUCKETS, keySuffix = "global", tokens = 1): Promise<{ allowed: boolean; retryAfterMs?: number }> {
+  // bucket is typed as `keyof typeof BUCKETS` — a compile-time-checked
+  // literal union of this object's own keys, not arbitrary/user-controlled
+  // input — so this bracket access carries no prototype-pollution risk
+  // despite the rule not being able to see that type constraint.
+  // eslint-disable-next-line security/detect-object-injection
   const cfg = BUCKETS[bucket];
   if (!cfg) return { allowed: true };
   const redis = getRedis();
   if (!redis) return { allowed: true };
   const k = `bucket:${bucket}:${keySuffix}`;
   try {
-    const res = await (redis as any).eval(LUA, 1, k, cfg.capacity, cfg.refillPerSecond, Date.now()/1000, tokens);
+    const res = await redis.eval(LUA, 1, k, cfg.capacity, cfg.refillPerSecond, Date.now() / 1000, tokens);
     if (res === 1) return { allowed: true };
     const waitSec = typeof res === 'number' ? res : 1;
     return { allowed: false, retryAfterMs: Math.ceil(waitSec * 1000) };
@@ -56,7 +65,7 @@ export async function acquire(bucket: string, keySuffix = "global", tokens = 1):
   }
 }
 
-export async function waitForBucket(bucket: string, keySuffix = "global", tokens = 1, maxWaitMs = 5000): Promise<void> {
+export async function waitForBucket(bucket: keyof typeof BUCKETS, keySuffix = "global", tokens = 1, maxWaitMs = 5000): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < maxWaitMs) {
     const { allowed, retryAfterMs } = await acquire(bucket, keySuffix, tokens);

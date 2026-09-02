@@ -7,6 +7,13 @@ const LRU_MAX_ENTRIES = 5_000;
 const LRU_MAX_BYTES = 50 * 1024 * 1024;
 const LRU_TTL_MS = 300_000;
 
+/**
+ * Known internal cache-key glob prefixes. Restricting cacheFlushPattern to
+ * this closed set (rather than a bare `string`) makes "must never be
+ * user-controlled input" an enforced invariant instead of just a convention.
+ */
+export type CachePatternPrefix = "watches:*" | "sponsors:*";
+
 type LruEntry = { value: unknown; expiresAt: number; bytes: number };
 const lruStore = new Map<string, LruEntry>();
 let lruBytes = 0;
@@ -24,7 +31,16 @@ function lruGet<T>(key: string): T | null {
   return e.value as T;
 }
 
-function lruSet(key: string, value: unknown): void {
+/**
+ * @param ttlMs How long this LRU entry stays fresh. Defaults to (and is
+ * capped at) LRU_TTL_MS. Callers that know the real cache TTL (cacheSet)
+ * must pass it explicitly — without this, every entry lived for the full
+ * 5 minutes regardless of the caller's actual TTL, so on every normal Redis
+ * key expiry (not just an outage) reads could silently fall through to this
+ * LRU and serve data up to 5 minutes stale, worst for the 60s-TTL endpoints
+ * that exist specifically to reflect near-real-time changes.
+ */
+function lruSet(key: string, value: unknown, ttlMs: number = LRU_TTL_MS): void {
   const bytes = JSON.stringify(value)?.length ?? 0;
   if (bytes > LRU_MAX_BYTES) return;
   const existing = lruStore.get(key);
@@ -38,13 +54,18 @@ function lruSet(key: string, value: unknown): void {
     lruBytes -= ev.bytes;
     lruStore.delete(oldest);
   }
-  lruStore.set(key, { value, bytes, expiresAt: Date.now() + LRU_TTL_MS });
+  lruStore.set(key, { value, bytes, expiresAt: Date.now() + Math.min(ttlMs, LRU_TTL_MS) });
 }
 
-function lruFlushPattern(pattern: string): number {
+function lruFlushPattern(pattern: CachePatternPrefix): number {
+  // pattern is one of a small closed set of internal cache-key globs (see
+  // CachePatternPrefix) — never user input — so building a RegExp from it
+  // carries no ReDoS/injection risk despite the pattern not being a literal
+  // at this call site.
+  // eslint-disable-next-line security/detect-non-literal-regexp
   const re = new RegExp("^" + pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "$");
   let n = 0;
-  for (const k of [...lruStore.keys()]) {
+  for (const k of lruStore.keys()) {
     if (re.test(k)) {
       const e = lruStore.get(k)!;
       lruBytes -= e.bytes;
@@ -111,7 +132,7 @@ export async function cacheGet<T>(key: string): Promise<T | null> {
 
 /** Stores a value as JSON with a TTL in seconds. Silent no-op on error. */
 export async function cacheSet(key: string, value: unknown, ttlSeconds: number): Promise<void> {
-  lruSet(key, value);
+  lruSet(key, value, ttlSeconds * 1000);
   if (!_redis) return;
   try {
     await _redis.set(key, JSON.stringify(value), "EX", ttlSeconds);
@@ -125,7 +146,7 @@ export async function cacheSet(key: string, value: unknown, ttlSeconds: number):
  * Returns the number of keys deleted.
  * Uses SCAN (cursor-based) instead of KEYS to avoid blocking large instances.
  */
-export async function cacheFlushPattern(pattern: string): Promise<number> {
+export async function cacheFlushPattern(pattern: CachePatternPrefix): Promise<number> {
   let deleted = lruFlushPattern(pattern);
   if (!_redis) return deleted;
   try {

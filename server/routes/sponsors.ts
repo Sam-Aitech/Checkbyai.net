@@ -5,7 +5,7 @@ import { sponsorCanonical, sponsorChanges, companyWatches, sponsorWatches, daily
 import { z } from "zod";
 import { isAuthenticated } from "../auth";
 import { requireRole } from "../middleware/roleGuard";
-import { getWatchLimit as getWatchLimitFromTier, getTierConfig, resolveTier } from "../utils/tierConfig";
+import { getWatchLimit as getWatchLimitFromTier, resolveTier } from "../utils/tierConfig";
 import { normalizeName, generateFingerprint, namePrefilterToken, SQL_COMPARABLE_CHAR_CLASS } from "../utils/sponsorListFetcher";
 import { ensureIndexReady, isIndexReady, searchSponsors, searchSponsorsFallback, searchRevokedSponsors, getIndexHealth, type PagedSearchResult } from "../utils/sponsorSearch";
 import { recordSearchRequest } from "../services/monitoringService";
@@ -165,8 +165,8 @@ export function registerSponsorRoutes(app: Express): void {
     const statusParam = (req.query.status as string || "").toUpperCase();
     const status = VALID_STATUSES.includes(statusParam) ? statusParam : undefined;
     const town = (req.query.town as string || "").trim() || undefined;
-    const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
+    const page = Math.max(1, Number.parseInt(req.query.page as string) || 1);
+    const limit = Math.min(50, Math.max(1, Number.parseInt(req.query.limit as string) || 20));
 
     const opts = { status, town, page, limit };
 
@@ -562,8 +562,8 @@ export function registerSponsorRoutes(app: Express): void {
     if (!fingerprint || typeof fingerprint !== 'string') {
       throw new ApiError(400, "Fingerprint is required.");
     }
-    const page = Math.max(1, parseInt(req.query.page as string || "1", 10) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string || "50", 10) || 50));
+    const page = Math.max(1, Number.parseInt(req.query.page as string || "1", 10) || 1);
+    const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit as string || "50", 10) || 50));
     const offset = (page - 1) * limit;
 
     const canonical = await db
@@ -926,7 +926,7 @@ export function registerSponsorRoutes(app: Express): void {
   }));
 
   app.delete('/api/watches/:id', isAuthenticated, asyncHandler(async (req: any, res) => {
-    const watchId = parseInt(req.params.id, 10);
+    const watchId = Number.parseInt(req.params.id, 10);
     if (isNaN(watchId)) {
       throw new ApiError(400, "Invalid watch ID.");
     }
@@ -958,7 +958,7 @@ export function registerSponsorRoutes(app: Express): void {
   }));
 
   app.patch('/api/watches/:id/reactivate', isAuthenticated, asyncHandler(async (req: any, res) => {
-    const watchId = parseInt(req.params.id, 10);
+    const watchId = Number.parseInt(req.params.id, 10);
     if (isNaN(watchId)) {
       throw new ApiError(400, "Invalid watch ID.");
     }
@@ -999,8 +999,8 @@ export function registerSponsorRoutes(app: Express): void {
     const pageParam = req.query.page as string | undefined;
     const limitParam = req.query.limit as string | undefined;
     const hasPagination = pageParam !== undefined || limitParam !== undefined;
-    const page = Math.max(1, parseInt(pageParam || "1", 10) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(limitParam || "50", 10) || 50));
+    const page = Math.max(1, Number.parseInt(pageParam || "1", 10) || 1);
+    const limit = Math.min(100, Math.max(1, Number.parseInt(limitParam || "50", 10) || 50));
     const offset = (page - 1) * limit;
 
     const cacheKey = hasPagination ? `sponsors:changes:p:${page}:l:${limit}` : "sponsors:changes";

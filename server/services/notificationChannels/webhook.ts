@@ -3,7 +3,7 @@ import type { NotificationChannel, ChannelPayload, SendResult } from "./types";
 import { logger } from "../../utils/logger";
 import { jitterDelay, parseRetryAfter } from "../../utils/jitterRetry";
 import { waitForBucket } from "../../utils/tokenBucket";
-import { getRedis } from "../../utils/redisClient";
+import { buildIdempotencyKey, claimIdempotency, releaseIdempotency } from "../../utils/notifIdempotency";
 
 const log = logger.child({ module: "Channel:Webhook" });
 
@@ -99,18 +99,22 @@ export const webhookChannel: NotificationChannel = {
       log.warn({ webhookUrl }, "Webhook delivery blocked — internal/private host");
       return { success: false, error: "Webhook URL targets a disallowed (internal/private) host" };
     }
-    const snap = payload.snapshotDate || new Date().toISOString().slice(0,10);
-    const key = `${payload.userId}:${payload.changeId ?? 0}:webhook:${snap}`;
-    const idem = crypto.createHash("sha256").update(key).digest("hex").slice(0,32);
-    const r = getRedis();
-    if (r) { try{ if(await r.get(`idem:notif:${idem}`)) return { success: true, providerMessageId: `idem:${idem}` }; }catch{} }
+    const snap = payload.snapshotDate || new Date().toISOString().slice(0, 10);
+    const idem = payload.userId && payload.changeId
+      ? buildIdempotencyKey(payload.userId, payload.changeId, "webhook", snap)
+      : null;
+    // Atomic claim, not a GET-then-SET: two concurrent invocations of the
+    // same notification can't both pass this check before either writes.
+    if (idem && !(await claimIdempotency(idem))) {
+      return { success: true, providerMessageId: `idem:${idem}` };
+    }
     const bodyJson = JSON.stringify(buildBody(payload));
     const headers = buildHeaders(bodyJson);
     let lastError: string | undefined;
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       try {
         const result = await attemptDelivery(webhookUrl, bodyJson, headers);
-        if (result.success) { if(r) try{ await r.set(`idem:notif:${idem}`,"1","EX",86400); }catch{} return result; }
+        if (result.success) return result;
         lastError = result.error;
         log.warn({ webhookUrl, attempt, error: lastError }, "Webhook delivery failed");
       } catch (err: unknown) {
@@ -119,6 +123,7 @@ export const webhookChannel: NotificationChannel = {
       }
       if (attempt < MAX_ATTEMPTS - 1) await new Promise(rr => setTimeout(rr, jitterDelay(attempt, 1000, 30000)));
     }
+    if (idem) await releaseIdempotency(idem);
     return { success: false, error: `Webhook delivery failed after ${MAX_ATTEMPTS} attempts: ${lastError}` };
   },
 };

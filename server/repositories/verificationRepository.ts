@@ -48,6 +48,30 @@ export class VerificationRepository {
     return result;
   }
 
+  /**
+   * Fallback lookup for GET /verify/status/:jobId once BullMQ has evicted
+   * the job record (removeOnComplete/removeOnFail). The BullMQ jobId is
+   * `verify-${documentHash.slice(0,16)}-${userId}` — a different format
+   * from `receiptId` (`CBA-XXXXXXXX-XXXXXXXX`), so looking it up via
+   * getVerificationByReceiptId() never matches; that bug made a completed
+   * verification permanently report "not_found" once its job aged out.
+   * Matches on the documentHash prefix + userId instead, taking the most
+   * recent verification if the same document was checked more than once.
+   */
+  async getVerificationByDocHashPrefixAndUser(documentHashPrefix: string, userId: string): Promise<VerificationResult | undefined> {
+    const [result] = await db
+      .select()
+      .from(verificationResults)
+      .where(and(
+        sql`${verificationResults.documentHash} LIKE ${documentHashPrefix + '%'}`,
+        eq(verificationResults.userId, userId),
+        isNull(verificationResults.deletedAt),
+      ))
+      .orderBy(desc(verificationResults.verifiedAt))
+      .limit(1);
+    return result;
+  }
+
   async getAdminFlaggedVerificationByHash(documentHash: string): Promise<VerificationResult | undefined> {
     const [result] = await db
       .select()

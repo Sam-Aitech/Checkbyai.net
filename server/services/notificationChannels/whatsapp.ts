@@ -1,10 +1,9 @@
-import crypto from "node:crypto";
 import type { NotificationChannel, ChannelPayload, SendResult } from "./types";
 import { sendWhatsApp } from "../messaging";
 import { logger } from "../../utils/logger";
 import { jitterDelay } from "../../utils/jitterRetry";
 import { waitForBucket } from "../../utils/tokenBucket";
-import { getRedis } from "../../utils/redisClient";
+import { buildIdempotencyKey, claimIdempotency, releaseIdempotency } from "../../utils/notifIdempotency";
 
 const log = logger.child({ module: "Channel:WhatsApp" });
 
@@ -44,23 +43,39 @@ function getLabel(changeType: string, prev?: string | null, next?: string | null
 export const whatsAppChannel: NotificationChannel = {
   name: "whatsapp",
   async send(payload: ChannelPayload): Promise<SendResult> {
-    const snap = payload.snapshotDate || new Date().toISOString().slice(0,10);
-    const key = `${payload.userId}:${payload.changeId ?? 0}:whatsapp:${snap}`;
-    const idem = crypto.createHash("sha256").update(key).digest("hex").slice(0,32);
-    const r = getRedis(); if(r){ try{ if(await r.get(`idem:notif:${idem}`)) return { success: true, providerMessageId: `idem:${idem}` }; }catch{} }
+    const snap = payload.snapshotDate || new Date().toISOString().slice(0, 10);
+    const idem = payload.userId && payload.changeId
+      ? buildIdempotencyKey(payload.userId, payload.changeId, "whatsapp", snap)
+      : null;
+    // Atomic claim, not a GET-then-SET: two concurrent invocations of the
+    // same notification can't both pass this check before either writes.
+    if (idem && !(await claimIdempotency(idem))) {
+      return { success: true, providerMessageId: `idem:${idem}` };
+    }
     const from = process.env.TWILIO_WHATSAPP_NUMBER || "global";
     const message = buildMessage(payload);
-    for(let attempt=0; attempt<3; attempt++){
+    for (let attempt = 0; attempt < 3; attempt++) {
       await waitForBucket("twilio", from);
-      try{
+      try {
         const result = await sendWhatsApp(payload.recipient, message);
-        if(result.success){ if(r) try{ await r.set(`idem:notif:${idem}`,"1","EX",86400);}catch{} return result; }
+        if (result.success) return result;
         const is429 = result.error?.includes("429") || result.error?.includes("rate");
-        if(!is429 || attempt===2) return result;
+        if (!is429 || attempt === 2) {
+          if (idem) await releaseIdempotency(idem);
+          return result;
+        }
         log.warn({ error: result.error, attempt }, "WhatsApp retrying");
-      }catch(err:unknown){ const m=err instanceof Error?err.message:String(err); if(attempt===2) return { success:false, error:m }; log.warn({ err:m, attempt }, "WhatsApp threw retrying"); }
-      await new Promise(rr=>setTimeout(rr, jitterDelay(attempt,1000,30000)));
+      } catch (err: unknown) {
+        const m = err instanceof Error ? err.message : String(err);
+        if (attempt === 2) {
+          if (idem) await releaseIdempotency(idem);
+          return { success: false, error: m };
+        }
+        log.warn({ err: m, attempt }, "WhatsApp threw retrying");
+      }
+      await new Promise((rr) => setTimeout(rr, jitterDelay(attempt, 1000, 30000)));
     }
-    return { success:false, error:"WhatsApp exhausted retries" };
+    if (idem) await releaseIdempotency(idem);
+    return { success: false, error: "WhatsApp exhausted retries" };
   },
 };

@@ -1,5 +1,5 @@
-import * as fs from "fs";
-import * as path from "path";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import type { Job } from "bullmq";
 import { db } from "../db";
 import { sql, eq } from "drizzle-orm";
@@ -152,8 +152,21 @@ export async function processPdfVerifyJob(job: Job<PdfVerifyJobData>): Promise<{
     const payload = { verificationId, receiptId, documentHash, result, confidence: analysis.confidence, isAdminOverride };
     try { emitToUser(userId, "VERIFICATION_COMPLETE", payload); } catch {}
     try { emitToUser(userId, "VERIFICATION_PROGRESS", { jobId: job.id, progress: 100, status: "completed", ...payload }); } catch {}
-    return { verificationId, receiptId, result };
-  } finally {
+    // Success: this attempt is the job's only run, always clean up.
     await fs.promises.unlink(filePath).catch(() => {});
+    return { verificationId, receiptId, result };
+  } catch (err) {
+    // Only unlink when this was the job's last allowed attempt. BullMQ's
+    // `attempts: 3` config (jobQueue.ts, verification.ts) exists to retry
+    // transient failures — deleting the temp file unconditionally in a
+    // `finally` here meant every retry after attempt 1 failed instantly with
+    // ENOENT instead of actually retrying, and the client's error surfaced a
+    // misleading "file not found" instead of the real failure reason.
+    const maxAttempts = job.opts.attempts ?? 1;
+    const isLastAttempt = job.attemptsMade + 1 >= maxAttempts;
+    if (isLastAttempt) {
+      await fs.promises.unlink(filePath).catch(() => {});
+    }
+    throw err;
   }
 }

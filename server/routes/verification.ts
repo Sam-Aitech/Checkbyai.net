@@ -78,17 +78,32 @@ export function registerVerificationRoutes(app: Express): void {
   app.get('/api/verify/status/:jobId', isAuthenticated, asyncHandler(async (req: any, res) => {
     const { jobId } = req.params;
     if (!jobId) throw new ApiError(400, "jobId required");
+    // jobId is `verify-${documentHash.slice(0,16)}-${userId}-${nonce}`, not a
+    // receiptId (`CBA-XXXXXXXX-XXXXXXXX`) — the fallback lookups below (used
+    // once BullMQ evicts the job record via removeOnComplete/removeOnFail)
+    // must match on that format, not storage.getVerificationByReceiptId(),
+    // which never matches a jobId and made a genuinely completed
+    // verification permanently report "not_found" once its job aged out.
+    // Greedy `.+` for userId (not `.+?`) so a userId containing its own
+    // hyphens (e.g. a UUID) is captured whole — it backtracks only enough to
+    // satisfy the required trailing `-<8 hex>` nonce.
+    const jobIdMatch = /^verify-([0-9a-f]{16})-(.+)-[0-9a-f]{8}$/.exec(jobId);
+    const lookupFallback = async () => {
+      if (!jobIdMatch) return null;
+      const [, hashPrefix, userId] = jobIdMatch;
+      return storage.getVerificationByDocHashPrefixAndUser(hashPrefix, userId).catch(() => null);
+    };
     const queue = getPdfVerifyQueue();
     if (!queue) {
-      const v = await storage.getVerificationByReceiptId(jobId).catch(() => null);
+      const v = await lookupFallback();
       if (v) success(res, { status: "completed", progress: 100, verificationId: v.id, receiptId: v.receiptId, result: v.result });
       else success(res, { status: "not_found" });
       return;
     }
     const job = await queue.getJob(jobId);
     if (!job) {
-      const byReceipt = await storage.getVerificationByReceiptId(jobId).catch(() => null);
-      if (byReceipt) success(res, { status: "completed", progress: 100, verificationId: byReceipt.id, receiptId: byReceipt.receiptId, result: byReceipt.result });
+      const byHash = await lookupFallback();
+      if (byHash) success(res, { status: "completed", progress: 100, verificationId: byHash.id, receiptId: byHash.receiptId, result: byHash.result });
       else success(res, { status: "not_found" });
       return;
     }
@@ -137,7 +152,12 @@ export function registerVerificationRoutes(app: Express): void {
       throw new ApiError(400, "Uploaded file is not a valid PDF.");
     }
 
-    let userId: string | undefined = betaUserId;
+    // Always defined: the isAuthenticated() check above throws before this
+    // point otherwise. Typed as `string` (not `string | undefined`) so
+    // Queue<PdfVerifyJobData>.add() below — PdfVerifyJobData.userId is
+    // required — actually enforces that at compile time instead of silently
+    // accepting an unchecked possibly-undefined value.
+    const userId: string = betaUserId;
 
     if (!betaUser.ipExempt && !isAdminUser) {
       const clientIp = getClientIp(req);
@@ -191,6 +211,7 @@ export function registerVerificationRoutes(app: Express): void {
     let isAdminOverride = false;
     let adminOverrideStatus: 'fake' | 'approved' | null = null;
     let adminOverrideSource: typeof priorAdminFlag | typeof priorAdminApproval;
+    let enqueueFailed = false;
 
     if (priorAdminFlag) {
       isAdminOverride = true;
@@ -212,7 +233,13 @@ export function registerVerificationRoutes(app: Express): void {
       const pdfQueue = getPdfVerifyQueue();
       const shouldQueue = isQueueAvailable() && !!pdfQueue && !isAdminOverride;
       if (shouldQueue) {
-        const jobId = `verify-${documentHash.slice(0,16)}-${userId}`;
+        // Nonce'd, not just `verify-${hash}-${userId}`: a deterministic id
+        // meant a re-upload of the same document while a prior job for it
+        // was still queued/active, or had failed and was kept around (up to
+        // 7 days via removeOnFail), silently returned that stale job instead
+        // of processing the new upload — and the new upload's temp file was
+        // never referenced by any job, so it leaked.
+        const jobId = `verify-${documentHash.slice(0, 16)}-${userId}-${crypto.randomBytes(4).toString('hex')}`;
         try {
           const job = await pdfQueue!.add('verify', {
             userId, filePath: safeFilePath, originalname: req.file!.originalname, documentHash, receiptId, ipAddress: req.ip ?? null, useCredits, useDailyLimit
@@ -228,6 +255,16 @@ export function registerVerificationRoutes(app: Express): void {
           return;
         } catch (e) {
           logger.warn({ err: e }, "[Verify] queue add failed, falling back to inline");
+          // The gate below must know this specific enqueue attempt failed —
+          // isQueueAvailable() only reflects Redis's boot-time reachability,
+          // not whether *this* .add() call threw. Without this flag, a
+          // transient enqueue failure (Redis otherwise healthy) fell through
+          // to inline analysis, then skipped persistence entirely because
+          // the gate saw Redis as available and assumed the job was queued —
+          // the computed result and any credit/daily-limit deduction were
+          // silently discarded, and the response claimed `queued: true` for
+          // a job that was never actually queued.
+          enqueueFailed = true;
         }
       }
       const pdfAnalyzer = new PDFAnalyzer();
@@ -265,7 +302,7 @@ export function registerVerificationRoutes(app: Express): void {
       };
     }
 
-    if (isAdminOverride || !isQueueAvailable() || !getPdfVerifyQueue()) {
+    if (isAdminOverride || enqueueFailed || !isQueueAvailable() || !getPdfVerifyQueue()) {
       const verificationId = await withRetry(() => db.transaction(async (tx) => {
         if (useCredits && userId) {
           await tx.update(users).set({ credits: sql`GREATEST(COALESCE(${users.credits}, 0) - 1, 0)`, updatedAt: new Date() }).where(eq(users.id, userId));

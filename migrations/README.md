@@ -41,3 +41,17 @@ CREATE TABLE IF NOT EXISTS "drizzle"."__drizzle_migrations" (
 
 This has not been run against production — it needs a deploy-time decision
 and DB credentials this session did not have.
+
+## CREATE INDEX CONCURRENTLY is not usable here
+
+`npm run db:migrate` (`drizzle-kit migrate`) wraps every pending migration's
+statements in one `session.transaction(...)` — confirmed against
+`node_modules/drizzle-orm/pg-core/dialect.js`'s `migrate()`. PostgreSQL
+rejects `CREATE INDEX CONCURRENTLY` inside a transaction block outright, so
+any migration file using it will abort the entire pending batch, not just
+itself. `0027_trgm_perf_indexes.sql` and `0028_notif_idempotency.sql` were
+written non-concurrently for this reason — each takes a brief write lock on
+its target table while building. If a future migration genuinely needs a
+non-blocking concurrent index build on a hot table, it must be applied
+outside `db:migrate` entirely (a one-off script against a fresh, non-pooled,
+non-transactional connection), not added to this journal.
