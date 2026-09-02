@@ -1,28 +1,11 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { STALE_TIMES } from "@/lib/queryDefaults";
 import { motion } from "framer-motion";
 import { useInView } from "react-intersection-observer";
 import { ArrowRight, Bell } from "lucide-react";
 import { ShieldMonitorIcon, AlertBellIcon, TripleChannelIcon } from "@/components/icons/CheckByAIIcons";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-
-interface DigestData {
-  available: boolean;
-  type: "overview" | "daily";
-  date: string;
-  headline: string;
-  emotion: string;
-  focus: string;
-  counts: {
-    added: number;
-    updated: number;
-    removed: number;
-  };
-  activeSponsors: number;
-  signature: string;
-}
+import { useDailyDigest } from "@/hooks/useDailyDigest";
 
 function AnimatedCounter({ value, label, icon, color, large }: { value: number; label: string; icon: React.ReactNode; color: string; large?: boolean }) {
   const [ref, inView] = useInView({ triggerOnce: true, threshold: 0.3 });
@@ -87,12 +70,7 @@ function AnimatedCounter({ value, label, icon, color, large }: { value: number; 
 }
 
 export default function LandingDigest() {
-  const { data, isLoading } = useQuery<DigestData>({
-    queryKey: ["/api/daily-digest/current"],
-    staleTime: STALE_TIMES.NORMAL,
-    refetchInterval: STALE_TIMES.INFREQUENT,
-    refetchOnWindowFocus: true,
-  });
+  const { data, isLoading, counts } = useDailyDigest();
 
   const [ref, inView] = useInView({ triggerOnce: true, threshold: 0.1 });
 
@@ -117,7 +95,7 @@ export default function LandingDigest() {
 
   if (!data?.available) return null;
 
-  const { headline, emotion, counts, date, type, activeSponsors } = data;
+  const { headline = "", emotion = "neutral", date, type, activeSponsors } = data;
   const total = counts.added + counts.updated + counts.removed;
   const hasChanges = type === "daily";
   const formattedDate = new Date(date + "T00:00:00").toLocaleDateString("en-GB", {
@@ -230,12 +208,12 @@ export default function LandingDigest() {
             <Link href="/pricing">
               <Button className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-full px-6 font-bold gap-2">
                 <Bell className="w-4 h-4" />
-                Get Instant Alerts
+                Get Alerts
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </Link>
             <p className="text-xs text-muted-foreground">
-              Know within minutes when your sponsor's licence changes
+              Get notified when your sponsor's licence changes
             </p>
           </div>
         </motion.div>

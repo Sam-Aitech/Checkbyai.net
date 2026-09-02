@@ -29,10 +29,29 @@ import SEOHead from "@/components/SEOHead";
 import LandingDigest from "@/components/LandingDigest";
 import { STALE_TIMES } from "@/lib/queryDefaults";
 import { useAuth } from "@/hooks/useAuth";
+import { useDailyDigest } from "@/hooks/useDailyDigest";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CompanyIntelligenceDialog } from "@/components/CompanyIntelligencePanel";
 import AlertAddOnModal from "@/components/AlertAddOnModal";
+import {
+  type PlanTier,
+  resolveTier,
+  getWatchLimit,
+  isChannelAllowed,
+  ALERT_TIMING_COPY,
+  ALERT_TIMING_SHORT,
+} from "@shared/planTiers";
+
+function pluralize(count: number, singular: string, plural: string = `${singular}s`): string {
+  return count === 1 ? singular : plural;
+}
+
+// getWatchLimit returns -1 for unlimited tiers; that must never compare as "at limit".
+function isAtWatchLimit(activeCount: number, subscriptionStatus: string | null | undefined): boolean {
+  const limit = getWatchLimit(subscriptionStatus);
+  return limit !== -1 && activeCount >= limit;
+}
 
 // Decode a base64url VAPID public key into the Uint8Array that
 // PushManager.subscribe expects as applicationServerKey.
@@ -115,14 +134,6 @@ interface CompanyHistoryData {
   lastSeen: string;
   historicalNames: string[];
   history: HistoryEvent[];
-}
-
-interface DigestSummary {
-  available: boolean;
-  type: "overview" | "daily";
-  date: string;
-  counts: { added: number; updated: number; removed: number };
-  activeSponsors: number;
 }
 
 function useDebounce<T>(value: T, delay: number): T {
@@ -443,19 +454,16 @@ function CompanyHistoryDialog({ fingerprint, companyName, open, onOpenChange, is
 
 function StickyAlertBanner() {
   const [dismissed, setDismissed] = useState(false);
-  const { data } = useQuery<DigestSummary>({
-    queryKey: ["/api/daily-digest/current"],
-    staleTime: STALE_TIMES.NORMAL,
-    refetchOnWindowFocus: true,
-  });
+  const { data, counts } = useDailyDigest();
 
   if (dismissed) return null;
-  if (!data?.available || !data.counts || data.counts.removed === 0) return null;
+  if (!data?.available || counts.removed === 0) return null;
 
   const dateLabel = data.date
     ? new Date(data.date + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
     : null;
-  const count = data.counts.removed;
+  const count = counts.removed;
+  const licenceWord = pluralize(count, "licence");
 
   return (
     <div className="bg-red-700 text-white relative">
@@ -463,7 +471,7 @@ function StickyAlertBanner() {
         <Activity className="w-4 h-4 shrink-0 animate-pulse" />
         <p className="text-xs sm:text-sm font-medium">
           <span className="font-bold">URGENT:</span>{" "}
-          {count} sponsor licence{count !== 1 ? "s" : ""} revoked{dateLabel ? ` on ${dateLabel}` : " in the last check"}. Subscribe to get instant alerts.
+          {`${count} sponsor ${licenceWord} revoked${dateLabel ? ` on ${dateLabel}` : " in the last check"}. Subscribe to get alerted.`}
         </p>
         <button onClick={() => setDismissed(true)} className="hidden sm:flex absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-white/10 rounded transition-colors" aria-label="Close banner">
           <X className="w-4 h-4" />
@@ -506,11 +514,7 @@ function HeroSection({ onScrollToSearch }: { onScrollToSearch: () => void }) {
 }
 
 function ProofBar() {
-  const { data, isLoading } = useQuery<DigestSummary>({
-    queryKey: ["/api/daily-digest/current"],
-    staleTime: STALE_TIMES.NORMAL,
-    refetchOnWindowFocus: true,
-  });
+  const { data, isLoading, counts } = useDailyDigest();
 
   const formattedDate = data?.date
     ? new Date(data.date + "T00:00:00").toLocaleDateString("en-GB", {
@@ -521,8 +525,8 @@ function ProofBar() {
     : null;
 
   const changesText = (() => {
-    if (!data?.available || !data.counts) return null;
-    const { removed, updated, added } = data.counts;
+    if (!data?.available) return null;
+    const { removed, updated, added } = counts;
     const parts: string[] = [];
     if (removed > 0) parts.push(`${removed} revoked`);
     if (updated > 0) parts.push(`${updated} updated`);
@@ -613,8 +617,8 @@ function ManualVsAutomated() {
               </div>
               <ul className="space-y-3 text-sm text-muted-foreground">
                 <li className="flex items-start gap-2"><CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />Add company to watchlist</li>
-                <li className="flex items-start gap-2"><CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />We check every midnight</li>
-                <li className="flex items-start gap-2"><CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />WhatsApp alert at 00:35 if revoked</li>
+                <li className="flex items-start gap-2"><CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />We check the register every weeknight (~00:30 UTC)</li>
+                <li className="flex items-start gap-2"><CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />Alert sent instantly on Pro, or by 18:00 same-day on Starter</li>
                 <li className="flex items-start gap-2"><CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />Take action before letter arrives</li>
               </ul>
               <div className="mt-5 p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg border border-emerald-200 dark:border-emerald-800">
@@ -644,7 +648,7 @@ function FeatureBlocks() {
               <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-4"><Timer className="w-5 h-5 text-red-600" /></div>
               <h3 className="text-lg font-bold text-foreground mb-2">The 12-Hour Advantage</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                When a licence is revoked, the register updates at 00:00. Letters are posted the next morning. Our WhatsApp alert hits your phone at 00:30. You have half a day to pivot before your employer even knows.
+                When a licence is revoked, we check the register at ~00:30 UTC. Letters are posted the next morning. Pro subscribers get a WhatsApp alert by 07:00 UTC. You have hours to pivot before your employer even knows.
               </p>
             </CardContent>
           </Card>
@@ -720,7 +724,7 @@ function SocialProof() {
               </div>
               <div>
                 <blockquote className="text-foreground text-sm sm:text-base italic leading-relaxed mb-3">
-                  "I got the alert at midnight. My employer got the suspension email at 9 AM. I had already applied for a new job. That subscription saved my 5-year UK career."
+                  "I got the alert just after midnight. My employer got the suspension email at 9 AM. I had already applied for a new job. That subscription saved my 5-year UK career."
                 </blockquote>
                 <p className="text-xs text-muted-foreground font-medium">Rahul K., Skilled Worker Visa Holder</p>
               </div>
@@ -732,8 +736,34 @@ function SocialProof() {
   );
 }
 
-function PricingSection() {
+const TIER_RANK: Record<PlanTier, number> = { free: 0, starter: 1, pro: 2, unlimited: 3, enterprise: 4 };
+
+function PlanCardAction({
+  cardTier, userTier, isAuthenticated, onUpgrade, upgradeLabel, upgradeIcon,
+}: {
+  cardTier: PlanTier;
+  userTier: PlanTier;
+  isAuthenticated: boolean;
+  onUpgrade: () => void;
+  upgradeLabel: string;
+  upgradeIcon?: React.ReactNode;
+}) {
+  if (isAuthenticated && userTier === cardTier) {
+    return <Button variant="outline" disabled className="w-full opacity-60">Current Plan</Button>;
+  }
+  if (isAuthenticated && TIER_RANK[userTier] > TIER_RANK[cardTier]) {
+    return <Button variant="outline" disabled className="w-full opacity-60">Included in your plan</Button>;
+  }
+  return (
+    <Button onClick={onUpgrade} className="w-full font-bold py-5 text-base">
+      {upgradeIcon}{upgradeLabel}
+    </Button>
+  );
+}
+
+function PricingSection({ isAuthenticated, tier }: { isAuthenticated: boolean; tier: PlanTier }) {
   const [, setLocation] = useLocation();
+  const goToPricing = () => setLocation("/pricing");
   return (
     <section className="py-16 sm:py-20" id="pricing-section">
       <div className="max-w-4xl mx-auto px-4">
@@ -752,7 +782,11 @@ function PricingSection() {
                 <li className="flex items-center gap-2 text-muted-foreground/60"><Lock className="w-4 h-4 text-slate-300 dark:text-slate-600" /><span className="line-through">No history</span></li>
                 <li className="flex items-center gap-2 text-muted-foreground/60"><Lock className="w-4 h-4 text-slate-300 dark:text-slate-600" /><span className="line-through">No monitoring</span></li>
               </ul>
-              <Button variant="outline" disabled className="w-full opacity-60">Current Plan</Button>
+              {isAuthenticated && tier === "free" ? (
+                <Button variant="outline" disabled className="w-full opacity-60">Current Plan</Button>
+              ) : (
+                <Button variant="outline" disabled className="w-full opacity-60">{isAuthenticated ? "Included in your plan" : "Free — no signup required"}</Button>
+              )}
             </CardContent>
           </Card>
 
@@ -771,11 +805,16 @@ function PricingSection() {
                 <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />Monitor 2 companies</li>
                 <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />Email + WhatsApp alerts</li>
                 <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />30-day history</li>
-                <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />Same-day alerts (6 PM)</li>
+                <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />{ALERT_TIMING_SHORT.starter}</li>
               </ul>
-              <Button onClick={() => setLocation("/pricing")} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-5 text-base shadow-md">
-                <Zap className="w-4 h-4 mr-2" />Get Instant Alerts
-              </Button>
+              <PlanCardAction
+                cardTier="starter"
+                userTier={tier}
+                isAuthenticated={isAuthenticated}
+                onUpgrade={goToPricing}
+                upgradeLabel="Get Instant Alerts"
+                upgradeIcon={<Zap className="w-4 h-4 mr-2" />}
+              />
             </CardContent>
           </Card>
 
@@ -791,11 +830,15 @@ function PricingSection() {
                 <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />Monitor 5 companies</li>
                 <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />Email + WhatsApp + SMS</li>
                 <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />90-day history</li>
-                <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />Immediate alerts</li>
+                <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />{ALERT_TIMING_SHORT.pro}</li>
               </ul>
-              <Button onClick={() => setLocation("/pricing")} variant="outline" className="w-full font-bold py-5 text-base">
-                Get Pro Protection
-              </Button>
+              <PlanCardAction
+                cardTier="pro"
+                userTier={tier}
+                isAuthenticated={isAuthenticated}
+                onUpgrade={goToPricing}
+                upgradeLabel="Get Pro Protection"
+              />
             </CardContent>
           </Card>
         </div>
@@ -921,9 +964,12 @@ export default function SponsorMonitor() {
   const [alertAddOnCompany, setAlertAddOnCompany] = useState<string>("");
   const searchRef = useRef<HTMLDivElement>(null);
 
-  const userPlan = user?.subscriptionStatus || "free";
-  const isFreeUser = !isAuthenticated || userPlan === "free" || !userPlan;
-  const isProUser = isAuthenticated && (userPlan === "pro" || userPlan === "unlimited" || userPlan === "enterprise");
+  const tier: PlanTier = resolveTier(user?.subscriptionStatus);
+  // While the auth query is still in flight, don't default to "free" — that
+  // window is exactly when a real paid user can flash as free (and vice
+  // versa). Both flags stay false until auth has definitively resolved.
+  const isFreeUser = !authLoading && (!isAuthenticated || tier === "free");
+  const isProUser = !authLoading && isAuthenticated && (tier === "pro" || tier === "unlimited" || tier === "enterprise");
   const shouldSearch = debouncedQuery.trim().length >= 3;
   const [freeSearchResults, setFreeSearchResults] = useState<SponsorSearchResult[]>([]);
   const [freeSearchLoading, setFreeSearchLoading] = useState(false);
@@ -1082,7 +1128,7 @@ export default function SponsorMonitor() {
     <PageLayout darkNav>
       <SEOHead
         title="Is Your Employer's Sponsor Licence Still Valid? | Free Check | CheckByAI"
-        description="Check any UK employer's sponsor licence status for free. Get instant alerts if it's revoked, suspended or downgraded, before it affects your visa."
+        description="Check any UK employer's sponsor licence status for free. Get alerted if it's revoked, suspended or downgraded, before it affects your visa."
         canonicalUrl="https://checkbyai.net/sponsor-monitor"
         ogTitle="Is Your Employer's Sponsor Licence Still Valid? | Free Check | CheckByAI"
         ogDescription="Check any UK employer's sponsor licence status for free. Get instant alerts if it's revoked, suspended or downgraded, before it affects your visa."
@@ -1096,7 +1142,7 @@ export default function SponsorMonitor() {
             {
               "@type": "WebApplication",
               "name": "UK Sponsor Licence Monitor",
-              "description": "Search and monitor the UK Home Office Register of Licensed Sponsors. Get instant alerts when sponsor licences are revoked.",
+              "description": "Search and monitor the UK Home Office Register of Licensed Sponsors. Get alerted when sponsor licences are revoked.",
               "url": "https://checkbyai.net/sponsor-monitor",
               "applicationCategory": "BusinessApplication",
               "operatingSystem": "Web",
@@ -1114,7 +1160,7 @@ export default function SponsorMonitor() {
                 {
                   "@type": "Question",
                   "name": "What does it mean if a sponsor licence is revoked?",
-                  "acceptedAnswer": { "@type": "Answer", "text": "If your employer's sponsor licence is revoked by the Home Office, your visa may be curtailed. You typically have 60 days to find a new sponsor or make alternative arrangements. CheckByAI sends instant alerts so you can act immediately." }
+                  "acceptedAnswer": { "@type": "Answer", "text": "If your employer's sponsor licence is revoked by the Home Office, your visa may be curtailed. You typically have 60 days to find a new sponsor or make alternative arrangements. CheckByAI sends alerts so you can act quickly." }
                 },
                 {
                   "@type": "Question",
@@ -1141,8 +1187,10 @@ export default function SponsorMonitor() {
           </div>
 
           <div className="relative mb-2">
+            <Label htmlFor="sponsor-search-input" className="sr-only">Search for a company on the UK sponsor register</Label>
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
             <Input
+              id="sponsor-search-input"
               type="text"
               placeholder="e.g., 'Deloitte' or your employer name..."
               value={searchQuery}
@@ -1287,7 +1335,7 @@ export default function SponsorMonitor() {
                             result={result}
                             isAuthenticated={isAuthenticated}
                             isFreeUser={isFreeUser}
-                            isAtWatchLimit={activeWatches.length >= 1}
+                            isAtWatchLimit={isAtWatchLimit(activeWatches.length, user?.subscriptionStatus)}
                             isAdded={isAdded}
                             isAdding={isAdding}
                             onAddWatch={handleAddWatch}
@@ -1307,7 +1355,7 @@ export default function SponsorMonitor() {
       <ManualVsAutomated />
       <FeatureBlocks />
       <SocialProof />
-      <PricingSection />
+      <PricingSection isAuthenticated={isAuthenticated} tier={tier} />
       <FAQSection />
 
       {isAuthenticated && (
@@ -1316,7 +1364,7 @@ export default function SponsorMonitor() {
             <div className="flex items-center gap-3 mb-6">
               <Shield className="w-5 h-5 text-primary" />
               <h2 className="text-xl font-bold text-foreground">Your Watchlist</h2>
-              {activeWatches.length > 0 && <Badge variant="secondary" className="text-xs">{activeWatches.length} compan{activeWatches.length === 1 ? "y" : "ies"}</Badge>}
+              {activeWatches.length > 0 && <Badge variant="secondary" className="text-xs">{`${activeWatches.length} ${pluralize(activeWatches.length, "company", "companies")}`}</Badge>}
             </div>
 
             {isFreeUser && (
@@ -1350,22 +1398,13 @@ export default function SponsorMonitor() {
                 </div>
                 <h3 className="text-2xl font-bold text-foreground mb-3">Your Watchlist is Empty</h3>
                 <p className="text-muted-foreground max-w-md mx-auto mb-8 leading-relaxed">
-                  {isFreeUser 
-                    ? "Don't get caught off guard by a sudden visa revocation. Upgrade to add companies to your watchlist and receive instant alerts."
+                  {isFreeUser
+                    ? "Your free plan includes monitoring 1 company at no cost. Search for your employer above and click 'Add to Watchlist' to get started."
                     : "Search for your employer above and click 'Add to Watchlist'. We'll monitor their licence status every night and alert you if anything changes."}
                 </p>
-                {isFreeUser ? (
-                  <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/25 rounded-full font-bold px-8 h-12" onClick={() => setLocation("/pricing")}>
-                    <ShieldCheck className="w-5 h-5 mr-2" />View Premium Plans
-                  </Button>
-                ) : (
-                  <Button size="lg" variant="outline" className="rounded-full font-bold px-8 h-12 border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => {
-                    const searchInput = document.querySelector('input[type="text"]') as HTMLInputElement;
-                    if (searchInput) searchInput.focus();
-                  }}>
-                    <Search className="w-4 h-4 mr-2" />Start Searching
-                  </Button>
-                )}
+                <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/25 rounded-full font-bold px-8 h-12" onClick={scrollToSearch}>
+                  <Search className="w-5 h-5 mr-2" />Start Searching
+                </Button>
               </div>
             )}
 
@@ -1481,7 +1520,7 @@ export default function SponsorMonitor() {
         <div className="max-w-2xl mx-auto px-4 text-center">
           <h2 className="text-2xl sm:text-3xl font-bold mb-3">Do Not Wait For The Letter</h2>
           <p className="text-slate-300 mb-8 max-w-lg mx-auto">
-            Get instant alerts when a sponsor licence changes. Protect your visa, your career, and your future in the UK.
+            Get alerted when a sponsor licence changes. Protect your visa, your career, and your future in the UK.
           </p>
           <Button onClick={() => setLocation("/pricing")} size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-base px-10 py-6 rounded-xl shadow-lg shadow-emerald-500/20">
             <ShieldCheck className="w-5 h-5 mr-2" />Start Monitoring Now
@@ -1518,16 +1557,10 @@ export default function SponsorMonitor() {
   );
 }
 
-const STATUS_TO_TIER: Record<string, string> = { free: "free", starter: "starter", pro: "unlimited", unlimited: "unlimited", enterprise: "enterprise" };
-const TIER_CHANNELS: Record<string, string[]> = { free: ["email"], starter: ["email"], pro: ["email", "whatsapp"], unlimited: ["email", "whatsapp", "sms"], enterprise: ["email", "whatsapp", "sms"] };
-const TIER_ALERT_TIMING: Record<string, string> = { free: "Next morning (8am UTC)", starter: "Same day (6pm UTC)", pro: "Immediate", unlimited: "Immediate", enterprise: "Immediate" };
-
 function NotificationSettings({ user }: { user: any }) {
   const { toast } = useToast();
-  const rawStatus = user?.subscriptionStatus || "free";
-  const resolvedTier = STATUS_TO_TIER[rawStatus] || "free";
-  const allowedChannels = TIER_CHANNELS[resolvedTier] || TIER_CHANNELS.free;
-  const alertTiming = TIER_ALERT_TIMING[resolvedTier] || TIER_ALERT_TIMING.free;
+  const resolvedTier = resolveTier(user?.subscriptionStatus);
+  const alertTiming = ALERT_TIMING_COPY[resolvedTier];
 
   const { data: prefs, isLoading: prefsLoading } = useQuery<NotificationPrefs>({ queryKey: ["/api/notification-preferences"] });
 
@@ -1635,7 +1668,7 @@ function NotificationSettings({ user }: { user: any }) {
         <p className="text-xs text-muted-foreground">
           <span className="font-medium text-foreground">Alert timing:</span> {alertTiming}
           {resolvedTier === "free" && <span>, <a href="/pricing" className="underline hover:no-underline text-primary">upgrade for faster alerts</a></span>}
-          {resolvedTier === "starter" && <span>, <a href="/pricing" className="underline hover:no-underline text-primary">upgrade to Pro for immediate alerts</a></span>}
+          {resolvedTier === "starter" && <span>, <a href="/pricing" className="underline hover:no-underline text-primary">upgrade to Pro for twice-daily alerts</a></span>}
         </p>
       </div>
       <Card>
@@ -1648,9 +1681,9 @@ function NotificationSettings({ user }: { user: any }) {
             {user?.email && <p className="text-xs text-muted-foreground ml-7">Alerts will be sent to {user.email}</p>}
           </div>
           <div className="border-t border-border/50" />
-          <PhoneVerificationField channel="whatsapp" label="WhatsApp Notifications" icon={MessageSquare} enabled={whatsappEnabled} onToggle={(v) => { setWhatsappEnabled(v); markDirty(); }} phoneNumber={whatsappNumber} onPhoneChange={(v) => { setWhatsappNumber(v); markDirty(); }} verified={prefs?.whatsappVerified ?? false} channelAllowed={allowedChannels.includes("whatsapp")} requiredPlan="Pro" />
+          <PhoneVerificationField channel="whatsapp" label="WhatsApp Notifications" icon={MessageSquare} enabled={whatsappEnabled} onToggle={(v) => { setWhatsappEnabled(v); markDirty(); }} phoneNumber={whatsappNumber} onPhoneChange={(v) => { setWhatsappNumber(v); markDirty(); }} verified={prefs?.whatsappVerified ?? false} channelAllowed={isChannelAllowed(user?.subscriptionStatus, "whatsapp")} requiredPlan="Starter" />
           <div className="border-t border-border/50" />
-          <PhoneVerificationField channel="sms" label="SMS Notifications" icon={Phone} enabled={smsEnabled} onToggle={(v) => { setSmsEnabled(v); markDirty(); }} phoneNumber={smsNumber} onPhoneChange={(v) => { setSmsNumber(v); markDirty(); }} verified={prefs?.smsVerified ?? false} channelAllowed={allowedChannels.includes("sms")} requiredPlan="Unlimited" />
+          <PhoneVerificationField channel="sms" label="SMS Notifications" icon={Phone} enabled={smsEnabled} onToggle={(v) => { setSmsEnabled(v); markDirty(); }} phoneNumber={smsNumber} onPhoneChange={(v) => { setSmsNumber(v); markDirty(); }} verified={prefs?.smsVerified ?? false} channelAllowed={isChannelAllowed(user?.subscriptionStatus, "sms")} requiredPlan="Pro" />
           {pushSupported.current && (
             <>
               <div className="border-t border-border/50" />

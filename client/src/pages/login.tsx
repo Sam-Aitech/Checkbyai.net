@@ -11,6 +11,7 @@ import SEOHead from "@/components/SEOHead";
 import { motion, AnimatePresence } from "framer-motion";
 import logoImg from "@assets/logo_material.png";
 import { queryClient, getQueryFn } from "@/lib/queryClient";
+import { isPaidTier } from "@shared/planTiers";
 import BrandLogo from "@/components/BrandLogo";
 import GoogleLoginButton from "@/components/GoogleLoginButton";
 import { Turnstile } from "@marsidev/react-turnstile";
@@ -219,8 +220,7 @@ export default function LoginPage() {
           if (userData?.role === "admin") {
             destination = "/admin";
           } else {
-            const proPlan = ["starter","pro","unlimited","enterprise","notification_starter","notification_pro"];
-            destination = proPlan.includes(userData?.subscriptionStatus || "") ? "/pro-dashboard" : "/sponsor-monitor";
+            destination = isPaidTier(userData?.subscriptionStatus) ? "/pro-dashboard" : "/sponsor-monitor";
           }
         } catch {
           destination = "/sponsor-monitor";

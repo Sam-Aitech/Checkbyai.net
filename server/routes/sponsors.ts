@@ -5,7 +5,7 @@ import { sponsorCanonical, sponsorChanges, companyWatches, sponsorWatches, daily
 import { z } from "zod";
 import { isAuthenticated } from "../auth";
 import { requireRole } from "../middleware/roleGuard";
-import { getWatchLimit as getWatchLimitFromTier, getTierConfig } from "../utils/tierConfig";
+import { getWatchLimit as getWatchLimitFromTier, getTierConfig, resolveTier } from "../utils/tierConfig";
 import { normalizeName, generateFingerprint, namePrefilterToken, SQL_COMPARABLE_CHAR_CLASS } from "../utils/sponsorListFetcher";
 import { ensureIndexReady, isIndexReady, searchSponsors, searchSponsorsFallback, searchRevokedSponsors, getIndexHealth, type PagedSearchResult } from "../utils/sponsorSearch";
 import { recordSearchRequest } from "../services/monitoringService";
@@ -46,12 +46,11 @@ const authenticatedSearchRateLimit = rateLimiterFactory(120, "rl:search:auth:");
 const personalizedRateLimiter = (baseLimit: number) => rateLimit({
   windowMs: 60 * 1_000,
   max: (req: any) => {
-    // Null-safe: subscriptionStatus may be null for free users.
-    const sub: string = req.user?.subscriptionStatus ?? "";
-    if (sub.includes('pro') || sub.includes('unlimited') || sub.includes('enterprise')) {
+    const tier = resolveTier(req.user?.subscriptionStatus);
+    if (tier === 'pro' || tier === 'unlimited' || tier === 'enterprise') {
       return baseLimit * 3; // 3x for premium users
     }
-    if (sub.includes('starter') || sub.includes('notification')) {
+    if (tier === 'starter') {
       return baseLimit * 2; // 2x for starter users
     }
     return baseLimit; // Default for free/trial users
@@ -205,7 +204,9 @@ export function registerSponsorRoutes(app: Express): void {
   }));
 
   app.get('/api/daily-digest/current', asyncHandler(async (_req: any, res) => {
-    const cacheKey = 'sponsors:daily-digest:current';
+    // Versioned so a future response-shape change can never be served stale
+    // out of a cache entry written by the previous shape.
+    const cacheKey = 'sponsors:daily-digest:current:v2';
     const cached = await cacheGet(cacheKey);
     if (cached) {
       success(res, cached);

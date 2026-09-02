@@ -37,7 +37,7 @@ export default function Home() {
 
   const homePageSEO = {
     title: "UK Sponsor Licence Monitoring & CoS Verification | CheckByAI",
-    description: "Search the UK sponsor register free, and get instant alerts the moment your employer's sponsor licence status changes. Plus AI-powered Certificate of Sponsorship verification.",
+    description: "Search the UK sponsor register free, and get alerted when your employer's sponsor licence status changes. Plus AI-powered Certificate of Sponsorship verification.",
     keywords: "sponsor licence revoked alert, UK sponsor monitor, certificate of sponsorship verification, sponsor licence check, visa revocation alert, CoS verification, UK immigration",
     canonicalUrl: "https://checkbyai.net/",
     ogImage: "https://checkbyai.net/og-image.png",
@@ -48,7 +48,7 @@ export default function Home() {
         {
           "@type": "WebApplication",
           "name": "UK Sponsor Licence Monitor and CoS Verification",
-          "description": "Real-time UK sponsor licence monitoring with instant WhatsApp, email, and SMS alerts when a licence is revoked. Plus AI-powered Certificate of Sponsorship verification.",
+          "description": "UK sponsor licence monitoring with WhatsApp, email, and SMS alerts when a licence is revoked. Plus AI-powered Certificate of Sponsorship verification.",
           "url": "https://checkbyai.net/",
           "applicationCategory": "SecurityApplication",
           "operatingSystem": "Web Browser",
@@ -76,7 +76,7 @@ export default function Home() {
             }
           ],
           "featureList": [
-            "Instant sponsor licence revocation alerts",
+            "Sponsor licence revocation alerts",
             "WhatsApp, email and SMS notifications",
             "Daily Home Office register monitoring",
             "AI-powered CoS document verification",
@@ -100,7 +100,7 @@ export default function Home() {
               "name": "What happens when a UK sponsor licence is revoked?",
               "acceptedAnswer": {
                 "@type": "Answer",
-                "text": "When a UK sponsor licence is revoked, all workers sponsored by that company typically have 60 days to find a new sponsor or leave the UK. CheckByAI's Notification Engine sends instant alerts via WhatsApp, email, and SMS so you can act immediately."
+                "text": "When a UK sponsor licence is revoked, all workers sponsored by that company typically have 60 days to find a new sponsor or leave the UK. CheckByAI's Notification Engine sends alerts via WhatsApp, email, and SMS so you can act quickly."
               }
             },
             {
@@ -124,7 +124,7 @@ export default function Home() {
               "name": "How quickly does CheckByAI detect sponsor licence changes?",
               "acceptedAnswer": {
                 "@type": "Answer",
-                "text": "CheckByAI monitors the Home Office Register of Licensed Sponsors daily. Pro plan subscribers receive alerts within minutes of detection. Starter plan subscribers receive same-day alerts at 6 PM UTC."
+                "text": "CheckByAI checks the Home Office Register of Licensed Sponsors on weeknights. Pro plan subscribers receive alerts twice daily at 07:00 and 19:00 UTC. Starter plan subscribers receive same-day alerts at 18:00 UTC."
               }
             },
             {

@@ -38,7 +38,7 @@ const navItems: NavItem[] = [
       { href: "/sponsor-changes", label: "Licence Changes",   desc: "Recent additions, revocations and downgrades",   icon: <TrendingUp className="w-4 h-4" /> },
     ],
   },
-  { href: "/verify-cos", label: "Verify CoS" },
+  { href: "/dashboard", label: "Verify CoS" },
   { href: "/pricing",   label: "Pricing" },
   {
     label: "Resources",
@@ -226,14 +226,19 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
 
               {/* Right actions */}
               <div className="flex items-center gap-2">
-                {isAuthenticated && (isPro || isAdmin) ? (
-                  <Link
-                    href="/pro-dashboard"
-                    className="hidden sm:flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-full shadow-sm shadow-emerald-500/20 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
-                  >
-                    <LayoutDashboard className="w-4 h-4" />
-                    My Dashboard
-                  </Link>
+                {isAuthenticated ? (
+                  <>
+                    {(isPro || isAdmin) && (
+                      <Link
+                        href="/pro-dashboard"
+                        className="hidden sm:flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-full shadow-sm shadow-emerald-500/20 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
+                      >
+                        <LayoutDashboard className="w-4 h-4" />
+                        My Dashboard
+                      </Link>
+                    )}
+                    <UserProfile />
+                  </>
                 ) : (
                   <>
                     <Link
@@ -253,8 +258,6 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
                     )}
                   </>
                 )}
-
-                {isAuthenticated && <UserProfile />}
 
                 <button
                   ref={menuButtonRef}
@@ -350,15 +353,17 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
 
                   {/* CTA */}
                   <div className={`border-t pt-3 ${darkNav ? "border-slate-800" : "border-border/50"}`}>
-                    {isAuthenticated && (isPro || isAdmin) ? (
-                      <Link
-                        href="/pro-dashboard"
-                        onClick={closeMobileMenu}
-                        className="flex items-center justify-center gap-2 w-full px-4 py-3 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all"
-                      >
-                        <LayoutDashboard className="w-4 h-4" />
-                        My Dashboard
-                      </Link>
+                    {isAuthenticated ? (
+                      (isPro || isAdmin) && (
+                        <Link
+                          href="/pro-dashboard"
+                          onClick={closeMobileMenu}
+                          className="flex items-center justify-center gap-2 w-full px-4 py-3 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all"
+                        >
+                          <LayoutDashboard className="w-4 h-4" />
+                          My Dashboard
+                        </Link>
+                      )
                     ) : (
                       <>
                         <Link

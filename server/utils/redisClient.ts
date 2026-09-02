@@ -92,7 +92,7 @@ export async function flushSponsorCaches(): Promise<void> {
       "sponsors:nightly-stats",
       "sponsors:latest-change",
       "sponsors:changes",
-      "sponsors:daily-digest:current",
+      "sponsors:daily-digest:current:v2",
     ];
     try {
       await _redis.del(...specificKeys);

@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { unwrapApiEnvelope } from "@/lib/apiEnvelope";
+import { isPaidTier, hasEnrichedNotifications } from "@shared/planTiers";
 import FileUploadSimple from "@/components/FileUploadSimple";
 import { CompanyIntelligenceDialog } from "@/components/CompanyIntelligencePanel";
 import { Switch } from "@/components/ui/switch";
@@ -344,8 +345,8 @@ function MonitorTab({ user }: { user: any }) {
   const [expanded, setExpanded] = useState<number|null>(null);
   const [intelligenceTarget, setIntelligenceTarget] = useState<{ fingerprint: string; name: string } | null>(null);
   const dq = useDebounce(query, 350);
-  const isPro = ["starter","pro","unlimited","enterprise"].includes(user?.subscriptionStatus||"");
-  const hasIntelligence = ["pro","unlimited","enterprise"].includes(user?.subscriptionStatus||"");
+  const isPro = isPaidTier(user?.subscriptionStatus);
+  const hasIntelligence = hasEnrichedNotifications(user?.subscriptionStatus);
 
   const { data: watches, isLoading } = useQuery<WatchEntry[]>({ queryKey:["/api/watches"], staleTime: STALE_TIMES.FREQUENT, retry:false });
 
