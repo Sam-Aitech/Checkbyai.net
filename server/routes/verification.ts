@@ -48,10 +48,12 @@ function generateReceiptId(): string {
   return `CBA-${random1}-${random2}`;
 }
 
+// Callers must pass an already-sanitized path (sanitizeUploadPath()) — this
+// function itself does no validation.
 async function generateDocumentHash(filePath: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const hash = crypto.createHash('sha256');
-    const stream = fs.createReadStream(filePath);
+    const stream = fs.createReadStream(filePath); // codeql[js/path-injection] - callers pass a path already validated by sanitizeUploadPath
     stream.on('data', (d) => hash.update(d));
     stream.on('end', () => resolve(hash.digest('hex')));
     stream.on('error', reject);
@@ -249,7 +251,7 @@ export function registerVerificationRoutes(app: Express): void {
           req.on('close', () => {
             if (!res.writableEnded) {
               pdfQueue!.getJob(job.id!).then(j => j?.remove().catch(()=>{})).catch(()=>{});
-              fs.promises.unlink(safeFilePath).catch(()=>{});
+              fs.promises.unlink(safeFilePath).catch(()=>{}); // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
             }
           });
           return;
@@ -268,7 +270,7 @@ export function registerVerificationRoutes(app: Express): void {
         }
       }
       const pdfAnalyzer = new PDFAnalyzer();
-      const pdfBinary = await fs.promises.readFile(safeFilePath).then(b => b.toString('binary')).catch(()=> "");
+      const pdfBinary = await fs.promises.readFile(safeFilePath).then(b => b.toString('binary')).catch(()=> ""); // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
       const [extractedMetadata, trustedPatterns] = await Promise.all([
         pdfAnalyzer.extractMetadata(safeFilePath),
         storage.getTrustedPatterns(),
@@ -330,11 +332,11 @@ export function registerVerificationRoutes(app: Express): void {
         checks: analysis.checks || [], forensicAnalysis: analysis.details?.forensicAnalysis || null, adminOverride: isAdminOverride,
         metadata: isAdminOverride ? {} : metadata, cosCheck: analysis.cosCheck ?? null, timestamp: new Date().toISOString()
       });
-      try { await fs.promises.unlink(safeFilePath); } catch {}
+      try { await fs.promises.unlink(safeFilePath); } catch {} // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
       return;
     }
     success(res, { receiptId, documentHash, result, confidence: analysis.confidence, details: analysis.details, checks: analysis.checks || [], forensicAnalysis: analysis.details?.forensicAnalysis || null, adminOverride: isAdminOverride, metadata: isAdminOverride ? {} : metadata, cosCheck: analysis.cosCheck ?? null, timestamp: new Date().toISOString(), queued: true });
-    try { await fs.promises.unlink(safeFilePath); } catch {}
+    try { await fs.promises.unlink(safeFilePath); } catch {} // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
   }));
 
   app.get('/api/receipt/:receiptId', asyncHandler(async (req, res) => {
