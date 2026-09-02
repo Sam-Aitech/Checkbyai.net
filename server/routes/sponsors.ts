@@ -5,7 +5,7 @@ import { sponsorCanonical, sponsorChanges, companyWatches, sponsorWatches, daily
 import { z } from "zod";
 import { isAuthenticated } from "../auth";
 import { requireRole } from "../middleware/roleGuard";
-import { getWatchLimit as getWatchLimitFromTier, getTierConfig, resolveTier } from "../utils/tierConfig";
+import { getWatchLimit as getWatchLimitFromTier, resolveTier } from "../utils/tierConfig";
 import { normalizeName, generateFingerprint, namePrefilterToken, SQL_COMPARABLE_CHAR_CLASS } from "../utils/sponsorListFetcher";
 import { ensureIndexReady, isIndexReady, searchSponsors, searchSponsorsFallback, searchRevokedSponsors, getIndexHealth, type PagedSearchResult } from "../utils/sponsorSearch";
 import { recordSearchRequest } from "../services/monitoringService";

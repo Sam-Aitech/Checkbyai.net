@@ -812,7 +812,7 @@ function PricingSection({ isAuthenticated, tier }: { isAuthenticated: boolean; t
                 userTier={tier}
                 isAuthenticated={isAuthenticated}
                 onUpgrade={goToPricing}
-                upgradeLabel="Get Instant Alerts"
+                upgradeLabel="Get Alerts"
                 upgradeIcon={<Zap className="w-4 h-4 mr-2" />}
               />
             </CardContent>
@@ -1131,7 +1131,7 @@ export default function SponsorMonitor() {
         description="Check any UK employer's sponsor licence status for free. Get alerted if it's revoked, suspended or downgraded, before it affects your visa."
         canonicalUrl="https://checkbyai.net/sponsor-monitor"
         ogTitle="Is Your Employer's Sponsor Licence Still Valid? | Free Check | CheckByAI"
-        ogDescription="Check any UK employer's sponsor licence status for free. Get instant alerts if it's revoked, suspended or downgraded, before it affects your visa."
+        ogDescription="Check any UK employer's sponsor licence status for free. Get alerted if it's revoked, suspended or downgraded, before it affects your visa."
         breadcrumbs={[
           { name: "Home", url: "https://checkbyai.net/" },
           { name: "Sponsor Monitor", url: "https://checkbyai.net/sponsor-monitor" }
