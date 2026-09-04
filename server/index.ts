@@ -12,8 +12,9 @@ import { logger } from "./utils/logger";
 import { errorHandler } from "./lib/errorHandler";
 
 // Import the job queue setup
-import { initJobQueue, setupWorkers } from "./services/jobQueue";
+import { initJobQueue, setupApiWorkers, setupVerificationWorkers, getProcessRole } from "./services/jobQueue";
 import { initRedisCache, cacheFlushPattern } from "./utils/redisClient";
+import { perfMiddleware } from "./utils/perfMonitor";
 import { rebuildSponsorIndex } from "./utils/sponsorSearch";
 
 // Startup validation — fail fast if truly critical env vars are missing
@@ -265,6 +266,8 @@ app.use(express.json({
 // T005: Use extended:false to prevent prototype pollution via nested object parsing
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
+app.use(perfMiddleware);
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -441,7 +444,15 @@ async function applyDataFixbacks() {
    } catch (err) {
      logger.warn({ err }, "Non-blocking: status cache flush failed on boot");
    }
-    setupWorkers();
+    const processRole = getProcessRole();
+    if (processRole === 'worker') {
+      setupVerificationWorkers();
+    } else if (processRole === 'api') {
+      setupApiWorkers();
+    } else {
+      setupApiWorkers();
+      setupVerificationWorkers();
+    }
     
     const server = await registerRoutes(app);
 

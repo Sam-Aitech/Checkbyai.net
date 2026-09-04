@@ -110,6 +110,17 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 - **Item 4 (registry indexes):** `pg_trgm` + GIN on `current_name`/`town_city` (0003) and compounds (0014) already existed; proposed `(licence_status, rating_tier, last_updated_at)` rejected (columns don't exist — actual: `status`, `type_rating`, no `last_updated_at`). New `migrations/0024_sponsor_directory_route_trgm.sql`: GIN trigram on `route` (only directory filter with zero index coverage) + partial btree on `removed_at` for the directory-stats aggregation.
 - **Verify:** 0 new type errors (5 pre-existing client-only), 328 tests pass, lint 261 errors byte-identical to baseline `admin.ts` (relocated verbatim, zero new).
 
+#### Phase 8 — Optimisation Verification Programme (Proofs 1–7)
+Code + automated evidence complete; live-environment transcripts still required — see `docs/perf-evidence/README.md` (do not mark complete until all boxes ticked).
+- **Proof 1 (processes):** `server/worker.ts` standalone PDF-worker entrypoint; `PROCESS_ROLE=api|worker|all` split in `jobQueue.ts`/`index.ts`; `dist/worker.js` via multi-entry esbuild; compose `worker:` service (`3g/2.0 CPUs`) vs `app:` (`1g/1.0`).
+- **Proof 2 (storage):** `server/services/documentStore.ts` (local + S3-compatible drivers, `DOCUMENT_STORE_DRIVER`); jobs carry `documentKey` only; worker/inline paths materialize-then-cleanup; boot-time orphan purge; `@aws-sdk/client-s3` added.
+- **Proof 3 (load):** `server/utils/perfMonitor.ts` (per-route p50/p95/p99, event-loop delay, heap, queue wait/service) surfaced at `GET /metrics/perf`; zero-dep `scripts/load/verify-load.mjs` writes `load-<label>-*.json`.
+- **Proof 4 (DB):** `scripts/db/explain-sponsors.sh` captures `EXPLAIN (ANALYZE, BUFFERS)` for the 4 real sponsor query shapes before/after 0024.
+- **Proof 5 (correctness):** Redis job index (`verify:job:{id}`) + `evicted` tombstone in `GET /api/verify/job/:jobId`; `verifyJobs.test.ts` covers eviction + double-upload isolation.
+- **Proof 6 (failure mode):** Redis-down `POST /api/verify` now `503` (no inline CPU burn, stored doc deleted, `Retry-After: 30`); `?sync=1` gated behind `ALLOW_SYNC_VERIFY`; covered by tests.
+- **Proof 7 (frontend):** visualizer (`ANALYZE=true`), `scripts/frontend/bundle-budget.mjs` CI gate (passes: 576.9 KB total gzip), web-vitals beacon → `POST /api/rum` → perf snapshot, virtualized `SponsorDirectory` results, `lighthouserc.cjs` + weekly/dispatch LHCI workflow.
+- **Verify:** 335 tests pass (incl. 5 verify-job + 2 RUM), 0 new type errors, `perf:budget` green, all new proof files lint-clean (repo total still 261, byte-identical to baseline).
+
 ### Remaining (Not Yet Scoped)
 - Fuse.js search index versioning for instant CDV cache bust on rebuild.
 - React Query `gcTime` reduction for sponsor pages (currently default 5min).
@@ -153,3 +164,12 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 | `migrations/0022_push_subscriptions.sql` | Push subscriptions table |
 | `migrations/0023_notification_preferences_webhook.sql` | Webhook prefs columns |
 | `migrations/0024_sponsor_directory_route_trgm.sql` | GIN trigram on `route`, partial btree on `removed_at` |
+| `server/worker.ts` | Standalone PDF-worker entrypoint (`PROCESS_ROLE=worker`) |
+| `server/services/documentStore.ts` | Durable document store (local + S3-compatible, key-based handoff) |
+| `server/utils/perfMonitor.ts` | Latency/event-loop/heap/queue/RUM reservoirs + `GET /metrics/perf` |
+| `server/routes/rum.ts` | Web-vitals beacon sink (`POST /api/rum`) |
+| `scripts/load/verify-load.mjs` | Zero-dep load runner writing `load-<label>-*.json` |
+| `scripts/db/explain-sponsors.sh` | EXPLAIN before/after harness for the 4 sponsor query shapes |
+| `scripts/frontend/bundle-budget.mjs` | CI gzip-budget guard (wired into `ci.yml` build job) |
+| `docs/perf-evidence/` | Proof index + 7 runbook/evidence docs (sign-off gate) |
+| `lighthouserc.cjs` + `lighthouse.yml` | LHCI lab audits (dispatch + weekly, CLS error gate) |

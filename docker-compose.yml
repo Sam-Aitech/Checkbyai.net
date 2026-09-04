@@ -34,6 +34,8 @@ services:
       AI_INTEGRATIONS_OPENAI_API_KEY: ${AI_INTEGRATIONS_OPENAI_API_KEY:-}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       APP_URL: ${APP_URL:-http://localhost:5000}
+      PROCESS_ROLE: api
+      NODE_OPTIONS: --max-old-space-size=512
     depends_on:
       postgres:
         condition: service_healthy
@@ -43,12 +45,47 @@ services:
       # Persist binaries across restarts
       - app-bin:/app/bin
     restart: unless-stopped
+    mem_limit: 1g
+    mem_reservation: 512m
+    cpus: 1.0
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    command: ["npm", "run", "start:worker"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://checkbyai:checkbyai@postgres:5432/checkbyai?sslmode=disable
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis}
+      PROCESS_ROLE: worker
+      NODE_OPTIONS: --max-old-space-size=2048
+      SESSION_SECRET: ${SESSION_SECRET}
+      PHONE_ENCRYPTION_KEY: ${PHONE_ENCRYPTION_KEY}
+      IP_HASH_SALT: ${IP_HASH_SALT}
+      CHECKOUT_HMAC_SECRET: ${CHECKOUT_HMAC_SECRET}
+      DIGEST_SIGNING_KEY: ${DIGEST_SIGNING_KEY}
+      APP_URL: ${APP_URL:-http://localhost:5000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - app-bin:/app/bin
+    restart: unless-stopped
+    mem_limit: 3g
+    mem_reservation: 1g
+    cpus: 2.0
 
   postgres:
     image: postgres:16-alpine

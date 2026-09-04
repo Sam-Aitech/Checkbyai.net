@@ -57,5 +57,8 @@ EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:5000/api/health || exit 1
 
-# Run with auto-migration
+# Run with auto-migration (API role).
+# The PDF worker uses the same image with an overridden command:
+#   command: ["npm", "run", "start:worker"]
+# plus PROCESS_ROLE=worker (see docker-compose.yml).
 CMD ["npm", "run", "start:with-migrate"]

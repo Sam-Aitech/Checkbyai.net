@@ -1,5 +1,6 @@
 import { Queue, Worker, Job } from 'bullmq';
 import { logger } from '../utils/logger';
+import { recordQueueTiming } from '../utils/perfMonitor';
 import IORedis from 'ioredis';
 import * as Sentry from '@sentry/node';
 
@@ -41,6 +42,7 @@ async function runJobWithSentryTrace<T>(
           op: 'bullmq.process',
         },
         async () => {
+          const serviceStart = Date.now();
           try {
             return await processor();
           } catch (error) {
@@ -55,6 +57,12 @@ async function runJobWithSentryTrace<T>(
               },
             });
             throw error;
+          } finally {
+            const serviceMs = Date.now() - serviceStart;
+            const waitMs = job.processedOn && job.timestamp
+              ? Math.max(0, job.processedOn - job.timestamp)
+              : 0;
+            recordQueueTiming(queueName, waitMs, serviceMs);
           }
         },
       );
@@ -78,6 +86,27 @@ export function getSponsorRefreshQueue(): Queue | null { return sponsorQueue; }
 export function getNotificationQueue(): Queue | null { return notificationQueue; }
 
 export function getVerificationQueue(): Queue | null { return verificationQueue; }
+
+export async function getQueueCounts(): Promise<Record<string, Record<string, number>>> {
+  const entries: Array<[string, Queue | null]> = [
+    [SPONSOR_REFRESH_JOB, sponsorQueue],
+    [NOTIFICATION_JOB, notificationQueue],
+    [VERIFICATION_JOB, verificationQueue],
+  ];
+  const counts: Record<string, Record<string, number>> = {};
+  for (const [name, queue] of entries) {
+    if (!queue) {
+      counts[name] = { unavailable: 1 };
+      continue;
+    }
+    try {
+      counts[name] = await queue.getJobCounts('waiting', 'active', 'completed', 'failed', 'delayed') as Record<string, number>;
+    } catch {
+      counts[name] = { error: 1 };
+    }
+  }
+  return counts;
+}
 
 /**
  * Probe Redis with a standalone IORedis connection, then create BullMQ
@@ -118,56 +147,84 @@ notificationQueue = new Queue(NOTIFICATION_JOB, { connection: redisOpts });
 verificationQueue = new Queue(VERIFICATION_JOB, { connection: redisOpts });
 }
 
-/** Registers BullMQ workers. No-op if Redis was unavailable at startup. */
-export function setupWorkers(): void {
+export type ProcessRole = 'api' | 'worker' | 'all';
+
+export function getProcessRole(): ProcessRole {
+  const raw = (process.env.PROCESS_ROLE || 'all').toLowerCase();
+  return raw === 'api' || raw === 'worker' ? raw : 'all';
+}
+
+/** Registers API-owned BullMQ workers (everything except PDF verification). */
+export function setupApiWorkers(): Worker[] {
   if (!redisAvailable) {
-    logger.info('[JobQueue] Skipping worker setup — Redis not available.');
-    return;
+    logger.info('[JobQueue] Skipping API worker setup — Redis not available.');
+    return [];
   }
 
-  new Worker(
-    SPONSOR_REFRESH_JOB,
-    async (job: Job) => {
-      return runJobWithSentryTrace(job, SPONSOR_REFRESH_JOB, async () => {
-        const { processSponsorRefreshJob } = await import('../workers/sponsorRefreshWorker');
-        return processSponsorRefreshJob(job);
-      });
-    },
-    { connection: redisOpts }
-  );
+  const workers = [
+    new Worker(
+      SPONSOR_REFRESH_JOB,
+      async (job: Job) => {
+        return runJobWithSentryTrace(job, SPONSOR_REFRESH_JOB, async () => {
+          const { processSponsorRefreshJob } = await import('../workers/sponsorRefreshWorker');
+          return processSponsorRefreshJob(job);
+        });
+      },
+      { connection: redisOpts }
+    ),
 
-  new Worker(
-    SCRAPING_JOB,
-    async (job: Job) => {
-      return runJobWithSentryTrace(job, SCRAPING_JOB, async () => {
-        const { processScrapingJob } = await import('../workers/scrapingWorker');
-        return processScrapingJob(job);
-      });
-    },
-    { connection: redisOpts }
-  );
+    new Worker(
+      SCRAPING_JOB,
+      async (job: Job) => {
+        return runJobWithSentryTrace(job, SCRAPING_JOB, async () => {
+          const { processScrapingJob } = await import('../workers/scrapingWorker');
+          return processScrapingJob(job);
+        });
+      },
+      { connection: redisOpts }
+    ),
 
-  new Worker(
-    NOTIFICATION_JOB,
-    async (job: Job) => {
-      return runJobWithSentryTrace(job, NOTIFICATION_JOB, async () => {
-        const { notifyUsersOfEvent } = await import('../services/notificationEngine');
-        return notifyUsersOfEvent(job.data);
-      });
-    },
-    { connection: redisOpts }
-  );
+    new Worker(
+      NOTIFICATION_JOB,
+      async (job: Job) => {
+        return runJobWithSentryTrace(job, NOTIFICATION_JOB, async () => {
+          const { notifyUsersOfEvent } = await import('../services/notificationEngine');
+          return notifyUsersOfEvent(job.data);
+        });
+      },
+      { connection: redisOpts }
+    ),
+  ];
 
-  new Worker(
-    VERIFICATION_JOB,
-    async (job: Job) => {
-      return runJobWithSentryTrace(job, VERIFICATION_JOB, async () => {
-        const { processVerificationJob } = await import('../workers/verificationWorker');
-        return processVerificationJob(job as Job);
-      });
-    },
-    { connection: redisOpts, concurrency: 2 }
-  );
+  logger.info('[JobQueue] API workers registered (sponsor-refresh, scraping, notification-dispatch).');
+  return workers;
+}
 
-  logger.info('[JobQueue] BullMQ workers registered.');
+/** Registers only the CPU-bound PDF verification worker. Runs standalone via server/worker.ts. */
+export function setupVerificationWorkers(): Worker[] {
+  if (!redisAvailable) {
+    logger.info('[JobQueue] Skipping verification worker setup — Redis not available.');
+    return [];
+  }
+
+  const workers = [
+    new Worker(
+      VERIFICATION_JOB,
+      async (job: Job) => {
+        return runJobWithSentryTrace(job, VERIFICATION_JOB, async () => {
+          const { processVerificationJob } = await import('../workers/verificationWorker');
+          return processVerificationJob(job as Job);
+        });
+      },
+      { connection: redisOpts, concurrency: 2 }
+    ),
+  ];
+
+  logger.info('[JobQueue] Verification worker registered (concurrency 2).');
+  return workers;
+}
+
+/** Registers all BullMQ workers in-process. Prefer role-split setup in production. */
+export function setupWorkers(): Worker[] {
+  return [...setupApiWorkers(), ...setupVerificationWorkers()];
 }

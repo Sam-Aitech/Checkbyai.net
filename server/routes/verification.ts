@@ -18,6 +18,9 @@ import { ApiError } from "../lib/apiError";
 import { logger } from "../utils/logger";
 import { runVerificationAnalysis } from "../services/verificationAnalysis";
 import { isQueueAvailable, getVerificationQueue, VERIFICATION_JOB } from "../services/jobQueue";
+import { getDocumentStore, buildDocumentKey } from "../services/documentStore";
+import { getRedis } from "../utils/redisClient";
+import { UPLOADS_DIR } from "../utils/uploadGuard";
 
 function generateReceiptId(): string {
   const random1 = crypto.randomBytes(4).toString('hex').toUpperCase();
@@ -170,6 +173,9 @@ export function registerVerificationRoutes(app: Express): void {
 
     const documentHash = await generateDocumentHash(safeFilePath);
     const receiptId = generateReceiptId();
+    const documentKey = buildDocumentKey(receiptId, documentHash);
+    await getDocumentStore().put(documentKey, await fs.promises.readFile(safeFilePath));
+    await fs.promises.unlink(safeFilePath).catch(() => {});
 
     const priorAdminFlag = await storage.getAdminFlaggedVerificationByHash(documentHash);
 
@@ -209,6 +215,7 @@ export function registerVerificationRoutes(app: Express): void {
         },
       });
       await fs.promises.unlink(safeFilePath).catch(() => {});
+      await getDocumentStore().delete(documentKey).catch(() => {});
       success(res, {
         id: verificationId,
         receiptId,
@@ -226,12 +233,17 @@ export function registerVerificationRoutes(app: Express): void {
       return;
     }
 
-    const forceSync = req.query.sync === '1' || req.query.sync === 'true';
+    const syncRequested = req.query.sync === '1' || req.query.sync === 'true';
+    const syncAllowed = (process.env.ALLOW_SYNC_VERIFY || '').toLowerCase() === 'true';
+    if (syncRequested && !syncAllowed) {
+      await getDocumentStore().delete(documentKey).catch(() => {});
+      throw new ApiError(400, 'Synchronous verification is disabled; submit the document normally to queue it.');
+    }
     const queue = getVerificationQueue();
 
-    if (!forceSync && isQueueAvailable() && queue) {
+    if (isQueueAvailable() && queue) {
       const job = await queue.add(VERIFICATION_JOB, {
-        filePath: safeFilePath,
+        documentKey,
         userId,
         receiptId,
         documentHash,
@@ -246,6 +258,14 @@ export function registerVerificationRoutes(app: Express): void {
         removeOnFail: 50,
       });
       logger.info(`[Verify] Enqueued job ${job.id} for receipt ${receiptId}`);
+      const redis = getRedis();
+      if (redis && job.id) {
+        await redis.set(
+          `verify:job:${job.id}`,
+          JSON.stringify({ receiptId, userId, documentHash }),
+          'EX', 24 * 60 * 60,
+        ).catch(() => {});
+      }
       res.status(202).json({
         success: true,
         data: {
@@ -258,41 +278,46 @@ export function registerVerificationRoutes(app: Express): void {
       return;
     }
 
-    if (!forceSync) {
-      logger.warn('[Verify] Queue unavailable — running verification inline');
+    if (!syncRequested || !syncAllowed) {
+      await getDocumentStore().delete(documentKey).catch(() => {});
+      logger.warn('[Verify] Queue unavailable — rejecting instead of consuming web-server CPU');
+      res.set('Retry-After', '30');
+      throw new ApiError(503, 'Verification queue unavailable — please retry shortly.');
     }
-    const { result, analysis, metadata } = await runVerificationAnalysis(safeFilePath);
-    const verificationId = await persistVerification({
-      userId,
-      originalName: req.file.originalname,
-      result,
-      analysis,
-      metadata,
-      ipAddress: req.ip,
-      receiptId,
-      documentHash,
-      useCredits,
-      useDailyLimit,
-    });
-
-    success(res, {
-      id: verificationId,
-      receiptId,
-      documentHash,
-      result,
-      confidence: analysis.confidence,
-      details: analysis.details,
-      checks: analysis.checks || [],
-      forensicAnalysis: analysis.details?.forensicAnalysis || null,
-      adminOverride: false,
-      metadata,
-      cosCheck: analysis.cosCheck ?? null,
-      timestamp: new Date().toISOString()
-    });
-
+    const inlineTmp = path.join(UPLOADS_DIR, `inline-${receiptId}.pdf`);
+    await fs.promises.writeFile(inlineTmp, await getDocumentStore().get(documentKey));
     try {
-      await fs.promises.unlink(safeFilePath);
-    } catch (err) {
+      const { result, analysis, metadata } = await runVerificationAnalysis(inlineTmp);
+      const verificationId = await persistVerification({
+        userId,
+        originalName: req.file.originalname,
+        result,
+        analysis,
+        metadata,
+        ipAddress: req.ip,
+        receiptId,
+        documentHash,
+        useCredits,
+        useDailyLimit,
+      });
+
+      success(res, {
+        id: verificationId,
+        receiptId,
+        documentHash,
+        result,
+        confidence: analysis.confidence,
+        details: analysis.details,
+        checks: analysis.checks || [],
+        forensicAnalysis: analysis.details?.forensicAnalysis || null,
+        adminOverride: false,
+        metadata,
+        cosCheck: analysis.cosCheck ?? null,
+        timestamp: new Date().toISOString()
+      });
+    } finally {
+      await fs.promises.unlink(inlineTmp).catch(() => {});
+      await getDocumentStore().delete(documentKey).catch(() => {});
     }
   }));
 
@@ -303,6 +328,20 @@ export function registerVerificationRoutes(app: Express): void {
     }
     const job = await queue.getJob(req.params.jobId);
     if (!job) {
+      const redis = getRedis();
+      if (redis) {
+        const tombstone = await redis.get(`verify:job:${req.params.jobId}`).catch(() => null);
+        if (tombstone) {
+          const { receiptId, documentHash } = JSON.parse(tombstone) as { receiptId: string; documentHash: string };
+          success(res, {
+            status: 'evicted',
+            receiptId,
+            documentHash,
+            receiptUrl: `/api/receipt/${receiptId}`,
+          });
+          return;
+        }
+      }
       throw new ApiError(404, 'Verification job not found');
     }
     const state = await job.getState();

@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import * as Sentry from "@sentry/react";
 import App from "./App";
 import "./index.css";
+import { initWebVitals } from "./lib/webVitals";
 
 const sentryDsn = import.meta.env.VITE_SENTRY_DSN as string | undefined;
 const isSentryEnabled = import.meta.env.MODE !== "test" && Boolean(sentryDsn);
@@ -20,6 +21,8 @@ if ("serviceWorker" in navigator) {
     });
   });
 }
+
+initWebVitals();
 
 createRoot(document.getElementById("root")!).render(
   <Sentry.ErrorBoundary fallback={<p>Something went wrong.</p>}>

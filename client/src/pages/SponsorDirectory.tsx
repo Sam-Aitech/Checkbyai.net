@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { Link } from "wouter";
 import {
   Search, Building2, MapPin, Route, Star, CheckCircle, Zap, XCircle,
@@ -204,6 +205,111 @@ function Pagination({
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+
+// ── Virtualized results ───────────────────────────────────────────────────────
+// Window-scrolled windowing over the directory page (≤100 rich rows): only
+// visible rows + overscan mount, keeping DOM nodes flat on large pages.
+// Row markup is identical to the previous plain map; absolute positioning
+// replaces the divide-y container (per-row border-b preserves separators).
+
+function DirectoryRow({ r }: { r: DirectoryResult }) {
+  const slug = r.organisationName.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim().replace(/\s+/g, "-").slice(0, 80);
+  const detailHref = r.id ? `/sponsor/${r.id}/${slug}` : null;
+  return (
+    <div className={`px-4 py-3 border-b ${rowClass(r.status)} transition-colors hover:bg-muted/20`}>
+      <div className="hidden md:grid grid-cols-[2fr_1fr_1fr_1fr_auto_auto] gap-4 items-center">
+        <div className="flex items-center gap-2 min-w-0">
+          <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
+          {detailHref ? (
+            <Link href={detailHref} className="font-medium text-foreground text-sm truncate hover:text-primary hover:underline" title={r.organisationName}>
+              {r.organisationName}
+            </Link>
+          ) : (
+            <span className="font-medium text-foreground text-sm truncate" title={r.organisationName}>
+              {r.organisationName}
+            </span>
+          )}
+        </div>
+        <span className="text-sm text-muted-foreground truncate">
+          {r.townCity ?? "—"}
+        </span>
+        <span className="text-sm text-muted-foreground truncate">
+          {r.typeRating ?? "—"}
+        </span>
+        <span className="text-sm text-muted-foreground truncate">
+          {r.route ?? "—"}
+        </span>
+        <span className="text-xs text-muted-foreground whitespace-nowrap tabular-nums">
+          {r.status === "REMOVED_REVOKED" && r.removedAt
+            ? new Date(r.removedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "2-digit" })
+            : r.grantedAt
+            ? new Date(r.grantedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "2-digit" })
+            : "—"}
+        </span>
+        <StatusBadge status={r.status} typeRating={r.typeRating} />
+      </div>
+      <div className="md:hidden space-y-1">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <Building2 className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
+            <span className="font-semibold text-sm text-foreground leading-tight">{r.organisationName}</span>
+          </div>
+          <StatusBadge status={r.status} typeRating={r.typeRating} />
+        </div>
+        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground pl-5">
+          {r.townCity && (
+            <span className="flex items-center gap-1">
+              <MapPin className="w-3 h-3" />{r.townCity}
+            </span>
+          )}
+          {r.typeRating && (
+            <span className="flex items-center gap-1">
+              <Star className="w-3 h-3" />{r.typeRating}
+            </span>
+          )}
+          {r.route && (
+            <span className="flex items-center gap-1">
+              <Route className="w-3 h-3" />{r.route}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function VirtualizedResults({ results }: { results: DirectoryResult[] }) {
+  const rowVirtualizer = useVirtualizer({
+    count: results.length,
+    getScrollElement: () => null,
+    estimateSize: () => 76,
+    overscan: 10,
+  });
+  const items = rowVirtualizer.getVirtualItems();
+  return (
+    <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}>
+      {items.map((virtualRow) => {
+        const r = results[virtualRow.index];
+        return (
+          <div
+            key={r.fingerprint}
+            data-index={virtualRow.index}
+            ref={rowVirtualizer.measureElement}
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              transform: `translateY(${virtualRow.start}px)`,
+            }}
+          >
+            <DirectoryRow r={r} />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function SponsorDirectory() {
   const [nameInput, setNameInput]   = useState("");
@@ -474,81 +580,9 @@ export default function SponsorDirectory() {
             </div>
           )}
 
-          {/* Data rows */}
+          {/* Data rows (window-virtualized) */}
           {!isLoading && data && data.results.length > 0 && (
-            <div className="divide-y">
-              {data.results.map((r) => {
-                const slug = r.organisationName.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim().replace(/\s+/g, "-").slice(0, 80);
-                const detailHref = r.id ? `/sponsor/${r.id}/${slug}` : null;
-                return (
-                <div
-                  key={r.fingerprint}
-                  className={`px-4 py-3 ${rowClass(r.status)} transition-colors hover:bg-muted/20`}
-                >
-                  {/* Desktop grid */}
-                  <div className="hidden md:grid grid-cols-[2fr_1fr_1fr_1fr_auto_auto] gap-4 items-center">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
-                      {detailHref ? (
-                        <Link href={detailHref} className="font-medium text-foreground text-sm truncate hover:text-primary hover:underline" title={r.organisationName}>
-                          {r.organisationName}
-                        </Link>
-                      ) : (
-                        <span className="font-medium text-foreground text-sm truncate" title={r.organisationName}>
-                          {r.organisationName}
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-sm text-muted-foreground truncate">
-                      {r.townCity ?? "—"}
-                    </span>
-                    <span className="text-sm text-muted-foreground truncate">
-                      {r.typeRating ?? "—"}
-                    </span>
-                    <span className="text-sm text-muted-foreground truncate">
-                      {r.route ?? "—"}
-                    </span>
-                    <span className="text-xs text-muted-foreground whitespace-nowrap tabular-nums">
-                      {r.status === "REMOVED_REVOKED" && r.removedAt
-                        ? new Date(r.removedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "2-digit" })
-                        : r.grantedAt
-                        ? new Date(r.grantedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "2-digit" })
-                        : "—"}
-                    </span>
-                    <StatusBadge status={r.status} typeRating={r.typeRating} />
-                  </div>
-
-                  {/* Mobile card */}
-                  <div className="md:hidden space-y-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <Building2 className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
-                        <span className="font-semibold text-sm text-foreground leading-tight">{r.organisationName}</span>
-                      </div>
-                      <StatusBadge status={r.status} typeRating={r.typeRating} />
-                    </div>
-                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground pl-5">
-                      {r.townCity && (
-                        <span className="flex items-center gap-1">
-                          <MapPin className="w-3 h-3" />{r.townCity}
-                        </span>
-                      )}
-                      {r.typeRating && (
-                        <span className="flex items-center gap-1">
-                          <Star className="w-3 h-3" />{r.typeRating}
-                        </span>
-                      )}
-                      {r.route && (
-                        <span className="flex items-center gap-1">
-                          <Route className="w-3 h-3" />{r.route}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                );
-              })}
-            </div>
+            <VirtualizedResults results={data.results} />
           )}
         </div>
 

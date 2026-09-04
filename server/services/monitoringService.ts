@@ -237,4 +237,24 @@ export function registerMonitoringRoutes(app: any): void {
          resetMetrics();
          res.json({ message: "Metrics reset successfully", timestamp: new Date().toISOString() });
    });
+
+   // GET /metrics/perf — admin-only percentile snapshot: per-route latency
+   // (p50/p95/p99), event-loop delay, heap, and BullMQ queue wait/service
+   // timings. Per-process reservoirs; reset via POST /metrics/perf/reset.
+   // Used by scripts/load for before/after evidence runs.
+   app.get("/metrics/perf", requireRole("admin"), async (_req: any, res: any) => {
+         const { getPerfSnapshot } = await import("../utils/perfMonitor");
+         const { getQueueCounts } = await import("./jobQueue");
+         res.json({
+                 perf: getPerfSnapshot(),
+                 queues: await getQueueCounts(),
+                 warning: "Per-process reservoirs — run load against a single instance and reset before each run.",
+         });
+   });
+
+   app.post("/metrics/perf/reset", requireRole("admin"), async (_req: any, res: any) => {
+         const { resetPerfMonitor } = await import("../utils/perfMonitor");
+         resetPerfMonitor();
+         res.json({ message: "Perf reservoirs reset", timestamp: new Date().toISOString() });
+   });
 }

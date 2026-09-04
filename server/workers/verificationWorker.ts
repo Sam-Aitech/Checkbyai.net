@@ -1,16 +1,19 @@
 import type { Job } from "bullmq";
 import * as fs from "fs";
 import * as path from "path";
+import { randomBytes } from "crypto";
 import { db } from "../db";
 import { sql, eq } from "drizzle-orm";
 import { withRetry } from "../utils/dbRetry";
 import { users, verificationResults } from "@shared/schema";
 import { runVerificationAnalysis } from "../services/verificationAnalysis";
+import { getDocumentStore } from "../services/documentStore";
 import { emitToUser } from "../services/socketGateway";
+import { UPLOADS_DIR } from "../utils/uploadGuard";
 import { logger } from "../utils/logger";
 
 export interface VerificationJobData {
-  filePath: string;
+  documentKey: string;
   userId: string;
   receiptId: string;
   documentHash: string;
@@ -21,13 +24,18 @@ export interface VerificationJobData {
 }
 
 export async function processVerificationJob(job: Job<VerificationJobData>) {
-  const { filePath, userId, receiptId, documentHash, originalName, ipAddress, useCredits, useDailyLimit } = job.data;
-  logger.info(`[VerificationWorker] Job ${job.id} started for receipt ${receiptId}`);
+  const { documentKey, userId, receiptId, documentHash, originalName, ipAddress, useCredits, useDailyLimit } = job.data;
+  logger.info(`[VerificationWorker] Job ${job.id} started for receipt ${receiptId} (key ${documentKey})`);
   emitToUser(userId, "verify:progress", { jobId: job.id, receiptId, stage: "extracting" });
-  await job.updateProgress(15);
+  await job.updateProgress(10);
+
+  const tmpPath = path.join(UPLOADS_DIR, `worker-${job.id}-${randomBytes(4).toString("hex")}.pdf`);
 
   try {
-    const { result, analysis, metadata } = await runVerificationAnalysis(filePath);
+    await fs.promises.writeFile(tmpPath, await getDocumentStore().get(documentKey));
+    await job.updateProgress(15);
+
+    const { result, analysis, metadata } = await runVerificationAnalysis(tmpPath);
     emitToUser(userId, "verify:progress", { jobId: job.id, receiptId, stage: "analyzing" });
     await job.updateProgress(70);
 
@@ -85,10 +93,7 @@ export async function processVerificationJob(job: Job<VerificationJobData>) {
     emitToUser(userId, "verify:progress", { jobId: job.id, receiptId, stage: "failed", error: err instanceof Error ? err.message : String(err) });
     throw err;
   } finally {
-    try {
-      await fs.promises.unlink(filePath);
-    } catch {
-      // already cleaned
-    }
+    await fs.promises.unlink(tmpPath).catch(() => {});
+    await getDocumentStore().delete(documentKey).catch(() => {});
   }
 }

@@ -5,8 +5,10 @@
   "license": "MIT",
   "scripts": {
     "dev": "NODE_ENV=development tsx server/index.ts",
-    "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "build": "vite build && esbuild server/index.ts server/worker.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "NODE_ENV=production node dist/index.js",
+    "dev:worker": "tsx server/worker.ts",
+    "start:worker": "NODE_ENV=production node dist/worker.js",
     "lint": "eslint .",
     "check": "tsc",
     "test": "vitest",
@@ -19,9 +21,13 @@
     "start:with-migrate": "npm run db:migrate && NODE_ENV=production node dist/index.js",
     "audit": "audit-ci --config audit-ci.jsonc",
     "test:e2e": "playwright test",
-    "playwright:install": "playwright install chromium"
+    "playwright:install": "playwright install chromium",
+    "build:analyze": "ANALYZE=true vite build",
+    "perf:budget": "node scripts/frontend/bundle-budget.mjs",
+    "perf:lighthouse": "npx -y @lhci/cli@0.14.0 autorun"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.864.0",
     "@hookform/resolvers": "^3.10.0",
     "@jridgewell/trace-mapping": "^0.3.31",
     "@marsidev/react-turnstile": "^1.4.2",
@@ -174,6 +180,7 @@
     "dotenv": "^17.4.2",
     "eslint": "^10.4.0",
     "eslint-plugin-security": "^4.0.0",
+    "rollup-plugin-visualizer": "5.12.0",
     "supertest": "^7.2.2",
     "vitest": "^4.1.1"
   },

@@ -17,6 +17,18 @@ export default defineConfig({
           ),
         ]
       : []),
+    ...(process.env.ANALYZE === "true"
+      ? [
+          await import("rollup-plugin-visualizer").then((m) =>
+            m.visualizer({
+              filename: "dist/stats.html",
+              gzipSize: true,
+              brotliSize: true,
+              open: false,
+            }),
+          ),
+        ]
+      : []),
   ],
   resolve: {
     alias: {

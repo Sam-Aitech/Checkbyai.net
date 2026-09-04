@@ -1,0 +1,49 @@
+name: Lighthouse
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Deployed URL to audit (e.g. staging)"
+        required: false
+        default: ""
+  schedule:
+    - cron: "0 4 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  lighthouse:
+    name: Lighthouse performance audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --prefer-offline
+
+      - name: Run Lighthouse CI
+        env:
+          BASE_URL: ${{ inputs.base_url || vars.LHCI_BASE_URL || secrets.LHCI_BASE_URL }}
+        run: |
+          if [ -z "$BASE_URL" ]; then
+            echo "::warning::BASE_URL not configured - skipping Lighthouse audit. Set LHCI_BASE_URL repo variable to enable."
+            exit 0
+          fi
+          npx -y @lhci/cli@0.14.0 autorun
+
+      - name: Upload LHCI results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lhci-results
+          path: docs/perf-evidence/lhci/
+          retention-days: 30
