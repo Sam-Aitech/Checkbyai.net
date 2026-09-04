@@ -3,10 +3,12 @@ import * as fs from "fs";
 import * as path from "path";
 import { getAppUrl } from "../utils/appUrl";
 import { db } from "../db";
-import { eq } from "drizzle-orm";
-import { sponsorCanonical } from "@shared/schema";
+import { eq, desc } from "drizzle-orm";
+import { sponsorCanonical, sponsorChanges } from "@shared/schema";
 import { toSlug } from "./sponsorPages";
 import { logger } from "../utils/logger";
+import { buildSponsorSeoBody, buildSponsorJsonLd } from "../utils/sponsorSeoHtml";
+import { cacheGet, cacheSet } from "../utils/redisClient";
 
 function escapeAttr(str: string): string {
   return str.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -41,6 +43,7 @@ const CORE_URLS: Array<{ path: string; priority: string; changefreq: string }> =
   { path: '/sponsor-monitor', priority: '0.9', changefreq: 'daily' },
   { path: '/sponsors', priority: '0.9', changefreq: 'daily' },
   { path: '/pricing', priority: '0.9', changefreq: 'weekly' },
+  { path: '/single-check', priority: '0.9', changefreq: 'weekly' },
   { path: '/cos-pricing', priority: '0.8', changefreq: 'weekly' },
   { path: '/dashboard', priority: '0.8', changefreq: 'weekly' },
   { path: '/sponsor-changes', priority: '0.8', changefreq: 'daily' },
@@ -139,6 +142,7 @@ Disallow: /uploads/`;
 
 ## Products
 
+- [Single Scam Check](${getAppUrl()}/single-check): One-off £9.99 Certificate of Sponsorship scam check — forensic document analysis, sponsor licence verification, and salary threshold check. No account needed.
 - [Notification Engine](${getAppUrl()}/pricing): Real-time UK sponsor licence monitoring. Get instant alerts via WhatsApp, email, and SMS when your employer's licence is revoked, suspended, or downgraded. Plans from £24.99/month.
 - [CoS Verification](${getAppUrl()}/cos-pricing): AI-powered Certificate of Sponsorship document verification. Detect fake or edited CoS documents using forensic metadata analysis.
 - [Free Sponsor Search](${getAppUrl()}/sponsor-monitor): Search the UK Home Office Register of Licensed Sponsors for free. Check if any company holds a valid sponsor licence.
@@ -231,6 +235,17 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
     if (isNaN(id) || id <= 0) return next();
 
     try {
+      // Fully rendered page is cached per sponsor; the nightly monitor job
+      // flushes "sponsors:*" so pages refresh after each register update.
+      const pageCacheKey = `sponsors:seopage:${id}`;
+      const cachedPage = await cacheGet<string>(pageCacheKey);
+      if (cachedPage) {
+        res.set("Content-Type", "text/html");
+        res.set("Cache-Control", "public, max-age=3600");
+        res.send(cachedPage);
+        return;
+      }
+
       const [sponsor] = await db
         .select()
         .from(sponsorCanonical)
@@ -238,6 +253,18 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
         .limit(1);
 
       if (!sponsor) return next();
+
+      const recentChanges = await db
+        .select({
+          changeType:    sponsorChanges.changeType,
+          snapshotDate:  sponsorChanges.snapshotDate,
+          previousValue: sponsorChanges.previousValue,
+          newValue:      sponsorChanges.newValue,
+        })
+        .from(sponsorChanges)
+        .where(eq(sponsorChanges.fingerprint, sponsor.fingerprint))
+        .orderBy(desc(sponsorChanges.detectedAt))
+        .limit(10);
 
       const base = getAppUrl();
       const slug = toSlug(sponsor.currentName);
@@ -297,8 +324,22 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
       html = html.replace(/<meta property="twitter:description" content="[^"]*"/, `<meta property="twitter:description" content="${d}"`);
       html = html.replace(/<meta property="twitter:url" content="[^"]*"/, `<meta property="twitter:url" content="${canonical}"`);
       html = html.replace(/<link rel="canonical" href="[^"]*"/, `<link rel="canonical" href="${canonical}"`);
-      html = html.replace('</head>', `<script type="application/ld+json">${schema}</script>\n</head>`);
+      const jsonLd = buildSponsorJsonLd(sponsor, canonical, base);
+      html = html.replace('</head>', `<script type="application/ld+json">${schema}</script>\n${jsonLd}\n</head>`);
 
+      // Replace the generic shell content inside #root with server-rendered
+      // sponsor content so crawlers index real page content (status, history,
+      // FAQ) instead of an empty React mount point. React replaces it on
+      // hydration. The root div closes immediately before a <script> tag in
+      // both dev (module script) and built (ld+json, module hoisted to head)
+      // HTML; the shell content itself contains no script tags.
+      const seoBody = buildSponsorSeoBody(sponsor, recentChanges);
+      html = html.replace(
+        /(<div id="root">)[\s\S]*?(<\/div>\s*<script type=")/,
+        `$1${seoBody}$2`,
+      );
+
+      await cacheSet(pageCacheKey, html, 21600); // 6h; flushed nightly via sponsors:*
       res.set('Content-Type', 'text/html');
       // CDN-friendly: sponsor pages are static between nightly runs
       res.set('Cache-Control', 'public, max-age=3600');
@@ -321,6 +362,10 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
     '/pricing': {
       title: 'Protect Your Visa | Sponsor Licence Alerts from £24.99/mo | CheckByAI',
       description: 'Never be blindsided by a sponsor licence revocation. Get instant WhatsApp and email alerts. Starter £24.99/mo (2 companies), Pro £49.99/mo (5 companies, SMS + immediate alerts).',
+    },
+    '/single-check': {
+      title: 'Is Your UK Job Offer a Scam? One-Off £9.99 CoS Check | CheckByAI',
+      description: 'Check a Certificate of Sponsorship in minutes: forensic document analysis, sponsor licence verification, and salary threshold check. One payment, no account, no subscription.',
     },
     '/cos-pricing': {
       title: 'Verify Your CoS is Genuine | Fake Document Detection from £24.99 | CheckByAI',
