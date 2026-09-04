@@ -11,7 +11,7 @@
 import { describe, it, expect } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
-import { buildSponsorSeoBody, buildSponsorJsonLd } from "../sponsorSeoHtml";
+import { buildSponsorSeoBody, buildSponsorJsonLd, ROOT_INJECTION_REGEX } from "../sponsorSeoHtml";
 
 function makeSponsor(overrides: Partial<Record<string, unknown>> = {}) {
   return {
@@ -83,6 +83,68 @@ describe("buildSponsorSeoBody", () => {
     const html = buildSponsorSeoBody(makeSponsor(), [] as any);
     expect(html).not.toContain("Licence history");
   });
+
+  it("shows an 'under review' notice, not a revoked warning, for GRACE_PERIOD sponsors", () => {
+    const html = buildSponsorSeoBody(makeSponsor({ status: "GRACE_PERIOD" }), [] as any);
+    expect(html).toContain("Under review:");
+    expect(html).not.toContain("Warning:");
+    expect(html).not.toContain("no longer a licensed sponsor");
+  });
+
+  it("shows no warning block for NEWLY_GRANTED sponsors", () => {
+    const html = buildSponsorSeoBody(makeSponsor({ status: "NEWLY_GRANTED" }), [] as any);
+    expect(html).toContain("Newly Granted UK Sponsor Licence");
+    expect(html).not.toContain("Warning:");
+    expect(html).not.toContain("Under review:");
+  });
+
+  it("omits register rows for null townCity, route, and typeRating", () => {
+    const html = buildSponsorSeoBody(
+      makeSponsor({ townCity: null, route: null, typeRating: null }),
+      [] as any,
+    );
+    expect(html).not.toContain("Location");
+    expect(html).not.toContain("Visa route");
+    expect(html).not.toContain("Type &amp; rating");
+  });
+
+  it("omits 'Removed from register' row for GRACE_PERIOD even when removedAt is set", () => {
+    const html = buildSponsorSeoBody(
+      makeSponsor({ status: "GRACE_PERIOD", removedAt: new Date("2026-05-01") }),
+      [] as any,
+    );
+    expect(html).not.toContain("Removed from register");
+  });
+
+  it("shows 'Removed from register' row only for REMOVED_REVOKED", () => {
+    const html = buildSponsorSeoBody(
+      makeSponsor({ status: "REMOVED_REVOKED", removedAt: new Date("2026-05-01") }),
+      [] as any,
+    );
+    expect(html).toContain("Removed from register");
+  });
+
+  it("escapes HTML special characters in townCity and history previous/new values", () => {
+    const html = buildSponsorSeoBody(
+      makeSponsor({ townCity: 'Leeds<script>' }),
+      [
+        { changeType: "NAME_CHANGE", snapshotDate: "2025-01-01", previousValue: 'A&B "Old"', newValue: 'A&B <New>' },
+      ] as any,
+    );
+    expect(html).not.toContain("Leeds<script>");
+    expect(html).toContain("Leeds&lt;script&gt;");
+    expect(html).toContain("A&amp;B &quot;Old&quot;");
+    expect(html).toContain("A&amp;B &lt;New&gt;");
+  });
+
+  it("falls back to the raw (escaped) changeType for an unrecognized change type", () => {
+    const html = buildSponsorSeoBody(
+      makeSponsor(),
+      [{ changeType: "SOMETHING_NEW<b>", snapshotDate: "2025-01-01", previousValue: null, newValue: null }] as any,
+    );
+    expect(html).toContain("SOMETHING_NEW&lt;b&gt;");
+    expect(html).not.toContain("SOMETHING_NEW<b>");
+  });
 });
 
 describe("buildSponsorJsonLd", () => {
@@ -111,12 +173,24 @@ describe("buildSponsorJsonLd", () => {
     );
     expect(out).toContain("no longer appears on the Home Office Register");
   });
+
+  it("escapes </script> in sponsor data so it can't break out of the JSON-LD script tag", () => {
+    const out = buildSponsorJsonLd(
+      makeSponsor({ currentName: 'Acme</script><script>alert(1)</script>' }),
+      "https://checkbyai.net/sponsor/42/acme-care-ltd",
+      "https://checkbyai.net",
+    );
+    expect(out).not.toContain("</script><script>alert(1)");
+    // Each declared script block must still parse as valid JSON on its own.
+    const blocks = [...out.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)];
+    expect(blocks.length).toBe(2);
+    for (const m of blocks) expect(() => JSON.parse(m[1])).not.toThrow();
+  });
 });
 
 describe("#root injection regex vs real templates", () => {
-  // Must stay in sync with the regex in server/routes/seo.ts
-  const ROOT_INJECT_REGEX = /(<div id="root">)[\s\S]*?(<\/div>\s*<script type=")/;
-
+  // Imported from sponsorSeoHtml.ts — the same constant server/routes/seo.ts
+  // uses, so this test can't silently drift out of sync with production.
   const templates = [
     ["dev", path.resolve(import.meta.dirname, "../../../client/index.html")],
     ["built", path.resolve(import.meta.dirname, "../../../dist/public/index.html")],
@@ -130,15 +204,23 @@ describe("#root injection regex vs real templates", () => {
         return;
       }
       const html = fs.readFileSync(templatePath, "utf-8");
-      expect(ROOT_INJECT_REGEX.test(html)).toBe(true);
+      expect(ROOT_INJECTION_REGEX.test(html)).toBe(true);
 
       const body = buildSponsorSeoBody(makeSponsor(), changes as any);
-      const injected = html.replace(ROOT_INJECT_REGEX, `$1${body}$2`);
+      const injected = html.replace(ROOT_INJECTION_REGEX, (_m, p1: string, p2: string) => `${p1}${body}${p2}`);
       expect(injected).toContain("Acme Care Ltd");
       // Original shell content inside #root must be gone
       expect(injected).not.toContain("UK Certificate of Sponsorship Verification\n");
-      // Module script still present so React hydrates
+      // Module script still present so React can remount over the SEO body
       expect(injected).toContain('<script type="module"');
+    });
+
+    it(`is unaffected by a literal "$" in the sponsor data on ${label} index.html`, () => {
+      if (!fs.existsSync(templatePath)) return;
+      const html = fs.readFileSync(templatePath, "utf-8");
+      const body = buildSponsorSeoBody(makeSponsor({ currentName: "Foo $& Bar $1 Ltd" }), [] as any);
+      const injected = html.replace(ROOT_INJECTION_REGEX, (_m, p1: string, p2: string) => `${p1}${body}${p2}`);
+      expect(injected).toContain("Foo $&amp; Bar $1 Ltd");
     });
   }
 });

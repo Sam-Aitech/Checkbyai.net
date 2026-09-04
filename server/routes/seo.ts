@@ -7,12 +7,15 @@ import { eq, desc } from "drizzle-orm";
 import { sponsorCanonical, sponsorChanges } from "@shared/schema";
 import { toSlug } from "./sponsorPages";
 import { logger } from "../utils/logger";
-import { buildSponsorSeoBody, buildSponsorJsonLd } from "../utils/sponsorSeoHtml";
+import {
+  buildSponsorSeoBody,
+  buildSponsorJsonLd,
+  statusLabel,
+  escapeHtml as escapeAttr,
+  toSafeJsonLd,
+  ROOT_INJECTION_REGEX,
+} from "../utils/sponsorSeoHtml";
 import { cacheGet, cacheSet } from "../utils/redisClient";
-
-function escapeAttr(str: string): string {
-  return str.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
 
 // In-memory HTML template cache — eliminates repeated disk reads per bot request.
 // Key = resolved file path; value = file contents (string).
@@ -270,26 +273,23 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
       const slug = toSlug(sponsor.currentName);
       const canonical = `${base}/sponsor/${id}/${slug}`;
 
-      const statusLabel =
-        sponsor.status === 'ACTIVE'         ? 'Active' :
-        sponsor.status === 'NEWLY_GRANTED'  ? 'Newly Granted' :
-        sponsor.status === 'GRACE_PERIOD'   ? 'Under Review' : 'Revoked';
+      const label = statusLabel(sponsor.status);
 
       const location  = sponsor.townCity ? ` in ${sponsor.townCity}` : '';
       const routePart = sponsor.route     ? ` (${sponsor.route})`    : '';
       const grantedYr = sponsor.grantedAt ? new Date(sponsor.grantedAt).getFullYear() : null;
 
       const title =
-        `${sponsor.currentName} — ${statusLabel} UK Sponsor Licence | CheckByAI`;
+        `${sponsor.currentName} — ${label} UK Sponsor Licence | CheckByAI`;
 
       const description = sponsor.status === 'REMOVED_REVOKED'
         ? `${sponsor.currentName}${location} had their UK sponsor licence revoked. ` +
           `Workers must find a new employer. See full licence history on CheckByAI.`
-        : `${sponsor.currentName}${location} holds a ${statusLabel} UK sponsor licence${routePart}` +
+        : `${sponsor.currentName}${location} holds a ${label} UK sponsor licence${routePart}` +
           `${grantedYr ? `, active since ${grantedYr}` : ''}. ` +
           `Get instant alerts if their status changes — free on CheckByAI.`;
 
-      const schema = JSON.stringify({
+      const schema = toSafeJsonLd({
         "@context": "https://schema.org",
         "@type":    "Organization",
         "name":     sponsor.currentName,
@@ -329,20 +329,38 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
 
       // Replace the generic shell content inside #root with server-rendered
       // sponsor content so crawlers index real page content (status, history,
-      // FAQ) instead of an empty React mount point. React replaces it on
-      // hydration. The root div closes immediately before a <script> tag in
-      // both dev (module script) and built (ld+json, module hoisted to head)
-      // HTML; the shell content itself contains no script tags.
+      // FAQ) instead of the generic marketing fallback. Browsers get it too on
+      // first paint, then React's createRoot().render() overwrites it — a
+      // plain client-side remount, not hydration. The root div closes
+      // immediately before a <script> tag in both dev (module script) and
+      // built (ld+json, module hoisted to head) HTML; the shell content
+      // itself contains no script tags.
+      //
+      // Uses a replacer function, not a `$1${seoBody}$2` replacement string —
+      // seoBody is DB-sourced and a literal "$" in it (a `$&`/`$1`/etc.
+      // sequence) would otherwise be interpreted as a replacement-pattern
+      // token by String.replace and corrupt the output.
       const seoBody = buildSponsorSeoBody(sponsor, recentChanges);
+      const preInjectionHtml = html;
       html = html.replace(
-        /(<div id="root">)[\s\S]*?(<\/div>\s*<script type=")/,
-        `$1${seoBody}$2`,
+        ROOT_INJECTION_REGEX,
+        (_match, p1: string, p2: string) => `${p1}${seoBody}${p2}`,
       );
 
-      await cacheSet(pageCacheKey, html, 21600); // 6h; flushed nightly via sponsors:*
       res.set('Content-Type', 'text/html');
       // CDN-friendly: sponsor pages are static between nightly runs
       res.set('Cache-Control', 'public, max-age=3600');
+
+      if (html === preInjectionHtml) {
+        // #root template didn't match (e.g. build shell changed shape) —
+        // the shell shipped without our SEO body. Serve it anyway (still
+        // better than a 404) but don't cache a broken render for 6h.
+        logger.warn({ sponsorId: id }, 'Sponsor SEO body injection did not match #root template; not caching');
+        res.send(html);
+        return;
+      }
+
+      await cacheSet(pageCacheKey, html, 21600); // 6h; flushed nightly via sponsors:*
       res.send(html);
     } catch (err) {
       logger.error({ err }, 'Sponsor page meta injection error:');

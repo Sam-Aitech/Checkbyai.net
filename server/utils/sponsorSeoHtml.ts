@@ -1,12 +1,14 @@
 /**
  * Server-rendered HTML body for /sponsor/:id/:slug pages.
  *
- * Crawlers previously received the React shell with only <title>/meta swapped —
- * an empty <div id="root"> with no sponsor content. Google treats 124k such
- * pages as thin/duplicate and won't index them. This module renders the full
- * sponsor content (status, licence details, change history, FAQ) as plain HTML
- * that is injected INSIDE #root, so bots index real content while React
- * replaces it on hydration for browsers.
+ * Crawlers previously received the React shell's generic fallback content
+ * inside <div id="root"> (same marketing copy on every page, only
+ * <title>/meta swapped). Google treats 124k such pages as thin/duplicate and
+ * won't index them. This module renders the full sponsor content (status,
+ * licence details, change history, FAQ) as plain HTML that is injected
+ * INSIDE #root, so bots index real content. Browsers get it too on first
+ * paint, then React's createRoot().render() call overwrites it — a plain
+ * client-side remount, not hydration.
  */
 
 import type { sponsorCanonical, sponsorChanges } from "@shared/schema";
@@ -27,13 +29,25 @@ const CHANGE_LABELS: Record<string, string> = {
   NAME_CHANGE: "Company renamed",
 };
 
-function esc(str: string): string {
+export function escapeHtml(str: string): string {
   return str
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 }
+
+/** JSON.stringify escapes quotes/backslashes but not `<` — without this, a
+ * value containing `</script>` closes the surrounding <script> tag early and
+ * lets the rest execute as markup. */
+export function toSafeJsonLd(value: unknown): string {
+  return JSON.stringify(value).replace(/</g, "\\u003c");
+}
+
+/** Matches the injected #root markup in both dev (client/index.html) and
+ * built (dist/public/index.html) shells — shared by seo.ts and its tests so
+ * the two can't silently drift apart. */
+export const ROOT_INJECTION_REGEX = /(<div id="root">)[\s\S]*?(<\/div>\s*<script type=")/;
 
 function formatDateGb(dateStr: string | Date | null): string | null {
   if (!dateStr) return null;
@@ -48,7 +62,7 @@ function formatDateGb(dateStr: string | Date | null): string | null {
   }
 }
 
-function statusLabel(status: string): string {
+export function statusLabel(status: string): string {
   switch (status) {
     case "ACTIVE":
       return "Active";
@@ -144,8 +158,8 @@ export function buildSponsorJsonLd(
   };
 
   return (
-    `<script type="application/ld+json">${JSON.stringify(faqSchema)}</script>\n` +
-    `<script type="application/ld+json">${JSON.stringify(breadcrumbSchema)}</script>`
+    `<script type="application/ld+json">${toSafeJsonLd(faqSchema)}</script>\n` +
+    `<script type="application/ld+json">${toSafeJsonLd(breadcrumbSchema)}</script>`
   );
 }
 
@@ -160,13 +174,14 @@ export function buildSponsorSeoBody(
   const label = statusLabel(sponsor.status);
   const granted = formatDateGb(sponsor.grantedAt);
   const removed = formatDateGb(sponsor.removedAt);
-  const isRevoked = sponsor.status !== "ACTIVE" && sponsor.status !== "NEWLY_GRANTED";
-  const name = esc(sponsor.currentName);
+  const isRevoked = sponsor.status === "REMOVED_REVOKED";
+  const isGracePeriod = sponsor.status === "GRACE_PERIOD";
+  const name = escapeHtml(sponsor.currentName);
 
   const rows: Array<[string, string]> = [["Licence status", label]];
-  if (sponsor.townCity) rows.push(["Location", esc(sponsor.townCity)]);
-  if (sponsor.route) rows.push(["Visa route", esc(sponsor.route)]);
-  if (sponsor.typeRating) rows.push(["Type & rating", esc(sponsor.typeRating)]);
+  if (sponsor.townCity) rows.push(["Location", escapeHtml(sponsor.townCity)]);
+  if (sponsor.route) rows.push(["Visa route", escapeHtml(sponsor.route)]);
+  if (sponsor.typeRating) rows.push(["Type & rating", escapeHtml(sponsor.typeRating)]);
   if (granted) rows.push(["On register since", granted]);
   if (isRevoked && removed) rows.push(["Removed from register", removed]);
 
@@ -180,12 +195,12 @@ export function buildSponsorSeoBody(
 
   const historyItems = changes
     .map((c) => {
-      const what = CHANGE_LABELS[c.changeType] ?? c.changeType;
+      const what = escapeHtml(CHANGE_LABELS[c.changeType] ?? c.changeType);
       const detail =
         c.previousValue && c.newValue && c.changeType !== "NEW_LICENCE"
-          ? ` — ${esc(c.previousValue)} → ${esc(c.newValue)}`
+          ? ` — ${escapeHtml(c.previousValue)} → ${escapeHtml(c.newValue)}`
           : "";
-      return `<li style="margin:4px 0;color:#374151;"><strong>${esc(c.snapshotDate)}</strong>: ${what}${detail}</li>`;
+      return `<li style="margin:4px 0;color:#374151;"><strong>${escapeHtml(c.snapshotDate)}</strong>: ${what}${detail}</li>`;
     })
     .join("");
 
@@ -200,6 +215,12 @@ export function buildSponsorSeoBody(
          Sponsorship from this employer cannot support a UK visa application. If you have paid for
          one, <a href="/what-to-do-fake-cos" style="color:#991b1b;text-decoration:underline;">read what to do next</a>.
        </p>`
+    : isGracePeriod
+    ? `<p style="background:#fffbeb;border:1px solid #fde68a;color:#92400e;padding:12px 16px;border-radius:8px;margin:1rem 0;">
+         <strong>Under review:</strong> this company recently disappeared from the Home Office register.
+         This can mean the licence was suspended, surrendered, or revoked. Verify it before relying on
+         any Certificate of Sponsorship from them.
+       </p>`
     : "";
 
   return `
@@ -212,7 +233,7 @@ export function buildSponsorSeoBody(
       <h1 style="font-size:1.875rem;font-weight:700;color:#1f2937;margin-bottom:0.5rem;">
         ${name} — ${label} UK Sponsor Licence
       </h1>
-      <p style="color:#374151;line-height:1.6;">${esc(statusSentence(sponsor))}</p>
+      <p style="color:#374151;line-height:1.6;">${escapeHtml(statusSentence(sponsor))}</p>
       ${warningBlock}
       <h2 style="font-size:1.25rem;margin:1.5rem 0 0.5rem;color:#1f2937;">Register details</h2>
       <table style="border-collapse:collapse;width:100%;font-size:0.95rem;">${tableRows}</table>
