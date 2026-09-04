@@ -21,8 +21,10 @@
   (fallback `%` similarity + status filter, revoked search).
 - Not executable here: no postgres/psql/Docker in this environment.
 
-## Live runbook (operator: staging with production-like volume, ≥100k rows)
-1. `DATABASE_URL=<staging> sh scripts/db/explain-sponsors.sh`
+## Live runbook (operator: staging with recorded provenance — see README)
+1. Seed ≥100k rows: sanitized production snapshot (preferred, with approval)
+   or `psql "$DATABASE_URL" -v seed_confirm=yes -v rowcount=100000 -f scripts/db/seed-synthetic-sponsors.sql`.
+2. `DATABASE_URL=<staging> sh scripts/db/explain-sponsors.sh`
 2. Inspect `docs/perf-evidence/explain/before/*.txt` vs `after/*.txt`.
 
 ## Pass criteria

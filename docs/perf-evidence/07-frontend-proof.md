@@ -40,16 +40,24 @@ visible + overscan (≈15–20 rows). Route-level code-splitting was already in
 place (24 lazy routes); no `manualChunks` change was warranted — splitting
 `index-*.js` further would churn long-term cache hashes for no measured gain.
 
-## Lighthouse / Core Web Vitals (operator: Nicolas)
+## Lighthouse / Core Web Vitals (operator: staging host required)
 Not runnable in this environment (no browser, no deployed URL). Procedure:
-1. `BASE_URL=<staging> npx @lhci/cli autorun` on the pre-change build →
-   save `docs/perf-evidence/lhci/before/`.
-2. Same on this build → `docs/perf-evidence/lhci/after/`.
-3. Compare LCP/CLS/INP/TBT on `/`, `/sponsor-directory`, `/sponsor-changes`.
-4. DOM check on `/sponsor-directory` (100-row page):
+1. If a pre-change staging deployment exists: `BASE_URL=<staging>`
+   `npx @lhci/cli autorun` → save `docs/perf-evidence/lhci/before/`, then
+   same on this build → `lhci/after/`. **If none exists (assumed): the first
+   LHCI run on staging IS the pre-change baseline** — run it before the
+   virtualized build deploys if possible, otherwise record it as the new
+   baseline and compare all later runs against it under identical conditions
+   (same URL set, same throttling, same staging data per the provenance
+   record in `README.md`).
+2. Compare LCP/CLS/INP/TBT on `/`, `/sponsor-directory`, `/sponsor-changes`,
+   plus bundle size and field RUM.
+3. DOM check on `/sponsor-directory` (100-row page):
    `document.querySelectorAll('*').length` at scroll-top — expect ≈5–8× fewer
    nodes after (virtualized) vs before (100 rows mounted).
-5. Field data after 7 days: `GET /metrics/perf` → `rum` percentiles.
+4. Field data after 7 days: `GET /metrics/perf` → `rum` percentiles.
+5. Reporting rule: "within defined bundle budget" — never "faster" — until
+   LHCI, DOM-count, and field-RUM deltas exist.
 
 ## Evidence (before sign-off)
 - [x] bundle before/after table above (this environment)

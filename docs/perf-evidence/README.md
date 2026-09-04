@@ -19,3 +19,22 @@ Code-side work is done; unchecked items require a live environment
 - Q1/Q2 EXPLAIN selects the 0024 indexes; no residual seq scans.
 - LCP ≤ 2.5 s (warn), CLS ≤ 0.1 (error), INP ≤ 300 ms (warn) — see `lighthouserc.cjs`.
 - All live transcripts committed under this directory.
+
+## Locked execution inputs
+- Load profile: 8 workers, 60 s, 10 MB PDF cap, mix 70/20/10 reads/uploads/auth.
+- LHCI rule: if no pre-change staging deployment exists, the first LHCI run
+  is the pre-change baseline; compare all later runs against it under
+  identical conditions (same URL set, same throttling, same staging data).
+- Frontend reporting: describe the result as "within defined bundle budget"
+  (currently 577.0 KB total JS gzip) — never "faster" — until LHCI, DOM-count,
+  and field-RUM deltas exist.
+
+## Provisioning records (fill in before the corresponding gate)
+- R2: see the provisioning record in `02-storage-proof.md` (bucket, scope,
+  secret locations, named ops-account owner, rotation/removal).
+- Staging provenance (required for Gates 3–6 — EXPLAIN/load results are only
+  meaningful against known data):
+  - [ ] Source: sanitized production snapshot (approval ref: …) OR synthetic
+    seed (`scripts/db/seed-synthetic-sponsors.sql`, rowcount: …).
+  - [ ] Staging URL: …
+  - [ ] sponsor_canonical row count at run time: …

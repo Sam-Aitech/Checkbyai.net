@@ -55,6 +55,29 @@
 5. Negative control (pre-fix behavior): with the old code this run fails with
    `ENOENT` on B — keep one transcript showing old-vs-new if required.
 
+## Production R2 provisioning (status: NOT CONFIRMED — complete before Gate 3)
+Owner: project/company operations account (not an individual developer).
+1. Cloudflare dashboard → R2 → Create bucket, **EU jurisdiction**, private
+   (no public access, no custom domain unless required).
+2. R2 → Manage API tokens → Create token scoped to this bucket only:
+   Object Read + Write + Delete. No account-wide tokens.
+3. Enable default encryption on the bucket; add lifecycle rule expiring
+   `verify/*` after 7 days.
+4. Store `S3_ENDPOINT=https://<account>.r2.cloudflarestorage.com`,
+   `S3_REGION=auto`, `S3_BUCKET`, `S3_PREFIX`, `S3_ACCESS_KEY_ID`,
+   `S3_SECRET_ACCESS_KEY`, `S3_SSE=AES256` in Replit Secrets (runtime) and
+   CI secrets (only if a job needs them) — never in the repository.
+5. Set identical values on BOTH api and worker services; boot refuses to
+   start otherwise (`validateDocumentStoreConfig`).
+6. Define rotation schedule + access-removal procedure; record owner below.
+
+### Provisioning record (fill in at provisioning time)
+- [ ] Bucket name / region-jurisdiction: …
+- [ ] Token scope (bucket, permissions): …
+- [ ] Secret locations (Replit Secrets / CI): …
+- [ ] Credential owner (ops account): …
+- [ ] Rotation schedule + removal procedure: …
+
 ## Evidence (paste live outputs here before sign-off)
 - [ ] API enqueue log + worker resolve-by-key log (different hosts)
 - [ ] `completed` poll response with matching receipt

@@ -10,6 +10,8 @@
 //
 // --cookie must belong to an admin user (reads /metrics/perf) with COS access
 // (for POST /api/verify). Without --pdf only API traffic is generated.
+// Locked traffic mix per worker: 70% reads / 20% PDF uploads (when --pdf is
+// given, else reads) / 10% auth-admin requests.
 // Prints a JSON summary and writes load-<label>-<timestamp>.json.
 import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
@@ -58,7 +60,7 @@ async function timedGet(path) {
   }
 }
 
-const API_PATHS = [
+const READ_PATHS = [
   "/api/health",
   "/api/sponsors/directory?limit=5",
   "/api/sponsors/directory?limit=5&status=ACTIVE",
@@ -66,10 +68,25 @@ const API_PATHS = [
   "/api/sponsors/latest-change",
 ];
 
-async function apiWorker(deadline) {
+const AUTH_PATHS = [
+  "/api/auth/user",
+  "/api/my-verifications",
+  "/api/admin/sponsor-monitor/status",
+];
+
+// Locked traffic mix: 70% reads / 20% PDF uploads / 10% auth-admin.
+async function mixedWorker(deadline, pdfBytes, pdfShare) {
   let i = 0;
+  let j = 0;
   while (Date.now() < deadline) {
-    await timedGet(API_PATHS[i++ % API_PATHS.length]);
+    const r = Math.random();
+    if (pdfBytes && r < pdfShare) {
+      await submitPdf(pdfBytes);
+    } else if (r < pdfShare + 0.1) {
+      await timedGet(AUTH_PATHS[j++ % AUTH_PATHS.length]);
+    } else {
+      await timedGet(READ_PATHS[i++ % READ_PATHS.length]);
+    }
   }
 }
 
@@ -124,12 +141,6 @@ async function pollJob(statusUrl, timeoutMs) {
   jobsFailed += 1;
 }
 
-async function pdfWorker(deadline, pdfBytes) {
-  while (Date.now() < deadline) {
-    await submitPdf(pdfBytes);
-  }
-}
-
 function percentile(sorted, p) {
   if (sorted.length === 0) return 0;
   return sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))];
@@ -147,10 +158,8 @@ await fetch(`${BASE}/metrics/perf/reset`, { method: "POST", headers });
 
 const deadline = Date.now() + DURATION_S * 1000;
 const workers = [];
-for (let i = 0; i < CONCURRENCY; i++) workers.push(apiWorker(deadline));
-if (pdfBytes) {
-  for (let i = 0; i < 2; i++) workers.push(pdfWorker(deadline, pdfBytes));
-}
+const PDF_SHARE = 0.2;
+for (let i = 0; i < CONCURRENCY; i++) workers.push(mixedWorker(deadline, pdfBytes, pdfBytes ? PDF_SHARE : 0));
 await Promise.all(workers);
 
 const sorted = [...latencies].sort((a, b) => a - b);
@@ -159,7 +168,7 @@ const serverPerf = await perfSnapshot().catch((e) => ({ error: e.message }));
 const summary = {
   label: LABEL,
   timestamp: new Date().toISOString(),
-  config: { base: BASE, concurrency: CONCURRENCY, durationS: DURATION_S, withPdf: Boolean(pdfBytes) },
+  config: { base: BASE, concurrency: CONCURRENCY, durationS: DURATION_S, withPdf: Boolean(pdfBytes), mix: "70/20/10 reads/uploads/auth" },
   client: {
     requests: apiCount,
     errors: apiErrors,
