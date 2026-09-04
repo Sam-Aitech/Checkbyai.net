@@ -1,8 +1,16 @@
 import * as fs from "fs";
 import * as path from "path";
 import { createHash, randomBytes } from "crypto";
+import type { ServerSideEncryption } from "@aws-sdk/client-s3";
 import { UPLOADS_DIR } from "../utils/uploadGuard";
 import { logger } from "../utils/logger";
+
+function resolveSSE(): ServerSideEncryption | undefined {
+  const raw = process.env.S3_SSE;
+  if (raw === "AES256" || raw === "aws:kms" || raw === "aws:kms:dsse") return raw;
+  if (raw) logger.warn({ raw }, "[DocumentStore] Ignoring unsupported S3_SSE value");
+  return undefined;
+}
 
 export interface DocumentStore {
   put(key: string, bytes: Buffer, contentType?: string): Promise<void>;
@@ -122,11 +130,13 @@ class S3DocumentStore implements DocumentStore {
   async put(key: string, bytes: Buffer, contentType = "application/pdf"): Promise<void> {
     const client = await this.getClient();
     const { PutObjectCommand } = await import("@aws-sdk/client-s3");
+    const sse = resolveSSE();
     await client.send(new PutObjectCommand({
       Bucket: this.bucket,
       Key: this.objectKey(key),
       Body: bytes,
       ContentType: contentType,
+      ...(sse ? { ServerSideEncryption: sse } : {}),
     }));
   }
 
@@ -192,4 +202,36 @@ export function getDocumentStore(): DocumentStore {
 
 export function documentKeyChecksum(bytes: Buffer): string {
   return createHash("sha256").update(bytes).digest("hex");
+}
+
+export type StoreConfigVerdict =
+  | { ok: true; driver: string }
+  | { ok: false; reason: string };
+
+export function validateDocumentStoreConfig(role: "api" | "worker" | "all"): StoreConfigVerdict {
+  const driver = (process.env.DOCUMENT_STORE_DRIVER || "local").toLowerCase();
+  if (driver === "s3") {
+    if (!process.env.S3_BUCKET) {
+      return { ok: false, reason: "DOCUMENT_STORE_DRIVER=s3 requires S3_BUCKET." };
+    }
+    if (process.env.NODE_ENV === "production" && !process.env.S3_ENDPOINT && (process.env.S3_REGION || "auto") === "auto") {
+      logger.warn("[DocumentStore] S3 driver in production without S3_ENDPOINT — assuming AWS S3 with default credential chain.");
+    }
+    if (!process.env.S3_ACCESS_KEY_ID) {
+      logger.info("[DocumentStore] No static S3 credentials — SDK will use the default credential chain (IAM role / instance profile).");
+    }
+    return { ok: true, driver };
+  }
+  if (role === "worker" && process.env.UPLOADS_SHARED !== "true") {
+    return {
+      ok: false,
+      reason:
+        "DOCUMENT_STORE_DRIVER=local without UPLOADS_SHARED=true: a split worker cannot read the API container filesystem. " +
+        "Mount a shared volume (single-host compose) or switch both roles to DOCUMENT_STORE_DRIVER=s3 (R2).",
+    };
+  }
+  if (role !== "all" && process.env.UPLOADS_SHARED !== "true") {
+    logger.warn("[DocumentStore] Split roles with the local driver and no UPLOADS_SHARED=true — jobs will fail with ENOENT on the worker.");
+  }
+  return { ok: true, driver };
 }

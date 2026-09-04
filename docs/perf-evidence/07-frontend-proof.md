@@ -12,9 +12,15 @@
 - `server/routes/rum.ts` (new, registered in `routes.ts`): zod-validated,
   rate-limited (60/min/IP) beacon sink into the perf reservoirs; visible in
   `GET /metrics/perf` as `rum` percentiles — field data, not estimates.
-- `SponsorDirectory.tsx`: results list window-virtualized with the
-  already-installed `@tanstack/react-virtual` (dynamic row measurement,
-  overscan 10, identical row markup, per-row `border-b` replaces `divide-y`).
+- `SponsorDirectory.tsx`: results list virtualized with the
+  already-installed `@tanstack/react-virtual` via `useWindowVirtualizer`
+  (page-level scroll observation with measured `scrollMargin`, dynamic row
+  measurement, overscan 10, identical row markup, per-row `border-b`
+  replaces `divide-y`). An earlier revision used `useVirtualizer` with
+  `getScrollElement: () => null`, which never attaches scroll observers —
+  fixed before release. Browser coverage: `tests/e2e/journey4-...`
+  (bounded mounts, scroll swaps rows, last-row visibility, link/keyboard/
+  mobile checks).
 - `lighthouserc.cjs` + `.github/workflows/lighthouse.yml` (dispatch +
   weekly schedule, skips cleanly without `BASE_URL`): asserts LCP ≤ 2.5 s
   (warn), CLS ≤ 0.1 (error), INP ≤ 300 ms (warn), TBT ≤ 400 ms (warn);

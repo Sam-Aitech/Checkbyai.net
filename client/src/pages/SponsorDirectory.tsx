@@ -1,6 +1,6 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useLayoutEffect, useRef } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { Link } from "wouter";
 import {
   Search, Building2, MapPin, Route, Star, CheckCircle, Zap, XCircle,
@@ -279,15 +279,26 @@ function DirectoryRow({ r }: { r: DirectoryResult }) {
 }
 
 function VirtualizedResults({ results }: { results: DirectoryResult[] }) {
-  const rowVirtualizer = useVirtualizer({
+  const listRef = useRef<HTMLDivElement>(null);
+  const [scrollMargin, setScrollMargin] = useState(0);
+  useLayoutEffect(() => {
+    const measure = () => {
+      const top = listRef.current?.getBoundingClientRect().top ?? 0;
+      setScrollMargin(Math.max(0, top + window.scrollY));
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+  const rowVirtualizer = useWindowVirtualizer({
     count: results.length,
-    getScrollElement: () => null,
     estimateSize: () => 76,
     overscan: 10,
+    scrollMargin,
   });
   const items = rowVirtualizer.getVirtualItems();
   return (
-    <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}>
+    <div ref={listRef} style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}>
       {items.map((virtualRow) => {
         const r = results[virtualRow.index];
         return (

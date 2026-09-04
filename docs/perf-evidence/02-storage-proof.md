@@ -15,12 +15,28 @@
   key, unlinks temp immediately. The BullMQ job carries ONLY `documentKey`
   (no local path). Admin-override path deletes the stored object after use.
 - `server/workers/verificationWorker.ts`: `get(key)` → temp file →
-  `runVerificationAnalysis` → persist → `finally` deletes temp AND store key
-  (exactly-once document lifecycle; retries re-download from the store).
-  Inline (`?sync=1`) path materializes from the store the same way.
-- `server/worker.ts`: best-effort `purgeStale(24h)` orphan sweep at boot.
-- `.env.example`: `DOCUMENT_STORE_DRIVER`, `S3_*`, `UPLOADS_DIR`,
-  `PROCESS_ROLE` documented.
+  `runVerificationAnalysis` → persist. Retry-safe lifecycle: temp file always
+  deleted in `finally`; the durable key is deleted on success or only when the
+  attempt is exhausted (`attemptsMade + 1 >= opts.attempts`), so BullMQ retries
+  re-download the same object. Covered by
+  `server/workers/__tests__/verificationWorker.test.ts` (fail-then-succeed,
+  exhausted-cleanup, first-try success, attempt classification).
+- `server/worker.ts`: refuses to boot with `driver=local` unless
+  `UPLOADS_SHARED=true` (split worker must share the FS); refuses `driver=s3`
+  without `S3_BUCKET` in production. Same check runs at API boot via
+  `validateDocumentStoreConfig()` (fatal in production). Best-effort
+  `purgeStale(24h)` orphan sweep at worker boot.
+- `docker-compose.yml` (local single-host only): named `documents-data`
+  volume mounted at `/app/uploads` in BOTH `app:` and `worker:`, with
+  `DOCUMENT_STORE_DRIVER=local` + `UPLOADS_SHARED=true` set explicitly.
+- S3 driver: optional `S3_SSE` (e.g. `AES256`) on `PutObject`.
+- **Production decision: Cloudflare R2** — S3-compatible, no egress fees.
+  R2 bucket requirements: private (no public access), least-privilege API
+  token (object read/write/delete on this bucket only), default encryption on,
+  lifecycle rule expiring `verify/*` after 7 days (defense in depth — the
+  worker deletes keys on completion and sweeps orphans at boot).
+- `.env.example`: `DOCUMENT_STORE_DRIVER`, `UPLOADS_SHARED`, `S3_*`,
+  `S3_SSE`, `UPLOADS_DIR`, `PROCESS_ROLE` documented.
 
 ## Verified in this environment
 - `npx tsc --noEmit`: zero errors in route, worker, store, entrypoint.

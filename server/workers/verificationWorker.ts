@@ -88,12 +88,22 @@ export async function processVerificationJob(job: Job<VerificationJobData>) {
     };
     emitToUser(userId, "verify:progress", { ...payload, stage: "done" });
     logger.info(`[VerificationWorker] Job ${job.id} complete — ${result}`);
+    await getDocumentStore().delete(documentKey).catch(() => {});
     return payload;
   } catch (err) {
     emitToUser(userId, "verify:progress", { jobId: job.id, receiptId, stage: "failed", error: err instanceof Error ? err.message : String(err) });
+    if (isLastAttempt(job)) {
+      await getDocumentStore().delete(documentKey).catch(() => {});
+    } else {
+      logger.info(`[VerificationWorker] Job ${job.id} will retry — keeping ${documentKey}`);
+    }
     throw err;
   } finally {
     await fs.promises.unlink(tmpPath).catch(() => {});
-    await getDocumentStore().delete(documentKey).catch(() => {});
   }
+}
+
+export function isLastAttempt(job: Pick<Job, "attemptsMade" | "opts">): boolean {
+  const maxAttempts = job.opts.attempts ?? 1;
+  return job.attemptsMade + 1 >= maxAttempts;
 }

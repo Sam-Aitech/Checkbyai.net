@@ -14,6 +14,7 @@ import { errorHandler } from "./lib/errorHandler";
 // Import the job queue setup
 import { initJobQueue, setupApiWorkers, setupVerificationWorkers, getProcessRole } from "./services/jobQueue";
 import { initRedisCache, cacheFlushPattern } from "./utils/redisClient";
+import { validateDocumentStoreConfig } from "./services/documentStore";
 import { perfMiddleware } from "./utils/perfMonitor";
 import { rebuildSponsorIndex } from "./utils/sponsorSearch";
 
@@ -424,9 +425,15 @@ async function applyDataFixbacks() {
      logger.error({ err }, "[Startup] Failed to check sponsor_canonical row count — DB may be unavailable.");
    }
    
-   // Probe Redis: initialise BullMQ queues + shared cache client (no-op if Redis is unavailable)
-   await initJobQueue();
-   await initRedisCache();
+    const storeVerdict = validateDocumentStoreConfig(getProcessRole());
+    if (!storeVerdict.ok) {
+      logger.error(`[Startup] Invalid document store configuration: ${storeVerdict.reason}`);
+      if (process.env.NODE_ENV === "production") process.exit(1);
+    }
+
+    // Probe Redis: initialise BullMQ queues + shared cache client (no-op if Redis is unavailable)
+    await initJobQueue();
+    await initRedisCache();
    // One-shot cache invalidation on boot: ensures the NOT_LISTED → REMOVED_REVOKED
    // backfill is reflected in the watch list immediately on the first deploy
    // after this fix (and is a cheap no-op on subsequent restarts).

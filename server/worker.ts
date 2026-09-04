@@ -1,7 +1,7 @@
 import type { Worker } from 'bullmq';
 import { getHeapStatistics } from 'v8';
 import { initJobQueue, setupVerificationWorkers, isQueueAvailable } from './services/jobQueue';
-import { getDocumentStore } from './services/documentStore';
+import { getDocumentStore, validateDocumentStoreConfig } from './services/documentStore';
 import { logger } from './utils/logger';
 
 async function main(): Promise<void> {
@@ -11,6 +11,12 @@ async function main(): Promise<void> {
     nodeOptions: process.env.NODE_OPTIONS ?? '(unset)',
     heapLimitMB: Math.round(getHeapStatistics().heap_size_limit / 1024 / 1024),
   }, '[Worker] Starting standalone PDF verification worker');
+
+  const storeVerdict = validateDocumentStoreConfig('worker');
+  if (!storeVerdict.ok) {
+    logger.error(`[Worker] Refusing to start: ${storeVerdict.reason} Exiting.`);
+    process.exit(1);
+  }
 
   await initJobQueue();
 
