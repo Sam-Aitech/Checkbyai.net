@@ -40,8 +40,13 @@ export function escapeHtml(str: string): string {
 /** JSON.stringify escapes quotes/backslashes but not `<` — without this, a
  * value containing `</script>` closes the surrounding <script> tag early and
  * lets the rest execute as markup. */
+// The 6-char JS/JSON unicode-escape sequence for the "less than" character,
+// built via fromCharCode(92) (backslash) + "u003c" rather than a backslash
+// literal in source, to keep this unambiguous.
+const JSON_LD_LT_ESCAPE = String.fromCharCode(92) + "u003c";
+
 export function toSafeJsonLd(value: unknown): string {
-  return JSON.stringify(value).replace(/</g, "\\u003c");
+  return JSON.stringify(value).replace(/</g, JSON_LD_LT_ESCAPE);
 }
 
 /** Matches the injected #root markup in both dev (client/index.html) and
@@ -94,9 +99,10 @@ function statusSentence(sponsor: Sponsor): string {
       );
     default: {
       const removed = formatDateGb(sponsor.removedAt);
+      const removedClause = removed ? ` (removed around ${removed})` : "";
       return (
         `No. ${name}${town} no longer appears on the Home Office Register of Licensed Sponsors` +
-        `${removed ? ` (removed around ${removed})` : ""}. ` +
+        `${removedClause}. ` +
         `A Certificate of Sponsorship issued by this company cannot support a UK visa application.`
       );
     }
@@ -209,19 +215,20 @@ export function buildSponsorSeoBody(
        <ul style="list-style:disc;padding-left:1.5rem;">${historyItems}</ul>`
     : "";
 
-  const warningBlock = isRevoked
-    ? `<p style="background:#fef2f2;border:1px solid #fecaca;color:#991b1b;padding:12px 16px;border-radius:8px;margin:1rem 0;">
+  let warningBlock = "";
+  if (isRevoked) {
+    warningBlock = `<p style="background:#fef2f2;border:1px solid #fecaca;color:#991b1b;padding:12px 16px;border-radius:8px;margin:1rem 0;">
          <strong>Warning:</strong> this company is no longer a licensed sponsor. A Certificate of
          Sponsorship from this employer cannot support a UK visa application. If you have paid for
          one, <a href="/what-to-do-fake-cos" style="color:#991b1b;text-decoration:underline;">read what to do next</a>.
-       </p>`
-    : isGracePeriod
-    ? `<p style="background:#fffbeb;border:1px solid #fde68a;color:#92400e;padding:12px 16px;border-radius:8px;margin:1rem 0;">
+       </p>`;
+  } else if (isGracePeriod) {
+    warningBlock = `<p style="background:#fffbeb;border:1px solid #fde68a;color:#92400e;padding:12px 16px;border-radius:8px;margin:1rem 0;">
          <strong>Under review:</strong> this company recently disappeared from the Home Office register.
          This can mean the licence was suspended, surrendered, or revoked. Verify it before relying on
          any Certificate of Sponsorship from them.
-       </p>`
-    : "";
+       </p>`;
+  }
 
   return `
     <main style="max-width:760px;margin:0 auto;padding:2rem 1rem;font-family:system-ui,sans-serif;">
