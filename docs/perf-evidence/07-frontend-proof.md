@@ -29,9 +29,9 @@
 ## Production bundle output (measured here, `vite build`)
 | Chunk | Before | After | Δ |
 |---|---|---|---|
-| `SponsorDirectory-*.js` raw / gzip | 15.55 KB / 4.64 KB | 31.02 KB / 9.55 KB | +15.5 / +4.9 KB (react-virtual) |
+| `SponsorDirectory-*.js` raw / gzip | 15.55 KB / 4.64 KB | 30.21 KB / 9.30 KB | +14.7 / +4.7 KB (react-virtual) |
 | `index-*.js` entry raw / gzip | 406.24 KB / 132.82 KB | 412.50 KB / 135.21 KB | +6.3 / +2.4 KB (web-vitals + rum client) |
-| Total JS gzip (100 chunks) | 569.9 KB | 576.9 KB | +7.0 KB |
+| Total JS gzip (100 chunks) | 569.9 KB | 577.0 KB | +7.1 KB |
 | Budget (`perf:budget`) | pass | pass | — |
 
 Stated plainly: virtualization costs ~5 KB gzip on this route; its payoff
