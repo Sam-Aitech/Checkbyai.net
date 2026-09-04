@@ -103,6 +103,13 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 - **`CORE_URLS`** and `seoMetaMap` updated in `seo.ts` for bot meta injection on the guide path.
 - **0 lint errors, 328 tests pass** — verified.
 
+#### Phase 7 — Tech-Debt Refactor (Items 1–4)
+- **Item 1 (routes/schema bloat):** `server/routes/admin.ts` (2433 lines, 68 endpoints) split into 7 controllers under `server/routes/admin/` (`patterns`, `verifications`, `sponsorMonitor`, `users`, `system`, `paid`, `notifications`); `admin.ts` is now a 12-line barrel preserving `registerAdminRoutes()`. `shared/schema.ts` (40 tables) split into 6 domain models under `shared/models/` (`users`, `verification`, `sponsors`, `notifications`, `billing`, `ops`); `schema.ts` is a re-export barrel so `server/db.ts` (`import * as schema`) is unaffected. Route-for-route (68/68) and export-for-export (114/114) parity verified.
+- **Item 2 (sync PDF verify → async):** `POST /api/verify` is now a job producer returning `202 { jobId, statusUrl }`. New `VERIFICATION_JOB` queue + `server/workers/verificationWorker.ts` (concurrency 2) run `PDFAnalyzer`/`COSAuthenticityChecker` out-of-band; shared analysis extracted to `server/services/verificationAnalysis.ts`. Progress via Socket.IO `verify:progress` (`user:{id}` room) + `GET /api/verify/job/:jobId` poll fallback. Admin-override fast path stays sync; `?sync=1` and Redis-down inline fallback preserved; credit/daily-limit deduction moved into the worker transaction (exactly-once). Frontend (`FileUpload.tsx`, `FileUploadSimple.tsx`, `lib/api.ts`) polls via new `lib/verifyJob.ts`, handling both 200 (sync) and 202 (async) shapes.
+- **Item 3 (duplicate notification engines):** Finding misnamed the duplicate — `consolidatedNotificationEngine.ts` never existed. Real duplication was `services/notificationEngine.ts` (`notifyUsersOfEvent`, production path) vs `utils/notificationDispatcher.ts` (`notifyAffectedUsers`, admin-test-only path) with divergent rate limits (3/hr Redis vs 10/day DB) and audit tables (`notif_log` vs `notification_log`). Admin test endpoint now dispatches through `notifyUsersOfEvent`; `notifyAffectedUsers` kept but deprecated. `sendViaResend` retained (still used by state machine + monitoring).
+- **Item 4 (registry indexes):** `pg_trgm` + GIN on `current_name`/`town_city` (0003) and compounds (0014) already existed; proposed `(licence_status, rating_tier, last_updated_at)` rejected (columns don't exist — actual: `status`, `type_rating`, no `last_updated_at`). New `migrations/0024_sponsor_directory_route_trgm.sql`: GIN trigram on `route` (only directory filter with zero index coverage) + partial btree on `removed_at` for the directory-stats aggregation.
+- **Verify:** 0 new type errors (5 pre-existing client-only), 328 tests pass, lint 261 errors byte-identical to baseline `admin.ts` (relocated verbatim, zero new).
+
 ### Remaining (Not Yet Scoped)
 - Fuse.js search index versioning for instant CDV cache bust on rebuild.
 - React Query `gcTime` reduction for sponsor pages (currently default 5min).
@@ -121,7 +128,13 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 | `server/utils/sponsorSearch.ts` | Fuse.js index + `getIndexHealth()` |
 | `server/routes/sponsors.ts` | `/api/sponsor-changes`, `/api/daily-digest/current` (with `lastPipelineRun`) |
 | `server/routes/sponsorPages.ts` | Public endpoints + Cache-Control headers |
-| `server/routes/admin.ts` | Rebuild-index, diagnostics, force-unlock |
+| `server/routes/admin.ts` | Barrel delegating to `server/routes/admin/` controllers (patterns, verifications, sponsorMonitor, users, system, paid, notifications) |
+| `server/routes/verification.ts` | Async `POST /api/verify` (202 producer) + `GET /api/verify/job/:jobId` status |
+| `server/services/verificationAnalysis.ts` | Shared PDF forensic analysis (worker + inline fallback) |
+| `server/workers/verificationWorker.ts` | BullMQ `VERIFICATION_JOB` consumer (concurrency 2) |
+| `server/services/jobQueue.ts` | Queue registry (`VERIFICATION_JOB`, `getVerificationQueue()`) |
+| `server/utils/notificationDispatcher.ts` | Deprecated `notifyAffectedUsers`; canonical path is `notifyUsersOfEvent` |
+| `shared/models/` | Domain schema models (users, verification, sponsors, notifications, billing, ops) |
 | `client/src/pages/SponsorMonitor.tsx` | Frontend sponsor monitor page |
 | `client/src/components/LandingDigest.tsx` | Homepage digest |
 | `client/src/lib/queryClient.ts` | React Query global defaults |
@@ -139,3 +152,4 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 | `docs/SEO_STRATEGY.md` | Full SEO strategy — keyword targets, content plan, timeline |
 | `migrations/0022_push_subscriptions.sql` | Push subscriptions table |
 | `migrations/0023_notification_preferences_webhook.sql` | Webhook prefs columns |
+| `migrations/0024_sponsor_directory_route_trgm.sql` | GIN trigram on `route`, partial btree on `removed_at` |

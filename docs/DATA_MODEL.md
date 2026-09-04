@@ -261,12 +261,12 @@ Immutable log of all detected changes on the sponsor register.
 | `snapshotDate` | text | ISO date when change was detected |
 | `detectedAt` | timestamp | — |
 
-**Alertable change types** (dispatched to users via notificationDispatcher):
+**Alertable change types** (dispatched to users via `notifyUsersOfEvent` in `services/notificationEngine.ts`):
 `NEW_LICENCE`, `RE_ACTIVATED`, `REMOVED_REVOKED`, `GRACE_PERIOD`, `UPGRADED`, `DOWNGRADED`, `ROUTE_CHANGE`
 
 **Non-alertable:** `NAME_CHANGE` — logged but not sent to users.
 
-**Note:** `id` is populated by `batchedInsertChanges()` using `.returning()` and written back to the in-memory `SponsorChange` objects so `notifyAffectedUsers()` can use it as the `notificationLog.changeId` FK.
+**Note:** `id` is populated by `batchedInsertChanges()` using `.returning()` and written back to the in-memory `SponsorChange` objects so `notifyUsersOfEvent()` can use it as the `notif_log.changeId` FK. (`notifyAffectedUsers()` in `utils/notificationDispatcher.ts` is deprecated.)
 
 ---
 

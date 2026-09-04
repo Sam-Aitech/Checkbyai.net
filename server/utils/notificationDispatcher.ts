@@ -281,6 +281,7 @@ async function sendNotificationViaChannel(
 }
 
 export async function notifyAffectedUsers(change: SponsorChange): Promise<{ sent: number; skipped: number; failed: number; queued: number }> {
+  log.warn(`[NotificationDispatcher] notifyAffectedUsers is deprecated — use notifyUsersOfEvent from services/notificationEngine instead.`);
   const stats = { sent: 0, skipped: 0, failed: 0, queued: 0 };
 
   // Global kill switch — admin can pause all notifications via /api/admin/notifications/pause

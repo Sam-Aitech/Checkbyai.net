@@ -163,9 +163,16 @@ export default function FileUploadSimple({
         throw new Error(`Verification failed: ${errorData.error || errorData.message || 'Unknown error'}`);
       }
       
-      const data = await response.json();
-      
-      // Transform backend response
+      let data = await response.json();
+      const accepted = (data.data ?? data) as any;
+      if (response.status === 202 || (accepted && accepted.jobId && accepted.statusUrl)) {
+        const { pollVerificationJob } = await import('../lib/verifyJob');
+        const jobResult: any = await pollVerificationJob(accepted.statusUrl);
+        data = jobResult.verificationId ? { ...jobResult, id: jobResult.verificationId } : jobResult;
+      } else {
+        data = data.data ?? data;
+      }
+
       const typeMapping: Record<string, 'genuine' | 'suspicious' | 'fake'> = {
         'genuine': 'genuine',
         'suspicious': 'suspicious',
@@ -173,15 +180,15 @@ export default function FileUploadSimple({
       };
 
       const transformedResult: VerificationResult = {
-        type: typeMapping[data.result] || 'fake',
-        confidence: (data.confidence || 0) / 100,
-        mismatchedFields: data.mismatchedFields || [],
-        checks: data.checks || [],
-        receiptId: data.receiptId,
-        documentHash: data.documentHash,
-        metadata: data.metadata || {},
-        verificationId: data.id,
-        cosCheck: data.cosCheck ?? null,
+        type: typeMapping[(data as any).result] || 'fake',
+        confidence: ((data as any).confidence || 0) / 100,
+        mismatchedFields: (data as any).mismatchedFields || [],
+        checks: (data as any).checks || [],
+        receiptId: (data as any).receiptId,
+        documentHash: (data as any).documentHash,
+        metadata: (data as any).metadata || {},
+        verificationId: (data as any).id ?? (data as any).verificationId,
+        cosCheck: (data as any).cosCheck ?? null,
       };
 
       setResult(transformedResult);

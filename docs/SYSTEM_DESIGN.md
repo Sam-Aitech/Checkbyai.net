@@ -285,7 +285,7 @@ All 3 rebuild paths call `rebuildSponsorIndex()` which issues a single `SELECT` 
 ### 3.4 Notification Engine
 
 ```
-notifyAffectedUsers(change: SponsorChange)  [changeId populated from batchedInsertChanges()]
+notifyUsersOfEvent(change: SponsorChange)  [changeId populated from batchedInsertChanges(); notifyAffectedUsers() in notificationDispatcher.ts is deprecated]
           │
           ▼
 Guard: change.id === undefined → warn + return (prevents FK violation)

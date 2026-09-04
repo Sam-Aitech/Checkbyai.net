@@ -32,7 +32,13 @@ export const api = {
     const formData = new FormData();
     formData.append('file', file);
     const response = await apiRequest('POST', '/api/verify', formData);
-    return response.json();
+    const body = await response.json();
+    const data = body.data ?? body;
+    if (response.status === 202 && data?.statusUrl) {
+      const { pollVerificationJob } = await import('./verifyJob');
+      return pollVerificationJob(data.statusUrl);
+    }
+    return data;
   },
 
   async getStats(): Promise<StatsResponse> {

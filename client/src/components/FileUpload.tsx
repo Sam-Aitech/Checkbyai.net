@@ -94,7 +94,14 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
         throw new Error(errorData.error || errorData.message || `Verification failed (${response.status})`);
       }
 
-      const data = await response.json();
+      let data = await response.json();
+      const accepted = (data.data ?? data) as any;
+      if (response.status === 202 || (accepted && accepted.jobId && accepted.statusUrl)) {
+        const { pollVerificationJob } = await import('../lib/verifyJob');
+        data = await pollVerificationJob(accepted.statusUrl);
+      } else {
+        data = data.data ?? data;
+      }
 
       const typeMapping: Record<string, 'genuine' | 'suspicious' | 'fake'> = {
         'genuine': 'genuine',
@@ -103,9 +110,9 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
       };
 
       const transformedResult = {
-        type: typeMapping[data.result] || 'fake',
-        confidence: (data.confidence || 0) / 100,
-        mismatchedFields: data.mismatchedFields || []
+        type: typeMapping[(data as any).result] || 'fake',
+        confidence: ((data as any).confidence || 0) / 100,
+        mismatchedFields: (data as any).mismatchedFields || []
       };
 
       setLocalResult(transformedResult);

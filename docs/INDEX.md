@@ -38,7 +38,7 @@
 Phase 1: discoverCsvUrl() → ensureTodaysArchive()   [qsv validate + 100k hard floor]
 Phase 2: runCsvDiff(yesterday_fp.csv, today_fp.csv)  [csvdiff Go binary]
 Phase 3: applyStateMachine(diff)                     [4-state: NEWLY_GRANTED/ACTIVE/GRACE_PERIOD/REMOVED_REVOKED]
-Phase 4: notifyAffectedUsers() per change            [7 alertable change types]
+Phase 4: notifyUsersOfEvent() per change              [7 alertable change types]
 Phase 5: generateHeadline() + monitor_job_runs audit
 ```
 

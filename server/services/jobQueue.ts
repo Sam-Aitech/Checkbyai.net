@@ -6,6 +6,7 @@ import * as Sentry from '@sentry/node';
 export const SPONSOR_REFRESH_JOB = 'sponsor-refresh';
 export const SCRAPING_JOB = 'scraping-job';
 export const NOTIFICATION_JOB = 'notification-dispatch';
+export const VERIFICATION_JOB = 'verification-job';
 
 // Plain connection options — passed directly to BullMQ so it creates its own
 // internal ioredis instance. Avoids the type-mismatch caused by bullmq bundling
@@ -20,6 +21,7 @@ const redisOpts = {
 let redisAvailable  = false;
 let sponsorQueue:  Queue | null = null;
 let notificationQueue: Queue | null = null;
+let verificationQueue: Queue | null = null;
 
 async function runJobWithSentryTrace<T>(
   job: Job,
@@ -75,6 +77,8 @@ export function getSponsorRefreshQueue(): Queue | null { return sponsorQueue; }
  */
 export function getNotificationQueue(): Queue | null { return notificationQueue; }
 
+export function getVerificationQueue(): Queue | null { return verificationQueue; }
+
 /**
  * Probe Redis with a standalone IORedis connection, then create BullMQ
  * queues + workers only when the ping succeeds.
@@ -111,6 +115,7 @@ export async function initJobQueue(): Promise<void> {
 // Redis is reachable — create the queues using plain opts (no shared client).
 sponsorQueue = new Queue(SPONSOR_REFRESH_JOB, { connection: redisOpts });
 notificationQueue = new Queue(NOTIFICATION_JOB, { connection: redisOpts });
+verificationQueue = new Queue(VERIFICATION_JOB, { connection: redisOpts });
 }
 
 /** Registers BullMQ workers. No-op if Redis was unavailable at startup. */
@@ -151,6 +156,17 @@ export function setupWorkers(): void {
       });
     },
     { connection: redisOpts }
+  );
+
+  new Worker(
+    VERIFICATION_JOB,
+    async (job: Job) => {
+      return runJobWithSentryTrace(job, VERIFICATION_JOB, async () => {
+        const { processVerificationJob } = await import('../workers/verificationWorker');
+        return processVerificationJob(job as Job);
+      });
+    },
+    { connection: redisOpts, concurrency: 2 }
   );
 
   logger.info('[JobQueue] BullMQ workers registered.');
