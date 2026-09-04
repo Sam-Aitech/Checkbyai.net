@@ -43,7 +43,7 @@ export function escapeHtml(str: string): string {
 // The 6-char JS/JSON unicode-escape sequence for the "less than" character,
 // built via fromCharCode(92) (backslash) + "u003c" rather than a backslash
 // literal in source, to keep this unambiguous.
-const JSON_LD_LT_ESCAPE = String.fromCharCode(92) + "u003c";
+const JSON_LD_LT_ESCAPE = String.fromCodePoint(92) + "u003c";
 
 export function toSafeJsonLd(value: unknown): string {
   return JSON.stringify(value).replace(/</g, JSON_LD_LT_ESCAPE);
