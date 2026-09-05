@@ -127,12 +127,12 @@ export default function LandingDigest() {
               Live Data
             </span>
             {formattedDate && (
-              <p className="text-[10px] text-muted-foreground">Updated {formattedDate}</p>
+              <p className="text-xs text-muted-foreground">Updated {formattedDate}</p>
             )}
           </div>
 
           <div className="text-center mb-4">
-            <p className="text-xs uppercase tracking-widest text-muted-foreground mb-4">
+            <p className="text-sm text-muted-foreground mb-4">
               {formattedDate}
             </p>
 
@@ -206,7 +206,7 @@ export default function LandingDigest() {
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link href="/pricing">
-              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-full px-6 font-bold gap-2">
+              <Button variant="brand" className="px-6 gap-2">
                 <Bell className="w-4 h-4" />
                 Get Alerts
                 <ArrowRight className="w-4 h-4" />

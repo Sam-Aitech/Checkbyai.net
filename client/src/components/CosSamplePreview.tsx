@@ -39,7 +39,7 @@ function formatCheckStatus(check: { passed: boolean; detail?: string }): string 
 
 export default function CosSamplePreview() {
   return (
-    <div className="mt-10 mb-2 grid lg:grid-cols-2 gap-8 items-start">
+    <div className="mt-12 mb-12 grid lg:grid-cols-2 gap-10 items-start">
       <div>
         <ol className="space-y-4">
           {STEPS.map((step) => (
@@ -57,8 +57,8 @@ export default function CosSamplePreview() {
       </div>
 
       <div>
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Sample result (synthetic example)</p>
-        <div className="p-5 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+        <p className="text-sm text-muted-foreground mb-2">Sample result (synthetic example)</p>
+        <div className="p-5 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
           <h3 className="text-sm font-semibold mb-3 text-gray-900 dark:text-gray-100">Verification Result</h3>
           <div className="flex items-center gap-3 mb-4">
             <div className="px-3 py-1.5 rounded-full text-sm font-semibold bg-gradient-to-r from-yellow-400 to-orange-500 text-white">
