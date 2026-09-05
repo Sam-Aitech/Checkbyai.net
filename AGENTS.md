@@ -117,6 +117,15 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 - `client/src/pages/SponsorDirectory.tsx`: `memo(StatusBadge/StatCard)`, `useVirtualizer` (64px, overscan 8, 640px viewport) for 50-row pages.
 - `client/src/pages/VerificationHistory.tsx`: `memo(VerificationCard)`, `useVirtualizer` (160px, 720px viewport), animation delay clamped to 0.3s.
 
+#### Phase 6 — Landing Usability Audit (16 heuristics)
+
+- **Buttons:** new `brand` variant in `ui/button.tsx` (`bg-emerald-600 hover:bg-emerald-700 rounded-full font-bold`); all landing primary CTAs migrated to it (#4, #14).
+- **Type/colour/radii:** no `text-[…]` arbitraries left on landing (`text-xs` min), `lg:text-[3.4rem]` → `text-5xl`; trust-strip colour explosion removed (single `text-white/60` list); `rounded-lg` cards → `rounded-xl`, `.icon-tile` → `var(--radius)` (#1–3).
+- **Typography:** long all-caps → sentence case (hero badge, digest date, sample label); short-label caps kept (#5, #9).
+- **Headings:** decorative mock `h3` → `p` + `aria-hidden`; footer `h4`/`h5` → `h2` in labelled `nav`s (#10–11).
+- **Grouping:** CoS link moved directly under search input; trust strip demoted to 3-item `ul[aria-label]` (#12–13).
+- **Spacing/density:** revoked rows `py-4` + relaxed leading (#15); `#cos-verification` split into demo/CTA + `cos-features` sections (#16).
+
 ### Remaining (Not Yet Scoped)
 - Fuse.js search index versioning for instant CDV cache bust on rebuild.
 - React Query `gcTime` reduction for sponsor pages (currently default 5min).
@@ -148,3 +157,9 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 | `server/routes/pushSubscriptions.ts` | Push API endpoints |
 | `migrations/0022_push_subscriptions.sql` | Push subscriptions table |
 | `migrations/0023_notification_preferences_webhook.sql` | Webhook prefs columns |
+| `client/src/components/HeroSection.tsx` | Landing hero, CoS section, revoked list (Phase 6) |
+| `client/src/components/AnimatedBackground.tsx` | Decorative CoS mock (Phase 6) |
+| `client/src/components/CosSamplePreview.tsx` | CoS demo/result preview (Phase 6) |
+| `client/src/components/Footer.tsx` | Footer nav + heading outline (Phase 6) |
+| `client/src/components/ui/button.tsx` | `brand` button variant (Phase 6) |
+| `client/src/index.css` | `.icon-tile` radius token (Phase 6) |
