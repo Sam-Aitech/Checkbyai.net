@@ -271,7 +271,7 @@ function NightlyStatsBar() {
     : "In last nightly run";
 
   return (
-    <div className="bg-slate-900 border-y border-slate-700 -mt-16 relative z-10">
+    <div className="bg-slate-900 border-y border-slate-700 -mt-8 sm:-mt-12 md:-mt-16 relative z-10">
       <div className="max-w-5xl mx-auto px-4 py-5">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-0 sm:divide-x sm:divide-slate-700 text-center">
           <div className="px-4">
@@ -725,7 +725,11 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
       <UrgencyBanner />
 
       <div className="relative overflow-hidden">
-        <div className="theme-gradient pb-32 pt-6">
+        {/* pb-* here and NightlyStatsBar's matching -mt-* below are a deliberate
+            paired overlap (the stats bar floats partway into the gradient's
+            bottom padding) — both scale together across breakpoints so the
+            overlap stays proportional instead of a single fixed-px hack. */}
+        <div className="theme-gradient pb-16 sm:pb-24 md:pb-32 pt-6">
           <div className="absolute inset-0 overflow-hidden">
             <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-white/5 rounded-full blur-3xl" />
             <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-white/5 rounded-full blur-3xl" />
@@ -790,19 +794,21 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={isLoaded ? { opacity: 1, y: 0 } : {}} transition={{ ...spring, delay: 0.45 }} className="space-y-3">
                   <div className="relative">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40 pointer-events-none" />
+                    <label htmlFor="hero-sponsor-search" className="sr-only">Search any UK sponsor by employer name</label>
                     <input
+                      id="hero-sponsor-search"
                       type="text"
                       ref={searchInputRef}
                       placeholder="Search any employer, e.g. NHS, Tata, Deloitte…"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && handleSearchSubmit()}
-                      className="w-full pl-11 pr-28 h-14 bg-white/10 border border-white/20 rounded-xl text-white placeholder:text-white/40 text-sm focus:outline-none focus:border-emerald-400 focus:bg-white/15 transition-all"
+                      className="w-full pl-11 pr-28 h-14 bg-white/10 border border-white/20 rounded-xl text-white placeholder:text-white/40 text-sm focus:outline-none focus:border-primary focus:bg-white/15 transition-all"
                     />
                     <button
                       onClick={handleSearchSubmit}
                       disabled={searchQuery.trim().length < 3 || searchLoading}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-full px-4 h-10 text-sm font-semibold transition-colors flex items-center gap-1.5"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground rounded-full px-4 h-10 text-sm font-semibold transition-colors flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
                     >
                       {heroSearchButtonLabel(searchLoading, alertMeOnSubmit)}
                     </button>
@@ -849,11 +855,11 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                               </p>
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0">
-                              {isNew && <span className="bg-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">New</span>}
-                              {isActive && !isNew && <span className="bg-emerald-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">Active</span>}
-                              {isGrace && <span className="bg-amber-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">Review</span>}
-                              {isRemoved && <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">Revoked</span>}
-                              {isBRated && <span className="bg-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">B</span>}
+                              {isNew && <span className="bg-blue-500/15 text-blue-300 border border-blue-400/30 text-xs font-bold px-2 py-0.5 rounded-full">New</span>}
+                              {isActive && !isNew && <span className="bg-emerald-500/15 text-emerald-300 border border-emerald-400/30 text-xs font-bold px-2 py-0.5 rounded-full">Active</span>}
+                              {isGrace && <span className="bg-amber-500/15 text-amber-300 border border-amber-400/30 text-xs font-bold px-2 py-0.5 rounded-full">Review</span>}
+                              {isRemoved && <span className="bg-red-500/15 text-red-300 border border-red-400/30 text-xs font-bold px-2 py-0.5 rounded-full">Revoked</span>}
+                              {isBRated && <span className="bg-orange-500/15 text-orange-300 border border-orange-400/30 text-xs font-bold px-2 py-0.5 rounded-full">B</span>}
                             </div>
                           </div>
                         );
@@ -862,7 +868,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                           : <div key={r.fingerprint}>{inner}</div>;
                       })}
                       <div className="pt-1 text-center">
-                        <Link href="/pricing" className="text-xs text-emerald-300 hover:text-emerald-200 font-semibold">
+                        <Link href="/pricing" className="text-xs text-indigo-300 hover:text-indigo-200 font-semibold">
                           Get alerts when any sponsor changes →
                         </Link>
                       </div>
@@ -896,14 +902,14 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                                     {removedDate ? `Licence revoked · ${removedDate}` : "Licence revoked"}{r.townCity ? ` · ${r.townCity}` : ""}
                                   </p>
                                 </div>
-                                <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shrink-0 mt-0.5">Revoked</span>
+                                <span className="bg-red-500/15 text-red-300 border border-red-400/30 text-xs font-bold px-2 py-0.5 rounded-full shrink-0 mt-0.5">Revoked</span>
                               </div>
                               <div className="mt-2 flex items-center justify-between gap-2">
                                 <p className="text-xs text-white/50">Get notified if this licence is restored</p>
                                 <Link
                                   href="/pricing?plan=starter"
                                   onClick={(e) => e.stopPropagation()}
-                                  className="text-xs font-bold text-emerald-300 hover:text-emerald-200 whitespace-nowrap"
+                                  className="text-xs font-bold text-indigo-300 hover:text-indigo-200 whitespace-nowrap"
                                 >
                                   Subscribe for alerts →
                                 </Link>
@@ -969,7 +975,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
               </Button>
             </Link>
             <Link href="/sponsor-monitor">
-              <Button size="lg" variant="outline" className="rounded-full px-8 font-bold border-emerald-500 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30">
+              <Button size="lg" variant="outline" className="rounded-full px-8 font-bold border-primary text-primary hover:bg-primary/5 dark:hover:bg-primary/10">
                 <Bell className="w-4 h-4 mr-2" />Set Up Monitoring
               </Button>
             </Link>
@@ -1066,10 +1072,10 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
               </CardContent>
             </Card>
 
-            <Card className="border-emerald-500 dark:border-emerald-400 ring-2 ring-emerald-500/30 relative shadow-lg shadow-emerald-500/10">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2"><Badge className="bg-emerald-600 text-white font-bold text-xs uppercase tracking-wider px-3 py-1 shadow-sm">Best Value</Badge></div>
+            <Card className="border-primary ring-2 ring-primary/30 relative shadow-lg shadow-primary/10">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2"><Badge className="bg-primary text-primary-foreground font-bold text-xs uppercase tracking-wider px-3 py-1 shadow-sm">Best Value</Badge></div>
               <CardContent className="py-6">
-                <p className="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-2">Starter</p>
+                <p className="text-xs font-bold uppercase tracking-wider text-primary mb-2">Starter</p>
                 <div className="mb-1"><span className="text-3xl font-extrabold text-foreground">£24.99</span><span className="text-sm text-muted-foreground">/month</span></div>
                 <p className="text-xs text-muted-foreground mb-6">£239.99/year (save 20%)</p>
                 <ul className="space-y-2.5 text-sm mb-6">
@@ -1168,7 +1174,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
 
           <div className="text-center">
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-              <Button variant="brand" size="lg" className="px-8 py-3 shadow-lg shadow-emerald-500/20 transition-all duration-200" onClick={onStartVerification}>
+              <Button variant="brand" size="lg" className="px-8 py-3 shadow-lg shadow-primary/20 transition-all duration-200" onClick={onStartVerification}>
                 Verify a Document
                 <ArrowRight className="ml-2 w-4 h-4" />
               </Button>
@@ -1205,7 +1211,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
           <h2 className="text-2xl sm:text-3xl font-bold mb-3">Stay Ahead of Sponsor Licence Changes</h2>
           <p className="text-slate-300 mb-8 max-w-lg mx-auto">Get automated alerts the moment a sponsor licence changes status, before it affects your visa, your career, or your future in the UK.</p>
           <Link href="/pricing">
-            <Button variant="brand" size="lg" className="text-base px-10 py-6 shadow-lg shadow-emerald-500/20">
+            <Button variant="brand" size="lg" className="text-base px-10 py-6 shadow-lg shadow-primary/20">
               <ShieldCheck className="w-5 h-5 mr-2" />Start Monitoring Now
             </Button>
           </Link>

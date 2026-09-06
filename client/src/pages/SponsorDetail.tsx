@@ -57,11 +57,11 @@ interface SponsorDetailData {
 // ── Change type display helpers ───────────────────────────────────────────────
 
 const CHANGE_META: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
-  NEW_LICENCE:      { label: "Licence Granted",    icon: <CheckCircle className="w-4 h-4" />,      color: "text-emerald-600 dark:text-emerald-400" },
+  NEW_LICENCE:      { label: "Licence Granted",    icon: <CheckCircle className="w-4 h-4" />,      color: "text-emerald-700 dark:text-emerald-400" },
   RE_ACTIVATED:     { label: "Licence Reinstated", icon: <RefreshCw className="w-4 h-4" />,         color: "text-blue-600 dark:text-blue-400" },
   REMOVED_REVOKED:  { label: "Licence Revoked",    icon: <XCircle className="w-4 h-4" />,           color: "text-red-600 dark:text-red-400" },
-  UPGRADED:         { label: "Rating Upgraded",    icon: <ArrowUpCircle className="w-4 h-4" />,     color: "text-emerald-600 dark:text-emerald-400" },
-  DOWNGRADED:       { label: "Rating Downgraded",  icon: <ArrowDownCircle className="w-4 h-4" />,   color: "text-amber-600 dark:text-amber-400" },
+  UPGRADED:         { label: "Rating Upgraded",    icon: <ArrowUpCircle className="w-4 h-4" />,     color: "text-emerald-700 dark:text-emerald-400" },
+  DOWNGRADED:       { label: "Rating Downgraded",  icon: <ArrowDownCircle className="w-4 h-4" />,   color: "text-amber-700 dark:text-amber-400" },
   ROUTE_CHANGE:     { label: "Route Updated",      icon: <Tag className="w-4 h-4" />,               color: "text-indigo-600 dark:text-indigo-400" },
   NAME_CHANGE:      { label: "Company Renamed",    icon: <FileText className="w-4 h-4" />,          color: "text-slate-600 dark:text-slate-400" },
 };
@@ -81,13 +81,13 @@ function formatDate(dateStr: string): string {
 function getStatusConfig(status: string) {
   switch (status) {
     case "ACTIVE":
-      return { label: "Active", icon: <CheckCircle className="w-4 h-4" />, badge: "bg-emerald-600", banner: "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200" };
+      return { label: "Active", icon: <CheckCircle className="w-4 h-4" />, badge: "bg-emerald-100 text-emerald-800 border border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30", banner: "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200" };
     case "NEWLY_GRANTED":
-      return { label: "Newly Granted", icon: <CheckCircle className="w-4 h-4" />, badge: "bg-blue-600", banner: "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200" };
+      return { label: "Newly Granted", icon: <CheckCircle className="w-4 h-4" />, badge: "bg-blue-100 text-blue-800 border border-blue-200 dark:bg-blue-500/15 dark:text-blue-300 dark:border-blue-500/30", banner: "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200" };
     case "GRACE_PERIOD":
-      return { label: "Under Review", icon: <AlertTriangle className="w-4 h-4" />, badge: "bg-amber-500", banner: "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200" };
+      return { label: "Under Review", icon: <AlertTriangle className="w-4 h-4" />, badge: "bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30", banner: "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200" };
     default:
-      return { label: "Revoked", icon: <XCircle className="w-4 h-4" />, badge: "bg-red-600", banner: "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800 text-red-800 dark:text-red-200" };
+      return { label: "Revoked", icon: <XCircle className="w-4 h-4" />, badge: "bg-red-100 text-red-700 border border-red-200 dark:bg-red-500/15 dark:text-red-300 dark:border-red-500/30", banner: "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800 text-red-800 dark:text-red-200" };
   }
 }
 
@@ -259,15 +259,15 @@ export default function SponsorDetail() {
               </div>
             </div>
             <div className="flex items-center gap-1.5 flex-wrap">
-              <Badge className={`${statusConfig.badge} text-white text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1`}>
+              <Badge className={`${statusConfig.badge} text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1`}>
                 {statusConfig.icon}
                 {statusConfig.label}
               </Badge>
               {isBRated && (
-                <Badge className="bg-amber-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">B-Rated</Badge>
+                <Badge className="bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30 text-xs font-bold px-2.5 py-1 rounded-full">B-Rated</Badge>
               )}
               <Link href={`/pricing?plan=starter&company=${encodeURIComponent(data.currentName)}`}>
-                <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-full px-3 h-7 text-xs gap-1" data-testid="button-set-alert-header">
+                <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-full px-3 h-7 text-xs gap-1" data-testid="button-set-alert-header">
                   <Bell className="w-3 h-3" />Set Alert
                 </Button>
               </Link>
@@ -489,8 +489,8 @@ export default function SponsorDetail() {
             <div className="p-6 space-y-5">
               {/* Value proposition */}
               <div className="flex items-start gap-4">
-                <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center shrink-0">
-                  <Bell className="w-5 h-5 text-emerald-400" />
+                <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center shrink-0">
+                  <Bell className="w-5 h-5 text-primary-foreground" />
                 </div>
                 <div>
                   <h3 className="font-bold text-lg mb-1 leading-snug">
@@ -532,7 +532,7 @@ export default function SponsorDetail() {
                     </div>
                   ) : (
                     <Button
-                      className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-full px-6 py-5 text-base shadow-lg shadow-emerald-900/40"
+                      className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-full px-6 py-5 text-base shadow-lg shadow-primary/30"
                       disabled={watchMutation.isPending}
                       onClick={() => watchMutation.mutate({ organisation_name: data.currentName, fingerprint: data.fingerprint })}
                     >
@@ -542,7 +542,7 @@ export default function SponsorDetail() {
                   )
                 ) : (
                   <Link href={`/pricing?plan=starter&company=${encodeURIComponent(data.currentName)}`} className="flex-1">
-                    <Button className="w-full bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-full px-6 py-5 text-base shadow-lg shadow-emerald-900/40">
+                    <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-full px-6 py-5 text-base shadow-lg shadow-primary/30">
                       <Bell className="w-4 h-4 mr-2" />
                       Subscribe for alerts — from £24.99/mo
                     </Button>
@@ -564,8 +564,8 @@ export default function SponsorDetail() {
           /* ── CTA: active company ──────────────────────────────────────── */
           <div className="bg-slate-900 dark:bg-slate-800 rounded-xl p-6 text-white">
             <div className="flex items-start gap-4">
-              <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center shrink-0">
-                <Bell className="w-5 h-5 text-emerald-400" />
+              <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center shrink-0">
+                <Bell className="w-5 h-5 text-primary-foreground" />
               </div>
               <div className="flex-1">
                 <h3 className="font-semibold mb-1">
@@ -578,7 +578,7 @@ export default function SponsorDetail() {
                 </p>
                 <div className="flex gap-3 flex-wrap">
                   <Link href={`/pricing?plan=starter&company=${encodeURIComponent(data.currentName)}`}>
-                    <Button className="bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-full px-6" data-testid="button-set-alert-cta">
+                    <Button className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-full px-6" data-testid="button-set-alert-cta">
                       Set Up Alerts — from £24.99/mo
                     </Button>
                   </Link>

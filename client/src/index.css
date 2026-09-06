@@ -20,8 +20,14 @@
   --popover-foreground: hsl(235, 40%, 15%);
   --card: hsl(0, 0%, 100%);
   --card-foreground: hsl(235, 40%, 15%);
-  --border: hsl(235, 20%, 90%);
-  --input: hsl(235, 20%, 90%);
+  /* Decorative dividers/card borders: a visible step up from the previous
+     near-invisible hsl(235,20%,90%) (1.23:1 vs --background), though still
+     intentionally softer than --input/--border-strong below, which carry
+     actual functional meaning and are held to the 3:1 non-text UI threshold. */
+  --border: hsl(235, 15%, 82%);
+  /* Form-control boundary: measures 3.11:1 against --background (WCAG 1.4.11
+     non-text contrast for UI components). */
+  --input: hsl(235, 15%, 60%);
   --primary: hsl(240, 55%, 45%);
   --primary-foreground: hsl(0, 0%, 100%);
   --secondary: hsl(235, 25%, 93%);
@@ -32,6 +38,32 @@
   --destructive-foreground: hsl(0, 0%, 98%);
   --ring: hsl(240, 55%, 45%);
   --radius: 0.75rem;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+
+  /* Semantic status tokens (interactive/brand stays --primary; these are for
+     success/warning/info state only — see CLAUDE.md system rule). Values are
+     solid-fill-safe: white text on each measures >=4.5:1. --destructive above
+     already serves as the "danger" token, so it isn't duplicated here. */
+  --success: hsl(163, 94%, 24%);
+  --success-foreground: hsl(0, 0%, 100%);
+  --warning: hsl(26, 90%, 37%);
+  --warning-foreground: hsl(0, 0%, 100%);
+  --info: hsl(201, 96%, 32%);
+  --info-foreground: hsl(0, 0%, 100%);
+
+  /* Stronger emphasis divider (e.g. section separators, highlighted card
+     borders) — measures 4.58:1 against --background. */
+  --border-strong: hsl(235, 15%, 50%);
+
+  --surface: var(--card);
+  --surface-muted: var(--muted);
+  --surface-elevated: hsl(0, 0%, 100%);
+
+  --shadow-sm: 0 1px 2px 0 rgba(15, 15, 35, 0.05);
+  --shadow-md: 0 4px 12px -2px rgba(15, 15, 35, 0.08), 0 2px 4px -2px rgba(15, 15, 35, 0.05);
+  --shadow-lg: 0 12px 32px -8px rgba(15, 15, 35, 0.14), 0 4px 8px -2px rgba(15, 15, 35, 0.06);
 
   --gradient-start: hsl(235, 40%, 15%);
   --gradient-mid: hsl(240, 45%, 35%);
@@ -48,8 +80,11 @@
   --popover-foreground: hsl(240, 20%, 95%);
   --card: hsl(235, 20%, 10%);
   --card-foreground: hsl(240, 20%, 95%);
-  --border: hsl(235, 15%, 18%);
-  --input: hsl(235, 15%, 18%);
+  /* Same rationale as light theme: previous hsl(235,15%,18%) measured 1.32:1
+     against --background. --border stays a soft divider; --input is pushed
+     to the 3:1 non-text UI threshold since it's a functional boundary. */
+  --border: hsl(235, 15%, 26%);
+  --input: hsl(235, 15%, 42%);
   --primary: hsl(240, 60%, 60%);
   --primary-foreground: hsl(0, 0%, 100%);
   --secondary: hsl(235, 18%, 13%);
@@ -60,6 +95,29 @@
   --destructive-foreground: hsl(0, 0%, 98%);
   --ring: hsl(240, 60%, 60%);
   --radius: 0.75rem;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+
+  /* Brighter accent tones read correctly on dark surfaces; text sits on top
+     of these as dark-on-bright rather than white-on-bright (measured 10:1+),
+     matching how --primary-foreground already behaves relative to --primary. */
+  --success: hsl(158, 64%, 52%);
+  --success-foreground: hsl(160, 60%, 10%);
+  --warning: hsl(43, 96%, 56%);
+  --warning-foreground: hsl(38, 60%, 10%);
+  --info: hsl(198, 93%, 60%);
+  --info-foreground: hsl(201, 60%, 10%);
+
+  --border-strong: hsl(235, 15%, 55%);
+
+  --surface: var(--card);
+  --surface-muted: var(--muted);
+  --surface-elevated: hsl(235, 20%, 13%);
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px -2px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 12px 32px -8px rgba(0, 0, 0, 0.5), 0 4px 8px -2px rgba(0, 0, 0, 0.35);
 
   --gradient-start: hsl(235, 40%, 8%);
   --gradient-mid: hsl(240, 40%, 20%);
@@ -84,15 +142,25 @@
     background: linear-gradient(90deg, var(--gradient-start) 0%, var(--gradient-mid) 50%, var(--gradient-end) 100%);
   }
 
+  /* Static surface — no interaction affordance. Use .theme-card-interactive
+     for cards that are themselves a click/tap target. */
   .theme-card {
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .theme-card-interactive {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
     transition: box-shadow 0.2s ease, border-color 0.2s ease;
   }
-  .theme-card:hover {
-    box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.08), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+  .theme-card-interactive:hover,
+  .theme-card-interactive:focus-visible {
+    box-shadow: var(--shadow-md);
     border-color: var(--primary);
   }
 
@@ -195,6 +263,15 @@
   button, .cursor-pointer, [role="button"] {
     min-height: 44px;
     min-width: 44px;
+  }
+
+  /* Opt-out for dense clusters of small controls (A-Z letter grids, numbered
+     pagination) where inflating every button to 44px would overflow/wrap the
+     layout. WCAG 2.5.8 allows an undersized target when adjacent targets have
+     sufficient spacing between centers — these clusters keep >=8px gaps. */
+  [data-compact-target] {
+    min-height: 0;
+    min-width: 0;
   }
 }
 

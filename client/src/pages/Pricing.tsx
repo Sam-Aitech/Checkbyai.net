@@ -139,8 +139,8 @@ function PlanCard<T extends PlanCardData>({ plan, index, isLoggedIn, loading, on
       transition={{ ...spring, delay: index * 0.1 }}
       whileHover={{ y: -4, transition: { type: "spring", stiffness: 300, damping: 20 } }}
       className={`relative overflow-hidden flex flex-col theme-card bg-card ${
-        highlighted ? 'ring-2 ring-emerald-500 border-emerald-500 shadow-lg shadow-emerald-500/20' :
-        plan.popular ? 'border-primary lg:scale-105 z-10' : ''
+        highlighted ? 'ring-2 ring-primary border-primary shadow-lg shadow-primary/20' :
+        plan.popular ? 'border-primary ring-1 ring-primary/30 shadow-lg shadow-primary/10 z-10' : ''
       }`}
     >
       {plan.popular && (
@@ -446,7 +446,7 @@ export default function Pricing() {
                   onClick={() => setCadence('annual')}
                   aria-pressed={cadence === 'annual'}
                   data-testid="cadence-toggle-annual"
-                  className={`px-5 py-2 text-sm font-semibold rounded-full transition-colors ${
+                  className={`px-5 py-2 text-sm font-semibold rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
                     cadence === 'annual' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
@@ -457,7 +457,7 @@ export default function Pricing() {
                   onClick={() => setCadence('monthly')}
                   aria-pressed={cadence === 'monthly'}
                   data-testid="cadence-toggle-monthly"
-                  className={`px-5 py-2 text-sm font-semibold rounded-full transition-colors ${
+                  className={`px-5 py-2 text-sm font-semibold rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
                     cadence === 'monthly' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
@@ -562,7 +562,7 @@ export default function Pricing() {
               </p>
               <button
                 onClick={() => setLocation('/cos-pricing')}
-                className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded"
               >
                 View CoS Verification Plans <ArrowRight className="w-4 h-4" />
               </button>

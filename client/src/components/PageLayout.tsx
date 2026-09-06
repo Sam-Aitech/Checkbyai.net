@@ -231,7 +231,7 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
                     {(isPro || isAdmin) && (
                       <Link
                         href="/pro-dashboard"
-                        className="hidden sm:flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-full shadow-sm shadow-emerald-500/20 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
+                        className="hidden sm:flex items-center gap-2 px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-full shadow-sm shadow-primary/20 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                       >
                         <LayoutDashboard className="w-4 h-4" />
                         My Dashboard
@@ -250,7 +250,7 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
                     {location !== "/pricing" && (
                       <Link
                         href="/pricing"
-                        className="hidden sm:flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-full shadow-sm shadow-emerald-500/20 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
+                        className="hidden sm:flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-full shadow-sm shadow-primary/20 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                       >
                         <Bell className="w-3.5 h-3.5" />
                         Get Alerts
@@ -279,8 +279,6 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
               <motion.div
                 id="mobile-nav"
                 ref={mobileMenuRef}
-                role="dialog"
-                aria-modal="true"
                 aria-label="Navigation menu"
                 initial={menuVariants.initial}
                 animate={menuVariants.animate}
@@ -358,7 +356,7 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
                         <Link
                           href="/pro-dashboard"
                           onClick={closeMobileMenu}
-                          className="flex items-center justify-center gap-2 w-full px-4 py-3 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all"
+                          className="flex items-center justify-center gap-2 w-full px-4 py-3 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-xl transition-all"
                         >
                           <LayoutDashboard className="w-4 h-4" />
                           My Dashboard
@@ -377,7 +375,7 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
                           <Link
                             href="/pricing"
                             onClick={closeMobileMenu}
-                            className="flex items-center justify-center gap-2 w-full px-4 py-3 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all"
+                            className="flex items-center justify-center gap-2 w-full px-4 py-3 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-xl transition-all"
                           >
                             <Bell className="w-4 h-4" />
                             Get Licence Alerts
