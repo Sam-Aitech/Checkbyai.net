@@ -34,7 +34,10 @@
   --secondary-foreground: hsl(235, 40%, 15%);
   --accent: hsl(240, 40%, 94%);
   --accent-foreground: hsl(235, 40%, 15%);
-  --destructive: hsl(0, 84%, 60%);
+  /* Deepened from hsl(0,84%,60%): white text on that measured 3.78:1, failing
+     WCAG AA (4.5:1) for normal text. Same hue/saturation, lower lightness
+     only, to keep hue parity with dark --destructive — now 4.87:1. */
+  --destructive: hsl(0, 84%, 48%);
   --destructive-foreground: hsl(0, 0%, 98%);
   --ring: hsl(240, 55%, 45%);
   --radius: 0.75rem;
@@ -69,6 +72,26 @@
   --gradient-mid: hsl(240, 45%, 35%);
   --gradient-end: hsl(240, 50%, 85%);
   --gradient-light: hsl(240, 40%, 95%);
+
+  /* Typographic-treatment tokens (tracking/leading/weight) behind the
+     .editorial-* classes below. Font-size for heading/subheading/body is
+     intentionally left to Tailwind's responsive text-* utilities at each
+     call site (e.g. `text-4xl md:text-6xl`) rather than baked in here —
+     these tokens capture the part of the "editorial" identity that's
+     constant across breakpoints. Same values as before this became a
+     token layer; theme-independent, so no .dark overrides. */
+  --text-h1-tracking: -0.03em;
+  --text-h1-leading: 1.05;
+  --text-h1-weight: 700;
+  --text-h2-tracking: -0.015em;
+  --text-h2-leading: 1.15;
+  --text-h2-weight: 600;
+  --text-body-tracking: 0.005em;
+  --text-body-leading: 1.65;
+  --text-body-weight: 400;
+  --text-caption-tracking: 0.06em;
+  --text-caption-weight: 600;
+  --text-caption-size: 0.6875rem;
 }
 
 .dark {
@@ -100,8 +123,10 @@
   --radius-lg: var(--radius);
 
   /* Brighter accent tones read correctly on dark surfaces; text sits on top
-     of these as dark-on-bright rather than white-on-bright (measured 10:1+),
-     matching how --primary-foreground already behaves relative to --primary. */
+     of these as dark-on-bright rather than white-on-bright, matching how
+     --primary-foreground already behaves relative to --primary. Measured
+     per pair (foreground vs its own background): success 8.12:1, warning
+     9.71:1, info 8.11:1. */
   --success: hsl(158, 64%, 52%);
   --success-foreground: hsl(160, 60%, 10%);
   --warning: hsl(43, 96%, 56%);
@@ -186,28 +211,28 @@
   }
 
   .editorial-heading {
-    letter-spacing: -0.03em;
-    line-height: 1.05;
-    font-weight: 700;
+    letter-spacing: var(--text-h1-tracking);
+    line-height: var(--text-h1-leading);
+    font-weight: var(--text-h1-weight);
   }
 
   .editorial-subheading {
-    letter-spacing: -0.015em;
-    line-height: 1.15;
-    font-weight: 600;
+    letter-spacing: var(--text-h2-tracking);
+    line-height: var(--text-h2-leading);
+    font-weight: var(--text-h2-weight);
   }
 
   .editorial-body {
-    letter-spacing: 0.005em;
-    line-height: 1.65;
-    font-weight: 400;
+    letter-spacing: var(--text-body-tracking);
+    line-height: var(--text-body-leading);
+    font-weight: var(--text-body-weight);
   }
 
   .editorial-caption {
-    letter-spacing: 0.06em;
+    letter-spacing: var(--text-caption-tracking);
     text-transform: uppercase;
-    font-weight: 600;
-    font-size: 0.6875rem;
+    font-weight: var(--text-caption-weight);
+    font-size: var(--text-caption-size);
   }
 
   .editorial-divider {

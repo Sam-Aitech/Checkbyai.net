@@ -113,6 +113,9 @@ const notificationPlans: NotificationPlan[] = [
   },
 ];
 
+// Blue/amber here are intentional per-tier decorative differentiation (Starter
+// vs Pro), not status indicators — deliberately not mapped to --info/--warning,
+// which would misleadingly imply the Pro plan is a "warning" state.
 function getIconWrapClass(planName: string): string {
   if (planName.includes("Starter")) return "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400";
   if (planName.includes("Pro")) return "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400";

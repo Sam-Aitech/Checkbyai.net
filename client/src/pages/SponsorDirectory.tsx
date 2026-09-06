@@ -51,9 +51,9 @@ interface DirectoryResponse {
 // ── Row highlight ─────────────────────────────────────────────────────────────
 
 function rowClass(status: string) {
-  if (status === "NEWLY_GRANTED")   return "border-l-2 border-l-orange-400 bg-orange-50/40 dark:bg-orange-950/10";
-  if (status === "REMOVED_REVOKED" || status === "NOT_LISTED") return "border-l-2 border-l-red-400    bg-red-50/30    dark:bg-red-950/10 opacity-75";
-  if (status === "GRACE_PERIOD")    return "border-l-2 border-l-yellow-400 bg-yellow-50/30 dark:bg-yellow-950/10";
+  if (status === "NEWLY_GRANTED")   return "border-l-2 border-l-warning/60 bg-warning/5";
+  if (status === "REMOVED_REVOKED" || status === "NOT_LISTED") return "border-l-2 border-l-destructive/60 bg-destructive/5 opacity-75";
+  if (status === "GRACE_PERIOD")    return "border-l-2 border-l-warning/60 bg-warning/10";
   return "";
 }
 
@@ -327,7 +327,7 @@ export default function SponsorDirectory() {
                 aria-pressed={statusFilter === tab.value}
                 className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
                   statusFilter === tab.value
-                    ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white"
+                    ? "bg-primary text-primary-foreground border-primary"
                     : "bg-transparent text-muted-foreground border-input hover:border-slate-400"
                 }`}
               >
