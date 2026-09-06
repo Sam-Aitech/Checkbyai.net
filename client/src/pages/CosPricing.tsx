@@ -170,7 +170,7 @@ function PricingCard({ plan, index, isLoggedIn, loading, onSelect, available }: 
       transition={{ ...spring, delay: index * 0.1 }}
       whileHover={{ y: -4, transition: { type: "spring", stiffness: 300, damping: 20 } }}
       className={`relative overflow-hidden flex flex-col theme-card bg-card ${
-        plan.popular ? 'border-primary lg:scale-105 z-10' : ''
+        plan.popular ? 'border-primary ring-1 ring-primary/30 shadow-lg shadow-primary/10 z-10' : ''
       }`}
     >
       {plan.popular && (
@@ -499,7 +499,7 @@ export default function CosPricing() {
               </p>
               <button
                 onClick={() => setLocation('/pricing')}
-                className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded"
               >
                 View Notification Engine Plans <ArrowRight className="w-4 h-4" />
               </button>

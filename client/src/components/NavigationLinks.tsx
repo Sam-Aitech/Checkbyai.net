@@ -20,7 +20,7 @@ export default function NavigationLinks({ className = "" }: NavigationLinksProps
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {links.map((link) => (
           <Link key={link.href} href={link.href}>
-            <div className="group theme-card p-5 cursor-pointer">
+            <div className="group theme-card-interactive p-5 cursor-pointer">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="font-semibold text-foreground text-sm">
                   {link.label}

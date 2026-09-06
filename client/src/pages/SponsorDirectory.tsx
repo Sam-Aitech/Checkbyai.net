@@ -5,14 +5,15 @@ import { Link } from "wouter";
 import {
   Search, Building2, MapPin, Route, Star, CheckCircle, Zap, XCircle,
   Clock, AlertTriangle, ChevronLeft, ChevronRight, ExternalLink, Shield,
-  Loader2, RefreshCw, Download, HelpCircle,
+  Loader2, RefreshCw, Download,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import PageLayout from "@/components/PageLayout";
 import SEOHead from "@/components/SEOHead";
+import SponsorStatusBadge from "@/components/SponsorStatusBadge";
 import { useDebounce } from "@/hooks/useDebounce";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -46,69 +47,6 @@ interface DirectoryResponse {
   limit: number;
   stats: DirectoryStats;
 }
-
-// ── Status badge ──────────────────────────────────────────────────────────────
-
-const StatusBadge = memo(function StatusBadge({ status, typeRating }: { status: string; typeRating: string | null }) {
-  const isBRated = (typeRating || "").toLowerCase().includes("b");
-
-  if (status === "REMOVED_REVOKED" || status === "NOT_LISTED") {
-    return (
-      <Badge className="bg-red-600 text-white border-red-700 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
-        <XCircle className="w-3 h-3 mr-1" />
-        Removed
-      </Badge>
-    );
-  }
-  if (status === "NEWLY_GRANTED") {
-    // If newly granted, check if it's a re-activation (not strictly in DB status yet, but logic-wise)
-    // For now, we use a single badge, but we can refine if the DB status differentiates.
-    return (
-      <Badge className="bg-orange-500 text-white border-orange-600 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
-        <Zap className="w-3 h-3 mr-1" />
-        Newly Granted
-      </Badge>
-    );
-  }
-  if (status === "REINSTATED") {
-     return (
-      <Badge className="bg-emerald-500 text-white border-emerald-600 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
-        <RefreshCw className="w-3 h-3 mr-1" />
-        Reinstated
-      </Badge>
-    );
-  }
-  if (status === "GRACE_PERIOD") {
-    return (
-      <Badge className="bg-yellow-500 text-white border-yellow-600 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
-        <Clock className="w-3 h-3 mr-1" />
-        Under Review
-      </Badge>
-    );
-  }
-  if (status === "ACTIVE") {
-    return (
-      <div className="flex items-center gap-1 flex-wrap">
-        <Badge className="bg-emerald-600 text-white border-emerald-700 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
-          <CheckCircle className="w-3 h-3 mr-1" />
-          Active
-        </Badge>
-        {isBRated && (
-          <Badge className="bg-amber-500 text-white border-amber-600 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
-            <AlertTriangle className="w-3 h-3 mr-1" />
-            B-Rated
-          </Badge>
-        )}
-      </div>
-    );
-  }
-  return (
-    <Badge className="bg-slate-500 text-white border-slate-600 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
-      <HelpCircle className="w-3 h-3 mr-1" />
-      Unknown
-    </Badge>
-  );
-});
 
 // ── Row highlight ─────────────────────────────────────────────────────────────
 
@@ -168,10 +106,12 @@ function Pagination({
   }
 
   return (
-    <div className="flex items-center justify-center gap-1 mt-6">
+    <nav className="flex items-center justify-center gap-1 mt-6" aria-label="Pagination">
       <Button
         variant="outline" size="sm" disabled={page === 1}
         onClick={() => onChange(page - 1)}
+        aria-label="Previous page"
+        data-compact-target
         className="h-8 w-8 p-0"
       >
         <ChevronLeft className="w-4 h-4" />
@@ -185,6 +125,9 @@ function Pagination({
             variant={p === page ? "default" : "outline"}
             size="sm"
             onClick={() => onChange(p as number)}
+            aria-label={`Page ${p}`}
+            aria-current={p === page ? "page" : undefined}
+            data-compact-target
             className="h-8 w-8 p-0 text-xs"
           >
             {p}
@@ -194,11 +137,13 @@ function Pagination({
       <Button
         variant="outline" size="sm" disabled={page === totalPages}
         onClick={() => onChange(page + 1)}
+        aria-label="Next page"
+        data-compact-target
         className="h-8 w-8 p-0"
       >
         <ChevronRight className="w-4 h-4" />
       </Button>
-    </div>
+    </nav>
   );
 }
 
@@ -312,25 +257,25 @@ export default function SponsorDirectory() {
           <StatCard
             label="Active Sponsors"
             value={stats?.active}
-            color="text-emerald-600"
+            color="text-emerald-700 dark:text-emerald-400"
             icon={CheckCircle}
           />
           <StatCard
             label="Newly Granted"
             value={stats?.newlyGranted}
-            color="text-orange-500"
+            color="text-orange-700 dark:text-orange-400"
             icon={Zap}
           />
           <StatCard
             label="Removed (7 days)"
             value={stats?.removedThisWeek}
-            color="text-red-500"
+            color="text-red-600 dark:text-red-400"
             icon={XCircle}
           />
           <StatCard
             label="Under Review"
             value={stats?.gracePeriod}
-            color="text-yellow-500"
+            color="text-amber-700 dark:text-amber-400"
             icon={Clock}
           />
         </div>
@@ -339,44 +284,51 @@ export default function SponsorDirectory() {
         <div className="bg-white dark:bg-slate-900 border rounded-xl p-4 shadow-sm space-y-3">
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
+              <Label htmlFor="directory-name-filter" className="sr-only">Search company name</Label>
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
               <Input
+                id="directory-name-filter"
                 placeholder="Search company name..."
                 value={nameInput}
                 onChange={(e) => handleNameChange(e.target.value)}
-                className="pl-9 h-10"
+                className="pl-9"
               />
             </div>
             <div className="relative w-full sm:w-44">
+              <Label htmlFor="directory-town-filter" className="sr-only">Filter by town or city</Label>
               <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
               <Input
+                id="directory-town-filter"
                 placeholder="Town / City..."
                 value={townInput}
                 onChange={(e) => handleTownChange(e.target.value)}
-                className="pl-9 h-10"
+                className="pl-9"
               />
             </div>
             <div className="relative w-full sm:w-52">
+              <Label htmlFor="directory-route-filter" className="sr-only">Filter by immigration route</Label>
               <Route className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
               <Input
+                id="directory-route-filter"
                 placeholder="Route (e.g. Skilled Worker)..."
                 value={routeInput}
                 onChange={(e) => handleRouteChange(e.target.value)}
-                className="pl-9 h-10"
+                className="pl-9"
               />
             </div>
           </div>
 
           {/* Status tabs */}
-          <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap" role="group" aria-label="Filter by status">
             {STATUS_TABS.map((tab) => (
               <button
                 key={tab.value}
                 onClick={() => handleStatusChange(tab.value)}
-                className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${
+                aria-pressed={statusFilter === tab.value}
+                className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
                   statusFilter === tab.value
                     ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white"
-                    : "bg-transparent text-muted-foreground border-slate-200 dark:border-slate-700 hover:border-slate-400"
+                    : "bg-transparent text-muted-foreground border-input hover:border-slate-400"
                 }`}
               >
                 {tab.label}
@@ -386,16 +338,19 @@ export default function SponsorDirectory() {
 
           {/* A–Z quick filter */}
           <div className="border-t pt-3">
-            <div className="flex items-center gap-1 flex-wrap">
-              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mr-1">A–Z</span>
+            <div className="flex items-center gap-1.5 flex-wrap" role="group" aria-label="Filter by first letter">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mr-1">A–Z</span>
               {ALPHABET.map((l) => (
                 <button
                   key={l}
+                  data-compact-target
                   onClick={() => handleLetterClick(l)}
-                  className={`w-7 h-7 rounded text-xs font-semibold border transition-colors ${
+                  aria-pressed={letterFilter === l}
+                  aria-label={`Filter by organisations starting with ${l}`}
+                  className={`w-7 h-7 rounded text-xs font-semibold border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
                     letterFilter === l
                       ? "bg-primary text-white border-primary"
-                      : "bg-transparent text-muted-foreground border-slate-200 dark:border-slate-700 hover:border-primary hover:text-primary"
+                      : "bg-transparent text-muted-foreground border-input hover:border-primary hover:text-primary"
                   }`}
                 >
                   {l}
@@ -403,8 +358,9 @@ export default function SponsorDirectory() {
               ))}
               {letterFilter && (
                 <button
+                  data-compact-target
                   onClick={() => handleLetterClick("")}
-                  className="ml-1 px-2 h-7 rounded text-xs font-medium text-muted-foreground border border-slate-200 dark:border-slate-700 hover:border-destructive hover:text-destructive transition-colors"
+                  className="ml-1 px-2 h-7 rounded text-xs font-medium text-muted-foreground border border-input hover:border-destructive hover:text-destructive transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                   Clear
                 </button>
@@ -490,6 +446,11 @@ export default function SponsorDirectory() {
                   const r = data.results[virtualRow.index];
                   const slug = r.organisationName.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim().replace(/\s+/g, "-").slice(0, 80);
                   const detailHref = r.id ? `/sponsor/${r.id}/${slug}` : null;
+                  const dateLabel = r.status === "REMOVED_REVOKED" && r.removedAt
+                    ? new Date(r.removedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "2-digit" })
+                    : r.grantedAt
+                    ? new Date(r.grantedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "2-digit" })
+                    : "—";
                   return (
                   <div
                     key={r.fingerprint}
@@ -511,19 +472,27 @@ export default function SponsorDirectory() {
                       <span className="text-sm text-muted-foreground truncate">{r.typeRating ?? "—"}</span>
                       <span className="text-sm text-muted-foreground truncate">{r.route ?? "—"}</span>
                       <span className="text-xs text-muted-foreground whitespace-nowrap tabular-nums">
-                        {r.status === "REMOVED_REVOKED" && r.removedAt ? new Date(r.removedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "2-digit" }) : r.grantedAt ? new Date(r.grantedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "2-digit" }) : "—"}
+                        {dateLabel}
                       </span>
-                      <StatusBadge status={r.status} typeRating={r.typeRating} />
+                      <SponsorStatusBadge status={r.status} typeRating={r.typeRating} />
                     </div>
                     <div className="md:hidden space-y-1">
                       <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-1.5 min-w-0"><Building2 className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" /><span className="font-semibold text-sm text-foreground leading-tight">{r.organisationName}</span></div>
-                        <StatusBadge status={r.status} typeRating={r.typeRating} />
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <Building2 className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
+                          {detailHref ? (
+                            <Link href={detailHref} className="font-semibold text-sm text-foreground leading-tight hover:text-primary hover:underline">{r.organisationName}</Link>
+                          ) : (
+                            <span className="font-semibold text-sm text-foreground leading-tight">{r.organisationName}</span>
+                          )}
+                        </div>
+                        <SponsorStatusBadge status={r.status} typeRating={r.typeRating} />
                       </div>
                       <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground pl-5">
                         {r.townCity && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{r.townCity}</span>}
                         {r.typeRating && <span className="flex items-center gap-1"><Star className="w-3 h-3" />{r.typeRating}</span>}
                         {r.route && <span className="flex items-center gap-1"><Route className="w-3 h-3" />{r.route}</span>}
+                        <span className="flex items-center gap-1 tabular-nums">{dateLabel}</span>
                       </div>
                     </div>
                   </div>

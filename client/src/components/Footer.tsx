@@ -89,8 +89,8 @@ export default function Footer() {
           <div className={`grid grid-cols-1 gap-8 mb-8 ${companyDetailLines.length > 0 ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
             {companyDetailLines.length > 0 && (
               <div>
-                <h2 className="editorial-caption mb-3 text-white/40">Company Details</h2>
-                <p className="text-xs text-white/40 leading-relaxed">
+                <h2 className="editorial-caption mb-3 text-white/60">Company Details</h2>
+                <p className="text-xs text-white/60 leading-relaxed">
                   {companyDetailLines.map((line, i) => (
                     <span key={line}>
                       {line}
@@ -101,8 +101,8 @@ export default function Footer() {
               </div>
             )}
             <div>
-              <h2 className="editorial-caption mb-3 text-white/40">Data Protection</h2>
-              <p className="text-xs text-white/40 leading-relaxed">
+              <h2 className="editorial-caption mb-3 text-white/60">Data Protection</h2>
+              <p className="text-xs text-white/60 leading-relaxed">
                 Compliant with UK GDPR 🇬🇧 and the Data Protection Act 2018. We process document metadata only.
                 Original documents are deleted immediately after verification. Free users: results are removed
                 when you leave the site. Paid account holders: only verification results are retained, never
@@ -110,8 +110,8 @@ export default function Footer() {
               </p>
             </div>
             <div className="md:text-right">
-              <h2 className="editorial-caption mb-3 text-white/40">Legal</h2>
-              <p className="text-xs text-white/40 leading-relaxed">
+              <h2 className="editorial-caption mb-3 text-white/60">Legal</h2>
+              <p className="text-xs text-white/60 leading-relaxed">
                 This tool provides technical analysis only and does not constitute legal or immigration advice.
                 Processing is carried out under Article 6(1)(f) UK GDPR (legitimate interests) for fraud
                 prevention purposes. For data subject requests, contact us via the admin portal.
@@ -119,10 +119,10 @@ export default function Footer() {
             </div>
           </div>
           <div className="text-center space-y-2">
-            <p className="text-xs text-white/30 font-medium tracking-wide">
+            <p className="text-xs text-white/60 font-medium tracking-wide">
               &copy; {new Date().getFullYear()} Check By AI. All rights reserved.
             </p>
-            <p className="text-xs text-white/25">
+            <p className="text-xs text-white/60">
               CheckByAI is not affiliated with the UK Home Office or UK Visas and Immigration (UKVI).
             </p>
           </div>

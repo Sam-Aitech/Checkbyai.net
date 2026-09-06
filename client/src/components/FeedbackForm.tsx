@@ -102,7 +102,9 @@ export default function FeedbackForm({ verificationId, onSubmitSuccess }: Feedba
                 onClick={() => setRating(star)}
                 onMouseEnter={() => setHoveredRating(star)}
                 onMouseLeave={() => setHoveredRating(0)}
-                className="focus:outline-none transition-transform hover:scale-110"
+                aria-label={`Rate ${star} star${star === 1 ? "" : "s"}`}
+                aria-pressed={rating === star}
+                className="rounded transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 data-testid={`star-${star}`}
               >
                 <Star

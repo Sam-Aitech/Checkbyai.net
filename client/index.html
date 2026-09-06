@@ -55,8 +55,8 @@
     <meta property="og:see_also" content="https://www.youtube.com/@CheckByAi" />
     
     <!-- Additional Meta Tags -->
-    <meta name="theme-color" content="#2563eb" />
-    <meta name="msapplication-TileColor" content="#2563eb" />
+    <meta name="theme-color" content="#3434b2" />
+    <meta name="msapplication-TileColor" content="#3434b2" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Check By AI" />
@@ -82,23 +82,25 @@
   </head>
   <body>
     <div id="root"><!--SSR-->
-      <!-- SEO content before React loads -->
-      <h1 style="font-size: 2.5rem; font-weight: bold; color: #1f2937; margin: 2rem; text-align: center;">
-        UK Certificate of Sponsorship Verification
-      </h1>
-      <p style="color: #6b7280; margin: 1rem 2rem; text-align: center;">
-        Free AI-powered <a href="/cos-check-ai" style="color: #2563eb; text-decoration: underline;">Certificate of Sponsorship checker</a> 
-        for <a href="/dashboard" style="color: #2563eb; text-decoration: underline;">UK Skilled Worker visa applicants</a>. 
-        Verify your CoS document meets <a href="/guides/how-to-check-cos-genuine" style="color: #2563eb; text-decoration: underline;">Home Office requirements</a> 
-        and detect <a href="/guides/cos-scams-red-flags" style="color: #2563eb; text-decoration: underline;">fake CoS documents</a> instantly.
-        This tool is designed exclusively for UK immigration documents.
-      </p>
-      <nav style="text-align: center; margin: 2rem;">
-        <a href="/" style="color: #2563eb; text-decoration: underline; margin: 0 1rem;">Home</a>
-        <a href="/dashboard" style="color: #2563eb; text-decoration: underline; margin: 0 1rem;">Verify UK CoS</a>
-        <a href="/cos-check-ai" style="color: #2563eb; text-decoration: underline; margin: 0 1rem;">How It Works</a>
-        <a href="/guides/how-to-check-cos-genuine" style="color: #2563eb; text-decoration: underline; margin: 0 1rem;">UK CoS Guides</a>
-      </nav>
+      <!-- SEO/no-JS fallback content, visually hidden so it never renders as a
+           second, differently-styled page before React mounts (see server/ssr/renderLanding.ts,
+           which replaces this block with the same treatment on every real request). -->
+      <div style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;">
+        <h1>UK Certificate of Sponsorship Verification</h1>
+        <p>
+          Free AI-powered <a href="/cos-check-ai">Certificate of Sponsorship checker</a>
+          for <a href="/dashboard">UK Skilled Worker visa applicants</a>.
+          Verify your CoS document meets <a href="/guides/how-to-check-cos-genuine">Home Office requirements</a>
+          and detect <a href="/guides/cos-scams-red-flags">fake CoS documents</a> instantly.
+          This tool is designed exclusively for UK immigration documents.
+        </p>
+        <nav aria-label="Primary">
+          <a href="/">Home</a>
+          <a href="/dashboard">Verify UK CoS</a>
+          <a href="/cos-check-ai">How It Works</a>
+          <a href="/guides/how-to-check-cos-genuine">UK CoS Guides</a>
+        </nav>
+      </div>
     <!--/SSR--></div>
     <script type="module" src="/src/main.tsx"></script>
 
