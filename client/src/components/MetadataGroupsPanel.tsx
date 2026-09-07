@@ -219,7 +219,7 @@ function buildGroups(meta: DocumentMetadata): MetadataGroup[] {
 
 function ReadOnlyBadge() {
   return (
-    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-medium bg-amber-50 text-amber-600 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-700/40 whitespace-nowrap flex-shrink-0">
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium bg-warning/10 text-warning border border-warning/20 whitespace-nowrap flex-shrink-0">
       <Lock className="w-3 h-3" />
       Read-only
     </span>
@@ -400,7 +400,7 @@ function MetadataGroupSection({
         </span>
         {/* Flag indicator on collapsed groups */}
         {groupHasFlags && !open && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-400">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-destructive/10 text-destructive">
             <XCircle className="w-3 h-3" />
             Flagged
           </span>
@@ -471,12 +471,12 @@ export default function MetadataGroupsPanel({ metadata, aiAnnotations }: Metadat
         </h4>
         <div className="ml-auto flex items-center gap-2">
           {legacy && (
-            <span className="text-[11px] px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 border border-gray-200 dark:border-gray-700">
+            <span className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground border border-border">
               Legacy record — limited fields
             </span>
           )}
           {flagCount > 0 && (
-            <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-400 border border-red-200 dark:border-red-700/40 font-semibold">
+            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-destructive/10 text-destructive border border-destructive/20 font-semibold">
               <XCircle className="w-3 h-3" />
               {flagCount} AI flag{flagCount !== 1 ? 's' : ''}
             </span>

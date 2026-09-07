@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import FileUploadSimple from "@/components/FileUploadSimple";
 import SEOHead from "@/components/SEOHead";
 import PageLayout from "@/components/PageLayout";
+import { getVerificationResultTone, verificationToneBadgeClasses } from "@/lib/verificationResultTone";
 
 const HeroSection = lazy(() => import("@/components/HeroSection"));
 
@@ -218,13 +219,7 @@ export default function Home() {
                   ) : (
                     <div className="text-center">
                       <div className="mb-6">
-                        <div className={`inline-block px-6 py-3 rounded-xl text-lg font-semibold transition-all duration-300 ${
-                          verificationResult.type === 'genuine' 
-                            ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
-                            : verificationResult.type === 'suspicious'
-                            ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20'
-                            : 'bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/20'
-                        }`}>
+                        <div className={`inline-block px-6 py-3 rounded-xl text-lg font-semibold border transition-colors duration-200 ${verificationToneBadgeClasses[getVerificationResultTone(verificationResult.type)]}`}>
                           {verificationResult.type === 'genuine' ? 'Genuine' : verificationResult.type === 'suspicious' ? 'Suspicious' : 'Fake'}
                         </div>
                       </div>

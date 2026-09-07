@@ -64,6 +64,15 @@
   --surface-muted: var(--muted);
   --surface-elevated: hsl(0, 0%, 100%);
 
+  /* Fixed-dark surface for panels that are deliberately dark regardless of
+     theme (e.g. the hero stats band, the COS 3D demo backdrop) — same value
+     in both :root and .dark below, on purpose, so it never flips with the
+     theme toggle. */
+  --surface-inverse: hsl(235, 25%, 7%);
+  --surface-inverse-foreground: hsl(240, 20%, 95%);
+  --surface-inverse-muted: hsl(235, 10%, 65%);
+  --surface-inverse-border: hsl(235, 15%, 26%);
+
   --shadow-sm: 0 1px 2px 0 rgba(15, 15, 35, 0.05);
   --shadow-md: 0 4px 12px -2px rgba(15, 15, 35, 0.08), 0 2px 4px -2px rgba(15, 15, 35, 0.05);
   --shadow-lg: 0 12px 32px -8px rgba(15, 15, 35, 0.14), 0 4px 8px -2px rgba(15, 15, 35, 0.06);
@@ -139,6 +148,11 @@
   --surface: var(--card);
   --surface-muted: var(--muted);
   --surface-elevated: hsl(235, 20%, 13%);
+
+  --surface-inverse: hsl(235, 25%, 7%);
+  --surface-inverse-foreground: hsl(240, 20%, 95%);
+  --surface-inverse-muted: hsl(235, 10%, 65%);
+  --surface-inverse-border: hsl(235, 15%, 26%);
 
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 12px -2px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);

@@ -6,6 +6,7 @@ import BrandLogo from "./BrandLogo";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
+import { useHoverDropdown } from "@/hooks/useHoverDropdown";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import logoImg from "@assets/logo_material.png";
 
@@ -57,25 +58,15 @@ interface NavDropdownProps {
 }
 
 function NavDropdown({ item, dark = false }: NavDropdownProps) {
-  const [open, setOpen] = useState(false);
   const [location] = useLocation();
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  const { open, setOpen, wrapperRef, triggerRef, wrapperHandlers } = useHoverDropdown<HTMLButtonElement>();
 
   const isChildActive = item.children?.some(c => location === c.href);
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={wrapperRef} className="relative" {...wrapperHandlers}>
       <button
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
+        ref={triggerRef}
         onClick={() => setOpen(v => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
@@ -91,40 +82,43 @@ function NavDropdown({ item, dark = false }: NavDropdownProps) {
 
       <AnimatePresence>
         {open && (
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 6 }}
-            transition={{ duration: 0.15 }}
-            onMouseEnter={() => setOpen(true)}
-            onMouseLeave={() => setOpen(false)}
-            role="menu"
-            className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 bg-white dark:bg-card rounded-xl border border-border shadow-xl shadow-black/10 overflow-hidden z-50"
-          >
-            <div className="p-1.5">
-              {item.children?.map(child => (
-                <Link
-                  key={child.href}
-                  href={child.href}
-                  onClick={() => setOpen(false)}
-                  role="menuitem"
-                  className={`flex items-start gap-3 p-3 rounded-lg transition-colors group ${
-                    location === child.href
-                      ? "bg-primary/10 text-primary"
-                      : "hover:bg-muted text-foreground"
-                  }`}
-                >
-                  <span className={`mt-0.5 shrink-0 ${location === child.href ? "text-primary" : "text-muted-foreground group-hover:text-foreground"}`}>
-                    {child.icon}
-                  </span>
-                  <div>
-                    <p className="text-sm font-semibold leading-none mb-1">{child.label}</p>
-                    <p className="text-xs text-muted-foreground leading-snug">{child.desc}</p>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </motion.div>
+          // pt-2 (not mt-2) keeps the same 8px visual gap while keeping the
+          // gap itself inside this element's hit-test area, so the pointer
+          // can travel from trigger to menu without a mouseleave firing.
+          <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 w-64 z-50">
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 6 }}
+              transition={{ duration: 0.15 }}
+              role="menu"
+              className="bg-white dark:bg-card rounded-xl border border-border shadow-xl shadow-black/10 overflow-hidden"
+            >
+              <div className="p-1.5">
+                {item.children?.map(child => (
+                  <Link
+                    key={child.href}
+                    href={child.href}
+                    onClick={() => setOpen(false)}
+                    role="menuitem"
+                    className={`flex items-start gap-3 p-3 rounded-lg transition-colors group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                      location === child.href
+                        ? "bg-primary/10 text-primary"
+                        : "hover:bg-muted text-foreground"
+                    }`}
+                  >
+                    <span className={`mt-0.5 shrink-0 ${location === child.href ? "text-primary" : "text-muted-foreground group-hover:text-foreground"}`}>
+                      {child.icon}
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold leading-none mb-1">{child.label}</p>
+                      <p className="text-xs text-muted-foreground leading-snug">{child.desc}</p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>
@@ -290,7 +284,7 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
 
                   {/* Monitor group */}
                   <div>
-                    <p className={`text-[10px] font-bold tracking-widest uppercase px-3 mb-1 ${darkNav ? "text-slate-500" : "text-muted-foreground/50"}`}>Monitor</p>
+                    <p className={`text-xs font-bold tracking-widest uppercase px-3 mb-1 ${darkNav ? "text-slate-500" : "text-muted-foreground/50"}`}>Monitor</p>
                     {monitorGroup.children?.map(child => (
                       <Link
                         key={child.href}
@@ -330,7 +324,7 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
 
                   {/* Resources group */}
                   <div className={`border-t pt-3 ${darkNav ? "border-slate-800" : "border-border/50"}`}>
-                    <p className={`text-[10px] font-bold tracking-widest uppercase px-3 mb-1 ${darkNav ? "text-slate-500" : "text-muted-foreground/50"}`}>Resources</p>
+                    <p className={`text-xs font-bold tracking-widest uppercase px-3 mb-1 ${darkNav ? "text-slate-500" : "text-muted-foreground/50"}`}>Resources</p>
                     {resourcesGroup.children?.map(child => (
                       <Link
                         key={child.href}

@@ -19,18 +19,20 @@ export default function NavigationLinks({ className = "" }: NavigationLinksProps
     <nav className={className} aria-label="Main navigation">
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {links.map((link) => (
-          <Link key={link.href} href={link.href}>
-            <div className="group theme-card-interactive p-5 cursor-pointer">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-semibold text-foreground text-sm">
-                  {link.label}
-                </h3>
-                <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {link.description}
-              </p>
+          <Link
+            key={link.href}
+            href={link.href}
+            className="group theme-card-interactive block p-5 cursor-pointer"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold text-foreground text-sm">
+                {link.label}
+              </h3>
+              <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
             </div>
+            <p className="text-xs text-muted-foreground">
+              {link.description}
+            </p>
           </Link>
         ))}
       </div>

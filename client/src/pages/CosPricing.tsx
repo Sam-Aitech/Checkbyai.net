@@ -219,8 +219,8 @@ function PricingCard({ plan, index, isLoggedIn, loading, onSelect, available }: 
         </ul>
 
         {plan.bundleBadge && (
-          <div className="mt-4 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-            <div className="flex items-start gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-400">
+          <div className="mt-4 p-3 bg-success/10 border border-success/20 rounded-lg">
+            <div className="flex items-start gap-2 text-sm font-medium text-success">
               <Bell className="w-4 h-4 mt-0.5 flex-shrink-0" />
               <span>{plan.bundleBadge}</span>
             </div>

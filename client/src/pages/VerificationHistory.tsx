@@ -49,23 +49,23 @@ interface Verification {
 const resultConfig = {
   genuine: {
     label: "Genuine",
-    bg: "bg-emerald-500/10",
-    text: "text-emerald-600 dark:text-emerald-400",
-    border: "border-emerald-500/20",
+    bg: "bg-success/10",
+    text: "text-success",
+    border: "border-success/20",
     icon: <CheckCircle className="w-4 h-4" />,
   },
   suspicious: {
     label: "Suspicious",
-    bg: "bg-amber-500/10",
-    text: "text-amber-600 dark:text-amber-400",
-    border: "border-amber-500/20",
+    bg: "bg-warning/10",
+    text: "text-warning",
+    border: "border-warning/20",
     icon: <AlertTriangle className="w-4 h-4" />,
   },
   fake: {
     label: "Fake",
-    bg: "bg-red-500/10",
-    text: "text-red-600 dark:text-red-400",
-    border: "border-red-500/20",
+    bg: "bg-destructive/10",
+    text: "text-destructive",
+    border: "border-destructive/20",
     icon: <XCircle className="w-4 h-4" />,
   },
 };
@@ -104,9 +104,9 @@ const VerificationCard = memo(function VerificationCard({ v, index }: { v: Verif
     v.filename.length > 40 ? v.filename.slice(0, 37) + "..." : v.filename;
 
   const severityStyles: Record<string, { bg: string; text: string }> = {
-    critical: { bg: "bg-red-500/10", text: "text-red-600 dark:text-red-400" },
-    warning: { bg: "bg-amber-500/10", text: "text-amber-600 dark:text-amber-400" },
-    info: { bg: "bg-blue-500/10", text: "text-blue-600 dark:text-blue-400" },
+    critical: { bg: "bg-destructive/10", text: "text-destructive" },
+    warning: { bg: "bg-warning/10", text: "text-warning" },
+    info: { bg: "bg-info/10", text: "text-info" },
   };
 
   return (
@@ -162,8 +162,8 @@ const VerificationCard = memo(function VerificationCard({ v, index }: { v: Verif
             {(v.adminStatus === "approved" || v.adminStatus === "fake") && (
               <span className={`editorial-caption inline-flex items-center gap-1 px-2.5 py-1 rounded-full ${
                 v.adminStatus === "approved"
-                  ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
-                  : "bg-red-500/10 text-red-600 dark:text-red-400"
+                  ? "bg-info/10 text-info"
+                  : "bg-destructive/10 text-destructive"
               }`}>
                 <Shield className="w-3 h-3" />
                 {v.adminStatus === "approved" ? "Admin Approved" : "Admin Flagged"}
@@ -203,14 +203,14 @@ const VerificationCard = memo(function VerificationCard({ v, index }: { v: Verif
                         key={idx}
                         className={`flex items-start gap-3 px-3 py-2 rounded-xl ${
                           check.passed
-                            ? "bg-emerald-500/5"
-                            : "bg-red-500/5"
+                            ? "bg-success/5"
+                            : "bg-destructive/5"
                         }`}
                       >
                         {check.passed ? (
-                          <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" />
+                          <CheckCircle className="w-4 h-4 text-success flex-shrink-0 mt-0.5" />
                         ) : (
-                          <XCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                          <XCircle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
                         )}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
@@ -357,15 +357,15 @@ export default function VerificationHistory() {
                 <p className="editorial-caption text-muted-foreground mt-1">Total</p>
               </div>
               <div className="border border-border rounded-xl bg-card p-5 text-center">
-                <p className="text-emerald-600 dark:text-emerald-400 text-2xl font-bold">{genuineCount}</p>
+                <p className="text-success text-2xl font-bold">{genuineCount}</p>
                 <p className="editorial-caption text-muted-foreground mt-1">Genuine</p>
               </div>
               <div className="border border-border rounded-xl bg-card p-5 text-center">
-                <p className="text-amber-600 dark:text-amber-400 text-2xl font-bold">{suspiciousCount}</p>
+                <p className="text-warning text-2xl font-bold">{suspiciousCount}</p>
                 <p className="editorial-caption text-muted-foreground mt-1">Suspicious</p>
               </div>
               <div className="border border-border rounded-xl bg-card p-5 text-center">
-                <p className="text-red-600 dark:text-red-400 text-2xl font-bold">{fakeCount}</p>
+                <p className="text-destructive text-2xl font-bold">{fakeCount}</p>
                 <p className="editorial-caption text-muted-foreground mt-1">Fake</p>
               </div>
             </div>

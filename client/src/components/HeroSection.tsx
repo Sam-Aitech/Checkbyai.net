@@ -23,6 +23,7 @@ import logoImg from "@assets/logo_material.png";
 import Footer from '@/components/Footer'
 import LandingDigest from '@/components/LandingDigest'
 import CosSamplePreview from '@/components/CosSamplePreview'
+import { useHoverDropdown } from '@/hooks/useHoverDropdown'
 
 const AnimatedBackground = lazy(() => import('./AnimatedBackground'))
 const Enhanced3DDemo = lazy(() => import('./Enhanced3DDemo'))
@@ -271,32 +272,32 @@ function NightlyStatsBar() {
     : "In last nightly run";
 
   return (
-    <div className="bg-slate-900 border-y border-slate-700 -mt-8 sm:-mt-12 md:-mt-16 relative z-10">
+    <div className="bg-surface-inverse border-y border-surface-inverse-border relative z-10">
       <div className="max-w-5xl mx-auto px-4 py-5">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-0 sm:divide-x sm:divide-slate-700 text-center">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-0 sm:divide-x sm:divide-surface-inverse-border text-center">
           <div className="px-4">
-            <p className={cn("text-2xl font-bold text-white", isLoading && "animate-pulse")}>{totalLabel}</p>
-            <p className="text-xs text-slate-400 mt-0.5">Active licensed sponsors</p>
+            <p className={cn("text-2xl font-bold text-surface-inverse-foreground", isLoading && "animate-pulse")}>{totalLabel}</p>
+            <p className="text-xs text-surface-inverse-muted mt-0.5">Active licensed sponsors</p>
           </div>
           <div className="px-4">
-            <p className={cn("text-2xl font-bold", isLoading ? "text-white animate-pulse" : hasRemovals ? "text-red-400" : "text-emerald-400")}>
+            <p className={cn("text-2xl font-bold", isLoading ? "text-surface-inverse-foreground animate-pulse" : hasRemovals ? "text-red-400" : "text-emerald-400")}>
               {changesLabel}
             </p>
-            <p className="text-xs text-slate-400 mt-0.5">{changesCaption}</p>
+            <p className="text-xs text-surface-inverse-muted mt-0.5">{changesCaption}</p>
           </div>
           <div className="px-4">
             <Link href="/sponsor-changes" className="group">
               <p className={cn("text-2xl font-bold text-red-400 group-hover:text-red-300 transition-colors", isLoading && "animate-pulse")}>
                 {revoked12Label}
               </p>
-              <p className="text-xs text-slate-400 mt-0.5 group-hover:text-slate-300 transition-colors">
+              <p className="text-xs text-surface-inverse-muted mt-0.5 group-hover:text-surface-inverse-foreground transition-colors">
                 Licences revoked · 12 months <ArrowRight className="w-3 h-3 inline ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
               </p>
             </Link>
           </div>
           <div className="px-4">
             <p className={cn("text-2xl font-bold text-emerald-400", isLoading && "animate-pulse")}>{dateLabel}</p>
-            <p className="text-xs text-slate-400 mt-0.5">Register last checked</p>
+            <p className="text-xs text-surface-inverse-muted mt-0.5">Register last checked</p>
           </div>
         </div>
       </div>
@@ -385,7 +386,7 @@ function UrgencyBanner() {
 
   if (removedCount > 0) {
     return (
-      <div className="bg-red-800 text-white">
+      <div className="bg-destructive text-destructive-foreground">
         <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2.5 text-center">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
           <p className="text-xs sm:text-sm font-medium">
@@ -400,7 +401,7 @@ function UrgencyBanner() {
 
   if (changesCount > 0) {
     return (
-      <div className="bg-amber-600 text-white">
+      <div className="bg-warning text-warning-foreground">
         <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2.5 text-center">
           <Activity className="w-3.5 h-3.5 shrink-0 animate-pulse" aria-hidden="true" />
           <p className="text-xs sm:text-sm font-medium">
@@ -415,7 +416,7 @@ function UrgencyBanner() {
 
   if (addedCount > 0) {
     return (
-      <div className="bg-emerald-700 text-white">
+      <div className="bg-success text-success-foreground">
         <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2.5 text-center">
           <CheckCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
           <p className="text-xs sm:text-sm font-medium">
@@ -445,9 +446,9 @@ function UrgencyBanner() {
 
   // No changes and data is fresh — show a calm confirmation strip
   return (
-    <div className="bg-slate-800 text-slate-200">
+    <div className="bg-surface-inverse text-surface-inverse-foreground">
       <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2 text-center">
-        <CheckCircle className="w-3.5 h-3.5 shrink-0 text-emerald-400" aria-hidden="true" />
+        <CheckCircle className="w-3.5 h-3.5 shrink-0 text-success" aria-hidden="true" />
         <p className="text-xs sm:text-sm font-medium">
           Register checked {formatRunDate(lastRunDate)}, no changes detected.
         </p>
@@ -461,22 +462,12 @@ function UrgencyBanner() {
 interface HeroNavItem { href: string; label: string; desc: string }
 
 function HeroNavDropdown({ label, items }: { label: string; items: HeroNavItem[] }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  const { open, setOpen, wrapperRef, triggerRef, wrapperHandlers } = useHoverDropdown<HTMLButtonElement>();
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={wrapperRef} className="relative" {...wrapperHandlers}>
       <button
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
+        ref={triggerRef}
         onClick={() => setOpen(v => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
@@ -488,31 +479,33 @@ function HeroNavDropdown({ label, items }: { label: string; items: HeroNavItem[]
 
       <AnimatePresence>
         {open && (
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 6 }}
-            transition={{ duration: 0.15 }}
-            onMouseEnter={() => setOpen(true)}
-            onMouseLeave={() => setOpen(false)}
-            role="menu"
-            className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-60 bg-slate-900/95 backdrop-blur-xl rounded-xl border border-white/10 shadow-2xl shadow-black/40 overflow-hidden z-50"
-          >
-            <div className="p-1.5">
-              {items.map(item => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setOpen(false)}
-                  role="menuitem"
-                  className="flex flex-col gap-0.5 px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors group"
-                >
-                  <span className="text-sm font-semibold text-white group-hover:text-emerald-300 transition-colors">{item.label}</span>
-                  <span className="text-xs text-white/50">{item.desc}</span>
-                </Link>
-              ))}
-            </div>
-          </motion.div>
+          // pt-2 (not mt-2) keeps the gap inside the wrapper's hit-test area
+          // so hovering from trigger to menu doesn't trip mouseleave.
+          <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 w-60 z-50">
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 6 }}
+              transition={{ duration: 0.15 }}
+              role="menu"
+              className="bg-surface-inverse/95 backdrop-blur-xl rounded-xl border border-white/10 shadow-2xl shadow-black/40 overflow-hidden"
+            >
+              <div className="p-1.5">
+                {items.map(item => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setOpen(false)}
+                    role="menuitem"
+                    className="flex flex-col gap-0.5 px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                  >
+                    <span className="text-sm font-semibold text-white group-hover:text-success transition-colors">{item.label}</span>
+                    <span className="text-xs text-white/50">{item.desc}</span>
+                  </Link>
+                ))}
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>
@@ -725,11 +718,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
       <UrgencyBanner />
 
       <div className="relative overflow-hidden">
-        {/* pb-* here and NightlyStatsBar's matching -mt-* below are a deliberate
-            paired overlap (the stats bar floats partway into the gradient's
-            bottom padding) — both scale together across breakpoints so the
-            overlap stays proportional instead of a single fixed-px hack. */}
-        <div className="theme-gradient pb-16 sm:pb-24 md:pb-32 pt-6">
+        <div className="theme-gradient pb-8 sm:pb-10 md:pb-12 pt-6">
           <div className="absolute inset-0 overflow-hidden">
             <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-white/5 rounded-full blur-3xl" />
             <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-white/5 rounded-full blur-3xl" />

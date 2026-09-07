@@ -141,7 +141,7 @@ export default function LandingDigest() {
                 value={activeSponsors}
                 label="Active Licensed Sponsors on the UK Register"
                 icon={<ShieldMonitorIcon size={20} />}
-                color="bg-emerald-500/15"
+                color="bg-success/15"
                 large
               />
             )}
@@ -165,19 +165,19 @@ export default function LandingDigest() {
                   value={counts.removed}
                   label="Revoked"
                   icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4 11H8v-2h8v2z" fill="#ef4444" opacity="0.8"/></svg>}
-                  color="bg-red-500/10"
+                  color="bg-destructive/10"
                 />
                 <AnimatedCounter
                   value={counts.updated}
                   label="Updated"
                   icon={<TripleChannelIcon size={20} />}
-                  color="bg-amber-500/10"
+                  color="bg-warning/10"
                 />
                 <AnimatedCounter
                   value={counts.added}
                   label="New Licences"
                   icon={<ShieldMonitorIcon size={20} />}
-                  color="bg-emerald-500/10"
+                  color="bg-success/10"
                 />
               </>
             ) : (
@@ -186,19 +186,19 @@ export default function LandingDigest() {
                   value={counts.added}
                   label="Active Licences"
                   icon={<ShieldMonitorIcon size={20} />}
-                  color="bg-emerald-500/10"
+                  color="bg-success/10"
                 />
                 <AnimatedCounter
                   value={counts.removed}
                   label="Revoked"
                   icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4 11H8v-2h8v2z" fill="#ef4444" opacity="0.8"/></svg>}
-                  color="bg-red-500/10"
+                  color="bg-destructive/10"
                 />
                 <AnimatedCounter
                   value={counts.updated}
                   label="Changes Today"
                   icon={<TripleChannelIcon size={20} />}
-                  color="bg-amber-500/10"
+                  color="bg-warning/10"
                 />
               </>
             )}

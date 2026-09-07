@@ -65,6 +65,12 @@ export default {
           DEFAULT: "var(--surface)",
           muted: "var(--surface-muted)",
           elevated: "var(--surface-elevated)",
+          inverse: {
+            DEFAULT: "var(--surface-inverse)",
+            foreground: "var(--surface-inverse-foreground)",
+            muted: "var(--surface-inverse-muted)",
+            border: "var(--surface-inverse-border)",
+          },
         },
         border: "var(--border)",
         "border-strong": "var(--border-strong)",
