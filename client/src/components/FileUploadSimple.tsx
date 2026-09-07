@@ -2,6 +2,7 @@ import { useState, useEffect, type ReactNode } from 'react';
 import { Link } from 'wouter';
 import { Lock, Crown, CheckCircle, ShieldAlert, LogIn } from 'lucide-react';
 import { unwrapApiEnvelope } from '@/lib/apiEnvelope';
+import { getVerificationResultTone, verificationToneBadgeClasses } from '@/lib/verificationResultTone';
 
 interface AccessDeniedCardProps {
   title: string;
@@ -430,13 +431,7 @@ export default function FileUploadSimple({
           <h3 className="text-lg font-semibold mb-4 text-foreground">Verification Result</h3>
 
           <div className="flex items-center gap-3 mb-4">
-            <div className={`px-4 py-2 rounded-full text-base font-semibold border animate-in fade-in zoom-in-95 duration-200 ${
-              result.type === 'genuine'
-                ? 'bg-success/10 text-success border-success/20'
-                : result.type === 'suspicious'
-                ? 'bg-warning/10 text-warning border-warning/20'
-                : 'bg-destructive/10 text-destructive border-destructive/20'
-            }`}>
+            <div className={`px-4 py-2 rounded-full text-base font-semibold border animate-in fade-in zoom-in-95 duration-200 ${verificationToneBadgeClasses[getVerificationResultTone(result.type)]}`}>
               {result.type}
             </div>
           </div>

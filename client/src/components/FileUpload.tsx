@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, FileText, AlertCircle, Loader2, Lock } from 'lucide-react';
 import { unwrapApiEnvelope } from '@/lib/apiEnvelope';
+import { getVerificationResultTone, verificationToneBadgeClasses } from '@/lib/verificationResultTone';
 
 interface FileUploadProps {
   onFileUpload: (file: File) => void;
@@ -242,13 +243,7 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
             <h3 className="text-sm editorial-subheading text-foreground mb-4">Verification Result</h3>
             
             <div className="flex items-center gap-3 mb-4">
-              <span className={`editorial-caption px-3 py-1.5 rounded-full relative overflow-hidden ${
-                localResult.type === 'genuine'
-                  ? 'bg-success/10 text-success border border-success/20'
-                  : localResult.type === 'suspicious'
-                  ? 'bg-warning/10 text-warning border border-warning/20'
-                  : 'bg-destructive/10 text-destructive border border-destructive/20'
-              }`}>
+              <span className={`editorial-caption px-3 py-1.5 rounded-full relative overflow-hidden border ${verificationToneBadgeClasses[getVerificationResultTone(localResult.type)]}`}>
                 {localResult.type}
               </span>
             </div>

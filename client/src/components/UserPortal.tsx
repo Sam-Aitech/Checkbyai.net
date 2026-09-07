@@ -6,6 +6,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { User } from '@shared/api-types';
+import { getVerificationResultTone, verificationToneBadgeClasses, verificationToneCardClasses } from '@/lib/verificationResultTone';
 
 interface VerificationResult {
   type: 'genuine' | 'suspicious' | 'fake';
@@ -179,13 +180,7 @@ export default function UserPortal() {
           {!loading && verificationResult && (
             <div className="mt-8 pt-6 border-t border-border">
               <h4 className="text-lg font-semibold text-foreground mb-4">Verification Results</h4>
-              <div className={`p-6 rounded-lg border-2 ${
-                verificationResult.type === 'genuine'
-                  ? 'bg-success/5 border-success/20'
-                  : verificationResult.type === 'suspicious'
-                  ? 'bg-warning/5 border-warning/20'
-                  : 'bg-destructive/5 border-destructive/20'
-              }`}>
+              <div className={`p-6 rounded-lg border-2 ${verificationToneCardClasses[getVerificationResultTone(verificationResult.type)]}`}>
                 <div className="flex items-center space-x-3">
                   {verificationResult.type === 'genuine' && <CheckCircle className="h-8 w-8 text-success" />}
                   {verificationResult.type === 'suspicious' && <AlertTriangle className="h-8 w-8 text-warning" />}
@@ -225,13 +220,7 @@ export default function UserPortal() {
           <h3 className="text-lg font-semibold mb-4 text-foreground">Verification Result</h3>
           
           <div className="flex items-center gap-3 mb-4">
-            <div className={`px-4 py-2 rounded-full text-base font-semibold border animate-in fade-in zoom-in-95 duration-200 ${
-              verificationResult.type === 'genuine'
-                ? 'bg-success/10 text-success border-success/20'
-                : verificationResult.type === 'suspicious'
-                ? 'bg-warning/10 text-warning border-warning/20'
-                : 'bg-destructive/10 text-destructive border-destructive/20'
-            }`}>
+            <div className={`px-4 py-2 rounded-full text-base font-semibold border animate-in fade-in zoom-in-95 duration-200 ${verificationToneBadgeClasses[getVerificationResultTone(verificationResult.type)]}`}>
               {verificationResult.type.charAt(0).toUpperCase() + verificationResult.type.slice(1)}
             </div>
           </div>
