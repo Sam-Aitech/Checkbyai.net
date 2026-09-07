@@ -152,24 +152,24 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
           <h3 className="text-base editorial-subheading text-foreground mb-2">Upload Document</h3>
           <p className="text-sm text-muted-foreground mb-6">Drag and drop your PDF file here, or click to select</p>
           
-          <input 
-            type="file" 
-            accept=".pdf" 
+          <input
+            type="file"
+            accept=".pdf"
             onChange={handleFileChange}
-            className="hidden"
+            className="peer sr-only"
             id="file-upload"
           />
-          
-          <label 
+
+          <label
             htmlFor="file-upload"
-            className="inline-flex items-center px-6 py-2.5 bg-primary text-primary-foreground text-sm font-medium rounded-full cursor-pointer hover:bg-primary/90 transition-colors"
+            className="inline-flex items-center px-6 py-2.5 bg-primary text-primary-foreground text-sm font-medium rounded-full cursor-pointer hover:bg-primary/90 transition-colors peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2"
           >
             Select PDF File
           </label>
           
           <div className="mt-6 flex items-center justify-center gap-1.5 text-muted-foreground">
             <Lock className="w-3 h-3" />
-            <p className="text-[11px] leading-relaxed">
+            <p className="text-xs leading-relaxed">
               PDF only, max 10MB. UK GDPR compliant. Document deleted immediately after verification.
             </p>
           </div>
@@ -243,11 +243,11 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
             
             <div className="flex items-center gap-3 mb-4">
               <span className={`editorial-caption px-3 py-1.5 rounded-full relative overflow-hidden ${
-                localResult.type === 'genuine' 
-                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
+                localResult.type === 'genuine'
+                  ? 'bg-success/10 text-success border border-success/20'
                   : localResult.type === 'suspicious'
-                  ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20'
-                  : 'bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/20'
+                  ? 'bg-warning/10 text-warning border border-warning/20'
+                  : 'bg-destructive/10 text-destructive border border-destructive/20'
               }`}>
                 {localResult.type}
               </span>

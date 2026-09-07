@@ -15,6 +15,13 @@ import PageLayout from "@/components/PageLayout";
 import SEOHead from "@/components/SEOHead";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import {
+  getSponsorStatusPresentation,
+  isSponsorBRated,
+  SPONSOR_B_RATED_PRESENTATION,
+  sponsorToneBadgeClasses,
+  sponsorToneBannerClasses,
+} from "@/lib/sponsorStatus";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -57,13 +64,13 @@ interface SponsorDetailData {
 // ── Change type display helpers ───────────────────────────────────────────────
 
 const CHANGE_META: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
-  NEW_LICENCE:      { label: "Licence Granted",    icon: <CheckCircle className="w-4 h-4" />,      color: "text-emerald-700 dark:text-emerald-400" },
-  RE_ACTIVATED:     { label: "Licence Reinstated", icon: <RefreshCw className="w-4 h-4" />,         color: "text-blue-600 dark:text-blue-400" },
-  REMOVED_REVOKED:  { label: "Licence Revoked",    icon: <XCircle className="w-4 h-4" />,           color: "text-red-600 dark:text-red-400" },
-  UPGRADED:         { label: "Rating Upgraded",    icon: <ArrowUpCircle className="w-4 h-4" />,     color: "text-emerald-700 dark:text-emerald-400" },
-  DOWNGRADED:       { label: "Rating Downgraded",  icon: <ArrowDownCircle className="w-4 h-4" />,   color: "text-amber-700 dark:text-amber-400" },
-  ROUTE_CHANGE:     { label: "Route Updated",      icon: <Tag className="w-4 h-4" />,               color: "text-indigo-600 dark:text-indigo-400" },
-  NAME_CHANGE:      { label: "Company Renamed",    icon: <FileText className="w-4 h-4" />,          color: "text-slate-600 dark:text-slate-400" },
+  NEW_LICENCE:      { label: "Licence Granted",    icon: <CheckCircle className="w-4 h-4" />,      color: "text-success" },
+  RE_ACTIVATED:     { label: "Licence Reinstated", icon: <RefreshCw className="w-4 h-4" />,         color: "text-info" },
+  REMOVED_REVOKED:  { label: "Licence Revoked",    icon: <XCircle className="w-4 h-4" />,           color: "text-destructive" },
+  UPGRADED:         { label: "Rating Upgraded",    icon: <ArrowUpCircle className="w-4 h-4" />,     color: "text-success" },
+  DOWNGRADED:       { label: "Rating Downgraded",  icon: <ArrowDownCircle className="w-4 h-4" />,   color: "text-warning" },
+  ROUTE_CHANGE:     { label: "Route Updated",      icon: <Tag className="w-4 h-4" />,               color: "text-info" },
+  NAME_CHANGE:      { label: "Company Renamed",    icon: <FileText className="w-4 h-4" />,          color: "text-muted-foreground" },
 };
 
 function formatDate(dateStr: string): string {
@@ -73,21 +80,6 @@ function formatDate(dateStr: string): string {
     });
   } catch {
     return dateStr;
-  }
-}
-
-// ── Status config ─────────────────────────────────────────────────────────────
-
-function getStatusConfig(status: string) {
-  switch (status) {
-    case "ACTIVE":
-      return { label: "Active", icon: <CheckCircle className="w-4 h-4" />, badge: "bg-emerald-100 text-emerald-800 border border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30", banner: "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200" };
-    case "NEWLY_GRANTED":
-      return { label: "Newly Granted", icon: <CheckCircle className="w-4 h-4" />, badge: "bg-blue-100 text-blue-800 border border-blue-200 dark:bg-blue-500/15 dark:text-blue-300 dark:border-blue-500/30", banner: "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200" };
-    case "GRACE_PERIOD":
-      return { label: "Under Review", icon: <AlertTriangle className="w-4 h-4" />, badge: "bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30", banner: "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200" };
-    default:
-      return { label: "Revoked", icon: <XCircle className="w-4 h-4" />, badge: "bg-red-100 text-red-700 border border-red-200 dark:bg-red-500/15 dark:text-red-300 dark:border-red-500/30", banner: "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800 text-red-800 dark:text-red-200" };
   }
 }
 
@@ -197,8 +189,9 @@ export default function SponsorDetail() {
   }
 
   // ── Render ──────────────────────────────────────────────────────────────────
-  const statusConfig = getStatusConfig(data.status);
-  const isBRated = (data.typeRating || "").toLowerCase().includes("b");
+  const statusPresentation = getSponsorStatusPresentation(data.status);
+  const StatusIcon = statusPresentation.icon;
+  const isBRated = isSponsorBRated(data.typeRating);
   const grantedYear = data.grantedAt ? new Date(data.grantedAt).getFullYear() : null;
   const isRevoked = data.status === "REMOVED_REVOKED";
 
@@ -206,10 +199,10 @@ export default function SponsorDetail() {
   const slug = data.currentName.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim().replace(/\s+/g, "-").slice(0, 80);
   const canonicalUrl = `${baseUrl}/sponsor/${data.id}/${slug}`;
 
-  const seoTitle = `${data.currentName} — ${statusConfig.label} UK Sponsor Licence | CheckByAI`;
+  const seoTitle = `${data.currentName} — ${statusPresentation.label} UK Sponsor Licence | CheckByAI`;
   const seoDesc = isRevoked
     ? `${data.currentName}${data.townCity ? ` in ${data.townCity}` : ""} had their UK sponsor licence revoked. See the full licence history on CheckByAI.`
-    : `${data.currentName}${data.townCity ? ` in ${data.townCity}` : ""} holds a ${statusConfig.label} UK sponsor licence${data.route ? ` (${data.route})` : ""}${grantedYear ? `, active since ${grantedYear}` : ""}. Get instant alerts if their status changes.`;
+    : `${data.currentName}${data.townCity ? ` in ${data.townCity}` : ""} holds a ${statusPresentation.label} UK sponsor licence${data.route ? ` (${data.route})` : ""}${grantedYear ? `, active since ${grantedYear}` : ""}. Get instant alerts if their status changes.`;
 
   return (
     <PageLayout>
@@ -227,8 +220,8 @@ export default function SponsorDetail() {
         </nav>
 
         {/* Status banner */}
-        <div className={`flex items-center gap-3 border rounded-xl px-5 py-4 ${statusConfig.banner}`}>
-          {statusConfig.icon}
+        <div className={`flex items-center gap-3 border rounded-xl px-5 py-4 ${sponsorToneBannerClasses[statusPresentation.tone]}`}>
+          <StatusIcon className="w-4 h-4" />
           <div className="flex-1">
             <p className="font-semibold text-sm">
               {isRevoked
@@ -259,12 +252,12 @@ export default function SponsorDetail() {
               </div>
             </div>
             <div className="flex items-center gap-1.5 flex-wrap">
-              <Badge className={`${statusConfig.badge} text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1`}>
-                {statusConfig.icon}
-                {statusConfig.label}
+              <Badge className={`${sponsorToneBadgeClasses[statusPresentation.tone]} text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1`}>
+                <StatusIcon className="w-3.5 h-3.5" />
+                {statusPresentation.label}
               </Badge>
               {isBRated && (
-                <Badge className="bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30 text-xs font-bold px-2.5 py-1 rounded-full">B-Rated</Badge>
+                <Badge className={`${sponsorToneBadgeClasses[SPONSOR_B_RATED_PRESENTATION.tone]} text-xs font-bold px-2.5 py-1 rounded-full`}>B-Rated</Badge>
               )}
               <Link href={`/pricing?plan=starter&company=${encodeURIComponent(data.currentName)}`}>
                 <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-full px-3 h-7 text-xs gap-1" data-testid="button-set-alert-header">
@@ -313,14 +306,14 @@ export default function SponsorDetail() {
 
         {/* ── Revoked: what this means for workers ─────────────────────── */}
         {isRevoked && (
-          <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-xl p-6 space-y-4">
+          <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-6 space-y-4">
             <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+              <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
               <div>
-                <h2 className="text-base font-semibold text-red-900 dark:text-red-200 mb-3">
+                <h2 className="text-base font-semibold text-destructive mb-3">
                   What does this mean for sponsored workers?
                 </h2>
-                <div className="space-y-2 text-sm text-red-800 dark:text-red-300">
+                <div className="space-y-2 text-sm text-destructive">
                   <p>
                     When the Home Office revokes a sponsor licence, any workers currently
                     sponsored by that company are given a <strong>60-day window</strong> to find a
@@ -338,15 +331,15 @@ export default function SponsorDetail() {
                 </div>
               </div>
             </div>
-            <div className="grid sm:grid-cols-3 gap-3 pt-2 border-t border-red-200 dark:border-red-800">
+            <div className="grid sm:grid-cols-3 gap-3 pt-2 border-t border-destructive/20">
               {[
                 { label: "60 days",        sub: "Grace period to find a new sponsor" },
                 { label: "Midnight check", sub: "Home Office updates the register nightly" },
                 { label: "30 min alert",   sub: "Pro subscribers notified within 30 minutes" },
               ].map((item) => (
                 <div key={item.label} className="text-center">
-                  <p className="text-base font-bold text-red-900 dark:text-red-200">{item.label}</p>
-                  <p className="text-xs text-red-700 dark:text-red-400 mt-0.5">{item.sub}</p>
+                  <p className="text-base font-bold text-destructive">{item.label}</p>
+                  <p className="text-xs text-destructive/80 mt-0.5">{item.sub}</p>
                 </div>
               ))}
             </div>
@@ -417,7 +410,7 @@ export default function SponsorDetail() {
               <Briefcase className="w-4 h-4 text-muted-foreground" />
               <h2 className="text-base font-semibold text-foreground">Companies House</h2>
               {data.enrichment.companiesHouseSource && (
-                <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 text-[10px] font-semibold px-2 py-0.5 rounded-full">Verified</Badge>
+                <Badge className="bg-info/10 text-info text-xs font-semibold px-2 py-0.5 rounded-full">Verified</Badge>
               )}
             </div>
             <div className="grid sm:grid-cols-2 gap-3">

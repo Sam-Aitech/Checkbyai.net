@@ -132,11 +132,11 @@ export default function UserPortal() {
             {verificationSteps.map((step, index) => (
               <div key={step.id} className="flex items-start space-x-4">
                 <div className="flex-shrink-0">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-500 ${
-                    step.status === 'completed' 
-                      ? 'bg-green-500 text-white scale-110' 
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors duration-200 ${
+                    step.status === 'completed'
+                      ? 'bg-success text-success-foreground'
                       : step.status === 'processing'
-                      ? 'bg-blue-500 text-white animate-pulse'
+                      ? 'bg-info text-info-foreground animate-pulse'
                       : 'bg-muted text-muted-foreground'
                   }`}>
                     {step.status === 'completed' ? (
@@ -151,22 +151,22 @@ export default function UserPortal() {
                 
                 <div className="flex-grow">
                   <div className="flex items-center justify-between">
-                    <h4 className={`font-medium transition-colors duration-300 ${
-                      step.status === 'completed' ? 'text-green-700 dark:text-green-400' : 
-                      step.status === 'processing' ? 'text-blue-700 dark:text-blue-400' : 'text-foreground'
+                    <h4 className={`font-medium transition-colors duration-200 ${
+                      step.status === 'completed' ? 'text-success' :
+                      step.status === 'processing' ? 'text-info' : 'text-foreground'
                     }`}>
                       {step.title}
                     </h4>
                     {step.status === 'completed' && (
-                      <span className="text-green-600 text-sm font-medium animate-fadeIn">✓ Complete</span>
+                      <span className="text-success text-sm font-medium animate-in fade-in duration-200">✓ Complete</span>
                     )}
                     {step.status === 'processing' && (
-                      <span className="text-blue-600 text-sm font-medium animate-pulse">Processing...</span>
+                      <span className="text-info text-sm font-medium animate-pulse">Processing...</span>
                     )}
                   </div>
-                  <p className={`text-sm mt-1 transition-colors duration-300 ${
-                    step.status === 'completed' ? 'text-green-600 dark:text-green-300' : 
-                    step.status === 'processing' ? 'text-blue-600 dark:text-blue-300' : 'text-muted-foreground'
+                  <p className={`text-sm mt-1 transition-colors duration-200 ${
+                    step.status === 'completed' ? 'text-success' :
+                    step.status === 'processing' ? 'text-info' : 'text-muted-foreground'
                   }`}>
                     {step.description}
                   </p>
@@ -180,16 +180,16 @@ export default function UserPortal() {
             <div className="mt-8 pt-6 border-t border-border">
               <h4 className="text-lg font-semibold text-foreground mb-4">Verification Results</h4>
               <div className={`p-6 rounded-lg border-2 ${
-                verificationResult.type === 'genuine' 
-                  ? 'bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-800' 
+                verificationResult.type === 'genuine'
+                  ? 'bg-success/5 border-success/20'
                   : verificationResult.type === 'suspicious'
-                  ? 'bg-yellow-50/50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-800'
-                  : 'bg-red-50/50 dark:bg-red-950/20 border-red-200 dark:border-red-800'
+                  ? 'bg-warning/5 border-warning/20'
+                  : 'bg-destructive/5 border-destructive/20'
               }`}>
                 <div className="flex items-center space-x-3">
-                  {verificationResult.type === 'genuine' && <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-500" />}
-                  {verificationResult.type === 'suspicious' && <AlertTriangle className="h-8 w-8 text-yellow-600 dark:text-yellow-500" />}
-                  {verificationResult.type === 'fake' && <XCircle className="h-8 w-8 text-red-600 dark:text-red-500" />}
+                  {verificationResult.type === 'genuine' && <CheckCircle className="h-8 w-8 text-success" />}
+                  {verificationResult.type === 'suspicious' && <AlertTriangle className="h-8 w-8 text-warning" />}
+                  {verificationResult.type === 'fake' && <XCircle className="h-8 w-8 text-destructive" />}
                   
                   <div>
                     <h5 className="text-lg font-semibold text-foreground">
@@ -225,12 +225,12 @@ export default function UserPortal() {
           <h3 className="text-lg font-semibold mb-4 text-foreground">Verification Result</h3>
           
           <div className="flex items-center gap-3 mb-4">
-            <div className={`px-4 py-2 rounded-full text-base font-semibold transition-all duration-700 ease-in-out transform hover:scale-105 ${
-              verificationResult.type === 'genuine' 
-                ? 'bg-gradient-to-r from-green-400 to-emerald-500 text-white shadow-lg shadow-green-500/25 animate-pulse'
+            <div className={`px-4 py-2 rounded-full text-base font-semibold border animate-in fade-in zoom-in-95 duration-200 ${
+              verificationResult.type === 'genuine'
+                ? 'bg-success/10 text-success border-success/20'
                 : verificationResult.type === 'suspicious'
-                ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white shadow-lg shadow-yellow-500/25 animate-pulse'
-                : 'bg-gradient-to-r from-red-400 to-rose-500 text-white shadow-lg shadow-red-500/25 animate-pulse'
+                ? 'bg-warning/10 text-warning border-warning/20'
+                : 'bg-destructive/10 text-destructive border-destructive/20'
             }`}>
               {verificationResult.type.charAt(0).toUpperCase() + verificationResult.type.slice(1)}
             </div>
@@ -238,8 +238,8 @@ export default function UserPortal() {
 
           {verificationResult.mismatchedFields && verificationResult.mismatchedFields.length > 0 && (
             <div className="mb-4">
-              <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Issues detected:</h4>
-              <ul className="list-disc list-inside text-gray-600 dark:text-gray-400">
+              <h4 className="font-medium text-foreground mb-2">Issues detected:</h4>
+              <ul className="list-disc list-inside text-muted-foreground">
                 {verificationResult.mismatchedFields.map((field: string, index: number) => (
                   <li key={index}>{field}</li>
                 ))}
