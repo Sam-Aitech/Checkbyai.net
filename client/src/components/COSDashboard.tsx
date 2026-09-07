@@ -8,6 +8,15 @@ import { useAuth } from '@/hooks/useAuth';
 import { Skeleton } from '@/components/ui/skeleton';
 import { queryClient } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
+import type { VerificationTone } from '@/lib/verificationResultTone';
+
+// Literal (not template-built) class strings — Tailwind's static scanner needs
+// the full class name to appear verbatim in source to include it in the build.
+const cardHeaderToneClasses: Record<VerificationTone, string> = {
+  success: 'bg-success text-success-foreground',
+  warning: 'bg-warning text-warning-foreground',
+  destructive: 'bg-destructive text-destructive-foreground',
+};
 
 interface VerificationResult {
   type: 'genuine' | 'suspicious' | 'fake';
@@ -305,92 +314,68 @@ export default function COSDashboard() {
           <h2 className="text-4xl font-bold text-foreground mb-12">How Document Verification Works</h2>
 
           <div className="flex flex-wrap justify-center gap-8">
-            <div className="w-[300px] theme-card overflow-hidden">
-              <div className="bg-success text-success-foreground text-center py-8 rounded-t-[calc(var(--radius)-1px)]">
-                <div className="text-5xl mb-5">
-                  <svg className="w-12 h-12 mx-auto" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
+            {[
+              {
+                tone: 'success' as const,
+                iconPath: 'M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z',
+                title: 'Genuine Document',
+                description: 'Document matches verified templates with no alterations detected.',
+                items: [
+                  'Metadata matches genuine pattern',
+                  'No tampering detected',
+                  'Digital signature valid',
+                  'Creation date consistent',
+                ],
+              },
+              {
+                tone: 'warning' as const,
+                iconPath: 'M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z',
+                title: 'Edited COS',
+                description: 'Document shows signs of alteration after original creation.',
+                items: [
+                  'Metadata inconsistencies',
+                  'Modification dates detected',
+                  'Content alterations found',
+                  'Signature validation failed',
+                ],
+              },
+              {
+                tone: 'destructive' as const,
+                iconPath: 'M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z',
+                title: 'Fake COS',
+                description: "Document is completely fabricated or doesn't match any genuine patterns.",
+                items: [
+                  'No metadata match found',
+                  'Fraudulent creation patterns',
+                  'Invalid security features',
+                  'Format violations detected',
+                ],
+              },
+            ].map((card) => (
+              <div key={card.title} className="w-[300px] theme-card overflow-hidden">
+                <div className={`${cardHeaderToneClasses[card.tone]} text-center py-8 rounded-t-[calc(var(--radius)-1px)]`}>
+                  <div className="text-5xl mb-5">
+                    <svg className="w-12 h-12 mx-auto" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d={card.iconPath} clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <h3 className="text-2xl font-semibold">{card.title}</h3>
                 </div>
-                <h3 className="text-2xl font-semibold">Genuine Document</h3>
-              </div>
-              <div className="p-8">
-                <p className="text-muted-foreground mb-5">Document matches verified templates with no alterations detected.</p>
-                <ul className="space-y-2">
-                  {[
-                    'Metadata matches genuine pattern',
-                    'No tampering detected',
-                    'Digital signature valid',
-                    'Creation date consistent',
-                  ].map((text) => (
-                    <li key={text} className="flex items-center gap-3">
-                      <svg className="w-4 h-4 text-success flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      <span className="text-foreground">{text}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-
-            <div className="w-[300px] theme-card overflow-hidden">
-              <div className="bg-warning text-warning-foreground text-center py-8 rounded-t-[calc(var(--radius)-1px)]">
-                <div className="text-5xl mb-5">
-                  <svg className="w-12 h-12 mx-auto" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
+                <div className="p-8">
+                  <p className="text-muted-foreground mb-5">{card.description}</p>
+                  <ul className="space-y-2">
+                    {card.items.map((text) => (
+                      <li key={text} className="flex items-center gap-3">
+                        <svg className="w-4 h-4 text-success flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-foreground">{text}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <h3 className="text-2xl font-semibold">Edited COS</h3>
               </div>
-              <div className="p-8">
-                <p className="text-muted-foreground mb-5">Document shows signs of alteration after original creation.</p>
-                <ul className="space-y-2">
-                  {[
-                    'Metadata inconsistencies',
-                    'Modification dates detected',
-                    'Content alterations found',
-                    'Signature validation failed',
-                  ].map((text) => (
-                    <li key={text} className="flex items-center gap-3">
-                      <svg className="w-4 h-4 text-success flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      <span className="text-foreground">{text}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-
-            <div className="w-[300px] theme-card overflow-hidden">
-              <div className="bg-destructive text-destructive-foreground text-center py-8 rounded-t-[calc(var(--radius)-1px)]">
-                <div className="text-5xl mb-5">
-                  <svg className="w-12 h-12 mx-auto" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <h3 className="text-2xl font-semibold">Fake COS</h3>
-              </div>
-              <div className="p-8">
-                <p className="text-muted-foreground mb-5">Document is completely fabricated or doesn't match any genuine patterns.</p>
-                <ul className="space-y-2">
-                  {[
-                    'No metadata match found',
-                    'Fraudulent creation patterns',
-                    'Invalid security features',
-                    'Format violations detected',
-                  ].map((text) => (
-                    <li key={text} className="flex items-center gap-3">
-                      <svg className="w-4 h-4 text-success flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      <span className="text-foreground">{text}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>
