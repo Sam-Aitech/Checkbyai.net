@@ -117,6 +117,17 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 - `client/src/pages/SponsorDirectory.tsx`: `memo(StatusBadge/StatCard)`, `useVirtualizer` (64px, overscan 8, 640px viewport) for 50-row pages.
 - `client/src/pages/VerificationHistory.tsx`: `memo(VerificationCard)`, `useVirtualizer` (160px, 720px viewport), animation delay clamped to 0.3s.
 
+#### Phase 6 — Frontend Craft Audit Remediation (P0+P1)
+
+**Scope:** P0+P1 visual defects from ruthless frontend audit; global pill buttons; SSR→CSS-var migration.
+
+- `server/ssr/renderLanding.ts`: all hardcoded hex (`#2563eb/#6b7280/#1f2937/#f9fafb/#e5e7eb/#2563eb10`) → `var(--primary/foreground/muted/muted-foreground/border/card/primary-foreground)`; `1280px/2rem` → `80rem/1.5rem` to match client `max-w-7xl px-6`; CTAs `0.75rem` → pill `999px`; step tiles use `var(--muted)` + `0.5rem` radius.
+- Containers: `NightlyStatsBar` `-mt-16` removed, `max-w-5xl px-4` → `max-w-7xl px-6 md:px-8`; `RecentlyRevokedSection` wrapped in shared `max-w-7xl px-6 md:px-8` with inner `max-w-4xl` preserved for readability; `PageLayout` nav `px-6 sm:px-8 lg:px-12` → `px-6 md:px-8`; logo `h-10 sm:h-12` → `h-10` (no nav jump).
+- Type/contrast: status badges `text-[11px]/text-[10px] font-bold tracking-wide` → `text-xs font-semibold tracking-[0.08em]` (`SponsorMonitor.tsx` 6×, `SponsorDirectory.tsx` 7×); `text-muted-foreground/70` timestamp → solid `text-xs`; `badge-live` `#10b981→#047857`, `11px→12px`; mobile menu labels `/50` → solid; `Submit.tsx` dead `text-sm+text-lg` conflict + `emerald-600→700` fixed; `home.tsx` dead `text-2xl font-bold` removed (editorial class owns size).
+- Components: `home.tsx` fake spinner → border spinner; modal spring → `0.2s [0.16,1,0.3,1]` tween; close `w-8 rounded-xl` → `w-11 rounded-full`; result badge `transition-all 300` → scoped `200ms`; `ui/button.tsx` global `rounded-md→rounded-full` (`h-10 px-5 / h-9 px-4 / h-12 px-8`), scoped transition + `active:scale-[0.98]`; `ui/input.tsx` `rounded-full px-4`, `placeholder/60`, `min-h-[44px]`; `FeatureCard` tile `w-16 rounded-2xl` → `w-12 rounded-[8px]`; revoked rows `px-5 py-3.5` → `px-4 py-3`; skeletons `h-14 rounded-xl` → `h-[56px] rounded-[8px]`.
+- Motion: `FeatureCard` stagger capped `min(index*0.06,0.18)`; `theme-card`/`icon-tile`/`otp-box` transitions use `cubic-bezier(0.16,1,0.3,1)` scoped properties (never `all`/`ease`); `icon-tile` gains `:focus-visible` parity; `float` reduced to `translateY(-6px)` `6s` (was `-20px` + `180deg` spin); OTP `2px/10px` → `1px/8px` + two-ring focus; mobile 44px media-query hack narrowed to non-button elements.
+- Verify: `eslint` clean on all 10 touched files. Full `npm run lint` has 732 pre-existing backend errors (untouched). `tsc` fails pre-existing missing `@react-three/fiber`/`vite/client` types. `vitest` unrunnable (no `node_modules` in worktree).
+
 ### Remaining (Not Yet Scoped)
 - Fuse.js search index versioning for instant CDV cache bust on rebuild.
 - React Query `gcTime` reduction for sponsor pages (currently default 5min).

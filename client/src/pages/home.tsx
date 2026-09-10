@@ -11,7 +11,7 @@ const HeroSection = lazy(() => import("@/components/HeroSection"));
 function LoadingSpinner() {
   return (
     <div className="flex items-center justify-center py-8">
-      <div className="animate-spin h-8 w-8 bg-primary/10 rounded-xl"></div>
+      <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full"></div>
     </div>
   );
 }
@@ -177,18 +177,18 @@ export default function Home() {
                 initial={{ opacity: 0, scale: 0.96 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.96 }}
-                transition={{ type: "spring", stiffness: 100, damping: 15 }}
+                transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
               >
                 <div className="sticky top-0 bg-background dark:bg-card p-6 border-b border-border flex justify-between items-center">
-                  <h2 className="text-2xl font-bold editorial-subheading text-foreground">Document Verification</h2>
+                  <h2 className="editorial-subheading text-2xl text-foreground">Document Verification</h2>
                   <button
                     onClick={() => {
                       setShowVerificationModal(false);
                       setVerificationResult(null);
                     }}
-                    className="text-muted-foreground hover:text-foreground text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-xl hover:bg-muted transition-colors"
+                    className="text-muted-foreground hover:text-foreground w-11 h-11 flex items-center justify-center rounded-full hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    <X className="w-6 h-6" />
+                    <X className="w-5 h-5" />
                   </button>
                 </div>
                 
@@ -218,7 +218,7 @@ export default function Home() {
                   ) : (
                     <div className="text-center">
                       <div className="mb-6">
-                        <div className={`inline-block px-6 py-3 rounded-xl text-lg font-semibold transition-all duration-300 ${
+                        <div className={`inline-block px-6 py-3 rounded-full text-lg font-semibold transition-[color,background-color,border-color] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] ${
                           verificationResult.type === 'genuine' 
                             ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
                             : verificationResult.type === 'suspicious'

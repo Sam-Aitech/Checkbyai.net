@@ -155,7 +155,7 @@ function StatusBadge({ status, typeRating }: { status: string; typeRating: strin
   // on the register. Treat it as REMOVED so it never silently renders as Active.
   if (status === "REMOVED_REVOKED" || status === "NOT_LISTED") {
     return (
-      <Badge className="bg-red-600 text-white border-red-700 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide">
+      <Badge className="bg-red-600 text-white border-red-700 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em]">
         <XCircle className="w-3 h-3 mr-1" />
         Removed
       </Badge>
@@ -164,7 +164,7 @@ function StatusBadge({ status, typeRating }: { status: string; typeRating: strin
 
   if (status === "NEWLY_GRANTED") {
     return (
-      <Badge className="bg-orange-500 text-white border-orange-600 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide">
+      <Badge className="bg-orange-500 text-white border-orange-600 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em]">
         <Zap className="w-3 h-3 mr-1" />
         Newly Granted
       </Badge>
@@ -173,7 +173,7 @@ function StatusBadge({ status, typeRating }: { status: string; typeRating: strin
 
   if (status === "GRACE_PERIOD") {
     return (
-      <Badge className="bg-yellow-500 text-white border-yellow-600 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide">
+      <Badge className="bg-yellow-500 text-white border-yellow-600 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em]">
         <Clock className="w-3 h-3 mr-1" />
         Under Review
       </Badge>
@@ -183,12 +183,12 @@ function StatusBadge({ status, typeRating }: { status: string; typeRating: strin
   if (status === "ACTIVE") {
     return (
       <div className="flex items-center gap-1.5 flex-wrap">
-        <Badge className="bg-emerald-600 text-white border-emerald-700 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide">
+        <Badge className="bg-emerald-600 text-white border-emerald-700 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em]">
           <CheckCircle className="w-3 h-3 mr-1" />
           Active
         </Badge>
         {isBRated && (
-          <Badge className="bg-amber-500 text-white border-amber-600 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide">
+          <Badge className="bg-amber-500 text-white border-amber-600 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em]">
             <AlertTriangle className="w-3 h-3 mr-1" />
             B-Rated
           </Badge>
@@ -199,7 +199,7 @@ function StatusBadge({ status, typeRating }: { status: string; typeRating: strin
 
   // Unknown / future status — render neutral grey badge, NEVER silently as Active.
   return (
-    <Badge className="bg-slate-500 text-white border-slate-600 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide">
+    <Badge className="bg-slate-500 text-white border-slate-600 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em]">
       <HelpCircle className="w-3 h-3 mr-1" />
       Unknown
     </Badge>

@@ -192,14 +192,14 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
     <div className="min-h-screen flex flex-col bg-background">
       {!hideNav && (
         <nav className={`sticky top-0 z-50 backdrop-blur-xl border-b ${darkNav ? "bg-slate-950/95 border-slate-800" : "bg-white/80 dark:bg-background/80 border-border/50"}`}>
-          <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
+          <div className="max-w-7xl mx-auto px-6 md:px-8">
             <div className="flex justify-between items-center h-16">
 
               {/* Logo */}
               <Link href="/" className="flex items-center shrink-0">
                 {darkNav
                   ? <BrandLogo variant="dark" />
-                  : <img src={logoImg} alt="CheckByAi.net" width={160} height={40} className="h-10 sm:h-12 w-auto object-contain" />}
+                  : <img src={logoImg} alt="CheckByAi.net" width={160} height={40} className="h-10 w-auto object-contain" />}
               </Link>
 
               {/* Desktop nav */}
@@ -292,7 +292,7 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
 
                   {/* Monitor group */}
                   <div>
-                    <p className={`text-[10px] font-bold tracking-widest uppercase px-3 mb-1 ${darkNav ? "text-slate-500" : "text-muted-foreground/50"}`}>Monitor</p>
+                    <p className={`text-xs font-semibold tracking-[0.08em] uppercase px-3 mb-1 ${darkNav ? "text-slate-500" : "text-muted-foreground"}`}>Monitor</p>
                     {monitorGroup.children?.map(child => (
                       <Link
                         key={child.href}
@@ -332,7 +332,7 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
 
                   {/* Resources group */}
                   <div className={`border-t pt-3 ${darkNav ? "border-slate-800" : "border-border/50"}`}>
-                    <p className={`text-[10px] font-bold tracking-widest uppercase px-3 mb-1 ${darkNav ? "text-slate-500" : "text-muted-foreground/50"}`}>Resources</p>
+                    <p className={`text-xs font-semibold tracking-[0.08em] uppercase px-3 mb-1 ${darkNav ? "text-slate-500" : "text-muted-foreground"}`}>Resources</p>
                     {resourcesGroup.children?.map(child => (
                       <Link
                         key={child.href}

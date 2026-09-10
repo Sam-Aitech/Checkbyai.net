@@ -34,9 +34,9 @@ const springGentle = { type: "spring" as const, stiffness: 80, damping: 18 }
 function FeatureCard({ icon, title, description, index }: { icon: React.ReactNode; title: string; description: string; index: number }) {
   const [ref, inView] = useInView({ triggerOnce: true, threshold: 0.15 })
   return (
-    <motion.div ref={ref} initial={{ opacity: 0, y: 40 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ ...spring, delay: index * 0.12 }} className="group theme-card p-8 overflow-hidden">
+    <motion.div ref={ref} initial={{ opacity: 0, y: 40 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ ...spring, delay: Math.min(index * 0.06, 0.18), duration: 0.45 }} className="group theme-card p-8 overflow-hidden">
       <div className="relative z-10">
-        <div className="mb-6 inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-2xl">{icon}</div>
+        <div className="mb-6 inline-flex items-center justify-center w-12 h-12 bg-primary/10 rounded-[8px] [&_svg]:w-6 [&_svg]:h-6">{icon}</div>
         <h3 className="text-lg editorial-subheading text-foreground mb-3">{title}</h3>
         <p className="text-sm editorial-body text-muted-foreground">{description}</p>
       </div>
@@ -92,7 +92,7 @@ function RecentlyRevokedSection() {
 
   return (
     <section ref={ref} className="bg-white dark:bg-background py-16 border-t border-border">
-      <div className="max-w-4xl mx-auto px-6">
+      <div className="max-w-7xl mx-auto px-6 md:px-8"><div className="max-w-4xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
@@ -107,7 +107,7 @@ function RecentlyRevokedSection() {
               <p className="text-sm text-muted-foreground">
                 Latest removals from the Home Office register, updated nightly.
                 {!statsLoading && stats?.lastRunDate && (
-                  <span className="ml-1 text-muted-foreground/70">
+                  <span className="ml-1 text-xs text-muted-foreground">
                     Register last checked: {formatRunDate(stats.lastRunDate)}.
                   </span>
                 )}
@@ -123,7 +123,7 @@ function RecentlyRevokedSection() {
           {isLoading && (
             <div className="space-y-3">
               {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="h-14 rounded-xl bg-muted animate-pulse" />
+                <div key={i} className="h-[56px] rounded-[8px] bg-muted animate-pulse" />
               ))}
             </div>
           )}
@@ -134,7 +134,7 @@ function RecentlyRevokedSection() {
                 <Link
                   key={s.id}
                   href={`/sponsor/${s.id}/${toDetailSlug(s.currentName)}`}
-                  className="flex items-center gap-4 px-5 py-3.5 bg-red-50/40 dark:bg-red-950/10 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors group"
+                  className="flex items-center gap-4 px-4 py-3 bg-red-50/40 dark:bg-red-950/10 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors group"
                 >
                   <XCircle className="w-4 h-4 text-red-500 shrink-0" />
                   <div className="flex-1 min-w-0">
@@ -161,7 +161,7 @@ function RecentlyRevokedSection() {
             </div>
           )}
 
-          <div className="mt-5 bg-slate-50 dark:bg-slate-900/50 border border-border rounded-xl px-5 py-3 flex items-center justify-between gap-3 flex-wrap">
+            <div className="mt-5 bg-slate-50 dark:bg-slate-900/50 border border-border rounded-[8px] px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
             <p className="text-sm text-muted-foreground">
               <Bell className="w-3.5 h-3.5 inline mr-1 text-emerald-500" />
               Get instant WhatsApp or email alerts when any sponsor revokes.
@@ -173,6 +173,7 @@ function RecentlyRevokedSection() {
             </Link>
           </div>
         </motion.div>
+        </div>
       </div>
     </section>
   );
@@ -272,8 +273,8 @@ function NightlyStatsBar() {
     : "In last nightly run";
 
   return (
-    <div className="bg-slate-900 border-y border-slate-700 -mt-16 relative z-10">
-      <div className="max-w-5xl mx-auto px-4 py-5">
+    <div className="bg-slate-900 border-y border-slate-700 relative z-10">
+      <div className="max-w-7xl mx-auto px-6 md:px-8 py-5">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-0 sm:divide-x sm:divide-slate-700 text-center">
           <div className="px-4">
             <p className={cn("text-2xl font-bold text-white", isLoading && "animate-pulse")}>{totalLabel}</p>
