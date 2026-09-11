@@ -214,11 +214,24 @@ async function applyPackageGrant(
   const withNotifPrefs = { notifPrefs: sql`COALESCE(${users.notifPrefs}, ${JSON.stringify(DEFAULT_NOTIF_PREFS)}::jsonb)` };
 
   if (packageType === 'starter') {
-    await tx.update(users).set({ ...base, credits: sql`COALESCE(${users.credits}, 0) + 50`, subscriptionStatus: 'starter' }).where(eq(users.id, userId));
+    // COS-only credit package (£24.99/50 checks). Does NOT write
+    // subscriptionStatus: that field drives Alert-Pass tier resolution
+    // (shared/planTiers.ts), and this buyer purchased COS credits, not
+    // Alert-Pass monitoring — granting Alert-Pass-Starter perks here was a
+    // stale coupling bug. COS access is already fully covered by `credits`.
+    await tx.update(users).set({ ...base, credits: sql`COALESCE(${users.credits}, 0) + 50` }).where(eq(users.id, userId));
   } else if (packageType === 'pro') {
-    await tx.update(users).set({ ...base, credits: sql`COALESCE(${users.credits}, 0) + 100`, subscriptionStatus: 'pro' }).where(eq(users.id, userId));
+    // COS-only credit package (£39.99/100 checks). Same rationale as
+    // 'starter' above — do not write subscriptionStatus.
+    await tx.update(users).set({ ...base, credits: sql`COALESCE(${users.credits}, 0) + 100` }).where(eq(users.id, userId));
   } else if (packageType === 'unlimited') {
-    await tx.update(users).set({ ...base, subscriptionStatus: 'unlimited' }).where(eq(users.id, userId));
+    // COS Unlimited (£99.99, one-time, grants zero credits). Locked product
+    // decision: keep subscriptionStatus:'unlimited' as-is (an accepted,
+    // over-generous bundle beyond the "10 companies watchlist" marketing —
+    // not being tightened in this pass). Additionally grant
+    // cosCheckSubscription so COS access survives independent of credits,
+    // since this package mints none.
+    await tx.update(users).set({ ...base, subscriptionStatus: 'unlimited', cosCheckSubscription: true }).where(eq(users.id, userId));
   } else if (packageType === 'notification_starter') {
     await tx.update(users).set({ ...base, ...withNotifPrefs, subscriptionStatus: 'starter' }).where(eq(users.id, userId));
   } else if (packageType === 'notification_pro') {
@@ -270,11 +283,11 @@ async function sendSubscriptionNotifications(
   const planDetails: Record<string, { credits: string; watches: string; timing: string; portal: string }> = {
     starter:              { credits: "50 CoS checks",          watches: "—",             timing: "—",           portal: "/verify" },
     pro:                  { credits: "100 CoS checks",         watches: "—",             timing: "—",           portal: "/verify" },
-    unlimited:            { credits: "Unlimited CoS checks",   watches: "10 companies",  timing: "Immediate",   portal: "/verify" },
+    unlimited:            { credits: "Unlimited CoS checks",   watches: "10 companies",  timing: "Twice-daily (07:00 & 19:00 UTC)",   portal: "/verify" },
     notification_starter: { credits: "—",                      watches: "2 companies",   timing: "Same-day",    portal: "/sponsor-monitor" },
-    notification_pro:     { credits: "5 CoS checks/month",     watches: "5 companies",   timing: "Immediate",   portal: "/sponsor-monitor" },
+    notification_pro:     { credits: "5 CoS checks/month",     watches: "5 companies",   timing: "Twice-daily (07:00 & 19:00 UTC)",   portal: "/sponsor-monitor" },
     alert_annual:         { credits: "—",                      watches: "1 company/yr",  timing: "Same-day",    portal: "/sponsor-monitor" },
-    alert_annual_pro:     { credits: "—",                      watches: "5 companies/yr",timing: "Immediate",   portal: "/sponsor-monitor" },
+    alert_annual_pro:     { credits: "—",                      watches: "5 companies/yr",timing: "Twice-daily (07:00 & 19:00 UTC)",   portal: "/sponsor-monitor" },
     cos_check_single:     { credits: "1 CoS check",             watches: "—",             timing: "—",           portal: "/verify" },
   };
   const details = planDetails[packageType] || { credits: "—", watches: "—", timing: "—", portal: "/" };

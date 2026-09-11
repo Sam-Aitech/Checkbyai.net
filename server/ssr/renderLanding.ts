@@ -21,11 +21,11 @@ const SSR_HIDDEN_STYLE =
 function landingHTML(): string {
   return `
 <div class="ssr-landing" style="${SSR_HIDDEN_STYLE}">
-  <h1>UK Sponsor Licence Monitoring &amp; Certificate of Sponsorship Verification</h1>
+  <h1>UK Sponsor Licence Monitoring &amp; Sponsored Job Alerts</h1>
   <p>
-    Real-time monitoring of the UK Sponsor Register with instant WhatsApp, email, SMS, and webhook
-    alerts when your employer's licence status changes. Free AI-powered Certificate of Sponsorship
-    verification for UK Skilled Worker visa applicants.
+    Monitor the UK Sponsor Register with same-day and twice-daily WhatsApp, email, SMS, and webhook
+    alerts when your employer's licence status changes. Alert Pass Pro also sends sponsored job
+    opportunity alerts and includes AI-powered Certificate of Sponsorship verification.
   </p>
   <nav aria-label="Primary">
     <a href="/sponsor-monitor">Sponsor Monitor</a>

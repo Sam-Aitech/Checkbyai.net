@@ -202,7 +202,7 @@ export default function SponsorDetail() {
   const seoTitle = `${data.currentName} — ${statusPresentation.label} UK Sponsor Licence | CheckByAI`;
   const seoDesc = isRevoked
     ? `${data.currentName}${data.townCity ? ` in ${data.townCity}` : ""} had their UK sponsor licence revoked. See the full licence history on CheckByAI.`
-    : `${data.currentName}${data.townCity ? ` in ${data.townCity}` : ""} holds a ${statusPresentation.label} UK sponsor licence${data.route ? ` (${data.route})` : ""}${grantedYear ? `, active since ${grantedYear}` : ""}. Get instant alerts if their status changes.`;
+    : `${data.currentName}${data.townCity ? ` in ${data.townCity}` : ""} holds a ${statusPresentation.label} UK sponsor licence${data.route ? ` (${data.route})` : ""}${grantedYear ? `, active since ${grantedYear}` : ""}. Get alerted if their status changes.`;
 
   return (
     <PageLayout>
@@ -501,7 +501,7 @@ export default function SponsorDetail() {
               {/* Feature checklist */}
               <div className="grid sm:grid-cols-2 gap-2 text-sm">
                 {[
-                  "Instant alert when licence is restored",
+                  "Same-day alert when licence is restored",
                   "WhatsApp, email & SMS notifications",
                   "Monitor multiple employers at once",
                   "Access full licence change history",
@@ -562,7 +562,7 @@ export default function SponsorDetail() {
               </div>
               <div className="flex-1">
                 <h3 className="font-semibold mb-1">
-                  Get instant alerts if {data.currentName} changes
+                  Get same-day alerts if {data.currentName} changes
                 </h3>
                 <p className="text-sm text-white/70 mb-4">
                   The Home Office updates the register at midnight without warning. Our

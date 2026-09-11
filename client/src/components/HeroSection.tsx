@@ -5,13 +5,12 @@ import { STALE_TIMES } from '@/lib/queryDefaults'
 import { unwrapApiEnvelope } from '@/lib/apiEnvelope'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useInView } from 'react-intersection-observer'
-import { Zap, Lock, ArrowRight, Play, Bell, Activity, CheckCircle, XCircle, AlertTriangle, ShieldCheck, Search, Loader2, ChevronDown } from 'lucide-react'
-import { ShieldMonitorIcon, DocumentVerifyIcon, TimelineClockIcon, EarlyWarningIcon,
+import { Zap, Lock, ArrowRight, Briefcase, Bell, Activity, CheckCircle, XCircle, AlertTriangle, ShieldCheck, Search, Loader2, ChevronDown } from 'lucide-react'
+import { TimelineClockIcon, EarlyWarningIcon,
   HeroAlertIcon,
   HeroTrackedIcon,
   HeroGDPRLockIcon,
   TripleChannelIcon,
-  UKLockIcon
 } from './icons/CheckByAIIcons';
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
@@ -22,11 +21,9 @@ import { Link, useLocation } from 'wouter'
 import logoImg from "@assets/logo_material.png";
 import Footer from '@/components/Footer'
 import LandingDigest from '@/components/LandingDigest'
-import CosSamplePreview from '@/components/CosSamplePreview'
 import { useHoverDropdown } from '@/hooks/useHoverDropdown'
 
 const AnimatedBackground = lazy(() => import('./AnimatedBackground'))
-const Enhanced3DDemo = lazy(() => import('./Enhanced3DDemo'))
 
 const spring = { type: "spring" as const, stiffness: 100, damping: 15 }
 const springGentle = { type: "spring" as const, stiffness: 80, damping: 18 }
@@ -512,10 +509,6 @@ function HeroNavDropdown({ label, items }: { label: string; items: HeroNavItem[]
   );
 }
 
-interface HeroSectionProps {
-  onStartVerification?: () => void;
-}
-
 interface FreeSearchResult {
   id?:             number;
   fingerprint:     string;
@@ -585,9 +578,8 @@ function toHeroSlug(name: string | null | undefined): string {
   return name.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim().replace(/\s+/g, "-").slice(0, 80);
 }
 
-export default function HeroSection({ onStartVerification }: HeroSectionProps) {
+export default function HeroSection() {
   const [isLoaded, setIsLoaded] = useState(false)
-  const [showDemo, setShowDemo] = useState(false)
   const [, setLocation] = useLocation()
   const [searchQuery, setSearchQuery] = useState("")
   const [alertMeOnSubmit, setAlertMeOnSubmit] = useState(false)
@@ -704,15 +696,6 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
 
   return (
     <>
-      {showDemo && (
-        <Suspense fallback={<LoadingFallback />}>
-          <Enhanced3DDemo
-            isVisible={showDemo}
-            onClose={() => setShowDemo(false)}
-            onTryFreeCheck={() => { setShowDemo(false); window.location.href = '/dashboard'; }}
-          />
-        </Suspense>
-      )}
 
     <div className="min-h-screen bg-background">
       <UrgencyBanner />
@@ -740,7 +723,6 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                     { href: "/sponsor-changes", label: "Licence Changes",   desc: "Recent additions and revocations" },
                   ]}
                 />
-                <Link href="/dashboard" className="px-4 py-2 text-sm text-white/70 hover:text-white font-medium rounded-full hover:bg-white/10 transition-all duration-200">Verify CoS</Link>
                 <Link href="/pricing"   className="px-4 py-2 text-sm text-white/70 hover:text-white font-medium rounded-full hover:bg-white/10 transition-all duration-200">Pricing</Link>
                 <HeroNavDropdown
                   label="Resources"
@@ -749,6 +731,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                     { href: "/ai-guide",   label: "AI Guide",   desc: "How our AI verification works" },
                     { href: "/technology", label: "Technology", desc: "The tech behind CheckByAI" },
                     { href: "/api-docs",   label: "API Docs",   desc: "Integrate via our REST API" },
+                    { href: "/dashboard",  label: "Verify CoS", desc: "Check a Certificate of Sponsorship" },
                   ]}
                 />
               </div>
@@ -914,13 +897,15 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                   )}
                 </motion.div>
 
-                <p className="text-xs text-white/60">
-                  CheckByAI is an independent monitoring service and is not affiliated with the UK Home Office or UKVI.
-                </p>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-x-4 gap-y-2">
+                  <p className="text-xs text-white/60">
+                    CheckByAI is an independent monitoring service and is not affiliated with the UK Home Office or UKVI.
+                  </p>
+                </div>
 
                 <motion.ul initial={{ opacity: 0 }} animate={isLoaded ? { opacity: 1 } : {}} transition={{ ...springGentle, delay: 0.6 }} aria-label="Trust signals" className="flex items-center gap-x-6 gap-y-2 pt-4 flex-wrap text-xs text-white/60">
                   {[
-                    { icon: <HeroAlertIcon className="w-4 h-4 flex-shrink-0" size={16} />, label: "Pro alerts in 30 min" },
+                    { icon: <HeroAlertIcon className="w-4 h-4 flex-shrink-0" size={16} />, label: "Same-day & twice-daily alerts" },
                     { icon: <HeroTrackedIcon className="w-4 h-4 flex-shrink-0" size={16} />, label: "47,823 sponsors tracked" },
                     { icon: <HeroGDPRLockIcon className="w-4 h-4 flex-shrink-0" size={16} />, label: "UK GDPR compliant" },
                   ].map((item, i) => (
@@ -1061,34 +1046,35 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
               </CardContent>
             </Card>
 
-            <Card className="border-primary ring-2 ring-primary/30 relative shadow-lg shadow-primary/10">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2"><Badge className="bg-primary text-primary-foreground font-bold text-xs uppercase tracking-wider px-3 py-1 shadow-sm">Best Value</Badge></div>
+            <Card className="border-slate-300 dark:border-slate-700">
               <CardContent className="py-6">
-                <p className="text-xs font-bold uppercase tracking-wider text-primary mb-2">Starter</p>
-                <div className="mb-1"><span className="text-3xl font-extrabold text-foreground">£24.99</span><span className="text-sm text-muted-foreground">/month</span></div>
-                <p className="text-xs text-muted-foreground mb-6">£239.99/year (save 20%)</p>
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-2">Alert Pass</p>
+                <div className="mb-1"><span className="text-3xl font-extrabold text-foreground">£9.99</span><span className="text-sm text-muted-foreground">/year</span></div>
+                <p className="text-xs text-muted-foreground mb-6">Low-commitment monitoring for a single employer</p>
                 <ul className="space-y-2.5 text-sm mb-6">
-                  <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />Monitor 2 companies</li>
-                  <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />Email + WhatsApp alerts</li>
-                  <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />30-day history</li>
-                  <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />Same-day alerts (18:00 UTC)</li>
+                  <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />Monitor 1 company for 12 months</li>
+                  <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />Email + WhatsApp alerts</li>
+                  <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />Same-day alerts (18:00 UTC)</li>
+                  <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />30-day change history</li>
                 </ul>
-                <Link href="/pricing?plan=starter"><Button variant="brand" className="w-full py-5 text-base shadow-md"><Zap className="w-4 h-4 mr-2" />Get Same-Day Alerts</Button></Link>
+                <Link href="/pricing"><Button variant="outline" className="w-full font-bold py-5 text-base">Get Alert Pass</Button></Link>
               </CardContent>
             </Card>
 
-            <Card className="border-slate-300 dark:border-slate-700">
+            <Card className="border-emerald-500 dark:border-emerald-400 ring-2 ring-emerald-500/30 relative shadow-lg shadow-emerald-500/10">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2"><Badge className="bg-emerald-600 text-white font-bold text-[10px] uppercase tracking-wider px-3 py-1 shadow-sm">Best Value</Badge></div>
               <CardContent className="py-6">
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-2">Pro</p>
-                <div className="mb-1"><span className="text-3xl font-extrabold text-foreground">£49.99</span><span className="text-sm text-muted-foreground">/month</span></div>
-                <p className="text-xs text-muted-foreground mb-6">£479.99/year (save 20%)</p>
+                <p className="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-2">Alert Pass Pro</p>
+                <div className="mb-1"><span className="text-3xl font-extrabold text-foreground">£19.99</span><span className="text-sm text-muted-foreground">/year</span></div>
+                <p className="text-xs text-muted-foreground mb-6">Full protection, billed once a year</p>
                 <ul className="space-y-2.5 text-sm mb-6">
-                  <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />Monitor 5 companies</li>
-                  <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />Email + WhatsApp + SMS</li>
-                  <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />90-day history</li>
-                  <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />Twice-daily alerts (07:00 & 19:00 UTC)</li>
+                  <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />Monitor up to 5 companies for 12 months</li>
+                  <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />Email + WhatsApp + SMS</li>
+                  <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />Twice-daily alerts (07:00 & 19:00 UTC)</li>
+                  <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />90-day change history</li>
+                  <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />Sponsored job alerts by email</li>
                 </ul>
-                <Link href="/pricing?plan=pro"><Button variant="outline" className="w-full font-bold py-5 text-base">Get Pro Protection</Button></Link>
+                <Link href="/pricing"><Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-5 text-base shadow-md"><Zap className="w-4 h-4 mr-2" />Get Alert Pass Pro</Button></Link>
               </CardContent>
             </Card>
           </div>
@@ -1143,52 +1129,46 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                 Yes. Many users monitor a prospective employer before accepting a job offer, or track a previous employer to follow up on a pending visa application. You can add any licensed UK sponsor to your watchlist.
               </AccordionContent>
             </AccordionItem>
+            <AccordionItem value="q9" className="border rounded-xl px-4 bg-white dark:bg-slate-900">
+              <AccordionTrigger className="text-sm font-semibold text-foreground hover:no-underline py-4">What are sponsored job alerts?</AccordionTrigger>
+              <AccordionContent className="text-sm text-muted-foreground pb-4">
+                Alert Pass Pro subscribers can opt in to email alerts when a company on their watchlist lists a new sponsored role. These alerts follow the same twice-daily delivery window as licence alerts (07:00 and 19:00 UTC) and reflect job listings tied to monitored sponsors — they are not a guarantee of sponsorship or visa eligibility for any specific listing.
+              </AccordionContent>
+            </AccordionItem>
           </Accordion>
         </div>
       </section>
 
-      <section id="cos-verification" className="py-16 sm:py-20 bg-background border-t border-border/50 scroll-mt-20">
+      <section id="job-alerts" className="py-16 sm:py-20 bg-background border-t border-border/50 scroll-mt-20">
         <div className="max-w-5xl mx-auto px-6 sm:px-8 lg:px-12">
-          <div className="text-center max-w-2xl mx-auto mb-10">
-            <span className="editorial-caption text-primary block mb-4">Also Available</span>
+          <div className="text-center max-w-2xl mx-auto mb-14">
+            <span className="editorial-caption text-primary block mb-4">Alert Pass Pro</span>
             <h2 className="text-3xl sm:text-4xl editorial-subheading text-foreground mb-4">
-              AI-Assisted Certificate of Sponsorship Authenticity Check
+              Sponsored Job Alerts For Companies You're Watching
             </h2>
             <p className="text-base editorial-body text-muted-foreground">
-              Received a Certificate of Sponsorship from a prospective employer? Upload the PDF to assess whether the document appears unaltered or has been modified. No personal data is retained at any stage.
+              Alert Pass Pro tracks sponsored job listings tied to the employers on your watchlist and emails you when a new one appears, so you have options before your own sponsor's status changes.
             </p>
           </div>
 
-          <CosSamplePreview />
+          <div className="grid md:grid-cols-3 gap-6 mb-10">
+            <FeatureCard icon={<Briefcase size={30} />} title="Job Alerts By Email" description="When a company you're monitoring lists a new sponsored role, Alert Pass Pro emails you the listing — title, employer, and location — as soon as it's picked up." index={0} />
+            <FeatureCard icon={<Bell size={30} />} title="Twice-Daily Delivery" description="Job alerts are delivered on the same twice-daily schedule as licence alerts: 07:00 and 19:00 UTC. No sub-hour or 'instant' delivery is promised on any plan." index={1} />
+            <FeatureCard icon={<ShieldCheck size={30} />} title="Real Register Data Only" description="Alerts are surfaced from job listings tied to licensed sponsors on your watchlist. This is not a guarantee of sponsorship or visa eligibility for any listing." index={2} />
+          </div>
 
           <div className="text-center">
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-              <Button variant="brand" size="lg" className="px-8 py-3 shadow-lg shadow-primary/20 transition-all duration-200" onClick={onStartVerification}>
-                Verify a Document
-                <ArrowRight className="ml-2 w-4 h-4" />
-              </Button>
-              <Button variant="outline" size="lg" className="rounded-full px-6 py-3 font-semibold transition-all duration-200" onClick={() => setShowDemo(true)}>
-                <Play className="mr-2 w-4 h-4" />Watch Demo
-              </Button>
+              <Link href="/pricing">
+                <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 px-8 py-3 rounded-full font-semibold shadow-lg transition-all duration-200">
+                  Get Alert Pass Pro
+                  <ArrowRight className="ml-2 w-4 h-4" />
+                </Button>
+              </Link>
             </div>
             <p className="text-xs text-muted-foreground mt-4">
-              CheckByAI is an independent verification service and is not affiliated with the UK Home Office or UKVI.
+              Sponsored job alerts are included with Alert Pass Pro. CheckByAI is an independent monitoring service and is not affiliated with the UK Home Office or UKVI.
             </p>
-          </div>
-        </div>
-      </section>
-
-      <section aria-labelledby="cos-features-heading" className="py-16 sm:py-20 bg-muted/40 border-t border-border/50">
-        <div className="max-w-5xl mx-auto px-6 sm:px-8 lg:px-12">
-          <div className="text-center max-w-2xl mx-auto mb-10">
-            <h2 id="cos-features-heading" className="text-2xl sm:text-3xl editorial-subheading text-foreground mb-4">
-              Built for compliance and privacy
-            </h2>
-          </div>
-          <div className="grid md:grid-cols-3 gap-6">
-            <FeatureCard icon={<ShieldMonitorIcon size={30} />} title="Home Office Compliance" description="Our tool cross-references your Certificate of Sponsorship against known Home Office document structure and formatting standards. Results are indicative only and do not constitute legal verification." index={0} />
-            <FeatureCard icon={<DocumentVerifyIcon size={30} />} title="Instant Assessment" description="Receive an automated assessment within seconds of upload. The system evaluates document structure, formatting consistency, and file integrity against Home Office-issued templates." index={1} />
-            <FeatureCard icon={<UKLockIcon size={30} />} title="UK Data Protection" description="Operates in full compliance with UK GDPR. No personal data is extracted, stored, or processed. Uploaded files are permanently deleted immediately upon completion of analysis." index={2} />
           </div>
         </div>
       </section>

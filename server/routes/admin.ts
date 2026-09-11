@@ -2104,7 +2104,7 @@ Format your response in clear, professional markdown.`;
       const planFeatures: Record<string, string> = {
         free: 'No company watches or notifications.',
         starter: '2 company watches · Same-day alerts · Email & WhatsApp notifications.',
-        pro: '5 company watches · Immediate alerts · Email, WhatsApp & SMS · Enriched intelligence.',
+        pro: '5 company watches · Twice-daily alerts · Email, WhatsApp & SMS · Enriched intelligence.',
       };
 
       const apiKey = process.env.RESEND_API_KEY;

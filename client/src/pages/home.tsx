@@ -1,11 +1,6 @@
-import { useState, Suspense, lazy } from "react";
-import { Shield, X } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Button } from "@/components/ui/button";
-import FileUploadSimple from "@/components/FileUploadSimple";
+import { Suspense, lazy } from "react";
 import SEOHead from "@/components/SEOHead";
 import PageLayout from "@/components/PageLayout";
-import { getVerificationResultTone, verificationToneBadgeClasses } from "@/lib/verificationResultTone";
 
 const HeroSection = lazy(() => import("@/components/HeroSection"));
 
@@ -18,234 +13,59 @@ function LoadingSpinner() {
 }
 
 export default function Home() {
-  const [showVerificationModal, setShowVerificationModal] = useState(false);
-  const [verificationResult, setVerificationResult] = useState<{type: 'genuine' | 'suspicious' | 'fake', confidence: number} | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handleFileUpload = async (file: File) => {
-    setIsLoading(true);
-  };
-
-  const handleVerificationResult = (result: {type: 'genuine' | 'suspicious' | 'fake', confidence: number}) => {
-    setVerificationResult(result);
-    setIsLoading(false);
-  };
-
-  const handleVerificationError = (error: string) => {
-    console.error('Verification error:', error);
-    setIsLoading(false);
-  };
-
   const homePageSEO = {
-    title: "UK Sponsor Licence Monitoring & CoS Verification | CheckByAI",
-    description: "Search the UK sponsor register free, and get alerted when your employer's sponsor licence status changes. Plus AI-powered Certificate of Sponsorship verification.",
-    keywords: "sponsor licence revoked alert, UK sponsor monitor, certificate of sponsorship verification, sponsor licence check, visa revocation alert, CoS verification, UK immigration",
+    title: "UK Sponsor Licence Monitoring & Sponsored Job Alerts | CheckByAI",
+    description: "Protect your UK sponsorship with sponsor licence monitoring and alerts via email, WhatsApp or SMS. Alert Pass Pro also sends sponsored job opportunity alerts by email.",
+    keywords: "sponsor licence revoked alert, UK sponsor monitor, sponsor licence check, visa revocation alert, sponsored job alerts, UK immigration, alert pass",
     canonicalUrl: "https://checkbyai.net/",
-    ogImage: "https://checkbyai.net/og-image.png",
-    breadcrumbs: [{ name: "Home", url: "https://checkbyai.net/" }],
     structuredData: {
       "@context": "https://schema.org",
       "@graph": [
         {
           "@type": "WebApplication",
-          "name": "UK Sponsor Licence Monitor and CoS Verification",
-          "description": "UK sponsor licence monitoring with WhatsApp, email, and SMS alerts when a licence is revoked. Plus AI-powered Certificate of Sponsorship verification.",
-          "url": "https://checkbyai.net/",
-          "applicationCategory": "SecurityApplication",
-          "operatingSystem": "Web Browser",
-          "offers": [
-            {
-              "@type": "Offer",
-              "name": "Free Sponsor Search",
-              "price": "0",
-              "priceCurrency": "GBP",
-              "description": "Unlimited free searches of the UK sponsor register, no login required"
-            },
-            {
-              "@type": "Offer",
-              "name": "Notification Starter",
-              "price": "24.99",
-              "priceCurrency": "GBP",
-              "priceSpecification": { "@type": "UnitPriceSpecification", "price": "24.99", "priceCurrency": "GBP", "unitText": "MONTH" }
-            },
-            {
-              "@type": "Offer",
-              "name": "Notification Pro",
-              "price": "49.99",
-              "priceCurrency": "GBP",
-              "priceSpecification": { "@type": "UnitPriceSpecification", "price": "49.99", "priceCurrency": "GBP", "unitText": "MONTH" }
-            }
-          ],
+          "name": "CheckByAI - UK Sponsor Licence Monitoring",
+          "alternateName": ["Alert Pass", "Sponsor Licence Monitor", "UK Sponsor Alert"],
+          "applicationCategory": "BusinessApplication",
+          "operatingSystem": "Web",
+          "description": "Monitor a UK employer's sponsor licence status and get alerted by email, WhatsApp or SMS when it changes. Alert Pass Pro adds sponsored job opportunity alerts.",
           "featureList": [
-            "Sponsor licence revocation alerts",
-            "WhatsApp, email and SMS notifications",
-            "Daily Home Office register monitoring",
-            "AI-powered CoS document verification",
-            "90-day licence change history",
-            "Multi-channel notification reliability"
+            "Sponsor licence status monitoring",
+            "Email, WhatsApp and SMS alerts",
+            "Same-day and twice-daily alert tiers",
+            "Sponsor change history",
+            "Sponsored job opportunity alerts (Alert Pass Pro)",
+            "AI-assisted Certificate of Sponsorship verification (separate product)",
           ],
-          "provider": {
-            "@type": "Organization",
-            "name": "Check By AI",
-            "url": "https://checkbyai.net/",
-            "logo": "https://checkbyai.net/checkbyai-logo.png",
-            "sameAs": ["https://www.youtube.com/@CheckByAi"],
-            "address": { "@type": "PostalAddress", "addressCountry": "GB" }
-          }
-        },
-        {
-          "@type": "FAQPage",
-          "mainEntity": [
-            {
-              "@type": "Question",
-              "name": "What happens when a UK sponsor licence is revoked?",
-              "acceptedAnswer": {
-                "@type": "Answer",
-                "text": "When a UK sponsor licence is revoked, all workers sponsored by that company typically have 60 days to find a new sponsor or leave the UK. CheckByAI's Notification Engine sends alerts via WhatsApp, email, and SMS so you can act quickly."
-              }
-            },
-            {
-              "@type": "Question",
-              "name": "How do I check if my employer has a valid UK sponsor licence?",
-              "acceptedAnswer": {
-                "@type": "Answer",
-                "text": "You can search the UK Home Office Register of Licensed Sponsors for free on CheckByAI. Simply enter your employer's name in the search box on our homepage or Sponsor Monitor page. Searches are free and unlimited with no login required."
-              }
-            },
-            {
-              "@type": "Question",
-              "name": "What is a Certificate of Sponsorship (CoS)?",
-              "acceptedAnswer": {
-                "@type": "Answer",
-                "text": "A Certificate of Sponsorship (CoS) is an electronic document issued by a UK employer with a sponsor licence. It contains details about the job and the sponsored worker, and is required when applying for a Skilled Worker visa. CheckByAI can verify CoS documents for authenticity using AI forensic analysis."
-              }
-            },
-            {
-              "@type": "Question",
-              "name": "How quickly does CheckByAI detect sponsor licence changes?",
-              "acceptedAnswer": {
-                "@type": "Answer",
-                "text": "CheckByAI checks the Home Office Register of Licensed Sponsors on weeknights. Pro plan subscribers receive alerts twice daily at 07:00 and 19:00 UTC. Starter plan subscribers receive same-day alerts at 18:00 UTC."
-              }
-            },
-            {
-              "@type": "Question",
-              "name": "Is the sponsor licence search really free?",
-              "acceptedAnswer": {
-                "@type": "Answer",
-                "text": "Yes, anyone can search the UK sponsor register unlimited times without creating an account or providing any personal information. For real-time alerts when a sponsor's status changes, subscription plans start from £24.99 per month."
-              }
-            }
-          ]
+          "offers": [
+            { "@type": "Offer", "name": "Alert Pass (Annual)", "price": "9.99", "priceCurrency": "GBP" },
+            { "@type": "Offer", "name": "Alert Pass Pro (Annual)", "price": "19.99", "priceCurrency": "GBP" },
+          ],
         },
         {
           "@type": "WebSite",
-          "name": "CheckByAI",
           "url": "https://checkbyai.net/",
           "potentialAction": {
             "@type": "SearchAction",
             "target": "https://checkbyai.net/sponsor-monitor?q={search_term_string}",
-            "query-input": "required name=search_term_string"
-          }
-        }
-      ]
-    }
+            "query-input": "required name=search_term_string",
+          },
+        },
+        {
+          "@type": "Organization",
+          "name": "Check By AI",
+          "url": "https://checkbyai.net/",
+          "description": "Sponsor licence monitoring, sponsored job alerts, and Certificate of Sponsorship verification for UK visa holders.",
+        },
+      ],
+    },
   };
 
   return (
     <PageLayout hideNav hideFooter>
       <SEOHead {...homePageSEO} />
       <Suspense fallback={<LoadingSpinner />}>
-        <HeroSection onStartVerification={() => setShowVerificationModal(true)} />
+        <HeroSection />
       </Suspense>
-
-      <AnimatePresence>
-        {showVerificationModal && (
-          <>
-            <motion.div
-              className="fixed inset-0 bg-foreground/50 z-40"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => {
-                setShowVerificationModal(false);
-                setVerificationResult(null);
-              }}
-            />
-            <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
-              <motion.div
-                className="bg-background dark:bg-card rounded-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto border border-border pointer-events-auto"
-                initial={{ opacity: 0, scale: 0.96 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.96 }}
-                transition={{ type: "spring", stiffness: 100, damping: 15 }}
-              >
-                <div className="sticky top-0 bg-background dark:bg-card p-6 border-b border-border flex justify-between items-center">
-                  <h2 className="text-2xl font-bold editorial-subheading text-foreground">Document Verification</h2>
-                  <button
-                    onClick={() => {
-                      setShowVerificationModal(false);
-                      setVerificationResult(null);
-                    }}
-                    className="text-muted-foreground hover:text-foreground text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-xl hover:bg-muted transition-colors"
-                  >
-                    <X className="w-6 h-6" />
-                  </button>
-                </div>
-                
-                <div className="p-6">
-                  {!verificationResult ? (
-                    <div>
-                      <div className="mb-6 p-4 bg-muted rounded-xl border border-border">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-primary rounded-xl flex items-center justify-center flex-shrink-0">
-                            <Shield className="w-5 h-5 text-primary-foreground" />
-                          </div>
-                          <div>
-                            <h3 className="font-semibold editorial-subheading text-foreground">Document Verification Available</h3>
-                            <p className="text-muted-foreground text-sm editorial-body">Upload your document to verify its authenticity instantly</p>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <FileUploadSimple
-                        onFileUpload={handleFileUpload}
-                        onVerificationResult={handleVerificationResult}
-                        onError={handleVerificationError}
-                        onLoading={setIsLoading}
-                        isAdmin={false}
-                      />
-                    </div>
-                  ) : (
-                    <div className="text-center">
-                      <div className="mb-6">
-                        <div className={`inline-block px-6 py-3 rounded-xl text-lg font-semibold border transition-colors duration-200 ${verificationToneBadgeClasses[getVerificationResultTone(verificationResult.type)]}`}>
-                          {verificationResult.type === 'genuine' ? 'Genuine' : verificationResult.type === 'suspicious' ? 'Suspicious' : 'Fake'}
-                        </div>
-                      </div>
-
-                      <div className="space-y-3 mb-6">
-                        <p className="text-muted-foreground editorial-body">
-                          Confidence: {Math.round(verificationResult.confidence)}%
-                        </p>
-                        <button
-                          onClick={() => {
-                            setShowVerificationModal(false);
-                            setVerificationResult(null);
-                          }}
-                          className="w-full bg-primary text-primary-foreground py-3 px-6 rounded-full font-semibold hover:opacity-90 transition-opacity editorial-subheading"
-                        >
-                          Close
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            </div>
-          </>
-        )}
-      </AnimatePresence>
     </PageLayout>
   );
 }

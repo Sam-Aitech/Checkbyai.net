@@ -95,7 +95,7 @@ export default function About() {
                       </div>
                       <h3 className="font-semibold text-foreground mb-2">Sponsor Licence Monitoring</h3>
                       <p className="text-sm text-muted-foreground">
-                        We track the UK Home Office register daily and alert you instantly if your employer's licence is revoked.
+                        We track the UK Home Office register daily and alert you if your employer's licence is revoked.
                       </p>
                     </div>
                     <div className="bg-muted/50 border border-border rounded-xl p-5">

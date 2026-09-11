@@ -250,7 +250,7 @@ export function buildSponsorSeoBody(
         A real company name on a CoS does not mean the document is genuine — scammers reuse the
         names of licensed sponsors. <a href="/single-check" style="color:#3434b2;text-decoration:underline;">Run a
         one-off &pound;9.99 scam check on your CoS document</a> (no account needed), or
-        <a href="/pricing" style="color:#3434b2;text-decoration:underline;">get instant alerts if this sponsor's
+        <a href="/pricing" style="color:#3434b2;text-decoration:underline;">get alerted if this sponsor's
         licence status changes</a>.
       </p>
       <nav style="margin-top:2rem;font-size:0.9rem;">

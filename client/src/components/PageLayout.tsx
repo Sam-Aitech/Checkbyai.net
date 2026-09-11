@@ -35,11 +35,10 @@ const navItems: NavItem[] = [
     label: "Monitor",
     children: [
       { href: "/sponsors",        label: "Sponsor Register",  desc: "Search 124,000+ licensed UK sponsors",          icon: <Search className="w-4 h-4" /> },
-      { href: "/sponsor-monitor", label: "Sponsor Monitor",   desc: "Get instant alerts when a licence changes",      icon: <Bell className="w-4 h-4" /> },
+      { href: "/sponsor-monitor", label: "Sponsor Monitor",   desc: "Get alerted when a licence changes",      icon: <Bell className="w-4 h-4" /> },
       { href: "/sponsor-changes", label: "Licence Changes",   desc: "Recent additions, revocations and downgrades",   icon: <TrendingUp className="w-4 h-4" /> },
     ],
   },
-  { href: "/dashboard", label: "Verify CoS" },
   { href: "/pricing",   label: "Pricing" },
   {
     label: "Resources",
@@ -48,6 +47,7 @@ const navItems: NavItem[] = [
       { href: "/ai-guide",    label: "AI Guide",    desc: "How our AI verification works",           icon: <Cpu className="w-4 h-4" /> },
       { href: "/technology",  label: "Technology",  desc: "The tech behind CheckByAI",               icon: <FileCheck className="w-4 h-4" /> },
       { href: "/api-docs",    label: "API Docs",    desc: "Integrate via our REST API",              icon: <Code2 className="w-4 h-4" /> },
+      { href: "/dashboard",   label: "Verify CoS",  desc: "Check a Certificate of Sponsorship",      icon: <FileCheck className="w-4 h-4" /> },
     ],
   },
 ];
@@ -180,7 +180,7 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
     : { initial: { opacity: 0, y: 15 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -15 } };
 
   const monitorGroup = navItems[0];
-  const resourcesGroup = navItems[3];
+  const resourcesGroup = navItems[2];
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -305,7 +305,7 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
 
                   {/* Standalone links */}
                   <div className={`border-t pt-3 ${darkNav ? "border-slate-800" : "border-border/50"}`}>
-                    {[navItems[1], navItems[2]].map(item => (
+                    {[navItems[1]].map(item => (
                       <Link
                         key={item.href}
                         href={item.href!}
