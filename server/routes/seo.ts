@@ -46,26 +46,35 @@ const CORE_URLS: Array<{ path: string; priority: string; changefreq: string }> =
   { path: '/sponsor-monitor', priority: '0.9', changefreq: 'daily' },
   { path: '/sponsors', priority: '0.9', changefreq: 'daily' },
   { path: '/pricing', priority: '0.9', changefreq: 'weekly' },
-  { path: '/single-check', priority: '0.9', changefreq: 'weekly' },
   { path: '/cos-pricing', priority: '0.8', changefreq: 'weekly' },
-  { path: '/dashboard', priority: '0.8', changefreq: 'weekly' },
+  { path: '/verify-cos', priority: '0.8', changefreq: 'weekly' },
   { path: '/sponsor-changes', priority: '0.8', changefreq: 'daily' },
   { path: '/ai-guide', priority: '0.7', changefreq: 'monthly' },
   { path: '/cos-guide', priority: '0.7', changefreq: 'monthly' },
   { path: '/technology', priority: '0.7', changefreq: 'monthly' },
-  { path: '/login', priority: '0.5', changefreq: 'monthly' },
   { path: '/about', priority: '0.6', changefreq: 'monthly' },
-  { path: '/privacy', priority: '0.4', changefreq: 'yearly' },
-  { path: '/data-security', priority: '0.4', changefreq: 'yearly' },
+  { path: '/privacy.html', priority: '0.4', changefreq: 'yearly' },
+  { path: '/data-security.html', priority: '0.4', changefreq: 'yearly' },
   { path: '/check-fake-cos', priority: '0.8', changefreq: 'monthly' },
   { path: '/what-to-do-fake-cos', priority: '0.8', changefreq: 'monthly' },
-  { path: '/guides/how-to-check-cos-genuine', priority: '0.6', changefreq: 'monthly' },
-  { path: '/guides/cos-scams-red-flags', priority: '0.6', changefreq: 'monthly' },
-  { path: '/guides/employers-guide-fake-cos', priority: '0.5', changefreq: 'monthly' },
-  { path: '/guides/what-to-do-fake-cos', priority: '0.5', changefreq: 'monthly' },
 ];
 
+const LEGACY_REDIRECTS: Record<string, string> = {
+  '/single-check': '/pricing',
+  '/privacy': '/privacy.html',
+  '/data-security': '/data-security.html',
+  '/cos-check-ai': '/cos-check-ai.html',
+  '/guides/how-to-check-cos-genuine': '/cos-guide',
+  '/guides/cos-scams-red-flags': '/check-fake-cos',
+  '/guides/employers-guide-fake-cos': '/cos-guide',
+  '/guides/what-to-do-fake-cos': '/what-to-do-fake-cos',
+};
+
 export function registerSeoRoutes(app: Express): void {
+
+  for (const [from, to] of Object.entries(LEGACY_REDIRECTS)) {
+    app.get(from, (_req, res) => res.redirect(301, to));
+  }
 
   // Sitemap INDEX — points to core pages + 124k sponsor detail pages
   app.get('/sitemap.xml', (req, res) => {
@@ -133,7 +142,13 @@ Allow: /
 
 Disallow: /api/
 Disallow: /admin
-Disallow: /uploads/`;
+Disallow: /uploads/
+Disallow: /dashboard
+Disallow: /history
+Disallow: /pro-dashboard
+Disallow: /checkout/
+Disallow: /receipt/
+Disallow: /submit`;
 
     res.set('Content-Type', 'text/plain');
     res.send(content);
@@ -463,6 +478,7 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
       html = html.replace(/<link rel="canonical" href="[^"]*"/, `<link rel="canonical" href="${canonical}"`);
 
       res.set('Content-Type', 'text/html');
+      res.set('Cache-Control', 'public, max-age=3600');
       res.send(html);
     } catch (err) {
       logger.error({ err }, 'Bot meta injection error:');

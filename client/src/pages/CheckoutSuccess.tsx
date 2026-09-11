@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { apiRequest } from '@/lib/queryClient';
 import { unwrapApiEnvelope } from '@/lib/apiEnvelope';
-import { isPaidTier, isUnlimitedWatchTier } from '@shared/planTiers';
+import { isPaidTier, isUnlimitedWatchTier, resolveTier, TIER_CONFIGS, TIER_LABELS, getWatchLimit } from '@shared/planTiers';
 import PageLayout from '@/components/PageLayout';
 import SEOHead from '@/components/SEOHead';
 
@@ -62,14 +62,7 @@ export default function CheckoutSuccess() {
   const isNotificationPlan = ['notification_starter', 'notification_pro', 'alert_annual', 'alert_annual_pro'].includes(verifyResult?.packageType ?? '');
 
   const sponsorDashboardUrl = '/pro-dashboard';
-
-  // Auto-redirect notification plan purchases to sponsor dashboard after 2s
-  useEffect(() => {
-    if (!isVerifying && verifyResult?.success && isNotificationPlan) {
-      const timer = setTimeout(() => setLocation(sponsorDashboardUrl), 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [isVerifying, verifyResult?.success, isNotificationPlan, sponsorDashboardUrl, setLocation]);
+  const monitorUrl = '/pro-dashboard/monitor';
 
   const getPackageLabel = (type?: string) => {
     switch (type) {
@@ -91,7 +84,7 @@ export default function CheckoutSuccess() {
       <SEOHead
         title="Payment Successful | Check By AI"
         description="Your payment has been processed successfully. Your verification credits are now available."
-        canonicalUrl="https://checkbyai.net/checkout/success"
+        robots="noindex, nofollow"
       />
       <div className="bg-background flex items-center justify-center p-4 min-h-screen">
         <motion.div
@@ -123,10 +116,12 @@ export default function CheckoutSuccess() {
                   <PartyPopper className="w-8 h-8 text-emerald-500" />
                 </div>
                 <h1 className="editorial-subheading text-emerald-600 dark:text-emerald-400 text-2xl">
-                  Payment Successful!
+                  {isNotificationPlan ? "You're protected." : "Payment Successful!"}
                 </h1>
                 <p className="text-muted-foreground text-sm mt-2">
-                  Thank you for your purchase
+                  {isNotificationPlan
+                    ? "Your monitoring is now active. Let's protect your first sponsor."
+                    : "Thank you for your purchase"}
                 </p>
               </>
             ) : (
@@ -188,14 +183,56 @@ export default function CheckoutSuccess() {
                 </div>
               )}
 
-              <Button
-                className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full"
-                size="lg"
-                onClick={() => setLocation(isNotificationPlan ? sponsorDashboardUrl : '/')}
-              >
-                {isNotificationPlan ? 'Go to Dashboard' : 'Start Verifying Documents'}
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
+              {isNotificationPlan && verifyResult.subscriptionStatus && (() => {
+                const tier = resolveTier(verifyResult.subscriptionStatus);
+                const cfg = TIER_CONFIGS[tier];
+                const slots = getWatchLimit(verifyResult.subscriptionStatus);
+                return (
+                  <div className="bg-muted/50 border border-border rounded-xl p-4 text-left text-sm space-y-2" data-testid="activation-entitlement">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Plan</span>
+                      <span className="font-semibold">{TIER_LABELS[tier]}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Monitoring</span>
+                      <span className="font-semibold">{slots === -1 ? "Unlimited sponsors" : `Up to ${slots} sponsors`}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Alerts</span>
+                      <span className="font-semibold">{cfg.channels.join(" + ")}</span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {isNotificationPlan ? (
+                <div className="space-y-2">
+                  <Button
+                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full min-h-[48px]"
+                    size="lg"
+                    onClick={() => setLocation(monitorUrl)}
+                  >
+                    Protect your first sponsor
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                  <Button
+                    className="w-full rounded-full min-h-[44px]"
+                    variant="ghost"
+                    onClick={() => setLocation(sponsorDashboardUrl)}
+                  >
+                    Explore dashboard first
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full"
+                  size="lg"
+                  onClick={() => setLocation('/')}
+                >
+                  Start Verifying Documents
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              )}
             </div>
           )}
 

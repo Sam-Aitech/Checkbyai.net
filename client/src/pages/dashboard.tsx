@@ -7,7 +7,7 @@ export default function DashboardPage() {
     title: "Verify Your Certificate of Sponsorship | Detect Fake CoS Documents | CheckByAI",
     description: "Upload your Certificate of Sponsorship and find out if it's genuine in under 60 seconds. Our forensic AI detects fakes, edits, and suspicious formatting. Your document is deleted immediately after checking.",
     keywords: "verify Certificate of Sponsorship, UK CoS checker, upload CoS document, fake CoS detection, AI CoS verification, UK visa document check, sponsor verification",
-    canonicalUrl: "https://checkbyai.net/dashboard",
+    robots: "noindex, nofollow",
     ogTitle: "Is Your CoS Genuine? | Upload & Verify Instantly",
     ogDescription: "Upload your Certificate of Sponsorship for instant verification. Detect fakes before it's too late.",
     structuredData: {

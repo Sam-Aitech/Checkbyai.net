@@ -1132,6 +1132,7 @@ export default function SponsorMonitor() {
         canonicalUrl="https://checkbyai.net/sponsor-monitor"
         ogTitle="Is Your Employer's Sponsor Licence Still Valid? | Free Check | CheckByAI"
         ogDescription="Check any UK employer's sponsor licence status for free. Get alerted if it's revoked, suspended or downgraded, before it affects your visa."
+        ogImage="https://checkbyai.net/og-image.png"
         breadcrumbs={[
           { name: "Home", url: "https://checkbyai.net/" },
           { name: "Sponsor Monitor", url: "https://checkbyai.net/sponsor-monitor" }

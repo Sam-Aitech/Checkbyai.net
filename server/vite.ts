@@ -111,16 +111,61 @@ export function serveStatic(app: Express) {
         const templatePath = path.resolve(distPath, "index.html");
         cachedLandingHtml = renderLandingPage(templatePath);
       }
-      res.status(200).set({ "Content-Type": "text/html" }).end(cachedLandingHtml);
+      res
+        .status(200)
+        .set({ "Content-Type": "text/html", "Cache-Control": "public, max-age=3600" })
+        .end(cachedLandingHtml);
     } catch (e) {
       next(e);
     }
   });
 
-  app.use(express.static(distPath));
+  app.use(
+    express.static(distPath, {
+      maxAge: "1y",
+      immutable: true,
+      etag: true,
+      index: false,
+    }),
+  );
 
-  // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
+  const KNOWN_SPA_PREFIXES = [
+    "/login",
+    "/admin",
+    "/dashboard",
+    "/verify-cos",
+    "/pricing",
+    "/cos-pricing",
+    "/checkout",
+    "/submit",
+    "/ai-guide",
+    "/cos-guide",
+    "/technology",
+    "/api-docs",
+    "/history",
+    "/sponsor-monitor",
+    "/sponsor-changes",
+    "/sponsors",
+    "/check-fake-cos",
+    "/what-to-do-fake-cos",
+    "/about",
+    "/pro-dashboard",
+    "/sponsor",
+    "/receipt",
+    "/404",
+  ];
+
+  // fall through to index.html if the file doesn't exist.
+  // Unknown paths return 404 status with the SPA shell so the client
+  // NotFound route renders without creating soft-404s for crawlers.
+  app.use("*", (req, res) => {
+    const isKnown =
+      req.path === "/" ||
+      KNOWN_SPA_PREFIXES.some(
+        (p) => req.path === p || req.path.startsWith(p.endsWith("/") ? p : `${p}/`) || req.path === p.replace(/\/$/, ""),
+      );
+    res
+      .status(isKnown ? 200 : 404)
+      .sendFile(path.resolve(distPath, "index.html"));
   });
 }

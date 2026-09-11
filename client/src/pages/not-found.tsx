@@ -12,7 +12,7 @@ export default function NotFound() {
     title: "Page Not Found | Check By AI",
     description: "The page you're looking for doesn't exist. Return to Check By AI to verify your documents with AI-powered technology.",
     keywords: "404, page not found, document verification",
-    canonicalUrl: "https://checkbyai.net/404"
+    robots: "noindex, nofollow"
   };
 
   return (

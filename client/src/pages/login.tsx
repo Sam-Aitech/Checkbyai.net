@@ -12,7 +12,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import logoImg from "@assets/logo_material.png";
 import { queryClient, getQueryFn } from "@/lib/queryClient";
 import { isPaidTier } from "@shared/planTiers";
-import BrandLogo from "@/components/BrandLogo";
+
 import GoogleLoginButton from "@/components/GoogleLoginButton";
 import { Turnstile } from "@marsidev/react-turnstile";
 
@@ -97,6 +97,7 @@ export default function LoginPage() {
   const [otpCode, setOtpCode] = useState("");
   const [step, setStep] = useState<"email" | "otp">("email");
   const [isLoading, setIsLoading] = useState(false);
+  const [resendIn, setResendIn] = useState(0);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const turnstileRef = useRef<any>(null);
   const oauthError = new URLSearchParams(search).get("error");
@@ -239,6 +240,7 @@ export default function LoginPage() {
   };
 
   const handleResendCode = async () => {
+    if (resendIn > 0) return;
     setIsLoading(true);
     try {
       const response = await fetch("/api/auth/email/send-otp", {
@@ -259,6 +261,16 @@ export default function LoginPage() {
         title: "Code resent!",
         description: "Check your email for a new verification code",
       });
+      setResendIn(30);
+      const timer = setInterval(() => {
+        setResendIn((s) => {
+          if (s <= 1) {
+            clearInterval(timer);
+            return 0;
+          }
+          return s - 1;
+        });
+      }, 1000);
     } catch (error: any) {
       toast({
         title: "Failed to resend",
@@ -275,7 +287,7 @@ export default function LoginPage() {
       <SEOHead
         title="Sign In | Check By AI"
         description="Sign in to Check By AI to verify your Certificate of Sponsorship documents. Access your verification history and manage your account."
-        canonicalUrl="https://checkbyai.net/login"
+        robots="noindex, nofollow"
       />
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <motion.div
@@ -295,13 +307,10 @@ export default function LoginPage() {
                 loading="eager"
               />
             </div>
-            <div className="flex justify-center mt-2 mb-2">
-              <BrandLogo size="lg" variant="auto" />
-            </div>
             <p className="text-muted-foreground mt-2 text-sm">
-              {step === "email" 
-                ? "Enter your email to receive a verification code" 
-                : "Enter the 6-digit code sent to your email"}
+              {step === "email"
+                ? "Welcome back — sign in to CheckByAI. Secure sign-in · No password required."
+                : "Check your email — we sent a 6-digit code. It expires soon."}
             </p>
           </div>
           <div className="p-6 space-y-6">
@@ -439,14 +448,15 @@ export default function LoginPage() {
                         <ArrowLeft className="h-3 w-3" />
                         Change email
                       </button>
-                      <button 
+                      <button
                         type="button"
                         onClick={handleResendCode}
-                        disabled={isLoading}
-                        className="text-muted-foreground hover:text-foreground"
+                        disabled={isLoading || resendIn > 0}
+                        className="text-muted-foreground hover:text-foreground disabled:opacity-50"
                         data-testid="button-resend-code"
+                        aria-live="polite"
                       >
-                        Resend code
+                        {resendIn > 0 ? `Resend code in ${resendIn}s` : "Resend code"}
                       </button>
                     </div>
                   </form>

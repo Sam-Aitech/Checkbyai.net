@@ -596,7 +596,7 @@ export default function SponsorDashboard() {
         <SEOHead
           title="Sponsor Monitor Dashboard | Check By AI"
           description="Monitor UK sponsor licence changes in real time."
-          canonicalUrl="https://checkbyai.net/dashboard/sponsor"
+          robots="noindex, nofollow"
         />
         <div className="max-w-[480px] mx-auto px-4 py-8">
           <motion.div
@@ -641,7 +641,7 @@ export default function SponsorDashboard() {
       <SEOHead
         title="Sponsor Monitor Dashboard | Check By AI"
         description="Monitor UK sponsor licence changes in real time."
-        canonicalUrl="https://checkbyai.net/dashboard/sponsor"
+        robots="noindex, nofollow"
       />
       <div className="max-w-[480px] mx-auto px-4 py-8">
         <motion.div

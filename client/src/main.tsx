@@ -6,18 +6,33 @@ import "./index.css";
 const sentryDsn = import.meta.env.VITE_SENTRY_DSN as string | undefined;
 const isSentryEnabled = import.meta.env.MODE !== "test" && Boolean(sentryDsn);
 
-Sentry.init({
-  dsn: sentryDsn,
-  enabled: isSentryEnabled,
-  environment: import.meta.env.MODE,
-  tracesSampleRate: import.meta.env.PROD ? 0.1 : 1.0,
-});
+const initSentry = () => {
+  Sentry.init({
+    dsn: sentryDsn,
+    enabled: isSentryEnabled,
+    environment: import.meta.env.MODE,
+    tracesSampleRate: import.meta.env.PROD ? 0.1 : 1.0,
+  });
+};
+
+if ("requestIdleCallback" in window) {
+  (window as Window & { requestIdleCallback: (cb: () => void) => void }).requestIdleCallback(initSentry);
+} else {
+  setTimeout(initSentry, 0);
+}
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch(() => {
-      // SW registration failed — push notifications unavailable
-    });
+    const register = () => {
+      navigator.serviceWorker.register("/sw.js").catch(() => {
+        // SW registration failed — push notifications unavailable
+      });
+    };
+    if ("requestIdleCallback" in window) {
+      (window as Window & { requestIdleCallback: (cb: () => void) => void }).requestIdleCallback(register);
+    } else {
+      register();
+    }
   });
 }
 

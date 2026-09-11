@@ -213,12 +213,31 @@ export default function SponsorDetail() {
 
   return (
     <PageLayout>
-      <SEOHead title={seoTitle} description={seoDesc} canonicalUrl={canonicalUrl} />
+      <SEOHead
+        title={seoTitle}
+        description={seoDesc}
+        canonicalUrl={canonicalUrl}
+        ogImage="https://checkbyai.net/og-image.png"
+        structuredData={{
+          "@context": "https://schema.org",
+          "@type": "Organization",
+          name: data.currentName,
+          url: canonicalUrl,
+          ...(data.townCity
+            ? { address: { "@type": "PostalAddress", addressLocality: data.townCity, addressCountry: "GB" } }
+            : {}),
+        }}
+        breadcrumbs={[
+          { name: "Home", url: "https://checkbyai.net/" },
+          { name: "Sponsors", url: "https://checkbyai.net/sponsors" },
+          { name: data.currentName, url: canonicalUrl },
+        ]}
+      />
 
       <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
 
         {/* Breadcrumb */}
-        <nav className="flex items-center gap-2 text-sm text-muted-foreground">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-muted-foreground">
           <Link href="/" className="hover:text-foreground transition-colors">Home</Link>
           <ChevronRight className="w-3.5 h-3.5" />
           <Link href="/sponsors" className="hover:text-foreground transition-colors">UK Sponsor Register</Link>

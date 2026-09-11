@@ -259,7 +259,7 @@ export default function VerificationHistory() {
           title="Verification History | Your Audit Trail | Check By AI"
           description="View your past Certificate of Sponsorship verifications. Access receipts, confidence scores, and forensic analysis details for every document you've checked."
           keywords="verification history, CoS audit trail, document verification records, verification receipts"
-          canonicalUrl="https://checkbyai.net/history"
+          robots="noindex, nofollow"
         />
         <div className="bg-background">
           <div className="max-w-4xl mx-auto px-4 py-12">
@@ -289,7 +289,7 @@ export default function VerificationHistory() {
           title="Verification History | Your Audit Trail | Check By AI"
           description="View your past Certificate of Sponsorship verifications. Access receipts, confidence scores, and forensic analysis details for every document you've checked."
           keywords="verification history, CoS audit trail, document verification records, verification receipts"
-          canonicalUrl="https://checkbyai.net/history"
+          robots="noindex, nofollow"
         />
         <div className="bg-background flex items-center justify-center">
           <div className="border border-border rounded-xl bg-card max-w-md mx-4 p-8 text-center">
@@ -316,7 +316,7 @@ export default function VerificationHistory() {
         title="Verification History | Your Audit Trail | Check By AI"
         description="View your past Certificate of Sponsorship verifications. Access receipts, confidence scores, and forensic analysis details for every document you've checked."
         keywords="verification history, CoS audit trail, document verification records, verification receipts"
-        canonicalUrl="https://checkbyai.net/history"
+        robots="noindex, nofollow"
       />
       <div className="bg-background">
         <div className="max-w-4xl mx-auto px-4 py-12">

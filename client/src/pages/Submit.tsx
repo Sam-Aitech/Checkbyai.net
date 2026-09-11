@@ -226,6 +226,7 @@ export default function Submit() {
         <SEOHead
           title="Submission Complete | COS Verification"
           description="Your Certificate of Sponsorship has been submitted for expert review."
+          robots="noindex, nofollow"
         />
         <div className="flex items-center justify-center bg-background p-4">
           <div className="max-w-lg text-center theme-card overflow-hidden">
@@ -268,6 +269,7 @@ export default function Submit() {
       <SEOHead
         title="Submit Your CoS for Verification | Expert Review"
         description="Complete your Certificate of Sponsorship submission for expert verification."
+        robots="noindex, nofollow"
       />
       
       <div className="bg-background">
@@ -276,7 +278,7 @@ export default function Submit() {
             <div className="p-6 border-b border-border">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="editorial-subheading text-foreground text-2xl">Complete Your Submission</h3>
+                  <h1 className="editorial-subheading text-foreground text-2xl">Complete Your Submission</h1>
                   <p className="text-muted-foreground text-sm mt-1">
                     Please provide details about your CoS and upload your documents
                   </p>

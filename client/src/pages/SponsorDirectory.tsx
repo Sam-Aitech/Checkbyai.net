@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, memo } from "react";
+import { useState, useCallback, useEffect, useRef, memo } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Link } from "wouter";
@@ -168,37 +168,40 @@ function Pagination({
   }
 
   return (
-    <div className="flex items-center justify-center gap-1 mt-6">
+    <nav aria-label="Sponsor directory pages" className="flex items-center justify-center gap-1 mt-6">
       <Button
         variant="outline" size="sm" disabled={page === 1}
         onClick={() => onChange(page - 1)}
         className="h-8 w-8 p-0"
+        aria-label="Previous page"
       >
-        <ChevronLeft className="w-4 h-4" />
+        <ChevronLeft className="w-4 h-4" aria-hidden="true" />
       </Button>
       {pages.map((p, i) =>
         p === "…" ? (
-          <span key={`ellipsis-${i}`} className="px-2 text-muted-foreground text-sm">…</span>
+          <span key={`ellipsis-${i}`} className="px-2 text-muted-foreground text-sm" aria-hidden="true">…</span>
         ) : (
-          <Button
-            key={p}
-            variant={p === page ? "default" : "outline"}
-            size="sm"
-            onClick={() => onChange(p as number)}
-            className="h-8 w-8 p-0 text-xs"
-          >
-            {p}
-          </Button>
+          <a key={p} href={`/sponsors?page=${p}`} onClick={(e) => { e.preventDefault(); onChange(p as number); }} aria-label={`Page ${p}`} aria-current={p === page ? "page" : undefined}>
+            <Button
+              variant={p === page ? "default" : "outline"}
+              size="sm"
+              className="h-8 w-8 p-0 text-xs"
+              tabIndex={-1}
+            >
+              {p}
+            </Button>
+          </a>
         )
       )}
       <Button
         variant="outline" size="sm" disabled={page === totalPages}
         onClick={() => onChange(page + 1)}
         className="h-8 w-8 p-0"
+        aria-label="Next page"
       >
-        <ChevronRight className="w-4 h-4" />
+        <ChevronRight className="w-4 h-4" aria-hidden="true" />
       </Button>
-    </div>
+    </nav>
   );
 }
 
@@ -212,13 +215,24 @@ export default function SponsorDirectory() {
   const [townInput, setTownInput]   = useState("");
   const [routeInput, setRouteInput] = useState("");
   const [letterFilter, setLetter]   = useState("");
-  const [page, setPage]             = useState(1);
+  const [page, setPage]             = useState(() => {
+    const initial = Number(new URLSearchParams(window.location.search).get("page"));
+    return Number.isFinite(initial) && initial >= 1 ? Math.floor(initial) : 1;
+  });
 
   const name  = useDebounce(nameInput,  400);
   const town  = useDebounce(townInput,  400);
   const route = useDebounce(routeInput, 400);
 
-  const resetPage = useCallback(() => setPage(1), []);
+  const goToPage = useCallback((p: number) => {
+    setPage(p);
+    const url = new URL(window.location.href);
+    if (p <= 1) url.searchParams.delete("page");
+    else url.searchParams.set("page", String(p));
+    window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+  }, []);
+
+  const resetPage = useCallback(() => goToPage(1), [goToPage]);
 
   const buildQuery = () => {
     const p = new URLSearchParams();
@@ -255,6 +269,32 @@ export default function SponsorDirectory() {
   };
 
   const stats = data?.stats;
+  const totalPages = data?.totalPages ?? 1;
+  const canonicalForPage = page <= 1 ? "https://checkbyai.net/sponsors" : `https://checkbyai.net/sponsors?page=${page}`;
+
+  useEffect(() => {
+    const upsert = (rel: string, href: string | null) => {
+      const existing = document.querySelector(`link[rel="${rel}"]`);
+      if (!href) {
+        existing?.remove();
+        return;
+      }
+      let link = existing as HTMLLinkElement | null;
+      if (!link) {
+        link = document.createElement("link");
+        link.rel = rel;
+        document.head.appendChild(link);
+      }
+      link.href = href;
+    };
+    upsert("prev", page > 1 ? `https://checkbyai.net/sponsors${page === 2 ? "" : `?page=${page - 1}`}` : null);
+    upsert("next", page < totalPages ? `https://checkbyai.net/sponsors?page=${page + 1}` : null);
+    return () => {
+      document.querySelector('link[rel="prev"]')?.remove();
+      document.querySelector('link[rel="next"]')?.remove();
+    };
+  }, [page, totalPages]);
+
   const parentRef = useRef<HTMLDivElement>(null);
   const rowVirtualizer = useVirtualizer({
     count: data?.results.length ?? 0,
@@ -268,7 +308,19 @@ export default function SponsorDirectory() {
       <SEOHead
         title="UK Licensed Sponsor Register — Browse 80,000+ Employers | CheckByAI"
         description="Search and browse the full UK Home Office Register of Licensed Sponsors. Filter by status: Active, Newly Granted, Removed. Updated daily from official gov.uk data."
-        canonicalUrl="https://checkbyai.net/sponsors"
+        canonicalUrl={canonicalForPage}
+        structuredData={{
+          "@context": "https://schema.org",
+          "@type": "CollectionPage",
+          name: "UK Licensed Sponsor Register",
+          url: canonicalForPage,
+          description: "Browse the UK Home Office Register of Licensed Sponsors.",
+          isPartOf: { "@type": "WebSite", name: "CheckByAI", url: "https://checkbyai.net" },
+        }}
+        breadcrumbs={[
+          { name: "Home", url: "https://checkbyai.net/" },
+          { name: "Sponsors", url: "https://checkbyai.net/sponsors" },
+        ]}
       />
 
       <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
@@ -536,7 +588,7 @@ export default function SponsorDirectory() {
 
         {/* ── Pagination ── */}
         {data && data.totalPages > 1 && (
-          <Pagination page={data.page} totalPages={data.totalPages} onChange={setPage} />
+          <Pagination page={data.page} totalPages={data.totalPages} onChange={goToPage} />
         )}
 
         {/* ── Footer CTA ── */}

@@ -16,6 +16,7 @@ interface SEOHeadProps {
   structuredData?: object;
   breadcrumbs?: BreadcrumbItem[];
   speakable?: boolean;
+  robots?: string;
 }
 
 export default function SEOHead({
@@ -28,7 +29,8 @@ export default function SEOHead({
   canonicalUrl,
   structuredData,
   breadcrumbs,
-  speakable
+  speakable,
+  robots
 }: SEOHeadProps) {
   useEffect(() => {
     document.title = title;
@@ -59,6 +61,7 @@ export default function SEOHead({
     updateMetaTag('title', title);
     updateMetaTag('description', description);
     if (keywords) updateMetaTag('keywords', keywords);
+    if (robots) updateMetaTag('robots', robots);
 
     updateMetaTag('og:title', ogTitle || title, true);
     updateMetaTag('og:description', ogDescription || description, true);
@@ -134,7 +137,7 @@ export default function SEOHead({
       }
     }
 
-  }, [title, description, keywords, ogTitle, ogDescription, ogImage, canonicalUrl, structuredData, breadcrumbs, speakable]);
+  }, [title, description, keywords, robots, ogTitle, ogDescription, ogImage, canonicalUrl, structuredData, breadcrumbs, speakable]);
 
   return null;
 }

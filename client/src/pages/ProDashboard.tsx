@@ -14,6 +14,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { unwrapApiEnvelope } from "@/lib/apiEnvelope";
 import { isPaidTier, hasEnrichedNotifications } from "@shared/planTiers";
 import FileUploadSimple from "@/components/FileUploadSimple";
+import ProtectionStatus from "@/components/pro-dashboard/ProtectionStatus";
 import { CompanyIntelligenceDialog } from "@/components/CompanyIntelligencePanel";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -96,12 +97,12 @@ interface SponsorSearchResult {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const NAV: Array<{ id: Tab; label: string; Icon: LucideIcon }> = [
-  { id: "overview",      label: "Overview",        Icon: LayoutDashboard },
-  { id: "monitor",       label: "Sponsor Monitor", Icon: Building2 },
-  { id: "verify",        label: "Verify CoS",      Icon: Shield },
-  { id: "notifications", label: "Notifications",   Icon: Bell },
-  { id: "history",       label: "History",         Icon: History },
-  { id: "support",       label: "Help & Support",  Icon: HelpCircle },
+  { id: "overview",      label: "Dashboard",        Icon: LayoutDashboard },
+  { id: "monitor",       label: "Monitor", Icon: Building2 },
+  { id: "verify",        label: "Verify",      Icon: Shield },
+  { id: "notifications", label: "Alerts",   Icon: Bell },
+  { id: "history",       label: "Your checks",         Icon: History },
+  { id: "support",       label: "Support",  Icon: HelpCircle },
 ];
 
 const EVENT_ROWS: Array<{ key: NotifEventType; label: string; sub: string }> = [
@@ -219,22 +220,52 @@ function OverviewTab({ user, setTab }: { user: any; setTab: (t: Tab) => void }) 
   return (
     <div>
       {/* Welcome */}
-      <div style={{ marginBottom: 28 }}>
+      <div style={{ marginBottom: 16 }}>
         <h1 style={{ fontSize: 26, fontWeight: 800, color: T.text, marginBottom: 4 }}>{greeting()}, {firstName} 👋</h1>
-        <p style={{ fontSize: 14, color: T.sub }}>
-          {revokedN > 0
-            ? <span style={{ color: "#FCA5A5" }}>⚠ {revokedN} sponsor{revokedN>1?"s":""} in your watchlist ha{revokedN>1?"ve":"s"} been revoked</span>
-            : "All your monitored sponsors are active — you're good to go."}
-        </p>
+        <p style={{ fontSize: 14, color: T.sub }}>Your sponsor monitoring is up to date</p>
+      </div>
+
+      <div style={{ marginBottom: 20 }}>
+        <ProtectionStatus
+          status={revokedN > 0 ? "critical" : myChanges.length > 0 ? "attention" : "clear"}
+          monitored={watches?.length ?? 0}
+          unresolved={myChanges.length}
+          revokedCount={revokedN}
+          lastCheckedAt={myChanges[0]?.detectedAt}
+          firstUnresolvedName={myChanges[0]?.organisationName}
+          onViewMonitoring={() => setTab("monitor")}
+          onVerify={() => setTab("verify")}
+          onReviewChange={() => setTab("monitor")}
+        />
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-7">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         <StatCard label="Watched Sponsors" value={wL?"—":watches?.length??0} sub={revokedN>0?`${revokedN} revoked`:"All active"} gradient="linear-gradient(135deg,#3B82F6,#06B6D4)" Icon={Building2} loading={wL} />
         <StatCard label="Alerts Today"     value={cL?"—":alertsToday} sub="Last 24 hours" gradient={`linear-gradient(135deg,${T.amber},#F97316)`} Icon={Bell} loading={cL} />
         <StatCard label="CoS Checks"       value={checksLeft} sub={plan==="free"?"Free tier":"Unlimited"} gradient={`linear-gradient(135deg,${T.violet},${T.indigo})`} Icon={Shield} />
-        <StatCard label="Plan"             value={PLAN_LABEL[plan]||plan} sub="Active subscription" gradient="linear-gradient(135deg,#10B981,#0D9488)" Icon={Crown} />
+        <StatCard label="Your plan"        value={PLAN_LABEL[plan]||plan} sub="Active · Pro" gradient="linear-gradient(135deg,#10B981,#0D9488)" Icon={Crown} />
       </div>
+
+      {/* Monitoring usage */}
+      {!wL && watches && (() => {
+        const used = watches.length;
+        const limit = plan === "pro" ? 5 : plan === "starter" ? 2 : plan === "free" ? 1 : -1;
+        if (limit === -1) return null;
+        const pct = Math.min(100, Math.round((used / limit) * 100));
+        const full = used >= limit;
+        return (
+          <div style={{ ...cardStyle, padding:14, borderRadius:12, marginBottom:20 }} data-testid="monitoring-usage">
+            <p style={{ fontSize:12, fontWeight:700, color:T.text }}>Monitoring · {used} / {limit} sponsors</p>
+            <div role="progressbar" aria-valuenow={used} aria-valuemin={0} aria-valuemax={limit} style={{ height:8, borderRadius:999, background:"#1E1E24", marginTop:8, overflow:"hidden" }}>
+              <div style={{ width:`${pct}%`, height:"100%", background: full ? "#EF4444" : "#7C3AED" }} />
+            </div>
+            <p style={{ fontSize:12, color:T.muted, marginTop:6 }}>
+              {full ? "Monitoring capacity reached — upgrade to protect more sponsors." : `${limit - used} monitoring slot${limit - used === 1 ? "" : "s"} remaining`}
+            </p>
+          </div>
+        );
+      })()}
 
       {/* Two-col layout */}
       <div className="grid lg:grid-cols-3 gap-6">
@@ -246,17 +277,31 @@ function OverviewTab({ user, setTab }: { user: any; setTab: (t: Tab) => void }) 
               {[...Array(5)].map((_,i) => <div key={i} style={{ ...cardStyle, height:56, borderRadius:12 }} />)}
             </div>
           ) : feed.length===0 ? (
-            <div style={{ ...cardStyle, padding:40, textAlign:"center", borderStyle:"dashed" }}>
-              <Activity style={{ width:32, height:32, color:T.muted, margin:"0 auto 12px" }} />
-              <p style={{ color:T.muted, fontSize:14 }}>No activity yet. Add a sponsor to start monitoring.</p>
+            <div style={{ ...cardStyle, padding:24, borderRadius:14 }} data-testid="first-run-checklist">
+              <p style={{ fontSize:15, fontWeight:700, color:T.text, marginBottom:4 }}>Welcome to CheckByAI Pro — let&apos;s get protection running.</p>
+              <ol style={{ display:"flex", flexDirection:"column", gap:8, marginTop:12 }}>
+                <li style={{ display:"flex", gap:10, alignItems:"flex-start" }}>
+                  <span aria-hidden="true">1️⃣</span>
+                  <div><p style={{ fontSize:13, fontWeight:700, color:T.text }}>Protect your first sponsor</p><p style={{ fontSize:12, color:T.muted }}>We&apos;ll monitor their licence.</p></div>
+                </li>
+                <li style={{ display:"flex", gap:10, alignItems:"flex-start", opacity:.7 }}>
+                  <span aria-hidden="true">2️⃣</span>
+                  <div><p style={{ fontSize:13, fontWeight:700, color:T.text }}>Choose your alerts</p><p style={{ fontSize:12, color:T.muted }}>Email, SMS or in-app.</p></div>
+                </li>
+                <li style={{ display:"flex", gap:10, alignItems:"flex-start", opacity:.7 }}>
+                  <span aria-hidden="true">3️⃣</span>
+                  <div><p style={{ fontSize:13, fontWeight:700, color:T.text }}>You&apos;re protected</p><p style={{ fontSize:12, color:T.muted }}>We&apos;ll tell you when something moves.</p></div>
+                </li>
+              </ol>
+              <button onClick={() => setTab("monitor")} style={{ marginTop:16, background:T.violet, color:"#fff", borderRadius:999, padding:"12px 20px", fontSize:14, fontWeight:700, minHeight:48, width:"100%", cursor:"pointer" }}>
+                Protect your first sponsor →
+              </button>
             </div>
           ) : (
             <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-              {feed.map((item, idx) => (
-                <motion.div
+              {feed.map((item) => (
+                <div
                   key={item.key}
-                  initial={{ opacity:0, x:-10 }} animate={{ opacity:1, x:0 }}
-                  transition={{ delay: idx*0.04, type:"spring", stiffness:120, damping:16 }}
                   style={{ ...cardStyle, padding:"10px 14px", display:"flex", alignItems:"center", gap:12, borderRadius:12 }}
                 >
                   {item.kind === "change" ? (() => {
@@ -284,7 +329,7 @@ function OverviewTab({ user, setTab }: { user: any; setTab: (t: Tab) => void }) 
                       <span style={{ fontSize:11, color:T.muted, flexShrink:0 }}>{fmtShort(v.verifiedAt)}</span>
                     </>;
                   })()}
-                </motion.div>
+                </div>
               ))}
             </div>
           )}
@@ -295,10 +340,10 @@ function OverviewTab({ user, setTab }: { user: any; setTab: (t: Tab) => void }) 
           <p style={{ fontSize:11, fontWeight:700, color:T.muted, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:14 }}>Quick Actions</p>
           <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
             {QUICK.map(q => (
-              <motion.button
-                key={q.tab} whileTap={{ scale:0.98 }} whileHover={{ y:-1 }}
+              <button
+                key={q.tab}
                 onClick={() => setTab(q.tab)}
-                style={{ ...cardStyle, display:"flex", alignItems:"center", gap:12, padding:14, textAlign:"left", cursor:"pointer", width:"100%", transition:"box-shadow 0.15s" }}
+                style={{ ...cardStyle, display:"flex", alignItems:"center", gap:12, padding:14, textAlign:"left", cursor:"pointer", width:"100%", minHeight:48 }}
               >
                 <div style={{ background:q.gradient, borderRadius:10, padding:9, flexShrink:0, boxShadow:"0 2px 8px rgba(0,0,0,0.3)" }}>
                   <q.Icon className="w-4 h-4 text-white" />
@@ -308,7 +353,7 @@ function OverviewTab({ user, setTab }: { user: any; setTab: (t: Tab) => void }) 
                   <p style={{ fontSize:12, color:T.muted }}>{q.sub}</p>
                 </div>
                 <ChevronRight style={{ width:14, height:14, color:T.muted, flexShrink:0 }} />
-              </motion.button>
+              </button>
             ))}
           </div>
 
@@ -469,8 +514,8 @@ function MonitorTab({ user }: { user: any }) {
             Your Watchlist ({watches?.length})
           </p>
           <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-            {(watches||[]).map((w, idx) => (
-              <motion.div key={w.id} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{delay:idx*0.05,type:"spring",stiffness:120,damping:16}} style={{ ...cardStyle, borderRadius:16, overflow:"hidden" }}>
+            {(watches||[]).map((w) => (
+              <div key={w.id} style={{ ...cardStyle, borderRadius:16, overflow:"hidden" }}>
                 <button onClick={() => setExpanded(expanded===w.id?null:w.id)}
                   style={{ display:"flex", alignItems:"center", gap:14, padding:"14px 16px", cursor:"pointer", width:"100%", background:"transparent", border:"none", textAlign:"left" }}>
                   <div style={{ background:"rgba(59,130,246,0.12)", borderRadius:10, padding:9, flexShrink:0 }}>
@@ -483,6 +528,9 @@ function MonitorTab({ user }: { user: any }) {
                     </div>
                     <p style={{ fontSize:12, color:T.muted, marginTop:2 }}>
                       {w.townCity||"—"} · {w.currentStatus?.typeRating||"Unknown"} · {w.currentStatus?.route||"—"}
+                    </p>
+                    <p style={{ fontSize:11, color:T.muted, marginTop:2 }}>
+                      Last checked today · {w.recentChanges?.length > 0 ? `${w.recentChanges.length} change${w.recentChanges.length === 1 ? "" : "s"} — review below` : "No changes detected"}
                     </p>
                   </div>
                   <div style={{ display:"flex", alignItems:"center", gap:8, flexShrink:0 }}>
@@ -499,17 +547,23 @@ function MonitorTab({ user }: { user: any }) {
                       <div style={{ padding:"14px 16px" }}>
                         {w.recentChanges?.length > 0 ? (
                           <>
-                            <p style={{ fontSize:11, fontWeight:700, color:T.muted, textTransform:"uppercase", letterSpacing:"0.07em", marginBottom:10 }}>Recent Changes</p>
+                            <p style={{ fontSize:11, fontWeight:700, color:T.muted, textTransform:"uppercase", letterSpacing:"0.07em", marginBottom:10 }}>What changed</p>
                             <div style={{ display:"flex", flexDirection:"column", gap:7 }}>
                               {w.recentChanges.slice(0,5).map(c => {
                                 const meta = CHANGE_META[c.changeType] || { label:c.changeType, Icon:Activity, color:T.muted };
                                 const MI = meta.Icon;
                                 return (
-                                  <div key={c.id} style={{ display:"flex", alignItems:"center", gap:8 }}>
-                                    <MI style={{ width:13, height:13, color:meta.color, flexShrink:0 }} />
-                                    <span style={{ fontSize:13, color:T.text, fontWeight:500 }}>{meta.label}</span>
-                                    {c.previousValue && c.newValue && <span style={{ fontSize:12, color:T.muted }}>{c.previousValue} → {c.newValue}</span>}
-                                    <span style={{ fontSize:11, color:T.muted, marginLeft:"auto" }}>{fmtDate(c.detectedAt)}</span>
+                                  <div key={c.id} style={{ display:"flex", flexDirection:"column", gap:4, padding:"8px 0", borderBottom:`1px solid ${T.border}` }}>
+                                    <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                                      <MI style={{ width:13, height:13, color:meta.color, flexShrink:0 }} aria-hidden="true" />
+                                      <span style={{ fontSize:13, color:T.text, fontWeight:500 }}>{meta.label}</span>
+                                      {c.previousValue && c.newValue && <span style={{ fontSize:12, color:T.muted }}>{c.previousValue} → {c.newValue}</span>}
+                                      <span style={{ fontSize:11, color:T.muted, marginLeft:"auto" }}><time dateTime={c.detectedAt}>{fmtDate(c.detectedAt)}</time></span>
+                                    </div>
+                                    <details style={{ fontSize:12, color:T.muted }}>
+                                      <summary style={{ cursor:"pointer", color:T.activeText }}>What does this mean?</summary>
+                                      <p style={{ marginTop:4 }}>This reflects the latest Home Office register entry for this sponsor. If the rating or route moved, reassess how confidently you rely on their current status and check the source data.</p>
+                                    </details>
                                   </div>
                                 );
                               })}
@@ -541,7 +595,7 @@ function MonitorTab({ user }: { user: any }) {
                     </motion.div>
                   )}
                 </AnimatePresence>
-              </motion.div>
+              </div>
             ))}
           </div>
         </div>
@@ -586,9 +640,9 @@ function VerifyTab({ user }: { user: any }) {
   };
 
   const RC = {
-    genuine:    { bg:"rgba(16,185,129,0.08)", border:"rgba(16,185,129,0.2)", title:"#6EE7B7", text:"Document is Genuine",    sub:"This document appears authentic. No anomalies detected.", Icon:CheckCircle2 },
-    suspicious: { bg:"rgba(245,158,11,0.08)", border:"rgba(245,158,11,0.2)", title:"#FCD34D", text:"Document is Suspicious", sub:"This document may have been modified.",                    Icon:AlertTriangle },
-    fake:       { bg:"rgba(239,68,68,0.08)",  border:"rgba(239,68,68,0.2)",  title:"#FCA5A5", text:"Document is Fake",       sub:"This document appears fraudulent.",                          Icon:XCircle },
+    genuine:    { bg:"rgba(16,185,129,0.08)", border:"rgba(16,185,129,0.2)", title:"#6EE7B7", text:"Document verified", sub:"High confidence — matches expected structure and signals.", Icon:CheckCircle2 },
+    suspicious: { bg:"rgba(245,158,11,0.08)", border:"rgba(245,158,11,0.2)", title:"#FCD34D", text:"Review recommended", sub:"Some signals need attention — see what changed.", Icon:AlertTriangle },
+    fake:       { bg:"rgba(239,68,68,0.08)",  border:"rgba(239,68,68,0.2)",  title:"#FCA5A5", text:"Verification failed", sub:"Strong indicators this document may not be genuine.", Icon:XCircle },
   };
 
   return (
@@ -711,9 +765,9 @@ function NotificationsTab() {
 
   return (
     <div>
-      <div style={{ marginBottom:24 }}>
-        <h2 style={{ fontSize:22, fontWeight:800, color:T.text, marginBottom:4 }}>Notification Preferences</h2>
-        <p style={{ fontSize:14, color:T.sub }}>Choose which events trigger alerts and on which channels</p>
+      <div style={{ marginBottom:16 }}>
+        <h2 style={{ fontSize:22, fontWeight:800, color:T.text, marginBottom:4 }}>Alerts</h2>
+        <p style={{ fontSize:14, color:T.sub }}>Alert me when something important changes — power controls live under Advanced.</p>
       </div>
 
       <div style={{ ...cardStyle, borderRadius:16, overflow:"hidden" }}>
@@ -1032,15 +1086,37 @@ function SupportTab() {
 }
 
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
+const VALID_TABS: Tab[] = ["overview", "monitor", "verify", "notifications", "history", "support"];
+
+function tabFromPath(pathname: string): Tab | null {
+  const seg = pathname.replace(/\/$/, "").split("/").pop() ?? "";
+  return (VALID_TABS as string[]).includes(seg) ? (seg as Tab) : null;
+}
+
 export default function ProDashboard() {
   const [, setLocation] = useLocation();
   const { user, isLoading: authLoading, isAuthenticated, isPro, isAdmin } = useAuth();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<Tab>("overview");
+  const [activeTab, setActiveTabState] = useState<Tab>(() =>
+    typeof window !== "undefined" ? (tabFromPath(window.location.pathname) ?? "overview") : "overview",
+  );
   const [drawerOpen, setDrawerOpen] = useState(false);
 
+  const setActiveTab = (t: Tab) => {
+    setActiveTabState(t);
+    const target = t === "overview" ? "/pro-dashboard" : `/pro-dashboard/${t}`;
+    if (typeof window !== "undefined" && window.location.pathname !== target) {
+      window.history.replaceState(null, "", target);
+    }
+  };
+
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) setLocation("/login");
+    const fromUrl = tabFromPath(window.location.pathname);
+    if (fromUrl) setActiveTabState(fromUrl);
+  }, []);
+
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) setLocation("/login?redirect=/pro-dashboard");
     else if (!authLoading && isAuthenticated && !isPro && !isAdmin) setLocation("/pricing");
   }, [authLoading, isAuthenticated, isPro, isAdmin, setLocation]);
 
@@ -1053,7 +1129,16 @@ export default function ProDashboard() {
     <div style={{ background:"var(--background)", height:"100vh", display:"flex", alignItems:"center", justifyContent:"center" }}>
       <div style={{ textAlign:"center" }}>
         <div style={{ width:44, height:44, borderRadius:12, background:"var(--primary)", margin:"0 auto 14px", animation:"pulse 1.5s infinite" }} />
-        <p style={{ fontSize:14, color:T.muted }}>Loading your dashboard…</p>
+        <p style={{ fontSize:14, color:T.muted }}>Checking your account…</p>
+      </div>
+    </div>
+  );
+
+  if (!isAuthenticated) return (
+    <div style={{ background:"var(--background)", height:"100vh", display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
+      <div style={{ textAlign:"center" }}>
+        <p style={{ fontSize:16, fontWeight:700, color:T.text }}>Login required</p>
+        <p style={{ fontSize:14, color:T.muted, marginTop:4 }}>Please sign in to view your dashboard.</p>
       </div>
     </div>
   );
@@ -1076,7 +1161,7 @@ export default function ProDashboard() {
     <div style={{ display:"flex", flexDirection:"column", height:"100%", userSelect:"none" }}>
       {/* Logo */}
       <div style={{ padding:"18px 16px 14px", borderBottom:`1px solid ${T.border}` }}>
-        <img src={logoImg} alt="CheckByAI" style={{ height:32, objectFit:"contain" }} />
+        <img src={logoImg} alt="CheckByAI" width={160} height={32} style={{ height:32, width:"auto", aspectRatio:"160 / 32", objectFit:"contain" }} loading="lazy" decoding="async" />
       </div>
 
       {/* Nav */}
@@ -1156,32 +1241,37 @@ export default function ProDashboard() {
               <span style={{ color:T.text, fontWeight:500, textTransform:"capitalize" }}>{activeTab.replace("-"," ")}</span>
             </div>
           </div>
-          <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
             <div className="hidden sm:block"><PlanPill plan={plan} /></div>
-            <div style={{ width:32, height:32, borderRadius:"50%", background:"var(--primary)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:"var(--primary-foreground)", flexShrink:0 }}>{initials}</div>
+            <button
+              onClick={() => setActiveTab("monitor")}
+              aria-label="Review items needing attention"
+              title="Items needing attention"
+              style={{ position:"relative", background:"var(--secondary)", border:"none", borderRadius:10, minWidth:44, minHeight:44, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:T.text }}
+            >
+              <Bell style={{ width:18, height:18 }} aria-hidden="true" />
+            </button>
+            <div style={{ width:32, height:32, borderRadius:"50%", background:"var(--primary)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:"var(--primary-foreground)", flexShrink:0 }} aria-label="Account">{initials}</div>
           </div>
         </header>
 
-        {/* Content */}
+        {/* Content — no route-transition animation inside the paid product (motion reserved for drawer/dialogs) */}
         <main style={{ flex:1, overflowY:"auto", padding:"24px 24px 80px", background:T.bg }} className="lg:pb-6">
-          <AnimatePresence mode="wait">
-            <motion.div key={activeTab} initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-6}} transition={{duration:0.18, ease:"easeOut"}}>
-              {PANELS[activeTab]}
-            </motion.div>
-          </AnimatePresence>
+          <div key={activeTab}>{PANELS[activeTab]}</div>
         </main>
       </div>
 
-      {/* Mobile bottom nav */}
-      <nav className="lg:hidden" style={{ position:"fixed", bottom:0, left:0, right:0, zIndex:30, height:60, background:"var(--card)", backdropFilter:"blur(16px)", borderTop:`1px solid var(--border)`, display:"flex", alignItems:"center", justifyContent:"space-around", padding:"0 8px" }}>
-        {NAV.map(({ id, label, Icon }) => {
+      {/* Mobile bottom nav — primary destinations only; History/Support live under profile */}
+      <nav aria-label="Primary" className="lg:hidden" style={{ position:"fixed", bottom:0, left:0, right:0, zIndex:30, minHeight:64, background:"var(--card)", backdropFilter:"blur(16px)", borderTop:`1px solid var(--border)`, display:"flex", alignItems:"center", justifyContent:"space-around", padding:"4px 8px calc(4px + env(safe-area-inset-bottom))" }}>
+        {NAV.filter(({ id }) => (["overview", "monitor", "verify", "notifications"] as Tab[]).includes(id)).map(({ id, label, Icon }) => {
           const active = activeTab === id;
+          const short = id === "overview" ? "Home" : id === "notifications" ? "Alerts" : label.split(" ")[0];
           return (
-            <button key={id} onClick={() => setActiveTab(id)}
-              style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:3, padding:"6px 10px", border:"none", background:"transparent", cursor:"pointer", color: active ? T.activeText : T.muted, position:"relative" }}>
-              <Icon className="w-5 h-5" style={{ color: active ? T.activeText : T.muted } as CSSProperties} />
-              <span style={{ fontSize:10, fontWeight: active?700:400 }}>{label.split(" ")[0]}</span>
-              {active && <motion.span layoutId="bottom-dot" style={{ position:"absolute", bottom:-2, width:4, height:4, borderRadius:"50%", background:T.violet }} />}
+            <button key={id} onClick={() => setActiveTab(id)} aria-current={active ? "page" : undefined}
+              style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:3, padding:"8px 14px", minHeight:48, minWidth:64, border:"none", background:"transparent", cursor:"pointer", color: active ? T.activeText : T.muted, position:"relative" }}>
+              <Icon className="w-5 h-5" style={{ color: active ? T.activeText : T.muted } as CSSProperties} aria-hidden="true" />
+              <span style={{ fontSize:11, fontWeight: active?700:400 }}>{short}</span>
+              {active && <span style={{ position:"absolute", bottom:2, width:4, height:4, borderRadius:"50%", background:T.violet }} />}
             </button>
           );
         })}

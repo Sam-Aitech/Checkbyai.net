@@ -240,7 +240,7 @@ export default function ApiDocs() {
         title="API Documentation | B2B Integration | Check By AI"
         description="Integrate CoS verification into your immigration consultancy or HR platform. RESTful API with real-time document analysis, webhooks, and enterprise features."
         keywords="CoS verification API, document verification integration, immigration API, HR document check API, B2B verification service"
-        canonicalUrl="https://checkbyai.net/api-docs"
+        robots="noindex, nofollow"
       />
       <div className="bg-background">
         <div className="max-w-4xl mx-auto px-4 py-12">

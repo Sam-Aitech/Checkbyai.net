@@ -71,6 +71,7 @@ function Router() {
         <Route path="/check-fake-cos" component={CheckFakeCoS} />
         <Route path="/what-to-do-fake-cos" component={WhatToDoFakeCoS} />
         <Route path="/about" component={About} />
+        <Route path="/pro-dashboard/:tab" component={ProDashboard} />
         <Route path="/pro-dashboard" component={ProDashboard} />
         <Route path="/sponsor/:id/:slug" component={SponsorDetail} />
         <Route path="/sponsor/:id" component={SponsorDetail} />

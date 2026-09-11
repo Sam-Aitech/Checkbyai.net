@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle, ArrowDown, ArrowUp, XCircle, PlusCircle, Route, Calendar, Building2, Loader2
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import PageLayout from "@/components/PageLayout";
@@ -37,9 +37,9 @@ function ChangeCard({ change }: { change: SponsorChange }) {
   const Icon = config.icon;
 
   return (
-    <div className={`flex items-start gap-3 p-4 rounded-lg border ${config.bg} ${config.border}`}>
+    <article className={`flex items-start gap-3 p-4 rounded-lg border ${config.bg} ${config.border}`}>
       <div className={`mt-0.5 ${config.color}`}>
-        <Icon className="h-5 w-5" />
+        <Icon className="h-5 w-5" aria-hidden="true" />
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
@@ -57,10 +57,10 @@ function ChangeCard({ change }: { change: SponsorChange }) {
           </p>
         )}
         <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-          {change.detectedAt ? new Date(change.detectedAt).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : ""}
+          {change.detectedAt ? <time dateTime={change.detectedAt}>{new Date(change.detectedAt).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</time> : ""}
         </p>
       </div>
-    </div>
+    </article>
   );
 }
 
@@ -80,6 +80,7 @@ export default function SponsorChanges() {
         canonicalUrl="https://checkbyai.net/sponsor-changes"
         ogTitle="Today's Sponsor Licence Changes | Who Lost Their Licence?"
         ogDescription="Live daily updates from the UK sponsor licence register. See which employers lost their licence today."
+        ogImage="https://checkbyai.net/og-image.png"
         breadcrumbs={[
           { name: "Home", url: "https://checkbyai.net/" },
           { name: "Sponsor Changes", url: "https://checkbyai.net/sponsor-changes" }
@@ -132,8 +133,8 @@ export default function SponsorChanges() {
         {data && data.totalCount === 0 && !isLoading && (
           <Card>
             <CardContent className="p-8 text-center">
-              <Building2 className="h-10 w-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
-              <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-1">No changes detected</h3>
+              <Building2 className="h-10 w-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" aria-hidden="true" />
+              <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-1">No changes detected</h2>
               <p className="text-gray-500 dark:text-gray-400">No sponsor licence changes have been detected in the last 7 days. This is normal: changes typically occur a few times per week.</p>
             </CardContent>
           </Card>
@@ -162,13 +163,14 @@ export default function SponsorChanges() {
               }
 
               return (
+                <article key={dateKey}>
                 <Card key={dateKey}>
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between flex-wrap gap-2">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-gray-400" />
-                        {formattedDate}
-                      </CardTitle>
+                      <h2 className="text-base font-semibold flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-gray-400" aria-hidden="true" />
+                        <time dateTime={dateKey}>{formattedDate}</time>
+                      </h2>
                       <div className="flex gap-1.5 flex-wrap">
                         {Object.entries(summary).map(([type, count]) => {
                           const cfg = changeConfig[type];
@@ -187,6 +189,7 @@ export default function SponsorChanges() {
                     ))}
                   </CardContent>
                 </Card>
+                </article>
               );
             })}
           </div>

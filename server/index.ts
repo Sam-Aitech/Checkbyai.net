@@ -207,10 +207,26 @@ app.use((req, res, next) => {
   );
 
 
-  // Performance headers for static assets
-  if (req.url.match(/\.(jpg|jpeg|png|gif|ico|css|js|svg|woff|woff2|ttf|eot)$/)) {
+  // Performance headers for static assets (hashed Vite output is immutable)
+  if (req.url.match(/\.(jpg|jpeg|png|gif|ico|css|js|svg|woff|woff2|ttf|eot|avif|webp|map|json|webmanifest)$/)) {
     res.header('Cache-Control', 'public, max-age=31536000, immutable'); // 1 year
     res.header('Expires', new Date(Date.now() + 31536000000).toUTCString());
+  }
+
+  // Private/app routes must not be indexed — crawlers that ignore client-side
+  // <meta name="robots"> still respect the HTTP header.
+  if (
+    req.path.startsWith('/login') ||
+    req.path.startsWith('/dashboard') ||
+    req.path.startsWith('/history') ||
+    req.path.startsWith('/pro-dashboard') ||
+    req.path.startsWith('/admin') ||
+    req.path.startsWith('/checkout') ||
+    req.path.startsWith('/receipt') ||
+    req.path.startsWith('/api-docs') ||
+    req.path === '/404'
+  ) {
+    res.header('X-Robots-Tag', 'noindex, nofollow');
   }
   
   // Block access to uploads folder (private documents)

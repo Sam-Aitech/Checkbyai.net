@@ -276,18 +276,18 @@ function NightlyStatsBar() {
       <div className="max-w-5xl mx-auto px-4 py-5">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-0 sm:divide-x sm:divide-slate-700 text-center">
           <div className="px-4">
-            <p className={cn("text-2xl font-bold text-white", isLoading && "animate-pulse")}>{totalLabel}</p>
+            <p className={cn("text-2xl font-bold text-white tabular-nums min-h-[2rem]", isLoading && "animate-pulse")}>{totalLabel}</p>
             <p className="text-xs text-slate-400 mt-0.5">Active licensed sponsors</p>
           </div>
           <div className="px-4">
-            <p className={cn("text-2xl font-bold", isLoading ? "text-white animate-pulse" : hasRemovals ? "text-red-400" : "text-emerald-400")}>
+            <p className={cn("text-2xl font-bold tabular-nums min-h-[2rem]", isLoading ? "text-white animate-pulse" : hasRemovals ? "text-red-400" : "text-emerald-400")}>
               {changesLabel}
             </p>
-            <p className="text-xs text-slate-400 mt-0.5">{changesCaption}</p>
+            <p className="text-xs text-slate-400 mt-0.5 min-h-[1rem]">{changesCaption}</p>
           </div>
           <div className="px-4">
             <Link href="/sponsor-changes" className="group">
-              <p className={cn("text-2xl font-bold text-red-400 group-hover:text-red-300 transition-colors", isLoading && "animate-pulse")}>
+              <p className={cn("text-2xl font-bold text-red-400 tabular-nums min-h-[2rem] group-hover:text-red-300 transition-colors", isLoading && "animate-pulse")}>
                 {revoked12Label}
               </p>
               <p className="text-xs text-slate-400 mt-0.5 group-hover:text-slate-300 transition-colors">
@@ -296,7 +296,7 @@ function NightlyStatsBar() {
             </Link>
           </div>
           <div className="px-4">
-            <p className={cn("text-2xl font-bold text-emerald-400", isLoading && "animate-pulse")}>{dateLabel}</p>
+            <p className={cn("text-2xl font-bold text-emerald-400 tabular-nums min-h-[2rem]", isLoading && "animate-pulse")}><time>{dateLabel}</time></p>
             <p className="text-xs text-slate-400 mt-0.5">Register last checked</p>
           </div>
         </div>
@@ -386,7 +386,7 @@ function UrgencyBanner() {
 
   if (removedCount > 0) {
     return (
-      <div className="bg-red-800 text-white">
+      <div className="bg-red-800 text-white min-h-[36px]">
         <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2.5 text-center">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
           <p className="text-xs sm:text-sm font-medium">
@@ -401,7 +401,7 @@ function UrgencyBanner() {
 
   if (changesCount > 0) {
     return (
-      <div className="bg-amber-600 text-white">
+      <div className="bg-amber-600 text-white min-h-[36px]">
         <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2.5 text-center">
           <Activity className="w-3.5 h-3.5 shrink-0 animate-pulse" aria-hidden="true" />
           <p className="text-xs sm:text-sm font-medium">
@@ -416,7 +416,7 @@ function UrgencyBanner() {
 
   if (addedCount > 0) {
     return (
-      <div className="bg-emerald-700 text-white">
+      <div className="bg-emerald-700 text-white min-h-[36px]">
         <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2.5 text-center">
           <CheckCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
           <p className="text-xs sm:text-sm font-medium">
@@ -433,7 +433,7 @@ function UrgencyBanner() {
   // warning banner — the register data may be outdated.
   if (data.staleDays >= 3) {
     return (
-      <div className="bg-amber-900 text-amber-100">
+      <div className="bg-amber-900 text-amber-100 min-h-[36px]">
         <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2 text-center">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-300" aria-hidden="true" />
           <p className="text-xs sm:text-sm font-medium">
@@ -446,7 +446,7 @@ function UrgencyBanner() {
 
   // No changes and data is fresh — show a calm confirmation strip
   return (
-    <div className="bg-slate-800 text-slate-200">
+    <div className="bg-slate-800 text-slate-200 min-h-[36px]">
       <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2 text-center">
         <CheckCircle className="w-3.5 h-3.5 shrink-0 text-emerald-400" aria-hidden="true" />
         <p className="text-xs sm:text-sm font-medium">
@@ -735,7 +735,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
           <div className="relative z-10 max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
             <nav className="flex justify-between items-center py-4 mb-6">
               <Link href="/" className="flex items-center shrink-0">
-                <img src={logoImg} alt="CheckByAi.net" width={160} height={40} className="h-10 sm:h-12 w-auto object-contain" />
+                <img src={logoImg} alt="CheckByAi.net" width={160} height={40} fetchPriority="high" decoding="async" className="h-10 sm:h-12 w-auto object-contain" />
               </Link>
 
               {/* Desktop grouped nav */}
