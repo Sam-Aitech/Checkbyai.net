@@ -4,7 +4,7 @@
  * summary -> jobs summary -> recent activity. See the approved plan
  * (Workstream 6) for the exact status semantics and copy.
  */
-import { useState, type CSSProperties } from "react";
+import type { CSSProperties } from "react";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { STALE_TIMES } from "@/lib/queryDefaults";

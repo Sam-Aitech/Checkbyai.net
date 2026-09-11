@@ -71,7 +71,12 @@ export async function processPdfVerifyJob(job: Job<PdfVerifyJobData>): Promise<{
     if (!upload) {
       throw new Error(`PDF upload ${uploadId} not found — already consumed or expired`);
     }
-    await fs.promises.writeFile(scratchPath, upload.fileBytes);
+    // `wx` (exclusive create) rather than the default `w`: if anything already
+    // exists at this randomized scratch path — including a symlink planted by
+    // another process in the shared OS temp dir — the write fails instead of
+    // following it, closing the classic insecure-temp-file/symlink-race class
+    // of vulnerability regardless of how unpredictable the path already is.
+    await fs.promises.writeFile(scratchPath, upload.fileBytes, { flag: 'wx' });
 
     const priorFlag = await storage.getAdminFlaggedVerificationByHash(documentHash);
     const priorApproval = priorFlag ? undefined : await storage.getAdminApprovedVerificationByHash(documentHash);

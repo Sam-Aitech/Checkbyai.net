@@ -17,7 +17,7 @@ import { CompanyIntelligenceDialog } from "@/components/CompanyIntelligencePanel
 import { Shell, T, cardStyle } from "./index";
 import type { WatchEntry } from "./hooks/useAccountSummary";
 import {
-  Building2, Crown, Plus, X, Search, Loader2, ChevronDown, ChevronRight,
+  Building2, Crown, Plus, X, Search, Loader2, ChevronDown,
   Trash2, BarChart3, Activity, CheckCircle2, XCircle, RotateCcw, ArrowUp,
   ArrowDown, RefreshCw, Pencil, type LucideIcon,
 } from "lucide-react";
