@@ -11,7 +11,15 @@ import {
   date,
   uuid,
   numeric,
+  customType,
 } from "drizzle-orm/pg-core";
+
+/** Raw binary column — drizzle-orm/pg-core has no first-class bytea helper. */
+const bytea = customType<{ data: Buffer }>({
+  dataType() {
+    return "bytea";
+  },
+});
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -172,6 +180,26 @@ export const verificationResults = pgTable(
     // NOTE: GIN indexes on metadata/analysis_details JSONB columns are defined in
     // migrations/0001_gin_indexes_jsonb.sql. They reduce admin HITL query cost
     // from O(N) full scan to O(log N) for JSONB key-path lookups.
+  ]
+);
+
+// Durable handoff for queued PDF verification jobs. The API route stores the
+// uploaded bytes here and enqueues only this row's id — the BullMQ worker
+// fetches the bytes from Postgres instead of a local disk path, so it works
+// correctly when the API and worker run as independently scaled processes.
+// Rows are deleted by the worker on completion (or final failed attempt) and
+// swept by a scheduled job as a safety net — see server/utils/pdfUploadStore.ts.
+export const pdfVerifyUploads = pgTable(
+  "pdf_verify_uploads",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: varchar("user_id").references(() => users.id),
+    originalname: varchar("originalname").notNull(),
+    fileBytes: bytea("file_bytes").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_pdf_verify_uploads_created_at").on(table.createdAt),
   ]
 );
 
