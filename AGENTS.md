@@ -126,6 +126,15 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 - **Grouping:** CoS link moved directly under search input; trust strip demoted to 3-item `ul[aria-label]` (#12–13).
 - **Spacing/density:** revoked rows `py-4` + relaxed leading (#15); `#cos-verification` split into demo/CTA + `cos-features` sections (#16).
 
+#### Phase 7 — Systematic Re-scan Closure + main Sync
+- **Alerts:** 3-group cards (licence/rating/route) + batch enable + per-channel switches + weekly digest row; full 7-event matrix under `<details>Advanced`; per-row motion removed (`ProDashboard.tsx` NotificationsTab).
+- **History:** Today/Yesterday/Earlier `<section>` grouping; card/expand motion removed; `time dateTime` kept.
+- **Support:** open-conversation card + last-update + CTA; ticket cards de-animated.
+- **Account:** `AccountTab` (Profile/Plan&usage/Billing/Security/Support) via `useAccountSummary()`; `account` tab + `/pro-dashboard/account` route.
+- **Shell:** bell badge + `aria-label` count; Escape-to-close + focus trap/restore drawer; layout-mirroring skeletons; actionable add-sponsor error.
+- **main sync (`14e1b55`):** merged `origin/main` (26 commits: design-token audit, dep bumps, archives); resolved `HeroSection.tsx` + `SponsorDirectory.tsx` by keeping `main`'s tokens and preserving CLS guards (`tabular-nums`/`min-h`/`<time>`) + SEO `<a href>` pagination.
+- Commits: `95e05ec` (closure) → `14e1b55` (merge). Lint clean; tsc shows only pre-existing TS2688s.
+
 ### Remaining (Not Yet Scoped)
 - Fuse.js search index versioning for instant CDV cache bust on rebuild.
 - React Query `gcTime` reduction for sponsor pages (currently default 5min).
