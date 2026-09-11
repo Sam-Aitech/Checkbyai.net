@@ -54,7 +54,7 @@ export default function CreditCounter({ variant = 'default', className = '' }: C
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ type: 'spring', stiffness: 160, damping: 18 }}
-      className={`shimmer-border inline-flex items-center gap-2 px-3.5 py-1.5 bg-blue-50/80 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 rounded-xl text-sm backdrop-blur-sm border border-blue-200/50 dark:border-blue-800/40 shadow-sm ${className}`}
+      className={`inline-flex items-center gap-2 px-3.5 py-1.5 bg-blue-50/80 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 rounded-xl text-sm backdrop-blur-sm border border-blue-200/50 dark:border-blue-800/40 shadow-sm ${className}`}
     >
       <CreditCoinIcon size={16} />
       {isUnlimited ? (

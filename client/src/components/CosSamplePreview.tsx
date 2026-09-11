@@ -39,7 +39,7 @@ function formatCheckStatus(check: { passed: boolean; detail?: string }): string 
 
 export default function CosSamplePreview() {
   return (
-    <div className="mt-10 mb-2 grid lg:grid-cols-2 gap-8 items-start">
+    <div className="mt-12 mb-12 grid lg:grid-cols-2 gap-10 items-start">
       <div>
         <ol className="space-y-4">
           {STEPS.map((step) => (
@@ -57,11 +57,11 @@ export default function CosSamplePreview() {
       </div>
 
       <div>
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Sample result (synthetic example)</p>
-        <div className="p-5 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-          <h3 className="text-sm font-semibold mb-3 text-gray-900 dark:text-gray-100">Verification Result</h3>
+        <p className="text-sm text-muted-foreground mb-2">Sample result (synthetic example)</p>
+        <div className="p-5 theme-card">
+          <h3 className="text-sm font-semibold mb-3 text-foreground">Verification Result</h3>
           <div className="flex items-center gap-3 mb-4">
-            <div className="px-3 py-1.5 rounded-full text-sm font-semibold bg-gradient-to-r from-yellow-400 to-orange-500 text-white">
+            <div className="px-3 py-1.5 rounded-full text-sm font-semibold bg-warning/10 text-warning border border-warning/20">
               suspicious
             </div>
             <span className="text-xs text-muted-foreground">Confidence: 62%</span>
@@ -69,8 +69,8 @@ export default function CosSamplePreview() {
           <ul className="space-y-1.5">
             {SAMPLE_CHECKS.map((check) => (
               <li key={check.name} className="flex items-center justify-between text-xs">
-                <span className="text-gray-700 dark:text-gray-300">{check.name}</span>
-                <span className={check.passed ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-red-600 dark:text-red-400 font-medium'}>
+                <span className="text-muted-foreground">{check.name}</span>
+                <span className={check.passed ? 'text-success font-medium' : 'text-destructive font-medium'}>
                   {formatCheckStatus(check)}
                 </span>
               </li>

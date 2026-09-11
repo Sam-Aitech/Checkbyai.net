@@ -464,7 +464,7 @@ export default function Submit() {
                             </Button>
                           </div>
                         ) : (
-                          <label className="cursor-pointer">
+                          <label className="cursor-pointer block rounded-xl has-[:focus-visible]:outline-none has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2">
                             <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
                             <p className="text-muted-foreground">
                               Click to upload your CoS document
@@ -474,7 +474,7 @@ export default function Submit() {
                               type="file"
                               accept=".pdf"
                               onChange={handleCosFileChange}
-                              className="hidden"
+                              className="sr-only"
                               data-testid="input-cos-file"
                             />
                           </label>
@@ -505,20 +505,20 @@ export default function Submit() {
                               </div>
                             ))}
                             {supportingFiles.length < 5 && (
-                              <label className="cursor-pointer block mt-2 text-foreground underline hover:underline">
+                              <label className="cursor-pointer block mt-2 text-foreground underline hover:underline rounded has-[:focus-visible]:outline-none has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2">
                                 + Add more files
                                 <input
                                   type="file"
                                   accept=".pdf,.jpg,.jpeg,.png"
                                   multiple
                                   onChange={handleSupportingFilesChange}
-                                  className="hidden"
+                                  className="sr-only"
                                 />
                               </label>
                             )}
                           </div>
                         ) : (
-                          <label className="cursor-pointer">
+                          <label className="cursor-pointer block rounded-xl has-[:focus-visible]:outline-none has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2">
                             <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
                             <p className="text-muted-foreground">
                               Upload emails, letters, or other documents
@@ -529,7 +529,7 @@ export default function Submit() {
                               accept=".pdf,.jpg,.jpeg,.png"
                               multiple
                               onChange={handleSupportingFilesChange}
-                              className="hidden"
+                              className="sr-only"
                               data-testid="input-supporting-files"
                             />
                           </label>

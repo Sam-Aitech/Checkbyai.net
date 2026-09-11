@@ -20,6 +20,7 @@ import SEOHead from "@/components/SEOHead";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { getSponsorStatusPresentation, sponsorToneBadgeClasses } from "@/lib/sponsorStatus";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -92,45 +93,18 @@ function isRevokedStatus(status: string | undefined): boolean {
 }
 
 function StatusBadge({ status }: { status: string | undefined }) {
-  if (status === "ACTIVE")
-    return (
-      <Badge className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-xs">
-        Active
-      </Badge>
-    );
-  if (status === "REMOVED_REVOKED" || status === "NOT_LISTED")
-    return (
-      <Badge className="bg-red-500/10 text-red-600 border border-red-500/20 text-xs">
-        Revoked
-      </Badge>
-    );
-  if (status === "GRACE_PERIOD")
-    return (
-      <Badge className="bg-amber-500/10 text-amber-600 border border-amber-500/20 text-xs">
-        Grace Period
-      </Badge>
-    );
-  if (status === "NEWLY_GRANTED")
-    return (
-      <Badge className="bg-blue-500/10 text-blue-600 border border-blue-500/20 text-xs">
-        Newly Granted
-      </Badge>
-    );
-  return (
-    <Badge variant="secondary" className="text-xs">
-      Unknown
-    </Badge>
-  );
+  const { label, tone } = getSponsorStatusPresentation(status);
+  return <Badge className={`${sponsorToneBadgeClasses[tone]} text-xs`}>{label}</Badge>;
 }
 
 const CHANGE_META: Record<string, { label: string; Icon: React.FC<{ className?: string }>; color: string }> = {
-  NEW_LICENCE:     { label: "Licence Granted",  Icon: CheckCircle2, color: "text-emerald-500" },
-  RE_ACTIVATED:    { label: "Reactivated",       Icon: RotateCcw,   color: "text-blue-500"    },
-  REMOVED_REVOKED: { label: "Licence Revoked",   Icon: XCircle,     color: "text-red-500"     },
-  UPGRADED:        { label: "Rating Upgraded",   Icon: ArrowUp,     color: "text-emerald-500" },
-  DOWNGRADED:      { label: "Rating Downgraded", Icon: ArrowDown,   color: "text-amber-500"   },
-  ROUTE_CHANGE:    { label: "Route Changed",     Icon: RefreshCw,   color: "text-violet-500"  },
-  NAME_CHANGE:     { label: "Name Changed",      Icon: Pencil,      color: "text-sky-500"     },
+  NEW_LICENCE:     { label: "Licence Granted",  Icon: CheckCircle2, color: "text-success" },
+  RE_ACTIVATED:    { label: "Reactivated",       Icon: RotateCcw,   color: "text-info"    },
+  REMOVED_REVOKED: { label: "Licence Revoked",   Icon: XCircle,     color: "text-destructive" },
+  UPGRADED:        { label: "Rating Upgraded",   Icon: ArrowUp,     color: "text-success" },
+  DOWNGRADED:      { label: "Rating Downgraded", Icon: ArrowDown,   color: "text-warning" },
+  ROUTE_CHANGE:    { label: "Route Changed",     Icon: RefreshCw,   color: "text-info"    },
+  NAME_CHANGE:     { label: "Name Changed",      Icon: Pencil,      color: "text-muted-foreground" },
 };
 
 function changeMeta(type: string) {
@@ -194,7 +168,7 @@ function CompanyHeaderCard({
           </div>
           {watch?.isActive && (
             <div className="shrink-0">
-              <span className="text-xs text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 flex items-center gap-1">
+              <span className="text-xs text-success bg-success/10 px-2 py-0.5 rounded-full border border-success/20 flex items-center gap-1">
                 <Bell className="w-3 h-3" />
                 Watching
               </span>
@@ -342,12 +316,12 @@ function ActivityTimelineCard({
           {!isLoading && (revokedEvents > 0 || reinstatedEvents > 0) && (
             <div className="flex flex-wrap justify-end gap-2">
               {revokedEvents > 0 && (
-                <Badge className="bg-red-500/10 text-red-600 border border-red-500/20 text-xs">
+                <Badge className="bg-destructive/10 text-destructive border border-destructive/20 text-xs">
                   {revokedEvents} revoked
                 </Badge>
               )}
               {reinstatedEvents > 0 && (
-                <Badge className="bg-blue-500/10 text-blue-600 border border-blue-500/20 text-xs">
+                <Badge className="bg-info/10 text-info border border-info/20 text-xs">
                   {reinstatedEvents} reinstated
                 </Badge>
               )}
@@ -698,10 +672,10 @@ export default function SponsorDashboard() {
                       </p>
                     </div>
                     <div className="flex flex-wrap justify-end gap-2 shrink-0">
-                      <Badge className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-xs">
+                      <Badge className="bg-success/10 text-success border border-success/20 text-xs">
                         {activeSponsorWatches.length} active
                       </Badge>
-                      <Badge className="bg-red-500/10 text-red-600 border border-red-500/20 text-xs">
+                      <Badge className="bg-destructive/10 text-destructive border border-destructive/20 text-xs">
                         {revokedSponsorWatches.length} revoked
                       </Badge>
                     </div>
@@ -729,7 +703,7 @@ export default function SponsorDashboard() {
                       return (
                         <button
                           key={watch.id}
-                          className="w-full flex items-center gap-3 p-3 rounded-xl border border-border bg-card hover:bg-muted/50 transition-colors text-left"
+                          className="w-full flex items-center gap-3 p-3 rounded-xl border border-border bg-card hover:bg-muted/50 transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={() =>
                             setLocation(
                               `/dashboard/sponsor?company=${encodeURIComponent(watch.organisationName)}`,
@@ -774,14 +748,14 @@ export default function SponsorDashboard() {
                       return (
                         <button
                           key={watch.id}
-                          className="w-full flex items-center gap-3 p-3 rounded-xl border border-red-500/20 bg-red-50/40 dark:bg-red-950/10 hover:bg-red-50/60 dark:hover:bg-red-950/20 transition-colors text-left"
+                          className="w-full flex items-center gap-3 p-3 rounded-xl border border-destructive/20 bg-destructive/5 hover:bg-destructive/10 transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={() =>
                             setLocation(
                               `/dashboard/sponsor?company=${encodeURIComponent(watch.organisationName)}`,
                             )
                           }
                         >
-                          <XCircle className="w-4 h-4 text-red-500 shrink-0" />
+                          <XCircle className="w-4 h-4 text-destructive shrink-0" />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm text-foreground truncate">{watch.organisationName}</p>
                             <p className="text-xs text-muted-foreground truncate mt-0.5">
