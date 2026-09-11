@@ -188,6 +188,18 @@ export function isPaidTier(subscriptionStatus: string | null | undefined): boole
 }
 
 /**
+ * True when the persisted status is the real, webhook-set 'past_due' value
+ * (set by billing.ts's invoice.payment_failed handler). Additive only —
+ * does not change resolveTier()'s existing fallback-to-'free' behavior for
+ * this or any other unrecognized status. UI messaging should check this
+ * before falling back to a plain "Free" label; feature-gating should keep
+ * using resolveTier()/isPaidTier() as before.
+ */
+export function isPastDue(subscriptionStatus: string | null | undefined): boolean {
+  return subscriptionStatus === "past_due";
+}
+
+/**
  * True for a tier with no watch-count ceiling (currently unlimited/enterprise).
  * Derived from watchLimit rather than tier name, so a status check against
  * this stays correct even if a tier's watchLimit changes without its name

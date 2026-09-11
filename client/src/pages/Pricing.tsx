@@ -12,6 +12,7 @@ import SEOHead from '@/components/SEOHead';
 import PageLayout from '@/components/PageLayout';
 import { usePackagePrices } from '@/hooks/usePackagePrices';
 import InlineEmailCheckout from '@/components/InlineEmailCheckout';
+import { ALERT_TIMING_SHORT } from '@shared/planTiers';
 
 interface User {
   id: string;
@@ -67,8 +68,9 @@ const annualPlans: AnnualPlan[] = [
     features: [
       'Monitor up to 5 companies for 12 months',
       'Email + WhatsApp + SMS',
-      'Twice-daily alerts (07:00 & 19:00 UTC)',
       '90-day change history',
+      'Sponsored job alerts by email',
+      ALERT_TIMING_SHORT.pro,
     ],
   },
 ];
@@ -360,7 +362,7 @@ export default function Pricing() {
             {
               "@type": "Product",
               "name": "CheckByAI Notification Engine - Pro",
-              "description": "UK sponsor licence monitoring with immediate email, WhatsApp and SMS alerts for up to 5 companies. Includes 5 CoS verification checks per month.",
+              "description": "UK sponsor licence monitoring with twice-daily email, WhatsApp and SMS alerts for up to 5 companies. Includes 5 CoS verification checks per month.",
               "brand": { "@type": "Brand", "name": "CheckByAI" },
               "offers": {
                 "@type": "Offer",

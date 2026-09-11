@@ -20,7 +20,7 @@ export default function Footer() {
               <img src={logoImg} alt="CheckByAi.net" width={160} height={40} className="h-10 sm:h-12 w-auto object-contain" loading="lazy" />
             </div>
             <p className="text-sm editorial-body text-white/70 mb-8 max-w-md">
-              UK sponsor licence monitoring with instant WhatsApp, email and SMS alerts. 
+              UK sponsor licence monitoring with same-day and twice-daily WhatsApp, email and SMS alerts.
               Plus AI-powered Certificate of Sponsorship verification for visa applicants.
             </p>
             <a

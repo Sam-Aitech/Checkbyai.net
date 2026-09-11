@@ -20,6 +20,7 @@ import SEOHead from "@/components/SEOHead";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { ALERT_TIMING_SHORT } from "@shared/planTiers";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -469,7 +470,7 @@ function UpsellCard({ plan }: { plan: string }) {
         <ul className="space-y-1.5 mb-4">
           {[
             "Monitor up to 5 companies",
-            "Immediate alerts (not same-day)",
+            ALERT_TIMING_SHORT.pro,
             "WhatsApp + SMS notifications",
             "5 CoS checks per month",
             "Enriched company intelligence",

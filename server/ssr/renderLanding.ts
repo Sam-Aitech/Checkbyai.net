@@ -26,7 +26,7 @@ function landingHTML(): string {
       Never Miss a <span style="color:#2563eb;">Sponsor Licence</span> Revocation Again
     </h1>
     <p style="font-size:1.125rem;color:#6b7280;max-width:640px;margin:0 auto 2.5rem;line-height:1.6;">
-      Real-time monitoring of the UK Sponsor Register with instant WhatsApp, email, SMS, and webhook alerts when your employer's licence status changes.
+      Real-time monitoring of the UK Sponsor Register with same-day and twice-daily WhatsApp, email, SMS, and webhook alerts when your employer's licence status changes.
     </p>
     <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;">
       <a href="/sponsor-monitor" style="display:inline-flex;align-items:center;padding:0.875rem 2rem;background:#2563eb;color:#fff;border-radius:0.75rem;text-decoration:none;font-weight:600;font-size:1rem;">
@@ -50,7 +50,7 @@ function landingHTML(): string {
         <div style="color:#6b7280;font-size:0.875rem;">Alert Channels</div>
       </div>
       <div style="padding:2rem;background:#f9fafb;border-radius:1rem;">
-        <div style="font-size:2rem;font-weight:800;color:#2563eb;margin-bottom:0.5rem;">Instant</div>
+        <div style="font-size:2rem;font-weight:800;color:#2563eb;margin-bottom:0.5rem;">Twice-Daily</div>
         <div style="color:#6b7280;font-size:0.875rem;">Revocation Alerts</div>
       </div>
       <div style="padding:2rem;background:#f9fafb;border-radius:1rem;">
@@ -75,7 +75,7 @@ function landingHTML(): string {
           <span style="font-size:1.25rem;font-weight:700;color:#2563eb;">2</span>
         </div>
         <h3 style="font-weight:600;color:#1f2937;margin-bottom:0.75rem;">Choose Alerts</h3>
-        <p style="color:#6b7280;font-size:0.875rem;line-height:1.5;">Pick WhatsApp, email, SMS, or webhook for instant notifications.</p>
+        <p style="color:#6b7280;font-size:0.875rem;line-height:1.5;">Pick WhatsApp, email, SMS, or webhook for same-day or twice-daily notifications.</p>
       </div>
       <div style="padding:2rem;border:1px solid #e5e7eb;border-radius:1rem;text-align:center;">
         <div style="width:3rem;height:3rem;background:#2563eb10;border-radius:0.75rem;display:flex;align-items:center;justify-content:center;margin:0 auto 1.5rem;">

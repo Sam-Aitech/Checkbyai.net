@@ -1648,7 +1648,7 @@ export default function AdminPortal() {
                                           <div className="flex flex-wrap gap-1 text-xs text-gray-400">
                                             <span className="bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">Free: 1 watch</span>
                                             <span className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded">Starter: 2 watches, same-day</span>
-                                            <span className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 px-2 py-0.5 rounded">Pro: 5 watches, immediate</span>
+                                            <span className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 px-2 py-0.5 rounded">Pro: 5 watches, twice-daily</span>
                                           </div>
                                           <Select
                                             value={dropdownValue}

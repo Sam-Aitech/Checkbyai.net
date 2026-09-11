@@ -141,12 +141,12 @@ Disallow: /uploads/`;
 
   const llmsBaseContent = `# CheckByAI - UK Sponsor Licence Monitor & CoS Verification
 
-> Real-time monitoring of the UK Home Office Register of Licensed Sponsors with instant WhatsApp, email and SMS alerts when licences are revoked. Plus AI-powered Certificate of Sponsorship verification.
+> Real-time monitoring of the UK Home Office Register of Licensed Sponsors with same-day and twice-daily WhatsApp, email and SMS alerts when licences are revoked. Plus AI-powered Certificate of Sponsorship verification.
 
 ## Products
 
 - [Single Scam Check](${getAppUrl()}/single-check): One-off £9.99 Certificate of Sponsorship scam check — forensic document analysis, sponsor licence verification, and salary threshold check. No account needed.
-- [Notification Engine](${getAppUrl()}/pricing): Real-time UK sponsor licence monitoring. Get instant alerts via WhatsApp, email, and SMS when your employer's licence is revoked, suspended, or downgraded. Plans from £24.99/month.
+- [Notification Engine](${getAppUrl()}/pricing): Real-time UK sponsor licence monitoring. Get alerted via WhatsApp, email, and SMS when your employer's licence is revoked, suspended, or downgraded. Plans from £24.99/month.
 - [CoS Verification](${getAppUrl()}/cos-pricing): AI-powered Certificate of Sponsorship document verification. Detect fake or edited CoS documents using forensic metadata analysis.
 - [Free Sponsor Search](${getAppUrl()}/sponsor-monitor): Search the UK Home Office Register of Licensed Sponsors for free. Check if any company holds a valid sponsor licence.
 
@@ -163,7 +163,7 @@ Disallow: /uploads/`;
 
 ## About
 
-CheckByAI is a UK-focused immigration technology platform. We monitor the Home Office Register of Licensed Sponsors daily and alert subscribers instantly when changes affect their employer. Our CoS verification tool uses forensic AI analysis to detect fraudulent Certificate of Sponsorship documents.
+CheckByAI is a UK-focused immigration technology platform. We monitor the Home Office Register of Licensed Sponsors daily and alert subscribers when changes affect their employer. Our CoS verification tool uses forensic AI analysis to detect fraudulent Certificate of Sponsorship documents.
 
 Website: ${getAppUrl()}`;
 
@@ -183,7 +183,7 @@ The Notification Engine monitors the UK Home Office Register of Licensed Sponsor
 **Pro Plan - £49.99/month (£479.99/year)**
 - Monitor up to 5 companies
 - Email, WhatsApp, and SMS alerts
-- Immediate alerts (within minutes of detection)
+- Twice-daily alerts (07:00 and 19:00 UTC)
 - 90-day change history
 - 5 CoS verification checks per month
 - Priority support
@@ -287,7 +287,7 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
           `Workers must find a new employer. See full licence history on CheckByAI.`
         : `${sponsor.currentName}${location} holds a ${label} UK sponsor licence${routePart}` +
           `${grantedYr ? `, active since ${grantedYr}` : ''}. ` +
-          `Get instant alerts if their status changes — free on CheckByAI.`;
+          `Get alerted if their status changes — free on CheckByAI.`;
 
       const schema = toSafeJsonLd({
         "@context": "https://schema.org",
@@ -370,16 +370,16 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
 
   const seoMetaMap: Record<string, { title: string; description: string }> = {
     '/': {
-      title: 'Is Your UK Sponsor Licence Safe? | Instant Revocation Alerts | CheckByAI',
-      description: 'Don\'t get caught out by a sponsor licence revocation. Get instant WhatsApp, email and SMS alerts the moment your employer\'s licence status changes. Plus verify any Certificate of Sponsorship is genuine.',
+      title: 'Is Your UK Sponsor Licence Safe? | Twice-Daily Revocation Alerts | CheckByAI',
+      description: 'Don\'t get caught out by a sponsor licence revocation. We check the Home Office register every weeknight and alert subscribers via WhatsApp, email and SMS — twice daily for Pro, same-day for Starter — when your employer\'s licence status changes.',
     },
     '/sponsor-monitor': {
       title: 'Is Your Employer\'s Sponsor Licence Still Valid? | Free Check | CheckByAI',
-      description: 'Check any UK employer\'s sponsor licence status for free. Get instant alerts if it\'s revoked, suspended or downgraded — before it affects your visa.',
+      description: 'Check any UK employer\'s sponsor licence status for free. Get alerted if it\'s revoked, suspended or downgraded — before it affects your visa.',
     },
     '/pricing': {
       title: 'Protect Your Visa | Sponsor Licence Alerts from £24.99/mo | CheckByAI',
-      description: 'Never be blindsided by a sponsor licence revocation. Get instant WhatsApp and email alerts. Starter £24.99/mo (2 companies), Pro £49.99/mo (5 companies, SMS + immediate alerts).',
+      description: 'Never be blindsided by a sponsor licence revocation. Get WhatsApp and email alerts. Starter £24.99/mo (2 companies, same-day alerts), Pro £49.99/mo (5 companies, SMS + twice-daily alerts).',
     },
     '/single-check': {
       title: 'Is Your UK Job Offer a Scam? One-Off £9.99 CoS Check | CheckByAI',

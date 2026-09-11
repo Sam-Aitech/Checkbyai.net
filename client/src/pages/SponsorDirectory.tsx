@@ -542,7 +542,7 @@ export default function SponsorDirectory() {
         {/* ── Footer CTA ── */}
         <div className="bg-slate-50 dark:bg-slate-900/50 border rounded-xl p-6 text-center space-y-2">
           <p className="text-sm font-semibold text-foreground">
-            Get instant alerts when any sponsor's licence changes
+            Get alerted when any sponsor's licence changes
           </p>
           <p className="text-xs text-muted-foreground">
             Revocations, downgrades, and new grants — delivered to your email, WhatsApp, or SMS.

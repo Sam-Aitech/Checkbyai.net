@@ -618,7 +618,7 @@ function ManualVsAutomated() {
               <ul className="space-y-3 text-sm text-muted-foreground">
                 <li className="flex items-start gap-2"><CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />Add company to watchlist</li>
                 <li className="flex items-start gap-2"><CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />We check the register every weeknight (~00:30 UTC)</li>
-                <li className="flex items-start gap-2"><CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />Alert sent instantly on Pro, or by 18:00 same-day on Starter</li>
+                <li className="flex items-start gap-2"><CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />{ALERT_TIMING_SHORT.pro} on Pro, or {ALERT_TIMING_SHORT.starter.toLowerCase()} on Starter</li>
                 <li className="flex items-start gap-2"><CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />Take action before letter arrives</li>
               </ul>
               <div className="mt-5 p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg border border-emerald-200 dark:border-emerald-800">
