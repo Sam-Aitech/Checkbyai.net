@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { resolveTier, TIER_CONFIGS, TIER_LABELS, getWatchLimit } from "@shared/planTiers";
 
-export type ProtectionStatus = "clear" | "attention" | "critical";
+export type ProtectionStatus = "empty" | "clear" | "attention" | "critical";
 
 interface WatchEntry {
   id: number;
@@ -48,7 +48,8 @@ export function useAccountSummary() {
     (w) => w.currentStatus?.status === "REMOVED_REVOKED" || w.currentStatus?.status === "NOT_LISTED",
   ).length;
 
-  const protection: ProtectionStatus = revokedN > 0 ? "critical" : unresolved.length > 0 ? "attention" : "clear";
+  const protection: ProtectionStatus =
+    watches.length === 0 ? "empty" : revokedN > 0 ? "critical" : unresolved.length > 0 ? "attention" : "clear";
   const lastCheckedAt = myChanges.length > 0 ? myChanges.map((c) => +new Date(c.detectedAt)).sort((a, b) => b - a)[0] : undefined;
 
   const resolvedTier = resolveTier(status);

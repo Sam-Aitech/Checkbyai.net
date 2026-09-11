@@ -227,7 +227,7 @@ function OverviewTab({ user, setTab }: { user: any; setTab: (t: Tab) => void }) 
 
       <div style={{ marginBottom: 20 }}>
         <ProtectionStatus
-          status={revokedN > 0 ? "critical" : myChanges.length > 0 ? "attention" : "clear"}
+          status={(watches?.length ?? 0) === 0 ? "empty" : revokedN > 0 ? "critical" : myChanges.length > 0 ? "attention" : "clear"}
           monitored={watches?.length ?? 0}
           unresolved={myChanges.length}
           revokedCount={revokedN}
@@ -244,7 +244,7 @@ function OverviewTab({ user, setTab }: { user: any; setTab: (t: Tab) => void }) 
         <StatCard label="Watched Sponsors" value={wL?"—":watches?.length??0} sub={revokedN>0?`${revokedN} revoked`:"All active"} gradient="linear-gradient(135deg,#3B82F6,#06B6D4)" Icon={Building2} loading={wL} />
         <StatCard label="Alerts Today"     value={cL?"—":alertsToday} sub="Last 24 hours" gradient={`linear-gradient(135deg,${T.amber},#F97316)`} Icon={Bell} loading={cL} />
         <StatCard label="CoS Checks"       value={checksLeft} sub={plan==="free"?"Free tier":"Unlimited"} gradient={`linear-gradient(135deg,${T.violet},${T.indigo})`} Icon={Shield} />
-        <StatCard label="Your plan"        value={PLAN_LABEL[plan]||plan} sub="Active · Pro" gradient="linear-gradient(135deg,#10B981,#0D9488)" Icon={Crown} />
+        <StatCard label="Your plan"        value={PLAN_LABEL[plan]||(plan === "past_due" ? "Past due" : plan)} sub={plan === "past_due" ? "Billing attention needed" : "Active · Pro"} gradient="linear-gradient(135deg,#10B981,#0D9488)" Icon={Crown} />
       </div>
 
       {/* Monitoring usage */}
@@ -1106,13 +1106,18 @@ export default function ProDashboard() {
     setActiveTabState(t);
     const target = t === "overview" ? "/pro-dashboard" : `/pro-dashboard/${t}`;
     if (typeof window !== "undefined" && window.location.pathname !== target) {
-      window.history.replaceState(null, "", target);
+      window.history.pushState(null, "", target);
     }
   };
 
   useEffect(() => {
-    const fromUrl = tabFromPath(window.location.pathname);
-    if (fromUrl) setActiveTabState(fromUrl);
+    const syncFromUrl = () => {
+      const fromUrl = tabFromPath(window.location.pathname);
+      if (fromUrl) setActiveTabState(fromUrl);
+    };
+    syncFromUrl();
+    window.addEventListener("popstate", syncFromUrl);
+    return () => window.removeEventListener("popstate", syncFromUrl);
   }, []);
 
   useEffect(() => {

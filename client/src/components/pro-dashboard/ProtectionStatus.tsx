@@ -25,9 +25,29 @@ export default function ProtectionStatus({
   onVerify,
   onReviewChange,
 }: Props) {
-  const checkedLabel = lastCheckedAt
-    ? `Last checked ${new Date(lastCheckedAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`
-    : "Last checked today";
+  const detectedLabel = lastCheckedAt
+    ? `Last change detected ${new Date(lastCheckedAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} · checks run daily`
+    : "Checks run daily";
+
+  if (status === "empty") {
+    return (
+      <section aria-live="polite" className="rounded-2xl border border-border bg-card p-6">
+        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Protection status</p>
+        <h2 className="mt-2 flex items-center gap-2 text-2xl font-bold">
+          <ShieldCheck className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
+          Not protected yet
+        </h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          No sponsors monitored · {detectedLabel}
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button className="min-h-[44px] rounded-full" onClick={onViewMonitoring}>
+            Protect your first sponsor <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
+          </Button>
+        </div>
+      </section>
+    );
+  }
 
   if (status === "critical") {
     return (
@@ -38,7 +58,7 @@ export default function ProtectionStatus({
           Attention required
         </h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          {revokedCount} sponsor{revokedCount === 1 ? " has" : "s have"} been revoked · {monitored} monitored · {checkedLabel}
+          {revokedCount} sponsor{revokedCount === 1 ? " has" : "s have"} been revoked · {monitored} monitored · {detectedLabel}
         </p>
         {firstUnresolvedName && (
           <p className="mt-1 text-sm font-semibold">{firstUnresolvedName}</p>
@@ -64,7 +84,7 @@ export default function ProtectionStatus({
           {unresolved} change{unresolved === 1 ? "" : "s"} to review
         </h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          {monitored} monitored · {checkedLabel}
+          {monitored} monitored · {detectedLabel}
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <Button className="min-h-[44px] rounded-full" onClick={onReviewChange ?? onViewMonitoring}>
@@ -86,9 +106,8 @@ export default function ProtectionStatus({
         You&apos;re protected
       </h2>
       <p className="mt-2 text-sm text-muted-foreground">
-        {monitored} {monitored === 1 ? "company" : "companies"} monitored · 0 changes need attention · {checkedLabel}
+        {monitored} {monitored === 1 ? "company" : "companies"} monitored · 0 changes need attention · {detectedLabel}
       </p>
-      <p className="mt-1 text-xs text-muted-foreground">Next automatic check tomorrow · 06:00</p>
       <div className="mt-4 flex flex-wrap gap-2">
         <Button variant="outline" className="min-h-[44px] rounded-full" onClick={onViewMonitoring}>
           View monitoring
