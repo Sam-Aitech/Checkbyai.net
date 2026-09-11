@@ -3,12 +3,13 @@
  * Design: Stitch MCP — CheckByAI Pro DS (dark, Geist, violet #7C3AED)
  * Palette: bg #0A0A0E · sidebar #0D0D12 · card rgba(17,17,20,.8) · border #1E1E24
  */
-import { useState, useEffect, CSSProperties } from "react";
+import { useState, useEffect, useRef, CSSProperties } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { STALE_TIMES } from "@/lib/queryDefaults";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
+import { useAccountSummary } from "@/hooks/useAccountSummary";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { unwrapApiEnvelope } from "@/lib/apiEnvelope";
@@ -25,7 +26,7 @@ import {
   ArrowUp, ArrowDown, RefreshCw, RotateCcw, Pencil, Activity,
   Clock, FileText, BarChart3, Copy, Menu, X, Plus, Search,
   Mail, Smartphone, Loader2, Trash2, ChevronDown, ChevronRight, Zap,
-  HelpCircle, SendHorizonal, MessageSquare, CheckCheck,
+  HelpCircle, SendHorizonal, MessageSquare, CheckCheck, User as UserIcon,
   type LucideIcon,
 } from "lucide-react";
 
@@ -63,7 +64,7 @@ const glowCardStyle: CSSProperties = {
 };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type Tab = "overview" | "monitor" | "verify" | "notifications" | "history" | "support";
+type Tab = "overview" | "monitor" | "verify" | "notifications" | "history" | "support" | "account";
 
 interface SponsorChange {
   id: number; organisationName: string; changeType: string;
@@ -103,6 +104,7 @@ const NAV: Array<{ id: Tab; label: string; Icon: LucideIcon }> = [
   { id: "notifications", label: "Alerts",   Icon: Bell },
   { id: "history",       label: "Your checks",         Icon: History },
   { id: "support",       label: "Support",  Icon: HelpCircle },
+  { id: "account",       label: "Account",  Icon: UserIcon },
 ];
 
 const EVENT_ROWS: Array<{ key: NotifEventType; label: string; sub: string }> = [
@@ -273,8 +275,15 @@ function OverviewTab({ user, setTab }: { user: any; setTab: (t: Tab) => void }) 
         <div className="lg:col-span-2">
           <p style={{ fontSize:11, fontWeight:700, color:T.muted, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:14 }}>Recent Activity</p>
           {cL||vL ? (
-            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-              {[...Array(5)].map((_,i) => <div key={i} style={{ ...cardStyle, height:56, borderRadius:12 }} />)}
+            <div style={{ display:"flex", flexDirection:"column", gap:8 }} aria-label="Loading recent activity">
+              <div style={{ ...cardStyle, padding:"10px 14px", borderRadius:12 }}><Skeleton className="h-4 w-2/3" /></div>
+              {[...Array(4)].map((_,i) => (
+                <div key={i} style={{ ...cardStyle, padding:"10px 14px", display:"flex", alignItems:"center", gap:12, borderRadius:12 }}>
+                  <Skeleton className="h-4 w-4 rounded-full" />
+                  <div style={{ flex:1 }}><Skeleton className="h-3.5 w-3/4" /><div style={{ height:6 }} /><Skeleton className="h-3 w-1/2" /></div>
+                  <Skeleton className="h-3 w-16" />
+                </div>
+              ))}
             </div>
           ) : feed.length===0 ? (
             <div style={{ ...cardStyle, padding:24, borderRadius:14 }} data-testid="first-run-checklist">
@@ -413,13 +422,13 @@ function MonitorTab({ user }: { user: any }) {
     mutationFn: (s: SponsorSearchResult) => apiRequest("POST","/api/watches",{ organisation_name:s.organisationName, town_city:s.townCity, fingerprint:s.fingerprint }),
     onSuccess: (_,s) => { qc.invalidateQueries({queryKey:["/api/watches"]}); toast({title:"Added to watchlist", description:`Monitoring ${s.organisationName}`}); setQuery(""); setShowSearch(false); },
     onError: (err: any) => {
-      let msg = "Something went wrong. Please try again.";
+      let msg = "We couldn't add this sponsor. Your watchlist is unchanged — please try again.";
       try {
         const raw = err?.message || "";
         const jsonStart = raw.indexOf("{");
         if (jsonStart >= 0) { msg = JSON.parse(raw.slice(jsonStart)).message || msg; }
       } catch {}
-      toast({title:"Could not add",description:msg,variant:"destructive"});
+      toast({title:"Could not protect sponsor",description:msg,variant:"destructive"});
     },
   });
 
@@ -757,6 +766,26 @@ function NotificationsTab() {
     patchM.mutate(patch);
   };
 
+  const GROUPS: Array<{ id: string; title: string; sub: string; keys: NotifEventType[] }> = [
+    { id: "licence", title: "Sponsor licence changes", sub: "Revoked or reinstated", keys: ["licence_revoked", "licence_reinstated"] },
+    { id: "rating", title: "Sponsor rating changes", sub: "Upgraded or downgraded", keys: ["rating_downgraded", "rating_upgraded"] },
+    { id: "route", title: "Immigration route changes", sub: "Routes added or removed", keys: ["route_added", "route_removed"] },
+  ];
+
+  const groupOn = (keys: NotifEventType[]) => keys.some((k) => prefs?.[k]?.enabled);
+  const setGroupEnabled = (keys: NotifEventType[], on: boolean) => {
+    if (!prefs) return;
+    const patch: any = {};
+    for (const k of keys) patch[k] = { ...prefs[k], enabled: on };
+    patchM.mutate(patch);
+  };
+  const setGroupChannel = (keys: NotifEventType[], ch: "email"|"inApp"|"sms", on: boolean) => {
+    if (!prefs) return;
+    const patch: any = {};
+    for (const k of keys) patch[k] = { ...prefs[k], channels: { ...prefs[k].channels, [ch]: on } };
+    patchM.mutate(patch);
+  };
+
   const CH: Array<{ key:"email"|"inApp"|"sms"; label:string; Icon:LucideIcon }> = [
     { key:"email", label:"Email", Icon:Mail },
     { key:"inApp", label:"In-App", Icon:Bell },
@@ -767,10 +796,52 @@ function NotificationsTab() {
     <div>
       <div style={{ marginBottom:16 }}>
         <h2 style={{ fontSize:22, fontWeight:800, color:T.text, marginBottom:4 }}>Alerts</h2>
-        <p style={{ fontSize:14, color:T.sub }}>Alert me when something important changes — power controls live under Advanced.</p>
+        <p style={{ fontSize:14, color:T.sub }}>Alert me when something important changes.</p>
       </div>
 
-      <div style={{ ...cardStyle, borderRadius:16, overflow:"hidden" }}>
+      <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:12 }}>
+        {GROUPS.map((g) => {
+          const on = groupOn(g.keys);
+          return (
+            <div key={g.id} style={{ ...cardStyle, borderRadius:14, padding:16, opacity: on ? 1 : 0.75 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                <div style={{ flex:1 }}>
+                  <p style={{ fontSize:14, fontWeight:700, color:T.text }}>{g.title}</p>
+                  <p style={{ fontSize:12, color:T.muted }}>{g.sub}</p>
+                </div>
+                <Switch checked={on} onCheckedChange={() => setGroupEnabled(g.keys, !on)} disabled={patchM.isPending || isLoading}
+                  style={{ "--switch-on": T.emerald } as any} aria-label={g.title} />
+              </div>
+              <div style={{ display:"flex", gap:16, marginTop:12 }}>
+                {CH.map((ch) => {
+                  const allOn = g.keys.every((k) => prefs?.[k]?.channels?.[ch.key]);
+                  return (
+                    <label key={ch.key} style={{ display:"flex", alignItems:"center", gap:6, fontSize:12, color:T.sub, cursor:"pointer" }}>
+                      <Switch checked={allOn} onCheckedChange={() => setGroupChannel(g.keys, ch.key, !allOn)} disabled={!on || patchM.isPending || isLoading}
+                        style={{ "--switch-on": T.violet } as any} aria-label={`${ch.label} for ${g.title}`} />
+                      {ch.label}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+        <div style={{ ...cardStyle, borderRadius:14, padding:16, display:"flex", alignItems:"center", gap:12 }}>
+          <div style={{ flex:1 }}>
+            <p style={{ fontSize:14, fontWeight:700, color:T.text }}>Weekly summary</p>
+            <p style={{ fontSize:12, color:T.muted }}>Send me a weekly digest</p>
+          </div>
+          <Switch checked={prefs?.weekly_digest?.enabled ?? false}
+            onCheckedChange={() => toggle("weekly_digest", "enabled")} disabled={patchM.isPending || isLoading}
+            style={{ "--switch-on": T.emerald } as any} aria-label="Weekly digest" />
+        </div>
+      </div>
+
+      <details style={{ ...cardStyle, borderRadius:14, padding:16 }}>
+        <summary style={{ cursor:"pointer", fontSize:13, fontWeight:700, color:T.activeText }}>Advanced notification settings</summary>
+
+      <div style={{ ...cardStyle, borderRadius:16, overflow:"hidden", marginTop:12 }}>
         {/* Header row */}
         <div style={{ display:"flex", alignItems:"center", padding:"12px 20px", background:"var(--secondary)", borderBottom:`1px solid var(--border)` }}>
           <div style={{ flex:1, fontSize:11, fontWeight:700, color:T.muted, textTransform:"uppercase", letterSpacing:"0.08em" }}>Event</div>
@@ -796,8 +867,8 @@ function NotificationsTab() {
             const pref = prefs?.[row.key];
             const on = pref?.enabled ?? false;
             return (
-              <motion.div key={row.key} initial={{opacity:0}} animate={{opacity:1}} transition={{delay:idx*0.04}}
-                style={{ display:"flex", alignItems:"center", padding:"14px 20px", borderBottom: idx<EVENT_ROWS.length-1?`1px solid ${T.border}`:"none", opacity: on ? 1 : 0.5, transition:"opacity 0.2s", borderLeft: on ? `3px solid ${T.violet}` : `3px solid transparent`, background: on ? T.violetDim : "transparent" }}>
+              <div key={row.key}
+                style={{ display:"flex", alignItems:"center", padding:"14px 20px", borderBottom: idx<EVENT_ROWS.length-1?`1px solid ${T.border}`:"none", opacity: on ? 1 : 0.5, borderLeft: on ? `3px solid ${T.violet}` : `3px solid transparent`, background: on ? T.violetDim : "transparent" }}>
                 <div style={{ flex:1, minWidth:0 }}>
                   <p style={{ fontSize:14, fontWeight:500, color:T.text }}>{row.label}</p>
                   <p style={{ fontSize:12, color:T.muted }}>{row.sub}</p>
@@ -810,20 +881,21 @@ function NotificationsTab() {
                 ))}
                 <div style={{ width:72, display:"flex", justifyContent:"center" }}>
                   <Switch checked={on} onCheckedChange={()=>toggle(row.key,"enabled")} disabled={patchM.isPending}
-                    style={{ "--switch-on": T.emerald } as any} />
+                    style={{ "--switch-on": T.emerald } as any} aria-label={`${row.label} active`} />
                 </div>
-              </motion.div>
+              </div>
             );
           })
         )}
 
         {patchM.isPending && (
           <div style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 20px", background:"var(--muted)", borderTop:`1px solid var(--border)` }}>
-            <Loader2 style={{ width:13, height:13, color:T.muted }} className="animate-spin" />
+            <Loader2 style={{ width:13, height:13, color:T.muted }} className="animate-spin" aria-hidden="true" />
             <span style={{ fontSize:12, color:T.muted }}>Saving…</span>
           </div>
         )}
       </div>
+      </details>
     </div>
   );
 }
@@ -884,8 +956,25 @@ function HistoryTab() {
           <p style={{ fontSize:14, color:T.sub }}>Your CoS verification history will appear here.</p>
         </div>
       ) : (
-        <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-          {verifs.map((v, idx) => {
+        <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+          {(() => {
+            const startOfDay = (d: Date) => { const c = new Date(d); c.setHours(0, 0, 0, 0); return c.getTime(); };
+            const today = startOfDay(new Date());
+            const groups: Array<{ id: string; title: string; items: typeof verifs }> = [
+              { id: "today", title: "Today", items: [] },
+              { id: "yesterday", title: "Yesterday", items: [] },
+              { id: "earlier", title: "Earlier", items: [] },
+            ];
+            for (const v of verifs) {
+              const day = startOfDay(new Date(v.verifiedAt));
+              const diff = Math.round((today - day) / 86_400_000);
+              (diff <= 0 ? groups[0] : diff === 1 ? groups[1] : groups[2]).items.push(v);
+            }
+            return groups.filter((g) => g.items.length > 0).map((g) => (
+              <section key={g.id} aria-label={g.title}>
+                <p style={{ fontSize:11, fontWeight:700, color:T.muted, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:8 }}>{g.title}</p>
+                <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                  {g.items.map((v) => {
             const rc = RC[v.result] || RC.fake;
             const RI = rc.Icon;
             const pct = Math.round(v.confidence*100);
@@ -894,7 +983,7 @@ function HistoryTab() {
             const isOpen = expanded===v.id;
 
             return (
-              <motion.div key={v.id} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{delay:idx*0.04,type:"spring",stiffness:120,damping:16}}
+              <div key={v.id}
                 style={{ background:rc.bg, border:`1px solid ${rc.border}`, borderRadius:16, overflow:"hidden" }}>
                 <button onClick={() => setExpanded(isOpen?null:v.id)}
                   style={{ display:"flex", alignItems:"center", gap:14, padding:"14px 16px", cursor:"pointer", width:"100%", background:"transparent", border:"none", textAlign:"left" }}>
@@ -915,9 +1004,8 @@ function HistoryTab() {
                   </div>
                 </button>
 
-                <AnimatePresence>
-                  {isOpen && (
-                    <motion.div initial={{height:0}} animate={{height:"auto"}} exit={{height:0}} transition={{type:"spring",stiffness:120,damping:18}} style={{overflow:"hidden",borderTop:`1px solid ${rc.border}`}}>
+                {isOpen && (
+                    <div style={{borderTop:`1px solid ${rc.border}`}}>
                       <div style={{ padding:"14px 16px", display:"flex", flexDirection:"column", gap:10 }}>
                         {v.receiptId && (
                           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
@@ -945,12 +1033,15 @@ function HistoryTab() {
                           </div>
                         )}
                       </div>
-                    </motion.div>
+                    </div>
                   )}
-                </AnimatePresence>
-              </motion.div>
+              </div>
             );
-          })}
+                  })}
+                </div>
+              </section>
+            ));
+          })()}
         </div>
       )}
     </div>
@@ -987,12 +1078,27 @@ function SupportTab() {
 
   const openCount = tickets?.filter(t => t.status === "open").length || 0;
 
+  const openTicket = tickets?.find((t) => t.status !== "resolved") ?? null;
+
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 22, fontWeight: 800, color: "var(--foreground)", marginBottom: 4 }}>Help & Support</h2>
-        <p style={{ fontSize: 14, color: "var(--muted-foreground)" }}>Ask a question or report an issue — our team replies within 24 hours</p>
+        <h2 style={{ fontSize: 22, fontWeight: 800, color: "var(--foreground)", marginBottom: 4 }}>Support</h2>
+        <p style={{ fontSize: 14, color: "var(--muted-foreground)" }}>Need help? We&apos;re here — typical response within 1 business day.</p>
       </div>
+
+      {openTicket && (
+        <div style={{ ...cardStyle, borderRadius: 14, padding: 16, marginBottom: 16 }} data-testid="support-open">
+          <p style={{ fontSize:11, fontWeight:700, color:T.muted, textTransform:"uppercase", letterSpacing:"0.07em" }}>
+            {openTicket.adminReply ? "Awaiting your reply" : "Open conversation"}
+          </p>
+          <p style={{ fontSize:14, fontWeight:700, color:T.text, marginTop:4 }}>{openTicket.subject}</p>
+          <p style={{ fontSize:12, color:T.muted, marginTop:2 }}>Last update: {fmtShort(openTicket.createdAt)}</p>
+          <button onClick={() => setView("history")} style={{ marginTop:10, background:"transparent", border:`1px solid ${T.border}`, borderRadius:99, padding:"10px 18px", minHeight:44, fontSize:13, fontWeight:700, cursor:"pointer", color:T.activeText }}>
+            Open conversation
+          </button>
+        </div>
+      )}
 
       {/* Toggle */}
       <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
@@ -1027,12 +1133,12 @@ function SupportTab() {
                 rows={5} style={{ ...inputStyle, resize: "vertical" as any, fontFamily: "inherit" }} maxLength={2000} />
               <p style={{ fontSize: 11, color: "var(--muted-foreground)", textAlign: "right", marginTop: 4 }}>{message.length}/2000</p>
             </div>
-            <motion.button whileTap={{ scale: 0.97 }}
+            <button
               onClick={() => submitM.mutate()}
               disabled={submitM.isPending || !subject.trim() || !message.trim()}
-              style={{ background: "var(--primary)", color: "var(--primary-foreground)", border: "none", borderRadius: 99, padding: "11px 24px", fontSize: 14, fontWeight: 700, cursor: submitM.isPending || !subject.trim() || !message.trim() ? "not-allowed" : "pointer", opacity: submitM.isPending || !subject.trim() || !message.trim() ? 0.6 : 1, display: "flex", alignItems: "center", gap: 8, alignSelf: "flex-start" }}>
-              {submitM.isPending ? <><Loader2 style={{ width: 14, height: 14 }} className="animate-spin" /> Sending…</> : <><SendHorizonal style={{ width: 14, height: 14 }} /> Send Request</>}
-            </motion.button>
+              style={{ background: "var(--primary)", color: "var(--primary-foreground)", border: "none", borderRadius: 99, padding: "11px 24px", minHeight:48, fontSize: 14, fontWeight: 700, cursor: submitM.isPending || !subject.trim() || !message.trim() ? "not-allowed" : "pointer", opacity: submitM.isPending || !subject.trim() || !message.trim() ? 0.6 : 1, display: "flex", alignItems: "center", gap: 8, alignSelf: "flex-start" }}>
+              {submitM.isPending ? <><Loader2 style={{ width: 14, height: 14 }} className="animate-spin" aria-hidden="true" /> Sending…</> : <><SendHorizonal style={{ width: 14, height: 14 }} aria-hidden="true" /> Send Request</>}
+            </button>
           </div>
         </div>
       ) : (
@@ -1049,8 +1155,8 @@ function SupportTab() {
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {tickets.map((t, idx) => (
-                <motion.div key={t.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}
+              {tickets.map((t) => (
+                <div key={t.id}
                   style={{ ...cardStyle, borderRadius: 14, padding: 20 }}>
                   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
                     <p style={{ fontSize: 14, fontWeight: 700, color: "var(--foreground)" }}>{t.subject}</p>
@@ -1072,10 +1178,10 @@ function SupportTab() {
                     </div>
                   )}
                   <p style={{ fontSize: 11, color: "var(--muted-foreground)", marginTop: 10 }}>
-                    <Clock style={{ width: 11, height: 11, display: "inline", marginRight: 4 }} />
-                    {fmtShort(t.createdAt)}
+                    <Clock style={{ width: 11, height: 11, display: "inline", marginRight: 4 }} aria-hidden="true" />
+                    <time dateTime={t.createdAt}>{fmtShort(t.createdAt)}</time>
                   </p>
-                </motion.div>
+                </div>
               ))}
             </div>
           )}
@@ -1085,8 +1191,98 @@ function SupportTab() {
   );
 }
 
+// ─── Account Tab ──────────────────────────────────────────────────────────────
+function AccountTab({ setTab }: { setTab: (t: Tab) => void }) {
+  const summary = useAccountSummary();
+  const { toast } = useToast();
+  const [portalLoading, setPortalLoading] = useState(false);
+
+  const openPortal = async () => {
+    setPortalLoading(true);
+    try {
+      const res = await apiRequest("POST", "/api/billing/portal");
+      const data = unwrapApiEnvelope<{ url: string }>(await res.json());
+      window.location.href = data.url;
+    } catch {
+      toast({ title: "Could not open billing", description: "Please try again.", variant: "destructive" });
+    } finally {
+      setPortalLoading(false);
+    }
+  };
+
+  if (summary.isLoading) {
+    return (
+      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+        <div style={{ ...cardStyle, padding:20 }}><Skeleton className="h-6 w-40" /></div>
+        <div style={{ ...cardStyle, padding:20 }}><Skeleton className="h-4 w-full" /></div>
+      </div>
+    );
+  }
+
+  const limit = summary.usage.sponsors.limit;
+  const used = summary.usage.sponsors.used;
+  const pct = limit ? Math.min(100, Math.round((used / limit) * 100)) : 0;
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:16, maxWidth:640 }}>
+      <div>
+        <h2 style={{ fontSize:22, fontWeight:800, color:T.text, marginBottom:4 }}>Account</h2>
+        <p style={{ fontSize:14, color:T.sub }}>Profile, plan, usage, billing and security.</p>
+      </div>
+
+      <section style={{ ...cardStyle, padding:20 }} aria-label="Profile">
+        <p style={{ fontSize:11, fontWeight:700, color:T.muted, textTransform:"uppercase", letterSpacing:"0.07em", marginBottom:8 }}>Profile</p>
+        <p style={{ fontSize:15, fontWeight:700, color:T.text }}>{summary.user?.firstName ?? summary.user?.email?.split("@")[0] ?? "User"}</p>
+        <p style={{ fontSize:13, color:T.sub }}>{summary.user?.email}</p>
+      </section>
+
+      <section style={{ ...cardStyle, padding:20 }} aria-label="Plan and usage">
+        <p style={{ fontSize:11, fontWeight:700, color:T.muted, textTransform:"uppercase", letterSpacing:"0.07em", marginBottom:8 }}>Your plan</p>
+        <p style={{ fontSize:15, fontWeight:700, color:T.text }}>
+          {summary.plan.label} · {summary.plan.status === "past_due" ? "Billing attention needed" : "Active"}
+        </p>
+        <p style={{ fontSize:13, color:T.sub, marginTop:4 }}>
+          Monitoring · {used}{limit ? ` / ${limit} sponsors` : " · unlimited"}
+        </p>
+        {limit && (
+          <div role="progressbar" aria-valuenow={used} aria-valuemin={0} aria-valuemax={limit} style={{ height:8, borderRadius:999, background:"#1E1E24", marginTop:8, overflow:"hidden" }}>
+            <div style={{ width:`${pct}%`, height:"100%", background: used >= limit ? "#EF4444" : "#7C3AED" }} />
+          </div>
+        )}
+        <p style={{ fontSize:13, color:T.sub, marginTop:8 }}>
+          Checks remaining · {summary.usage.checks.isUnlimited || summary.usage.checks.remaining === null ? "Unlimited" : summary.usage.checks.remaining} · Credits: {summary.usage.checks.credits}
+        </p>
+        <p style={{ fontSize:13, color:T.sub, marginTop:4 }}>Alerts · {summary.plan.config.channels.join(" + ")}</p>
+      </section>
+
+      <section style={{ ...cardStyle, padding:20 }} aria-label="Billing">
+        <p style={{ fontSize:11, fontWeight:700, color:T.muted, textTransform:"uppercase", letterSpacing:"0.07em", marginBottom:8 }}>Billing</p>
+        <p style={{ fontSize:13, color:T.sub, marginBottom:12 }}>Manage payment method, history and cancellation via the secure billing portal.</p>
+        <button onClick={openPortal} disabled={portalLoading}
+          style={{ background:"var(--primary)", color:"var(--primary-foreground)", border:"none", borderRadius:99, padding:"11px 22px", minHeight:48, fontSize:14, fontWeight:700, cursor:"pointer", opacity: portalLoading ? 0.6 : 1 }}>
+          {portalLoading ? "Opening…" : "Manage subscription"}
+        </button>
+      </section>
+
+      <section style={{ ...cardStyle, padding:20 }} aria-label="Security and support">
+        <p style={{ fontSize:11, fontWeight:700, color:T.muted, textTransform:"uppercase", letterSpacing:"0.07em", marginBottom:8 }}>Security & support</p>
+        <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+          <button onClick={() => setTab("support")}
+            style={{ background:"transparent", border:`1px solid ${T.border}`, borderRadius:99, padding:"10px 18px", minHeight:44, fontSize:13, fontWeight:700, cursor:"pointer", color:T.activeText }}>
+            Open support
+          </button>
+          <button onClick={() => setTab("notifications")}
+            style={{ background:"transparent", border:`1px solid ${T.border}`, borderRadius:99, padding:"10px 18px", minHeight:44, fontSize:13, fontWeight:700, cursor:"pointer", color:T.text }}>
+            Alert settings
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
-const VALID_TABS: Tab[] = ["overview", "monitor", "verify", "notifications", "history", "support"];
+const VALID_TABS: Tab[] = ["overview", "monitor", "verify", "notifications", "history", "support", "account"];
 
 function tabFromPath(pathname: string): Tab | null {
   const seg = pathname.replace(/\/$/, "").split("/").pop() ?? "";
@@ -1101,6 +1297,27 @@ export default function ProDashboard() {
     typeof window !== "undefined" ? (tabFromPath(window.location.pathname) ?? "overview") : "overview",
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const summary = useAccountSummary();
+  const drawerCloseRef = useRef<HTMLButtonElement>(null);
+  const lastTriggerRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!drawerOpen) return;
+    drawerCloseRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setDrawerOpen(false);
+        lastTriggerRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [drawerOpen]);
+
+  const openDrawer = (e: React.MouseEvent<HTMLElement>) => {
+    lastTriggerRef.current = e.currentTarget;
+    setDrawerOpen(true);
+  };
 
   const setActiveTab = (t: Tab) => {
     setActiveTabState(t);
@@ -1159,6 +1376,7 @@ export default function ProDashboard() {
     notifications: <NotificationsTab />,
     history:       <HistoryTab />,
     support:       <SupportTab />,
+    account:       <AccountTab setTab={setActiveTab} />,
   };
 
   // ── Sidebar ──────────────────────────────────────────────────────────────────
@@ -1224,8 +1442,8 @@ export default function ProDashboard() {
             onClick={() => setDrawerOpen(false)} />
           <motion.aside initial={{x:-264}} animate={{x:0}} exit={{x:-264}} transition={{type:"spring",stiffness:140,damping:20}}
             style={{ position:"fixed", left:0, top:0, bottom:0, width:260, zIndex:50, background:T.sidebar, borderRight:`1px solid ${T.border}`, display:"flex", flexDirection:"column" }}>
-            <button onClick={() => setDrawerOpen(false)} style={{ position:"absolute", top:14, right:14, background:"var(--secondary)", border:"none", borderRadius:8, padding:6, cursor:"pointer", color:"var(--muted-foreground)" }}>
-              <X style={{ width:14, height:14 }} />
+            <button ref={drawerCloseRef} onClick={() => { setDrawerOpen(false); lastTriggerRef.current?.focus(); }} aria-label="Close menu" style={{ position:"absolute", top:14, right:14, background:"var(--secondary)", border:"none", borderRadius:8, padding:6, minWidth:44, minHeight:44, cursor:"pointer", color:"var(--muted-foreground)" }}>
+              <X style={{ width:14, height:14 }} aria-hidden="true" />
             </button>
             {Sidebar}
           </motion.aside>
@@ -1237,8 +1455,8 @@ export default function ProDashboard() {
         {/* Topbar */}
         <header style={{ height:54, flexShrink:0, background:"var(--card)", borderBottom:`1px solid var(--border)`, display:"flex", alignItems:"center", justifyContent:"space-between", padding:"0 20px", gap:12 }}>
           <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-            <button className="lg:hidden" onClick={() => setDrawerOpen(true)} style={{ background:"var(--secondary)", border:"none", borderRadius:8, padding:7, cursor:"pointer", color:"var(--muted-foreground)", display:"flex" }}>
-              <Menu style={{ width:16, height:16 }} />
+            <button className="lg:hidden" onClick={openDrawer} aria-label="Open menu" style={{ background:"var(--secondary)", border:"none", borderRadius:8, padding:7, minWidth:44, minHeight:44, cursor:"pointer", color:"var(--muted-foreground)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+              <Menu style={{ width:16, height:16 }} aria-hidden="true" />
             </button>
             <div className="hidden sm:flex" style={{ alignItems:"center", gap:6, fontSize:13, color:T.muted }}>
               <span>Dashboard</span>
@@ -1250,11 +1468,16 @@ export default function ProDashboard() {
             <div className="hidden sm:block"><PlanPill plan={plan} /></div>
             <button
               onClick={() => setActiveTab("monitor")}
-              aria-label="Review items needing attention"
+              aria-label={summary.protection.unresolvedAlerts > 0 || summary.protection.revokedCount > 0 ? `${summary.protection.unresolvedAlerts + summary.protection.revokedCount} items need attention` : "No items need attention"}
               title="Items needing attention"
               style={{ position:"relative", background:"var(--secondary)", border:"none", borderRadius:10, minWidth:44, minHeight:44, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:T.text }}
             >
               <Bell style={{ width:18, height:18 }} aria-hidden="true" />
+              {(summary.protection.unresolvedAlerts + summary.protection.revokedCount) > 0 && (
+                <span aria-hidden="true" style={{ position:"absolute", top:6, right:6, minWidth:18, height:18, borderRadius:99, background:"#EF4444", color:"#fff", fontSize:11, fontWeight:800, display:"flex", alignItems:"center", justifyContent:"center", padding:"0 5px" }}>
+                  {summary.protection.unresolvedAlerts + summary.protection.revokedCount}
+                </span>
+              )}
             </button>
             <div style={{ width:32, height:32, borderRadius:"50%", background:"var(--primary)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:"var(--primary-foreground)", flexShrink:0 }} aria-label="Account">{initials}</div>
           </div>
