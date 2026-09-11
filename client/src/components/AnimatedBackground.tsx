@@ -114,18 +114,19 @@ function DocumentAnimation() {
       >
         <animated.div
           style={{ ...documentAnimation, width: '264px', height: '340px' }}
+          aria-hidden="true"
           className="relative bg-white dark:bg-slate-900 rounded-xl p-6 border border-indigo-100 dark:border-slate-700 overflow-hidden"
         >
           {/* Document Header with UK cues */}
           <div className="flex items-start justify-between mb-4">
             <div>
-              <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center mb-2.5 shadow-md shadow-indigo-500/20">
+              <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center mb-2.5 shadow-md shadow-indigo-500/20">
                 <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
                 </svg>
               </div>
-              <h3 className="text-[11px] font-bold text-gray-900 dark:text-white leading-tight">Certificate of Sponsorship</h3>
-              <p className="text-[9px] text-gray-400 dark:text-gray-500 mt-0.5 uppercase tracking-wide">AI Forensic Verification</p>
+              <p className="text-xs font-bold text-gray-900 dark:text-white leading-tight">Certificate of Sponsorship</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">AI forensic verification</p>
             </div>
             {/* UK flag mini */}
             <svg width="22" height="15" viewBox="0 0 22 15" className="opacity-75">
@@ -137,37 +138,37 @@ function DocumentAnimation() {
             </svg>
           </div>
 
-          {/* Form field mock-ups */}
-          <div className="space-y-2.5 mb-4">
+          {/* Form field mock-ups (decorative) */}
+          <div className="space-y-2.5 mb-4" aria-hidden="true">
             <div>
-              <div className="text-[8px] text-gray-400 dark:text-gray-500 mb-0.5 uppercase tracking-wider font-semibold">Sponsor Name</div>
+              <div className="text-xs text-gray-400 dark:text-gray-500 mb-0.5 font-semibold">Sponsor name</div>
               <div className="h-1.5 bg-gray-200 dark:bg-slate-700 rounded-full w-full" />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <div className="text-[8px] text-gray-400 dark:text-gray-500 mb-0.5 uppercase tracking-wider font-semibold">CoS Ref</div>
+                <div className="text-xs text-gray-400 dark:text-gray-500 mb-0.5 font-semibold">CoS ref</div>
                 <div className="h-1.5 bg-gray-200 dark:bg-slate-700 rounded-full" />
               </div>
               <div>
-                <div className="text-[8px] text-gray-400 dark:text-gray-500 mb-0.5 uppercase tracking-wider font-semibold">Issue Date</div>
+                <div className="text-xs text-gray-400 dark:text-gray-500 mb-0.5 font-semibold">Issue date</div>
                 <div className="h-1.5 bg-gray-200 dark:bg-slate-700 rounded-full w-3/4" />
               </div>
             </div>
             <div>
-              <div className="text-[8px] text-gray-400 dark:text-gray-500 mb-0.5 uppercase tracking-wider font-semibold">Worker Name</div>
+              <div className="text-xs text-gray-400 dark:text-gray-500 mb-0.5 font-semibold">Worker name</div>
               <div className="h-1.5 bg-gray-200 dark:bg-slate-700 rounded-full w-5/6" />
             </div>
             <div>
-              <div className="text-[8px] text-gray-400 dark:text-gray-500 mb-0.5 uppercase tracking-wider font-semibold">SOC Code</div>
+              <div className="text-xs text-gray-400 dark:text-gray-500 mb-0.5 font-semibold">SOC code</div>
               <div className="h-1.5 bg-gray-200 dark:bg-slate-700 rounded-full w-1/2" />
             </div>
           </div>
 
           {/* AI Analysis status bar */}
-          <div className="bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/40 rounded-lg px-3 py-2 mb-3">
+          <div className="bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/40 rounded-xl px-3 py-2 mb-3">
             <div className="flex items-center gap-2">
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-[9px] text-indigo-600 dark:text-indigo-300 font-bold tracking-widest uppercase">AI Analyzing…</span>
+              <span className="text-xs text-indigo-600 dark:text-indigo-300 font-bold">AI analysing…</span>
             </div>
             <div className="mt-1.5 w-full bg-indigo-100 dark:bg-indigo-900/50 rounded-full h-1">
               <div className="h-1 rounded-full bg-gradient-to-r from-indigo-500 to-emerald-500 w-4/5" style={{ animation: 'pulse 2s ease-in-out infinite' }} />

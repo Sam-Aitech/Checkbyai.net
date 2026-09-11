@@ -282,7 +282,7 @@ export default function LoginPage() {
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: "spring", stiffness: 100, damping: 15 }}
-          className="w-full max-w-md shimmer-border theme-card bg-card p-0"
+          className="w-full max-w-md theme-card bg-card p-0"
         >
           <div className="text-center p-6 pb-0">
             <div className="flex justify-center mb-6">

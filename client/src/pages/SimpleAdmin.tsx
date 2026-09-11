@@ -267,7 +267,7 @@ function EnrichmentQueueTab() {
                       <div className="flex flex-col gap-1">
                         {rows.map(({ status, count }) => (
                           <div key={status} className="flex justify-between items-center text-xs">
-                            <Badge variant="outline" className={`${STATUS_COLORS[status] ?? ''} text-[10px] py-0`}>{status}</Badge>
+                            <Badge variant="outline" className={`${STATUS_COLORS[status] ?? ''} text-xs py-0`}>{status}</Badge>
                             <span className="text-gray-500 dark:text-slate-400">{count.toLocaleString()}</span>
                           </div>
                         ))}
@@ -297,7 +297,7 @@ function EnrichmentQueueTab() {
                       <tbody>
                         {data.stalled.map((row, i) => (
                           <tr key={i} className="border-b border-gray-100 dark:border-slate-700/50">
-                            <td className="py-2 px-3 font-mono text-[10px] max-w-[160px] truncate text-gray-700 dark:text-slate-300">{row.fingerprint}</td>
+                            <td className="py-2 px-3 font-mono text-xs max-w-[160px] truncate text-gray-700 dark:text-slate-300">{row.fingerprint}</td>
                             <td className="py-2 px-3 text-gray-600 dark:text-slate-400">{row.job_type}</td>
                             <td className="py-2 px-3 text-amber-500">{new Date(row.locked_at).toLocaleString()}</td>
                             <td className="py-2 px-3 text-gray-400 dark:text-slate-500 truncate max-w-[120px]">{row.locked_by ?? '—'}</td>
@@ -328,10 +328,10 @@ function EnrichmentQueueTab() {
                       <tbody>
                         {data.recentFailures.map((row, i) => (
                           <tr key={i} className="border-b border-gray-100 dark:border-slate-700/50 hover:bg-gray-50 dark:hover:bg-slate-700/20">
-                            <td className="py-2 px-3 font-mono text-[10px] max-w-[140px] truncate text-gray-700 dark:text-slate-300">{row.fingerprint}</td>
+                            <td className="py-2 px-3 font-mono text-xs max-w-[140px] truncate text-gray-700 dark:text-slate-300">{row.fingerprint}</td>
                             <td className="py-2 px-3 text-gray-600 dark:text-slate-400">{row.job_type}</td>
                             <td className="py-2 px-3">
-                              <Badge variant="outline" className={`${STATUS_COLORS[row.status] ?? ''} text-[10px] py-0`}>{row.status}</Badge>
+                              <Badge variant="outline" className={`${STATUS_COLORS[row.status] ?? ''} text-xs py-0`}>{row.status}</Badge>
                             </td>
                             <td className="py-2 px-3 text-gray-500 dark:text-slate-400">{row.attempt_count}</td>
                             <td className="py-2 px-3 text-red-400 max-w-[200px] truncate" title={row.error_message ?? ''}>{row.error_message ?? '—'}</td>
@@ -2221,7 +2221,7 @@ export default function SimpleAdmin() {
                                 <div className="flex flex-col gap-1">
                                   {getStatusBadge(log.result, log.confidence)}
                                   {(log as any).adminStatus === 'fake' && (
-                                    <span className="text-[10px] font-medium text-red-500 dark:text-red-400 uppercase tracking-wide">Admin override</span>
+                                    <span className="text-xs font-medium text-destructive uppercase tracking-wide">Admin override</span>
                                   )}
                                 </div>
                               </td>
@@ -2333,9 +2333,6 @@ export default function SimpleAdmin() {
                       variant={usersPaidOnly ? "default" : "outline"}
                       size="sm"
                       onClick={() => { setUsersPaidOnly(v => !v); setUsersPage(1); }}
-                      className={usersPaidOnly
-                        ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600"
-                        : "border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700"}
                     >
                       Paid Only
                     </Button>
@@ -2629,8 +2626,8 @@ export default function SimpleAdmin() {
                         <span className="text-sm text-gray-400">Loading…</span>
                       ) : (
                         <>
-                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold ${notifPaused ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'}`}>
-                            <span className={`w-2 h-2 rounded-full ${notifPaused ? 'bg-red-500' : 'bg-emerald-500'}`} />
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold ${notifPaused ? 'bg-destructive/10 text-destructive' : 'bg-success/10 text-success'}`}>
+                            <span className={`w-2 h-2 rounded-full ${notifPaused ? 'bg-destructive' : 'bg-success'}`} />
                             {notifPaused ? 'PAUSED' : 'ACTIVE'}
                           </span>
                           <Button
@@ -2638,7 +2635,6 @@ export default function SimpleAdmin() {
                             size="sm"
                             onClick={toggleNotifPaused}
                             disabled={notifPausedLoading}
-                            className={notifPaused ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}
                           >
                             {notifPausedLoading ? 'Saving…' : notifPaused ? 'Resume Notifications' : 'Pause All Notifications'}
                           </Button>
@@ -2946,7 +2942,7 @@ export default function SimpleAdmin() {
                     <p className="text-gray-500 dark:text-slate-400 max-w-md mx-auto mb-6">
                       Upload genuine Certificate of Sponsorship documents to establish a baseline. The AI uses these patterns to detect anomalies in user submissions.
                     </p>
-                    <Button onClick={() => setActiveTab('upload')} className="rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg shadow-blue-500/20 font-medium px-6">
+                    <Button onClick={() => setActiveTab('upload')} className="rounded-full font-medium px-6">
                       <Upload className="w-4 h-4 mr-2" />
                       Upload First Pattern
                     </Button>
@@ -3035,12 +3031,12 @@ export default function SimpleAdmin() {
                       accept=".pdf"
                       onChange={handleFileSelect}
                       disabled={previewLoading}
-                      className="hidden"
+                      className="peer sr-only"
                       id="file-upload"
                       data-testid="input-file-upload"
                     />
                     <Button asChild disabled={previewLoading}>
-                      <label htmlFor="file-upload" className="cursor-pointer">
+                      <label htmlFor="file-upload" className="cursor-pointer peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2">
                         {previewLoading ? 'Extracting metadata...' : 'Select File'}
                       </label>
                     </Button>
@@ -3285,19 +3281,19 @@ export default function SimpleAdmin() {
                               {/* Content */}
                               <div className="flex-1 min-w-0">
                                 <div className="flex flex-wrap items-center gap-1.5 mb-1">
-                                  <Badge className="bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20 rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap">
+                                  <Badge className="bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20 rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap">
                                     {rule.category}
                                   </Badge>
                                   {rule.isActive ? (
-                                    <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
+                                    <Badge className="bg-success/10 text-success border-success/20 rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wide whitespace-nowrap">
                                       <CheckCircle className="w-3 h-3 mr-1 inline" />Active
                                     </Badge>
                                   ) : (
-                                    <Badge className="bg-gray-400/10 text-gray-500 dark:text-slate-500 border-gray-400/20 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
+                                    <Badge className="bg-muted text-muted-foreground border-border rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wide whitespace-nowrap">
                                       <XCircle className="w-3 h-3 mr-1 inline" />Disabled
                                     </Badge>
                                   )}
-                                  <span className="font-mono text-[10px] text-gray-400 dark:text-slate-500">p={rule.priority}</span>
+                                  <span className="font-mono text-xs text-muted-foreground">p={rule.priority}</span>
                                 </div>
                                 <p className="text-sm text-gray-700 dark:text-slate-300 leading-snug">{rule.ruleText}</p>
                               </div>
@@ -3395,7 +3391,6 @@ export default function SimpleAdmin() {
                         size="sm"
                         onClick={() => setRunConfirmOpen(true)}
                         disabled={runningJob || sponsorStatus?.jobRunning}
-                        className="bg-blue-600 hover:bg-blue-700"
                       >
                         {runningJob || sponsorStatus?.jobRunning ? (
                           <>
@@ -3471,14 +3466,14 @@ export default function SimpleAdmin() {
                     </div>
                   )}
                   {runResult && !runError && !(runningJob || sponsorStatus?.jobRunning) && (
-                    <Alert className="mt-4 bg-blue-500/10 border-blue-500/30">
-                      <AlertDescription className="text-blue-300">{runResult}</AlertDescription>
+                    <Alert className="mt-4 bg-info/10 border-info/30">
+                      <AlertDescription className="text-info">{runResult}</AlertDescription>
                     </Alert>
                   )}
                   {runError && (
-                    <Alert className="mt-4 bg-red-500/10 border-red-500/30">
-                      <AlertTriangle className="w-4 h-4 text-red-400" />
-                      <AlertDescription className="text-red-300 text-xs font-mono break-all">{runError}</AlertDescription>
+                    <Alert className="mt-4 bg-destructive/10 border-destructive/30">
+                      <AlertTriangle className="w-4 h-4 text-destructive" />
+                      <AlertDescription className="text-destructive text-xs font-mono break-all">{runError}</AlertDescription>
                     </Alert>
                   )}
                   {!runError && sponsorStatus?.lastRun?.success === false && sponsorStatus?.lastRun?.error && (
@@ -3542,10 +3537,10 @@ export default function SimpleAdmin() {
                               <td className="py-1.5 pr-3 text-gray-700 dark:text-slate-300 font-mono">{run.runDate}</td>
                               <td className="py-1.5 pr-3 text-gray-500 dark:text-slate-400 capitalize">{run.source}</td>
                               <td className="py-1.5 pr-3">
-                                <span className={`inline-block px-1.5 py-0.5 rounded text-[11px] font-medium
+                                <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium
                                   ${run.status === 'success'
-                                    ? 'bg-green-500/10 text-green-500 dark:text-green-400'
-                                    : 'bg-red-500/10 text-red-500 dark:text-red-400'}`}>
+                                    ? 'bg-success/10 text-success'
+                                    : 'bg-destructive/10 text-destructive'}`}>
                                   {run.status}
                                 </span>
                               </td>
@@ -3581,7 +3576,7 @@ export default function SimpleAdmin() {
                       {jobHistory.some((r: any) => r.errorMessage) && (
                         <div className="mt-3 space-y-1 border-t border-gray-100 dark:border-slate-700 pt-2">
                           {jobHistory.filter((r: any) => r.errorMessage).slice(0, 3).map((r: any) => (
-                            <p key={r.id} className="text-[11px] text-red-400 font-mono truncate">
+                            <p key={r.id} className="text-xs text-destructive font-mono truncate">
                               {r.runDate}: {r.errorMessage}
                             </p>
                           ))}
@@ -3659,7 +3654,6 @@ export default function SimpleAdmin() {
                         <Button
                           onClick={() => setInitConfirmOpen(true)}
                           disabled={initializing}
-                          className="bg-emerald-600 hover:bg-emerald-700"
                         >
                           <Download className="w-4 h-4 mr-1" />
                           Initialize Baseline
@@ -4340,13 +4334,11 @@ export default function SimpleAdmin() {
             <Button
               variant="outline"
               onClick={() => setRunConfirmOpen(false)}
-              className="border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700"
             >
               Cancel
             </Button>
             <Button
               onClick={handleRunSponsorJob}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
             >
               <Play className="w-4 h-4 mr-1" />
               Confirm & Run
@@ -4359,7 +4351,7 @@ export default function SimpleAdmin() {
       <Dialog open={initConfirmOpen} onOpenChange={setInitConfirmOpen}>
         <DialogContent className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-emerald-400">
+            <DialogTitle className="flex items-center gap-2 text-success">
               <Database className="w-5 h-5" />
               Initialize Sponsor Register
             </DialogTitle>
@@ -4371,13 +4363,11 @@ export default function SimpleAdmin() {
             <Button
               variant="outline"
               onClick={() => setInitConfirmOpen(false)}
-              className="border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700"
             >
               Cancel
             </Button>
             <Button
               onClick={handleInitialize}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
             >
               <Download className="w-4 h-4 mr-1" />
               Confirm & Initialize
@@ -4390,7 +4380,7 @@ export default function SimpleAdmin() {
       <Dialog open={cleanupConfirmOpen} onOpenChange={setCleanupConfirmOpen}>
         <DialogContent className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-amber-400">
+            <DialogTitle className="flex items-center gap-2 text-warning">
               <Trash2 className="w-5 h-5" />
               Clean Up Old Snapshots
             </DialogTitle>
@@ -4402,13 +4392,12 @@ export default function SimpleAdmin() {
             <Button
               variant="outline"
               onClick={() => setCleanupConfirmOpen(false)}
-              className="border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700"
             >
               Cancel
             </Button>
             <Button
               onClick={handleCleanup}
-              className="bg-amber-600 hover:bg-amber-700 text-white"
+              className="bg-warning hover:bg-warning/90 text-warning-foreground"
             >
               <Trash2 className="w-4 h-4 mr-1" />
               Confirm Cleanup

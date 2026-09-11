@@ -22,7 +22,7 @@ pymupdf>=1.28.2               # PDF parsing (cos_verifier.py, ai_engine.py)
 # ── Machine learning / NLP ────────────────────────────────────────────────────
 scikit-learn>=1.9.0           # TF-IDF cosine similarity (ai_engine.py, cos_verifier.py)
 numpy>=2.4.6
-sentence-transformers>=6.0.0    # optional: semantic embeddings (cos_verifier.py)
+sentence-transformers>=6.0.1    # optional: semantic embeddings (cos_verifier.py)
                               # falls back to TF-IDF when not installed
 
 # ── Database ──────────────────────────────────────────────────────────────────
@@ -31,7 +31,7 @@ psycopg2-binary>=2.9.12        # direct PostgreSQL writes in sponsor_etl_cron.py
 # sqlite3                     # stdlib — was used by sponsor_etl.py (now retired)
 
 # ── Validation ────────────────────────────────────────────────────────────────
-pydantic>=2.13.4              # request/response models
+pydantic>=2.13.5              # request/response models
 
 # ── Enrichment ────────────────────────────────────────────────────────────────
 rapidfuzz>=3.0.0              # fuzzy string matching (enrichment_router.py)

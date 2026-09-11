@@ -18,7 +18,7 @@ export default function COSCheckPanel({ result }: COSCheckPanelProps) {
       animate={{ opacity: 1, y: 0 }}
       transition={spring}
     >
-      <Card className={`border-2 ${isGenuine ? "border-emerald-500/30 bg-emerald-500/5" : "border-red-500/30 bg-red-500/5"}`}>
+      <Card className={`border-2 ${isGenuine ? "border-success/30 bg-success/5" : "border-destructive/30 bg-destructive/5"}`}>
         <CardContent className="pt-8 pb-8 flex flex-col items-center gap-4 text-center">
           {/* Icon */}
           <motion.div
@@ -27,14 +27,14 @@ export default function COSCheckPanel({ result }: COSCheckPanelProps) {
             transition={{ ...spring, delay: 0.1 }}
             className={`w-20 h-20 rounded-full flex items-center justify-center ${
               isGenuine
-                ? "bg-emerald-100 dark:bg-emerald-900/40"
-                : "bg-red-100 dark:bg-red-900/40"
+                ? "bg-success/10"
+                : "bg-destructive/10"
             }`}
           >
             {isGenuine ? (
-              <ShieldCheck className="w-10 h-10 text-emerald-600 dark:text-emerald-400" />
+              <ShieldCheck className="w-10 h-10 text-success" />
             ) : (
-              <ShieldX className="w-10 h-10 text-red-600 dark:text-red-400" />
+              <ShieldX className="w-10 h-10 text-destructive" />
             )}
           </motion.div>
 
@@ -43,10 +43,10 @@ export default function COSCheckPanel({ result }: COSCheckPanelProps) {
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ ...spring, delay: 0.18 }}
-            className={`inline-flex items-center gap-2 px-5 py-2 rounded-full font-bold text-lg tracking-wide ${
+            className={`inline-flex items-center gap-2 px-5 py-2 rounded-full font-bold text-lg tracking-wide border ${
               isGenuine
-                ? "bg-emerald-500 text-white"
-                : "bg-red-500 text-white"
+                ? "bg-success/10 text-success border-success/20"
+                : "bg-destructive/10 text-destructive border-destructive/20"
             }`}
           >
             {isGenuine ? (

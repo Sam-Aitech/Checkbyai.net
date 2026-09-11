@@ -55,8 +55,8 @@
     <meta property="og:see_also" content="https://www.youtube.com/@CheckByAi" />
     
     <!-- Additional Meta Tags -->
-    <meta name="theme-color" content="#2563eb" />
-    <meta name="msapplication-TileColor" content="#2563eb" />
+    <meta name="theme-color" content="#3434b2" />
+    <meta name="msapplication-TileColor" content="#3434b2" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Check By AI" />
@@ -82,22 +82,25 @@
   </head>
   <body>
     <div id="root"><!--SSR-->
-      <!-- SEO content before React loads (overridden by server/ssr/renderLanding.ts in production) -->
-      <h1 style="font-size: 2.5rem; font-weight: bold; color: #1f2937; margin: 2rem; text-align: center;">
-        Never Miss a UK Sponsor Licence Revocation Again
-      </h1>
-      <p style="color: #6b7280; margin: 1rem 2rem; text-align: center;">
-        <a href="/sponsor-monitor" style="color: #2563eb; text-decoration: underline;">Monitor your UK sponsor licence</a>
-        and get alerted via WhatsApp, email and SMS when your employer's status changes.
-        Free, unlimited <a href="/sponsors" style="color: #2563eb; text-decoration: underline;">sponsor register search</a>, no login required.
-        Also includes AI-assisted <a href="/dashboard" style="color: #2563eb; text-decoration: underline;">Certificate of Sponsorship verification</a>.
-      </p>
-      <nav style="text-align: center; margin: 2rem;">
-        <a href="/" style="color: #2563eb; text-decoration: underline; margin: 0 1rem;">Home</a>
-        <a href="/sponsor-monitor" style="color: #2563eb; text-decoration: underline; margin: 0 1rem;">Sponsor Monitor</a>
-        <a href="/pricing" style="color: #2563eb; text-decoration: underline; margin: 0 1rem;">Pricing</a>
-        <a href="/dashboard" style="color: #2563eb; text-decoration: underline; margin: 0 1rem;">Verify a CoS</a>
-      </nav>
+      <!-- SEO/no-JS fallback content, visually hidden so it never renders as a
+           second, differently-styled page before React mounts (see server/ssr/renderLanding.ts,
+           which replaces this block with the same treatment on every real request). -->
+      <div style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;">
+        <h1>Never Miss a UK Sponsor Licence Revocation Again</h1>
+        <p>
+          <a href="/sponsor-monitor">Monitor your UK sponsor licence</a>
+          and get alerted via WhatsApp, email and SMS when your employer's status changes.
+          Free, unlimited <a href="/sponsors">sponsor register search</a>, no login required.
+          Alert Pass Pro also sends sponsored job opportunity alerts and includes AI-assisted
+          <a href="/dashboard">Certificate of Sponsorship verification</a>.
+        </p>
+        <nav aria-label="Primary">
+          <a href="/">Home</a>
+          <a href="/sponsor-monitor">Sponsor Monitor</a>
+          <a href="/pricing">Pricing</a>
+          <a href="/dashboard">Verify a CoS</a>
+        </nav>
+      </div>
     <!--/SSR--></div>
     <script type="module" src="/src/main.tsx"></script>
 

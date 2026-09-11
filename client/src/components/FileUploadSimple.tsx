@@ -2,6 +2,7 @@ import { useState, useEffect, type ReactNode } from 'react';
 import { Link } from 'wouter';
 import { Lock, Crown, CheckCircle, ShieldAlert, LogIn } from 'lucide-react';
 import { unwrapApiEnvelope } from '@/lib/apiEnvelope';
+import { getVerificationResultTone, verificationToneBadgeClasses } from '@/lib/verificationResultTone';
 
 interface AccessDeniedCardProps {
   title: string;
@@ -11,12 +12,12 @@ interface AccessDeniedCardProps {
 
 function AccessDeniedCard({ title, message, children }: Readonly<AccessDeniedCardProps>) {
   return (
-    <div className="w-full border border-amber-200 dark:border-amber-700/40 rounded-xl p-6 bg-amber-50 dark:bg-amber-900/10 text-center space-y-4">
+    <div className="w-full border border-warning/20 rounded-xl p-6 bg-warning/10 text-center space-y-4">
       <div className="flex justify-center">
-        <ShieldAlert className="w-10 h-10 text-amber-500" />
+        <ShieldAlert className="w-10 h-10 text-warning" />
       </div>
-      <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
-      <p className="text-sm text-gray-600 dark:text-gray-400">{message}</p>
+      <h3 className="text-base font-semibold text-foreground">{title}</h3>
+      <p className="text-sm text-muted-foreground">{message}</p>
       {children}
     </div>
   );
@@ -245,7 +246,7 @@ export default function FileUploadSimple({
         <div className="flex justify-center">
           <Link
             href={`/login?redirect=${encodeURIComponent(window.location.pathname)}`}
-            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors"
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             <LogIn className="w-4 h-4" />
             Log In / Sign Up
@@ -264,14 +265,14 @@ export default function FileUploadSimple({
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Link
             href="/cos-pricing"
-            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors"
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             <Crown className="w-4 h-4" />
             View COS Check Plans
           </Link>
           <a
             href="mailto:support@checkbyai.net?subject=COS%20Check%20Access%20Request"
-            className="inline-flex items-center justify-center px-5 py-2.5 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-sm font-semibold rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            className="inline-flex items-center justify-center px-5 py-2.5 border border-border text-foreground text-sm font-semibold rounded-lg hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             Request Access
           </a>
@@ -284,28 +285,28 @@ export default function FileUploadSimple({
   if (restrictToOneCheck && hasUsedFreeCheck && !result && !isAdmin) {
     return (
       <div className="w-full">
-        <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 sm:p-8 text-center min-h-[160px] sm:min-h-[200px] flex flex-col justify-center bg-gray-50 dark:bg-gray-800/50 relative">
-          <div className="absolute inset-0 bg-gray-100 dark:bg-gray-800 rounded-lg opacity-90 flex items-center justify-center">
+        <div className="border-2 border-dashed border-border rounded-lg p-6 sm:p-8 text-center min-h-[160px] sm:min-h-[200px] flex flex-col justify-center bg-muted/50 relative">
+          <div className="absolute inset-0 bg-muted rounded-lg opacity-90 flex items-center justify-center">
             <div className="text-center space-y-4 p-6">
               <div className="flex justify-center">
-                <Lock className="w-12 h-12 text-gray-400" />
+                <Lock className="w-12 h-12 text-muted-foreground" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Free Check Used</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">You've already used your free document verification today.</p>
+                <h3 className="text-lg font-semibold text-foreground mb-2">Free Check Used</h3>
+                <p className="text-sm text-muted-foreground mb-4">You've already used your free document verification today.</p>
               </div>
               <div className="space-y-3">
-                <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-4 rounded-lg">
+                <div className="bg-primary text-primary-foreground p-4 rounded-lg">
                   <div className="flex items-center justify-center mb-2">
                     <Crown className="w-5 h-5 mr-2" />
                     <span className="font-semibold">Upgrade to Pro</span>
                   </div>
                   <p className="text-sm opacity-90 mb-3">Get unlimited document verifications, priority support, and advanced analytics</p>
-                  <Link href="/cos-pricing" className="inline-block bg-white text-blue-600 px-4 py-2 rounded-md font-medium hover:bg-gray-50 transition-colors">
+                  <Link href="/cos-pricing" className="inline-block bg-background text-primary px-4 py-2 rounded-md font-medium hover:bg-background/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                     Upgrade Now
                   </Link>
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-muted-foreground">
                   Your free check will reset tomorrow
                 </p>
               </div>
@@ -320,15 +321,15 @@ export default function FileUploadSimple({
     <div className="w-full">
       {/* Usage indicator for restricted mode */}
       {restrictToOneCheck && !isAdmin && (
-        <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg">
+        <div className="mb-4 p-3 bg-info/10 border border-info/20 rounded-lg">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
-              <CheckCircle className="w-4 h-4 text-blue-600 mr-2" />
-              <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
+              <CheckCircle className="w-4 h-4 text-info mr-2" />
+              <span className="text-sm font-medium text-info">
                 Free User
               </span>
             </div>
-            <div className="text-sm text-blue-600 dark:text-blue-300">
+            <div className="text-sm text-info">
               {hasUsedFreeCheck ? '0/1' : '1/1'} checks remaining today
             </div>
           </div>
@@ -337,59 +338,59 @@ export default function FileUploadSimple({
 
       {/* Admin indicator */}
       {isAdmin && (
-        <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg">
+        <div className="mb-4 p-3 bg-success/10 border border-success/20 rounded-lg">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
-              <Crown className="w-4 h-4 text-green-600 mr-2" />
-              <span className="text-sm font-medium text-green-800 dark:text-green-200">
+              <Crown className="w-4 h-4 text-success mr-2" />
+              <span className="text-sm font-medium text-success">
                 Admin User
               </span>
             </div>
-            <div className="text-sm text-green-600 dark:text-green-300">
+            <div className="text-sm text-success">
               Unlimited verifications
             </div>
           </div>
         </div>
       )}
 
-      <div 
+      <div
         className={`border-2 border-dashed rounded-lg p-6 sm:p-8 text-center transition-all duration-200 min-h-[160px] sm:min-h-[200px] flex flex-col justify-center ${
-          isDragging 
-            ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20 scale-[1.02]' 
-            : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 active:scale-[0.98]'
+          isDragging
+            ? 'border-primary/60 bg-primary/5 scale-[1.02]'
+            : 'border-border hover:border-border-strong active:scale-[0.98]'
         }`}
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
       >
-        <svg className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+        <svg className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground" stroke="currentColor" fill="none" viewBox="0 0 48 48">
           <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        
-        <h3 className="mt-2 text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100">Upload Document</h3>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 px-2">
+
+        <h3 className="mt-2 text-base sm:text-lg font-medium text-foreground">Upload Document</h3>
+        <p className="mt-1 text-sm text-muted-foreground px-2">
           <span className="hidden sm:inline">Drag and drop your PDF file here, or click to select</span>
           <span className="sm:hidden">Tap to select your PDF file</span>
         </p>
-        
-        <input 
-          type="file" 
-          accept=".pdf" 
+
+        <input
+          type="file"
+          accept=".pdf"
           onChange={handleFileChange}
-          className="hidden"
+          className="peer sr-only"
           id="file-upload-simple"
         />
-        
-        <label 
+
+        <label
           htmlFor="file-upload-simple"
-          className="mt-4 inline-flex items-center px-4 sm:px-6 py-3 sm:py-2 border border-transparent text-sm sm:text-base font-medium rounded-lg shadow-sm text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 cursor-pointer touch-manipulation transition-colors"
+          className="mt-4 inline-flex items-center px-4 sm:px-6 py-3 sm:py-2 border border-transparent text-sm sm:text-base font-medium rounded-lg shadow-sm text-primary-foreground bg-primary hover:bg-primary/90 active:bg-primary/80 cursor-pointer touch-manipulation transition-colors peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2"
         >
           Select PDF File
         </label>
-        
-        <div className="mt-4 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-          <svg className="h-4 w-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+
+        <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+          <svg className="h-4 w-4 text-success flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
           </svg>
           <span>Your document is <strong>deleted immediately</strong> after verification. We never store files.</span>
@@ -397,54 +398,48 @@ export default function FileUploadSimple({
       </div>
       
       {file && (
-        <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-md">
+        <div className="mt-4 p-4 bg-muted rounded-md">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
-              <svg className="h-5 w-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-5 w-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              <span className="ml-2 text-sm text-gray-900 dark:text-gray-100 truncate">{file.name}</span>
+              <span className="ml-2 text-sm text-foreground truncate">{file.name}</span>
             </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">
+            <div className="text-sm text-muted-foreground">
               {(file.size / 1024).toFixed(1)} KB
             </div>
           </div>
         </div>
       )}
-      
+
       {error && (
-        <div className="mt-4 p-3 bg-red-100 dark:bg-red-900/30 border-l-4 border-red-500 text-red-700 dark:text-red-400">
+        <div className="mt-4 p-3 bg-destructive/10 border-l-4 border-destructive text-destructive" role="alert">
           <p className="text-sm">{error}</p>
         </div>
       )}
 
       {loading && (
         <div className="mt-6 flex justify-center items-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-          <span className="ml-3 text-gray-600 dark:text-gray-400">Analyzing document...</span>
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+          <span className="ml-3 text-muted-foreground">Analyzing document...</span>
         </div>
       )}
 
       {result && (
-        <div className="mt-6 p-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Verification Result</h3>
-          
+        <div className="mt-6 p-6 bg-card rounded-lg border border-border">
+          <h3 className="text-lg font-semibold mb-4 text-foreground">Verification Result</h3>
+
           <div className="flex items-center gap-3 mb-4">
-            <div className={`px-4 py-2 rounded-full text-base font-semibold transition-all duration-700 ease-in-out transform hover:scale-105 ${
-              result.type === 'genuine' 
-                ? 'bg-gradient-to-r from-green-400 to-emerald-500 text-white shadow-lg shadow-green-500/25 animate-pulse'
-                : result.type === 'suspicious'
-                ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white shadow-lg shadow-yellow-500/25 animate-bounce'
-                : 'bg-gradient-to-r from-red-400 to-rose-500 text-white shadow-lg shadow-red-500/25 animate-pulse'
-            }`}>
+            <div className={`px-4 py-2 rounded-full text-base font-semibold border animate-in fade-in zoom-in-95 duration-200 ${verificationToneBadgeClasses[getVerificationResultTone(result.type)]}`}>
               {result.type}
             </div>
           </div>
 
           {result.mismatchedFields && result.mismatchedFields.length > 0 && (
             <div className="mb-4">
-              <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Issues detected:</h4>
-              <ul className="list-disc list-inside text-gray-600 dark:text-gray-400">
+              <h4 className="font-medium text-foreground mb-2">Issues detected:</h4>
+              <ul className="list-disc list-inside text-muted-foreground">
                 {result.mismatchedFields.map((field: string, index: number) => (
                   <li key={index}>{field}</li>
                 ))}

@@ -1952,7 +1952,6 @@ export default function AdminPortal() {
                         Cancel
                       </AlertDialogCancel>
                       <AlertDialogAction
-                        className={pendingPlanChange?.newPlan === 'pro' ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : pendingPlanChange?.newPlan === 'starter' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-gray-600 hover:bg-gray-700 text-white'}
                         disabled={sponsorMonitorPlanMutation.isPending}
                         onClick={() => {
                           if (!pendingPlanChange) return;
@@ -2169,7 +2168,6 @@ export default function AdminPortal() {
                         });
                       }}
                       disabled={updateSubmissionMutation.isPending}
-                      className="bg-green-600 hover:bg-green-700"
                     >
                       <Save className="w-4 h-4 mr-2" />
                       Complete Review
@@ -2177,7 +2175,6 @@ export default function AdminPortal() {
                     <Button
                       onClick={() => sendReportMutation.mutate(selectedSubmission.id)}
                       disabled={sendReportMutation.isPending || selectedSubmission.reviewStatus !== 'completed'}
-                      className="bg-blue-600 hover:bg-blue-700"
                     >
                       <Download className="w-4 h-4 mr-2" />
                       {sendReportMutation.isPending ? 'Sending...' : 'Send Report to User'}
