@@ -261,7 +261,7 @@ export default function COSDashboard() {
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Want instant access? Upgrade your plan:</p>
             <Link
               href="/cos-pricing"
-              className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all"
+              className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 min-h-[44px] bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-[box-shadow] duration-200 hover:shadow-lg"
             >
               View COS Check Plans →
             </Link>
@@ -309,16 +309,16 @@ export default function COSDashboard() {
         {/* 3D Geometric Shapes */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-4 left-1/4 w-8 h-8 border-2 border-white/20 rotate-45 animate-spin" style={{ animationDuration: '8s' }} />
-          <div className="absolute bottom-4 right-1/3 w-6 h-6 bg-white dark:bg-gray-800/10 rounded-full animate-bounce" style={{ animationDelay: '2s' }} />
-          <div className="absolute top-1/2 right-1/4 w-10 h-10 border border-white/15 rounded-full animate-ping" style={{ animationDelay: '1s' }} />
+          <div className="absolute bottom-4 right-1/3 w-6 h-6 bg-white dark:bg-gray-800/10 rounded-full" aria-hidden="true" />
+          <div className="absolute top-1/2 right-1/4 w-10 h-10 border border-white/15 rounded-full" aria-hidden="true" />
         </div>
 
-        <div className="relative max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="relative container-wide">
           <div className="flex justify-between items-center h-16 sm:h-20">
             <div className="flex items-center space-x-2 sm:space-x-4 group">
               <div className="relative">
-                <div className="absolute inset-0 bg-white dark:bg-gray-800/20 rounded-full blur-xl group-hover:blur-2xl transition-all duration-500" />
-                <div className="relative w-12 h-12 bg-gradient-to-br from-white to-blue-100 rounded-full flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-all duration-300">
+                <div className="absolute inset-0 bg-white dark:bg-gray-800/20 rounded-full blur-xl" aria-hidden="true" />
+                <div className="relative w-12 h-12 bg-gradient-to-br from-white to-blue-100 rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-200">
                   <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                   </svg>
@@ -338,7 +338,7 @@ export default function COSDashboard() {
 
               <button 
                 onClick={() => setShowFreeCheck(true)}
-                className="group relative inline-flex items-center px-3 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg sm:rounded-xl text-white font-semibold shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 hover:scale-105 touch-manipulation"
+                className="group relative inline-flex items-center px-3 sm:px-6 py-2 sm:py-3 min-h-[44px] bg-gradient-to-r from-green-700 to-emerald-700 rounded-lg text-white font-semibold shadow-lg hover:shadow-2xl transition-[box-shadow,transform] duration-200 hover:-translate-y-1 hover:scale-105 touch-manipulation"
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-green-400 to-emerald-500 rounded-lg sm:rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                 <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2 relative z-10 transform group-hover:rotate-12 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -400,30 +400,30 @@ export default function COSDashboard() {
           <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
             <button 
               onClick={() => setShowFreeCheck(true)}
-              className="group relative inline-block px-10 py-5 bg-gradient-to-r from-green-500 via-emerald-600 to-green-600 text-white rounded-full font-bold text-xl transition-all duration-500 hover:shadow-2xl hover:shadow-green-500/50 transform hover:-translate-y-2 hover:scale-110"
+              className="group relative inline-block px-10 py-5 min-h-[44px] bg-gradient-to-r from-green-700 via-emerald-700 to-green-700 text-white rounded-full font-bold text-xl transition-[box-shadow,transform] duration-200 hover:shadow-2xl hover:shadow-green-500/50 hover:-translate-y-2 hover:scale-110"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-pulse" />
+              <div className="absolute inset-0 bg-gradient-to-r from-green-600 to-emerald-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200" aria-hidden="true" />
               <span className="relative z-10 flex items-center">
                 <svg className="w-6 h-6 mr-3 transform group-hover:rotate-12 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 Verify UK CoS Now
               </span>
-              <div className="absolute inset-0 rounded-full bg-white dark:bg-gray-800/20 scale-0 group-hover:scale-100 transition-transform duration-700" />
+              <div className="absolute inset-0 rounded-full bg-white/20 scale-0 group-hover:scale-100 transition-transform duration-300" aria-hidden="true" />
             </button>
 
-            <button 
+            <button
               onClick={startDemo}
-              className="group relative inline-block px-10 py-5 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white rounded-full font-bold text-xl transition-all duration-500 hover:shadow-2xl hover:shadow-purple-500/50 transform hover:-translate-y-2 hover:scale-110"
+              className="group relative inline-block px-10 py-5 min-h-[44px] bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white rounded-full font-bold text-xl transition-[box-shadow,transform] duration-200 hover:shadow-2xl hover:shadow-purple-500/50 hover:-translate-y-2 hover:scale-110"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-pulse" />
+              <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200" aria-hidden="true" />
               <span className="relative z-10 flex items-center">
                 <svg className="w-6 h-6 mr-3 transform group-hover:rotate-12 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 Watch Demo
               </span>
-              <div className="absolute inset-0 rounded-full bg-white dark:bg-gray-800/20 scale-0 group-hover:scale-100 transition-transform duration-700" />
+              <div className="absolute inset-0 rounded-full bg-white/20 scale-0 group-hover:scale-100 transition-transform duration-300" aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -431,12 +431,12 @@ export default function COSDashboard() {
 
       {/* Verification Highlight */}
       <section className="py-20 bg-white dark:bg-gray-800">
-        <div className="container mx-auto px-5 text-center">
+        <div className="container-content text-center">
           <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-12">How Document Verification Works</h2>
           
           <div className="flex flex-wrap justify-center gap-8">
-            <div className="w-[300px] bg-white dark:bg-gray-800 rounded-2xl overflow-hidden shadow-lg transition-all duration-300 hover:transform hover:-translate-y-3 hover:shadow-xl">
-              <div className="bg-green-500 text-white text-center py-8">
+            <div className="w-[300px] max-w-full bg-white dark:bg-gray-800 rounded-2xl overflow-hidden shadow-lg transition-[transform,box-shadow] duration-200 hover:-translate-y-3 hover:shadow-xl">
+              <div className="bg-green-700 text-white text-center py-8">
                 <div className="text-5xl mb-5">
                   <svg className="w-12 h-12 mx-auto" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -448,25 +448,25 @@ export default function COSDashboard() {
                 <p className="text-gray-600 dark:text-gray-300 mb-5">Document matches verified templates with no alterations detected.</p>
                 <ul className="space-y-2">
                   <li className="flex items-center gap-3">
-                    <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                     <span className="text-gray-700 dark:text-gray-200">Metadata matches genuine pattern</span>
                   </li>
                   <li className="flex items-center gap-3">
-                    <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                     <span className="text-gray-700 dark:text-gray-200">No tampering detected</span>
                   </li>
                   <li className="flex items-center gap-3">
-                    <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                     <span className="text-gray-700 dark:text-gray-200">Digital signature valid</span>
                   </li>
                   <li className="flex items-center gap-3">
-                    <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                     <span className="text-gray-700 dark:text-gray-200">Creation date consistent</span>
@@ -475,8 +475,8 @@ export default function COSDashboard() {
               </div>
             </div>
             
-            <div className="w-[300px] bg-white dark:bg-gray-800 rounded-2xl overflow-hidden shadow-lg transition-all duration-300 hover:transform hover:-translate-y-3 hover:shadow-xl">
-              <div className="bg-yellow-500 text-white text-center py-8">
+            <div className="w-[300px] max-w-full bg-white dark:bg-gray-800 rounded-2xl overflow-hidden shadow-lg transition-[transform,box-shadow] duration-200 hover:-translate-y-3 hover:shadow-xl">
+              <div className="bg-amber-700 text-white text-center py-8">
                 <div className="text-5xl mb-5">
                   <svg className="w-12 h-12 mx-auto" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
@@ -488,25 +488,25 @@ export default function COSDashboard() {
                 <p className="text-gray-600 dark:text-gray-300 mb-5">Document shows signs of alteration after original creation.</p>
                 <ul className="space-y-2">
                   <li className="flex items-center gap-3">
-                    <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                     <span className="text-gray-700 dark:text-gray-200">Metadata inconsistencies</span>
                   </li>
                   <li className="flex items-center gap-3">
-                    <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                     <span className="text-gray-700 dark:text-gray-200">Modification dates detected</span>
                   </li>
                   <li className="flex items-center gap-3">
-                    <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                     <span className="text-gray-700 dark:text-gray-200">Content alterations found</span>
                   </li>
                   <li className="flex items-center gap-3">
-                    <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                     <span className="text-gray-700 dark:text-gray-200">Signature validation failed</span>
@@ -515,8 +515,8 @@ export default function COSDashboard() {
               </div>
             </div>
             
-            <div className="w-[300px] bg-white dark:bg-gray-800 rounded-2xl overflow-hidden shadow-lg transition-all duration-300 hover:transform hover:-translate-y-3 hover:shadow-xl">
-              <div className="bg-red-500 text-white text-center py-8">
+            <div className="w-[300px] max-w-full bg-white dark:bg-gray-800 rounded-2xl overflow-hidden shadow-lg transition-[transform,box-shadow] duration-200 hover:-translate-y-3 hover:shadow-xl">
+              <div className="bg-red-600 text-white text-center py-8">
                 <div className="text-5xl mb-5">
                   <svg className="w-12 h-12 mx-auto" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
@@ -528,25 +528,25 @@ export default function COSDashboard() {
                 <p className="text-gray-600 dark:text-gray-300 mb-5">Document is completely fabricated or doesn't match any genuine patterns.</p>
                 <ul className="space-y-2">
                   <li className="flex items-center gap-3">
-                    <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                     <span className="text-gray-700 dark:text-gray-200">No metadata match found</span>
                   </li>
                   <li className="flex items-center gap-3">
-                    <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                     <span className="text-gray-700 dark:text-gray-200">Fraudulent creation patterns</span>
                   </li>
                   <li className="flex items-center gap-3">
-                    <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                     <span className="text-gray-700 dark:text-gray-200">Invalid security features</span>
                   </li>
                   <li className="flex items-center gap-3">
-                    <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                     <span className="text-gray-700 dark:text-gray-200">Format violations detected</span>

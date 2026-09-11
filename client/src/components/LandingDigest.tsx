@@ -77,7 +77,7 @@ export default function LandingDigest() {
   if (isLoading) {
     return (
       <section className="py-12 sm:py-16">
-        <div className="max-w-4xl mx-auto px-4">
+      <div className="container-content">
           <div className="animate-pulse space-y-4">
             <div className="h-10 bg-muted rounded w-1/3 mx-auto" />
             <div className="h-6 bg-muted rounded w-2/3 mx-auto" />
@@ -127,12 +127,12 @@ export default function LandingDigest() {
               Live Data
             </span>
             {formattedDate && (
-              <p className="text-[10px] text-muted-foreground">Updated {formattedDate}</p>
+              <p className="text-xs text-muted-foreground">Updated {formattedDate}</p>
             )}
           </div>
 
           <div className="text-center mb-4">
-            <p className="text-xs uppercase tracking-widest text-muted-foreground mb-4">
+            <p className="editorial-caption text-muted-foreground mb-4">
               {formattedDate}
             </p>
 

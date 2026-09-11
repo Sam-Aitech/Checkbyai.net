@@ -267,7 +267,7 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
                 onClick={() => {
                   setViewMode(viewMode === 'simplified' ? 'technical' : 'simplified');
                 }}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 ${
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-[color,background-color] duration-200 ${
                   viewMode === 'simplified' 
                     ? 'bg-blue-600 text-white' 
                     : 'bg-gray-600 text-gray-300'
@@ -285,7 +285,7 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
                 onChange={(e) => {
                   setSelectedScenario(e.target.value as 'genuine' | 'edited' | 'fake');
                 }}
-                className="bg-gray-700 text-white rounded-md px-3 py-2 text-sm"
+                className="bg-gray-700 text-white rounded-lg px-3 py-2 text-sm min-h-[44px]"
               >
                 <option value="genuine">Genuine Document</option>
                 <option value="edited">Edited Document</option>
@@ -323,13 +323,13 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
             {['Upload', 'Extract', 'Analyze', 'Verify', 'Report'].map((stage, index) => (
               <div 
                 key={stage} 
-                className={`flex items-center space-x-3 transition-all duration-500 cursor-pointer ${
+                className={`flex items-center space-x-3 transition-opacity duration-300 cursor-pointer ${
                   demoStep > index ? 'opacity-100' : 'opacity-30'
                 }`}
                 onMouseEnter={() => setShowTooltip(`${stage}: ${getStageDescription(stage)}`)}
                 onMouseLeave={() => setShowTooltip(null)}
               >
-                <div className={`w-4 h-4 rounded-full transition-all duration-300 ${
+                <div className={`w-4 h-4 rounded-full transition-[background-color,box-shadow] duration-300 ${
                   demoStep > index ? 'bg-green-500 animate-pulse shadow-lg shadow-green-500/50' : 'bg-gray-500'
                 }`} />
                 <span className="text-white text-sm font-medium">{stage}</span>
@@ -362,7 +362,7 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
           {demoStep >= 4 && (
             <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 text-center">
               <div 
-                className="inline-block px-8 py-4 rounded-full text-white font-bold text-xl shadow-2xl transition-all duration-1000 transform animate-pulse"
+                className="inline-block px-8 py-4 rounded-full text-white font-bold text-xl shadow-2xl transition-[background-color,box-shadow] duration-300 animate-pulse"
                 style={{ 
                   backgroundColor: scenarioResults[selectedScenario].color,
                   boxShadow: `0 0 30px ${scenarioResults[selectedScenario].color}50`
@@ -373,7 +373,7 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
               
               <div className="mt-4 bg-gray-700 rounded-full h-4 w-64 mx-auto overflow-hidden">
                 <div 
-                  className="h-full rounded-full transition-all duration-2000 ease-out"
+                  className="h-full rounded-full transition-[width] duration-2000 ease-out"
                   style={{ 
                     width: `${scenarioResults[selectedScenario].confidence}%`,
                     backgroundColor: scenarioResults[selectedScenario].color
@@ -400,13 +400,13 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
           <div className="flex justify-center items-center space-x-4">
             {['Input', 'Processing', 'Analysis', 'Output'].map((phase, index) => (
               <div key={phase} className="flex items-center">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-500 ${
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-[background-color] duration-300 ${
                   demoStep > index ? 'bg-blue-600 animate-pulse' : 'bg-gray-600'
                 }`}>
                   <span className="text-white text-xs font-bold">{index + 1}</span>
                 </div>
                 {index < 3 && (
-                  <div className={`w-16 h-1 mx-2 transition-all duration-500 ${
+                  <div className={`w-16 h-1 mx-2 transition-[background-color] duration-300 ${
                     demoStep > index ? 'bg-blue-400 animate-pulse' : 'bg-gray-600'
                   }`} />
                 )}
@@ -423,7 +423,7 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
                 startAnimation();
               }}
               disabled={isAnimating}
-              className="px-8 py-4 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-full text-white font-bold text-lg hover:shadow-xl hover:shadow-blue-500/50 transition-all duration-300 transform hover:-translate-y-1 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-8 py-4 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-full text-white font-bold text-lg hover:shadow-xl hover:shadow-blue-500/50 transition-[box-shadow,transform] duration-200 hover:-translate-y-1 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isAnimating ? 'Animation Running...' : 'Start Interactive Demo'}
             </button>
@@ -433,7 +433,7 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
                 onClose();
                 onTryFreeCheck();
               }}
-              className="px-8 py-4 bg-gradient-to-r from-green-600 to-emerald-600 rounded-full text-white font-bold text-lg hover:shadow-xl hover:shadow-green-500/50 transition-all duration-300 transform hover:-translate-y-1"
+              className="px-8 py-4 bg-gradient-to-r from-green-600 to-emerald-600 rounded-full text-white font-bold text-lg hover:shadow-xl hover:shadow-green-500/50 transition-[box-shadow,transform] duration-200 hover:-translate-y-1"
             >
               Try Free Verification
             </button>

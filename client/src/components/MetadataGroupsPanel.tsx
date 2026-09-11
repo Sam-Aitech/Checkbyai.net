@@ -219,7 +219,7 @@ function buildGroups(meta: DocumentMetadata): MetadataGroup[] {
 
 function ReadOnlyBadge() {
   return (
-    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-medium bg-amber-50 text-amber-600 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-700/40 whitespace-nowrap flex-shrink-0">
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-700/40 whitespace-nowrap flex-shrink-0">
       <Lock className="w-3 h-3" />
       Read-only
     </span>
@@ -232,13 +232,13 @@ function FieldTypeIcon({ type }: { type: MetadataField['type'] }) {
   }
   if (type === 'number' || type === 'bytes') {
     return (
-      <span className="text-[11px] font-bold text-gray-400 dark:text-gray-500 flex-shrink-0 select-none leading-none">
+      <span className="text-xs font-bold text-gray-500 flex-shrink-0 select-none leading-none" aria-hidden="true">
         #
       </span>
     );
   }
   return (
-    <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 flex-shrink-0 tracking-wider select-none leading-none">
+    <span className="text-xs font-bold text-gray-500 flex-shrink-0 tracking-wider select-none leading-none" aria-hidden="true">
       ABC
     </span>
   );
@@ -250,17 +250,17 @@ function AnnotationIndicator({ annotation }: { annotation: FieldAnnotation }) {
   const colors = {
     critical: {
       dot: 'bg-red-500',
-      icon: <XCircle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />,
+      icon: <XCircle className="w-3.5 h-3.5 text-red-600 dark:text-red-400 flex-shrink-0" aria-hidden="true" />,
       banner: 'bg-red-50 border-red-200 text-red-700 dark:bg-red-900/20 dark:border-red-700/40 dark:text-red-400',
     },
     warning: {
       dot: 'bg-amber-500',
-      icon: <AlertTriangle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />,
+      icon: <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 flex-shrink-0" aria-hidden="true" />,
       banner: 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/20 dark:border-amber-700/40 dark:text-amber-400',
     },
     info: {
       dot: 'bg-blue-400',
-      icon: <Info className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />,
+      icon: <Info className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 flex-shrink-0" aria-hidden="true" />,
       banner: 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-700/40 dark:text-blue-400',
     },
   }[annotation.severity];
@@ -395,12 +395,12 @@ function MetadataGroupSection({
             open ? 'rotate-0' : '-rotate-90'
           }`}
         />
-        <span className="text-[17px] font-bold text-gray-900 dark:text-gray-100 flex-1 leading-tight">
+        <span className="text-lg font-bold text-gray-900 dark:text-gray-100 flex-1 leading-tight">
           {group.label}
         </span>
         {/* Flag indicator on collapsed groups */}
         {groupHasFlags && !open && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-400">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-400">
             <XCircle className="w-3 h-3" />
             Flagged
           </span>
@@ -451,7 +451,7 @@ export default function MetadataGroupsPanel({ metadata, aiAnnotations }: Metadat
 
   if (groups.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-400 dark:text-gray-600 text-sm">
+        <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
         No metadata available for this document.
       </div>
     );
@@ -471,17 +471,17 @@ export default function MetadataGroupsPanel({ metadata, aiAnnotations }: Metadat
         </h4>
         <div className="ml-auto flex items-center gap-2">
           {legacy && (
-            <span className="text-[11px] px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 border border-gray-200 dark:border-gray-700">
+            <span className="text-xs px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700">
               Legacy record — limited fields
             </span>
           )}
           {flagCount > 0 && (
-            <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-400 border border-red-200 dark:border-red-700/40 font-semibold">
+            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-400 border border-red-200 dark:border-red-700/40 font-semibold">
               <XCircle className="w-3 h-3" />
               {flagCount} AI flag{flagCount !== 1 ? 's' : ''}
             </span>
           )}
-          <span className="text-xs text-gray-400 dark:text-gray-600">
+          <span className="text-xs text-gray-500 dark:text-gray-400">
             {groups.length} group{groups.length !== 1 ? 's' : ''}
           </span>
         </div>

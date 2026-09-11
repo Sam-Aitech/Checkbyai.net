@@ -45,9 +45,9 @@ const T = {
   text:    "var(--foreground)",
   muted:   "var(--muted-foreground)",
   violet:  "var(--primary)",
-  emerald: "#10B981",
-  amber:   "#F59E0B",
-  red:     "#EF4444",
+  emerald: "var(--status-success)",
+  amber:   "var(--status-warning)",
+  red:     "var(--status-danger)",
 } as const;
 
 const card: CSSProperties = {
@@ -105,13 +105,14 @@ function fmtDate(s: string | null | undefined): string {
   return new Date(s).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
 
-function licenceStatusStyle(status: string): CSSProperties {
+/** Theme-aware status pill classes (AA in both themes). */
+function licenceStatusClass(status: string): string {
   const s = status.toLowerCase();
-  if (s === "active")     return { background: "rgba(16,185,129,0.12)",  color: "#6EE7B7",  border: "1px solid rgba(16,185,129,0.25)"  };
-  if (s === "revoked")    return { background: "rgba(239,68,68,0.12)",   color: "#FCA5A5",  border: "1px solid rgba(239,68,68,0.25)"   };
-  if (s === "suspended")  return { background: "rgba(245,158,11,0.12)",  color: "#FCD34D",  border: "1px solid rgba(245,158,11,0.25)"  };
-  if (s === "surrendered")return { background: "rgba(249,115,22,0.12)",  color: "#FDBA74",  border: "1px solid rgba(249,115,22,0.25)"  };
-  return                         { background: "rgba(100,116,139,0.12)", color: "#94A3B8",  border: "1px solid rgba(100,116,139,0.25)" };
+  if (s === "active")      return "st-soft st-soft-success";
+  if (s === "revoked")     return "st-soft st-soft-danger";
+  if (s === "suspended")   return "st-soft st-soft-warning";
+  if (s === "surrendered") return "st-soft st-soft-warning";
+  return                          "st-soft st-soft-neutral";
 }
 
 function companyStatusColor(status: string | null): string {
@@ -173,9 +174,9 @@ function CompanyHealthPanel({ fingerprint }: { fingerprint: string }) {
 
   if (error) {
     return (
-      <div style={{ ...card, padding: 32, textAlign: "center" }}>
-        <AlertTriangle style={{ width: 24, height: 24, color: T.amber, margin: "0 auto 8px" }} />
-        <p style={{ color: T.muted, fontSize: 13 }}>Failed to load company health data.</p>
+      <div className="dash-card p-8 text-center">
+        <AlertTriangle style={{ width: 24, height: 24, color: "var(--status-warning)", margin: "0 auto 8px" }} aria-hidden="true" />
+        <p className="dash-body">Failed to load company health data.</p>
       </div>
     );
   }
@@ -183,10 +184,10 @@ function CompanyHealthPanel({ fingerprint }: { fingerprint: string }) {
   // Enrichment in flight
   if (data?.status === "not_enriched" || enrichM.isPending) {
     return (
-      <div style={{ ...card, padding: 40, textAlign: "center" }}>
-        <Loader2 style={{ width: 28, height: 28, color: T.violet, margin: "0 auto 12px" }} className="animate-spin" />
-        <p style={{ fontSize: 14, fontWeight: 700, color: T.text, marginBottom: 4 }}>Analysing Company…</p>
-        <p style={{ fontSize: 13, color: T.muted }}>
+      <div className="dash-card p-10 text-center" role="status">
+        <Loader2 style={{ width: 28, height: 28, color: "var(--primary)", margin: "0 auto 12px" }} className="animate-spin" aria-hidden="true" />
+        <p className="text-sm font-bold text-foreground mb-1">Analysing Company…</p>
+        <p className="dash-body">
           Fetching Companies House data. Results appear after the next hourly batch (at :15 past the hour).
         </p>
       </div>
@@ -198,13 +199,13 @@ function CompanyHealthPanel({ fingerprint }: { fingerprint: string }) {
   // No record and enrichment isn't pending — offer manual trigger
   if (!e) {
     return (
-      <div style={{ ...card, padding: 32, textAlign: "center" }}>
-        <Info style={{ width: 24, height: 24, color: T.muted, margin: "0 auto 8px" }} />
-        <p style={{ color: T.muted, fontSize: 13, marginBottom: 12 }}>No company data available yet.</p>
+      <div className="dash-card p-8 text-center">
+        <Info style={{ width: 24, height: 24, color: "var(--muted-foreground)", margin: "0 auto 8px" }} aria-hidden="true" />
+        <p className="dash-body mb-3">No company data available yet.</p>
         <button
           onClick={() => enrichM.mutate()}
           disabled={enrichM.isPending}
-          style={{ background: "var(--primary)", color: "var(--primary-foreground)", border: "none", borderRadius: 8, padding: "7px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+          className="dash-btn-primary" style={{ padding: "7px 16px", fontSize: 13 }}
         >
           {enrichM.isPending ? "Requesting…" : "Request Analysis"}
         </button>
@@ -217,12 +218,12 @@ function CompanyHealthPanel({ fingerprint }: { fingerprint: string }) {
   const score           = e.fuzzyMatchScore ? parseFloat(e.fuzzyMatchScore) : null;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+    <div className="flex flex-col gap-3">
       {/* Stale data warning */}
       {data.stale && (
-        <div style={{ background: "rgba(245,158,11,0.10)", border: "1px solid rgba(245,158,11,0.25)", borderRadius: 10, padding: "8px 14px", display: "flex", alignItems: "center", gap: 8 }}>
-          <AlertTriangle style={{ width: 13, height: 13, color: T.amber, flexShrink: 0 }} />
-          <span style={{ fontSize: 12, color: T.amber }}>
+        <div className="flex items-center gap-2 rounded-lg border px-3.5 py-2" style={{ background: "var(--status-warning-bg)", borderColor: "color-mix(in srgb, var(--status-warning) 25%, transparent)" }}>
+          <AlertTriangle style={{ width: 13, height: 13, color: "var(--status-warning)", flexShrink: 0 }} aria-hidden="true" />
+          <span className="dash-meta" style={{ color: "var(--status-warning)" }}>
             Data is over 7 days old — re-enrichment runs automatically on the next hourly batch.
           </span>
         </div>
@@ -231,9 +232,9 @@ function CompanyHealthPanel({ fingerprint }: { fingerprint: string }) {
       {/* Primary 2-col grid */}
       <div className="grid grid-cols-2 gap-3">
         {/* Company Status */}
-        <div style={{ ...card, padding: "12px 14px" }}>
-          <p style={{ fontSize: 10, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 700, marginBottom: 4 }}>Company Status</p>
-          <p style={{ fontSize: 15, fontWeight: 700, color: companyStatusColor(e.companyStatus) }}>
+        <div className="dash-card px-3.5 py-3">
+          <p className="dash-label mb-1">Company Status</p>
+          <p className="text-base font-bold" style={{ color: companyStatusColor(e.companyStatus) }}>
             {e.companyStatus
               ? e.companyStatus.charAt(0).toUpperCase() + e.companyStatus.slice(1)
               : "Unknown"}
@@ -241,22 +242,22 @@ function CompanyHealthPanel({ fingerprint }: { fingerprint: string }) {
         </div>
 
         {/* Match Confidence */}
-        <div style={{ ...card, padding: "12px 14px" }}>
-          <p style={{ fontSize: 10, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 700, marginBottom: 4 }}>CH Match Confidence</p>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <p style={{ fontSize: 15, fontWeight: 700, color: fuzzyScoreColor(e.fuzzyMatchScore) }}>
+        <div className="dash-card px-3.5 py-3">
+          <p className="dash-label mb-1">CH Match Confidence</p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-base font-bold" style={{ color: fuzzyScoreColor(e.fuzzyMatchScore) }}>
               {score !== null ? `${Math.round(score * 100)}%` : "—"}
             </p>
             {e.companiesHouseSource && (
-              <span style={{ fontSize: 10, color: T.emerald, fontWeight: 600 }}>Official API</span>
+              <span className="dash-label" style={{ color: "var(--status-success)" }}>Official API</span>
             )}
           </div>
         </div>
 
         {/* Company Type */}
-        <div style={{ ...card, padding: "12px 14px" }}>
-          <p style={{ fontSize: 10, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 700, marginBottom: 4 }}>Company Type</p>
-          <p style={{ fontSize: 13, fontWeight: 600, color: T.text }}>
+        <div className="dash-card px-3.5 py-3">
+          <p className="dash-label mb-1">Company Type</p>
+          <p className="text-sm font-semibold text-foreground">
             {e.companyType
               ? e.companyType.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
               : "—"}
@@ -264,9 +265,9 @@ function CompanyHealthPanel({ fingerprint }: { fingerprint: string }) {
         </div>
 
         {/* Incorporation Date */}
-        <div style={{ ...card, padding: "12px 14px" }}>
-          <p style={{ fontSize: 10, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 700, marginBottom: 4 }}>Incorporated</p>
-          <p style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{fmtDate(e.incorporationDate)}</p>
+        <div className="dash-card px-3.5 py-3">
+          <p className="dash-label mb-1">Incorporated</p>
+          <p className="text-sm font-semibold text-foreground">{fmtDate(e.incorporationDate)}</p>
         </div>
       </div>
 
@@ -274,15 +275,15 @@ function CompanyHealthPanel({ fingerprint }: { fingerprint: string }) {
       {(e.lastFiledAccountsDate || e.nextConfStmtDueDate) && (
         <div className="grid grid-cols-2 gap-3">
           {e.lastFiledAccountsDate && (
-            <div style={{ ...card, padding: "12px 14px" }}>
-              <p style={{ fontSize: 10, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 700, marginBottom: 4 }}>Last Accounts Filed</p>
-              <p style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{fmtDate(e.lastFiledAccountsDate)}</p>
+            <div className="dash-card px-3.5 py-3">
+              <p className="dash-label mb-1">Last Accounts Filed</p>
+              <p className="text-sm font-semibold text-foreground">{fmtDate(e.lastFiledAccountsDate)}</p>
             </div>
           )}
           {e.nextConfStmtDueDate && (
-            <div style={{ ...card, padding: "12px 14px" }}>
-              <p style={{ fontSize: 10, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 700, marginBottom: 4 }}>Conf. Statement Due</p>
-              <p style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{fmtDate(e.nextConfStmtDueDate)}</p>
+            <div className="dash-card px-3.5 py-3">
+              <p className="dash-label mb-1">Conf. Statement Due</p>
+              <p className="text-sm font-semibold text-foreground">{fmtDate(e.nextConfStmtDueDate)}</p>
             </div>
           )}
         </div>
@@ -290,35 +291,35 @@ function CompanyHealthPanel({ fingerprint }: { fingerprint: string }) {
 
       {/* Registered Address */}
       {e.registeredAddress && (
-        <div style={{ ...card, padding: "12px 14px", display: "flex", gap: 10, alignItems: "flex-start" }}>
+        <div className="dash-card px-3.5 py-3 flex gap-2.5 items-start">
           <MapPin style={{ width: 14, height: 14, color: T.muted, flexShrink: 0, marginTop: 2 }} />
           <div>
-            <p style={{ fontSize: 10, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 700, marginBottom: 3 }}>Registered Address</p>
-            <p style={{ fontSize: 13, color: T.text }}>{e.registeredAddress}</p>
+            <p className="dash-label mb-1">Registered Address</p>
+            <p className="text-sm text-foreground">{e.registeredAddress}</p>
           </div>
         </div>
       )}
 
       {/* Nature of Business */}
       {e.natureOfBusiness && (
-        <div style={{ ...card, padding: "12px 14px", display: "flex", gap: 10, alignItems: "flex-start" }}>
+        <div className="dash-card px-3.5 py-3 flex gap-2.5 items-start">
           <Briefcase style={{ width: 14, height: 14, color: T.muted, flexShrink: 0, marginTop: 2 }} />
           <div>
-            <p style={{ fontSize: 10, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 700, marginBottom: 3 }}>Nature of Business</p>
-            <p style={{ fontSize: 13, color: T.text }}>{e.natureOfBusiness}</p>
+            <p className="dash-label mb-1">Nature of Business</p>
+            <p className="text-sm text-foreground">{e.natureOfBusiness}</p>
           </div>
         </div>
       )}
 
       {/* SIC Codes */}
       {sicCodes.length > 0 && (
-        <div style={{ ...card, padding: "12px 14px" }}>
-          <p style={{ fontSize: 10, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 700, marginBottom: 8 }}>SIC Codes</p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        <div className="dash-card px-3.5 py-3">
+          <p className="dash-label mb-2">SIC Codes</p>
+          <div className="flex flex-wrap gap-1.5">
             {sicCodes.map((code) => (
               <span
                 key={code}
-                style={{ background: "color-mix(in srgb, var(--primary) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--primary) 22%, transparent)", color: "var(--primary)", fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 99 }}
+                className="dash-chip" style={{ color: "var(--primary)", borderColor: "color-mix(in srgb, var(--primary) 22%, transparent)", background: "color-mix(in srgb, var(--primary) 8%, transparent)" }}
               >
                 {code}
               </span>
@@ -329,11 +330,11 @@ function CompanyHealthPanel({ fingerprint }: { fingerprint: string }) {
 
       {/* Historical Names */}
       {historicalNames.length > 0 && (
-        <div style={{ ...card, padding: "12px 14px" }}>
-          <p style={{ fontSize: 10, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 700, marginBottom: 8 }}>Previous Names</p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+        <div className="dash-card px-3.5 py-3">
+          <p className="dash-label mb-2">Previous Names</p>
+          <div className="flex flex-col gap-1">
             {historicalNames.map((name, i) => (
-              <p key={i} style={{ fontSize: 13, color: T.muted }}>{name}</p>
+              <p key={i} className="dash-meta">{name}</p>
             ))}
           </div>
         </div>
@@ -341,23 +342,23 @@ function CompanyHealthPanel({ fingerprint }: { fingerprint: string }) {
 
       {/* CH number + link */}
       {e.companyNumber && (
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Hash style={{ width: 12, height: 12, color: T.muted }} />
-          <span style={{ fontSize: 12, color: T.muted }}>Companies House: {e.companyNumber}</span>
+        <div className="flex items-center gap-2.5">
+          <Hash style={{ width: 12, height: 12, color: "var(--muted-foreground)" }} aria-hidden="true" />
+          <span className="dash-meta">Companies House: {e.companyNumber}</span>
           <a
             href={`https://find-and-update.company-information.service.gov.uk/company/${e.companyNumber}`}
             target="_blank"
             rel="noopener noreferrer"
-            style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 12, color: "var(--primary)", textDecoration: "none" }}
+            className="inline-flex items-center gap-1 text-xs text-primary no-underline hover:underline"
           >
-            View <ExternalLink style={{ width: 10, height: 10 }} />
+            View <ExternalLink style={{ width: 10, height: 10 }} aria-hidden="true" />
           </a>
         </div>
       )}
 
       {/* Data age footer */}
       {e.scrapedAt && (
-        <p style={{ fontSize: 11, color: T.muted }}>
+        <p className="dash-meta">
           Data fetched {fmtDate(e.scrapedAt)}
           {e.companiesHouseSource ? " · Companies House Official API" : " · Web scrape"}
         </p>
@@ -381,17 +382,17 @@ function LicenceTimelinePanel({ fingerprint }: { fingerprint: string }) {
 
   if (isLoading) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 rounded-xl" />)}
+      <div className="flex flex-col gap-2" role="status" aria-label="Loading licence timeline">
+        {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 rounded-lg" />)}
       </div>
     );
   }
 
   if (error) {
     return (
-      <div style={{ ...card, padding: 32, textAlign: "center" }}>
-        <AlertTriangle style={{ width: 24, height: 24, color: T.amber, margin: "0 auto 8px" }} />
-        <p style={{ color: T.muted, fontSize: 13 }}>Failed to load licence timeline.</p>
+      <div className="dash-card p-8 text-center" role="alert">
+        <AlertTriangle style={{ width: 24, height: 24, color: "var(--status-warning)", margin: "0 auto 8px" }} aria-hidden="true" />
+        <p className="dash-body">Failed to load licence timeline.</p>
       </div>
     );
   }
@@ -400,10 +401,10 @@ function LicenceTimelinePanel({ fingerprint }: { fingerprint: string }) {
 
   if (timeline.length === 0) {
     return (
-      <div style={{ ...card, padding: 40, textAlign: "center" }}>
-        <Clock style={{ width: 28, height: 28, color: T.muted, margin: "0 auto 12px" }} />
-        <p style={{ fontSize: 14, fontWeight: 700, color: T.text, marginBottom: 4 }}>No historical records yet</p>
-        <p style={{ fontSize: 13, color: T.muted }}>
+      <div className="dash-card p-10 text-center">
+        <Clock style={{ width: 28, height: 28, color: "var(--muted-foreground)", margin: "0 auto 12px" }} aria-hidden="true" />
+        <p className="text-sm font-bold text-foreground mb-1">No historical records yet</p>
+        <p className="dash-body">
           Timeline data appears after the next enrichment batch (daily at 02:00 UTC).
         </p>
       </div>
@@ -411,12 +412,17 @@ function LicenceTimelinePanel({ fingerprint }: { fingerprint: string }) {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      <p style={{ fontSize: 11, color: T.muted, marginBottom: 4 }}>
+    <div className="flex flex-col gap-1.5">
+      <p className="dash-meta mb-1">
         {timeline.length} historical record{timeline.length !== 1 ? "s" : ""}
       </p>
       {timeline.map((entry, idx) => {
-        const statusStyle = licenceStatusStyle(entry.licenceStatus);
+        const statusClass = licenceStatusClass(entry.licenceStatus);
+        const s = entry.licenceStatus.toLowerCase();
+        const accent = s === "active" ? "var(--status-success)"
+          : s === "revoked" ? "var(--status-danger)"
+          : (s === "suspended" || s === "surrendered") ? "var(--status-warning)"
+          : "var(--text-secondary)";
         const isStatusChange = idx === 0 || timeline[idx - 1].licenceStatus !== entry.licenceStatus;
         return (
           <motion.div
@@ -424,42 +430,22 @@ function LicenceTimelinePanel({ fingerprint }: { fingerprint: string }) {
             initial={{ opacity: 0, x: -8 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: Math.min(idx * 0.02, 0.3), type: "spring", stiffness: 120, damping: 16 }}
-            style={{
-              ...card,
-              padding: "9px 14px",
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              // Highlight rows where the status changed
-              ...(isStatusChange ? { boxShadow: `0 0 0 1px ${String(statusStyle.border ?? "").replace("1px solid ", "")}` } : {}),
-            }}
+            className="dash-card flex items-center gap-3 px-3.5 py-2"
+            style={isStatusChange ? { boxShadow: `0 0 0 1px ${accent}` } : undefined}
           >
             {/* Status pill */}
-            <span
-              style={{
-                ...statusStyle,
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: "0.06em",
-                padding: "2px 8px",
-                borderRadius: 99,
-                textTransform: "uppercase",
-                flexShrink: 0,
-                minWidth: 70,
-                textAlign: "center",
-              }}
-            >
+            <span className={`${statusClass} shrink-0 min-w-[70px] justify-center`}>
               {entry.licenceStatus}
             </span>
 
             {/* Route / typeRating / name */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {entry.route    && <span style={{ fontSize: 12, color: T.muted }}>{entry.route}</span>}
-                {entry.typeRating && <span style={{ fontSize: 12, color: T.muted }}>· {entry.typeRating}</span>}
+            <div className="flex-1 min-w-0">
+              <div className="flex gap-1.5 flex-wrap">
+                {entry.route    && <span className="dash-meta">{entry.route}</span>}
+                {entry.typeRating && <span className="dash-meta">· {entry.typeRating}</span>}
               </div>
               {entry.organisationName && (
-                <p style={{ fontSize: 11, color: T.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <p className="dash-meta truncate">
                   {entry.organisationName}
                 </p>
               )}
@@ -498,14 +484,14 @@ export function CompanyIntelligenceDialog({
   const tabBtnStyle = (active: boolean): CSSProperties => ({
     flex: 1,
     padding: "7px 14px",
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: 600,
     borderRadius: 8,
     border: "none",
     cursor: "pointer",
     background: active ? "var(--primary)" : "transparent",
-    color:      active ? "var(--primary-foreground)" : T.muted,
-    transition: "background 0.15s, color 0.15s",
+    color:      active ? "var(--primary-foreground)" : "var(--muted-foreground)",
+    transition: "background-color 150ms cubic-bezier(0.16,1,0.3,1), color 150ms cubic-bezier(0.16,1,0.3,1)",
   });
 
   return (
@@ -513,23 +499,21 @@ export function CompanyIntelligenceDialog({
       <DialogContent className="max-w-[560px] max-h-[85vh] flex flex-col overflow-hidden p-0">
         {/* ── Header ── */}
         <DialogHeader className="px-5 pt-5 pb-0 flex-shrink-0">
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-            <div style={{ background: "linear-gradient(135deg, var(--primary), #06B6D4)", borderRadius: 8, padding: 7, flexShrink: 0 }}>
+          <div className="flex items-center gap-2.5 mb-1">
+            <div style={{ background: "linear-gradient(135deg, var(--primary), var(--status-info))", borderRadius: 8, padding: 7, flexShrink: 0 }} aria-hidden="true">
               <Building2 style={{ width: 14, height: 14, color: "white" }} />
             </div>
-            <div style={{ minWidth: 0 }}>
-              <DialogTitle
-                style={{ fontSize: 15, fontWeight: 800, color: T.text, lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-              >
+            <div className="min-w-0">
+              <DialogTitle className="truncate text-base font-extrabold leading-tight">
                 {companyName}
               </DialogTitle>
-              <p style={{ fontSize: 12, color: T.muted }}>Company Intelligence</p>
+              <p className="dash-meta">Company Intelligence</p>
             </div>
           </div>
 
           {/* Tab switcher */}
           <div
-            style={{ display: "flex", gap: 4, background: "var(--secondary)", borderRadius: 10, padding: 3, marginTop: 10, marginBottom: 4 }}
+            className="flex gap-1 rounded-lg bg-secondary p-1 mt-2.5 mb-1"
           >
             <button style={tabBtnStyle(tab === "health")}   onClick={() => setTab("health")}>Company Health</button>
             <button style={tabBtnStyle(tab === "timeline")} onClick={() => setTab("timeline")}>Licence Timeline</button>
@@ -537,7 +521,7 @@ export function CompanyIntelligenceDialog({
         </DialogHeader>
 
         {/* ── Scrollable panel content ── */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "14px 20px 20px" }}>
+        <div className="flex-1 overflow-y-auto px-5 pt-3.5 pb-5">
           {fingerprint && (
             <AnimatePresence mode="wait">
               <motion.div

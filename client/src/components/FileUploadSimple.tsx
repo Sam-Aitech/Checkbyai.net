@@ -353,7 +353,7 @@ export default function FileUploadSimple({
       )}
 
       <div 
-        className={`border-2 border-dashed rounded-lg p-6 sm:p-8 text-center transition-all duration-200 min-h-[160px] sm:min-h-[200px] flex flex-col justify-center ${
+        className={`border-2 border-dashed rounded-lg p-6 sm:p-8 text-center transition-[border-color,background-color,transform] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] min-h-[160px] sm:min-h-[200px] flex flex-col justify-center ${
           isDragging 
             ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20 scale-[1.02]' 
             : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 active:scale-[0.98]'
@@ -430,12 +430,12 @@ export default function FileUploadSimple({
           <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Verification Result</h3>
           
           <div className="flex items-center gap-3 mb-4">
-            <div className={`px-4 py-2 rounded-full text-base font-semibold transition-all duration-700 ease-in-out transform hover:scale-105 ${
-              result.type === 'genuine' 
-                ? 'bg-gradient-to-r from-green-400 to-emerald-500 text-white shadow-lg shadow-green-500/25 animate-pulse'
+            <div role="status" className={`px-4 py-2 rounded-full text-base font-semibold ${
+              result.type === 'genuine'
+                ? 'bg-gradient-to-r from-green-700 to-emerald-700 text-white shadow-lg shadow-green-500/25 animate-pulse'
                 : result.type === 'suspicious'
-                ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white shadow-lg shadow-yellow-500/25 animate-bounce'
-                : 'bg-gradient-to-r from-red-400 to-rose-500 text-white shadow-lg shadow-red-500/25 animate-pulse'
+                ? 'bg-gradient-to-r from-amber-700 to-amber-800 text-white shadow-lg shadow-amber-500/25 animate-pulse'
+                : 'bg-gradient-to-r from-red-600 to-rose-700 text-white shadow-lg shadow-red-500/25 animate-pulse'
             }`}>
               {result.type}
             </div>

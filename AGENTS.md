@@ -128,6 +128,21 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 - Motion: `FeatureCard` stagger capped `min(index*0.06,0.18)`; `theme-card`/`icon-tile`/`otp-box` transitions use `cubic-bezier(0.16,1,0.3,1)` scoped properties (never `all`/`ease`); `icon-tile` gains `:focus-visible` parity; `float` reduced to `translateY(-6px)` `6s` (was `-20px` + `180deg` spin); OTP `2px/10px` → `1px/8px` + two-ring focus; mobile 44px media-query hack narrowed to non-button elements.
 - Verify: `eslint` clean on all 10 touched files. Full `npm run lint` has 732 pre-existing backend errors (untouched). `tsc` fails pre-existing missing `@react-three/fiber`/`vite/client` types. `vitest` unrunnable (no `node_modules` in worktree).
 
+#### Phase 7 — Full Frontend Visual-System Remediation (audit of 82089bb)
+
+**Scope:** Re-audited 82089bb (30 findings: 12 fixed, 14 open, 2 regressed, 2 N/A); implemented complete system below. Verified with headless Chromium (390/1280px, no overflow), computed WCAG ratios, `lint` 0 errors, `tsc` clean, 475 tests pass, `vite build` OK.
+
+- Tokens (`index.css`): surfaces, text, borders, status (+bg) light/dark, hero fg/secondary/tertiary/placeholder, radii (control 8/card 12/panel 16/hero 24/pill), motion (120/180/260ms + `[0.16,1,0.3,1]`), containers (75/60/45rem + `px-6 md:px-8`), type roles, `.st-soft-*` badges, `.hero-*` utilities, `.dash-*` dashboard primitives, icon gradient vars. Deleted dead: `pulse-glow`, `shimmer`, `urgency-dot`, `glass-card`.
+- Contrast (measured): hero tokens 5.8–17:1 vs gradient; muted 5.12:1; emerald/red/blue-600+ and amber-700 white-text ≥4.8:1; placeholders solid (muted/hero-tertiary). Footer overlay deepened (`to-black/50`) + hero tokens.
+- Hero: H1 → `type-display` (no leading override); search gets `focus-visible:ring-white`, `aria-label`, `role=status` loaders; switch `scale-90` removed, 44px label, visible ring; chips → AA shades + `text-xs`; trust tiles static (no fake hover); AnimatedBackground shapes deleted, 12 particles, static doc shadow.
+- Components: `theme-card` static / `theme-card-interactive` (NavigationLinks); buttons semantic (default+lg pill, base control, sm compact); CardTitle `leading-tight`; inputs/select/textarea control radius + solid placeholders; OTP slots scoped + 8px; progress width-only; tabs trigger nested-radius 4px; toast transform+opacity; accordion/content scoped; sidebar rail scoped; chart dots pill.
+- Badges: solid `-700/-600` whites + `st-soft-*` tinted (Pro/Intel/Admin); `unknown` neutral never resembles `active`; icons + text (never color-alone); `aria-hidden` on decorative icons.
+- Dashboards: T hexes → status vars; StatusPill/licence maps → `st-soft` classes; ~120 inline patterns → `dash-*`/Tailwind; `borderRadius:99→999`; data-driven geometry kept inline (virtualizers, widths, state colors); dead `glowCardStyle`/`inputStyle` removed.
+- SSR: `shared/landingCopy.ts` shared by client + server; section order mirrors client (nav/hero/check/why/how/cos/revoked/footer); gradient wrapper + static search form + trust (invented 99.9% stats grid removed); mobile nav hides secondary links ≤640px.
+- Login: single BrandLogo (2 dup imgs removed), modal tween, input follows system radius.
+- Motion policy: scoped properties only, ≤260ms routine, springs for spatial entrances only, one ambient language per viewport, reduced-motion intact.
+- Remaining (documented exceptions): radix-internal `rounded-md` geometry; admin-internal dark tint badges; illustration mock micro-type (`AnimatedBackground` doc, UK-flag spec colors); gradient display text (`text-gradient-*`); `leading-none` on icon-paired micro-glyphs; 26px stat display + fixed avatar/skeleton dims; footer/hero share hero tokens by design.
+
 ### Remaining (Not Yet Scoped)
 - Fuse.js search index versioning for instant CDV cache bust on rebuild.
 - React Query `gcTime` reduction for sponsor pages (currently default 5min).

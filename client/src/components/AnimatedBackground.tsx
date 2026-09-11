@@ -1,57 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useSpring, animated } from '@react-spring/web'
 
-interface FloatingShapeProps {
-  delay: number
-  size: string
-  color: string
-  position: { x: string, y: string }
-  duration: number
-}
-
-function FloatingShape({ delay, size, color, position, duration }: FloatingShapeProps) {
-  const animation = useSpring({
-    from: { 
-      transform: 'translateY(0px) rotateZ(0deg) scale(0.8)',
-      opacity: 0.5 
-    },
-    to: async (next) => {
-      while (true) {
-        await next({ 
-          transform: 'translateY(-18px) rotateZ(180deg) scale(1.08)',
-          opacity: 0.75 
-        })
-        await next({ 
-          transform: 'translateY(0px) rotateZ(360deg) scale(0.8)',
-          opacity: 0.5 
-        })
-      }
-    },
-    config: { mass: 1, tension: 260, friction: 65 },
-    delay: delay,
-  })
-
-  return (
-    <animated.div
-      style={{
-        ...animation,
-        position: 'absolute',
-        left: position.x,
-        top: position.y,
-        width: size,
-        height: size,
-        borderRadius: '30% 70% 70% 30% / 30% 30% 70% 70%',
-        background: `linear-gradient(135deg, ${color}60, ${color}25)`,
-        backdropFilter: 'blur(10px)',
-        border: `1px solid ${color}30`,
-        boxShadow: `0 4px 20px ${color}20`,
-      }}
-    />
-  )
-}
+/* Ambient language: one floating document (status metaphor) + a sparse static
+   starfield. Rotating blurred shapes were removed — they duplicated the hero's
+   static gradient blobs while costing a backdrop-filter per shape. */
 
 function ParticleField() {
-  const particles = Array.from({ length: 30 }, (_, i) => ({
+  const particles = Array.from({ length: 12 }, (_, i) => ({
     id: i,
     x: Math.random() * 100,
     y: Math.random() * 100,
@@ -84,12 +39,9 @@ function DocumentAnimation() {
   const [isHovered, setIsHovered] = useState(false)
   
   const documentAnimation = useSpring({
-    transform: isHovered 
-      ? 'translateY(-10px) rotateY(4deg) scale(1.04)' 
+    transform: isHovered
+      ? 'translateY(-10px) rotateY(4deg) scale(1.04)'
       : 'translateY(0px) rotateY(0deg) scale(1)',
-    boxShadow: isHovered
-      ? '0 28px 48px rgba(0,0,0,0.28), 0 0 0 1px rgba(99,102,241,0.2)'
-      : '0 12px 32px rgba(0,0,0,0.16)',
     config: { mass: 1, tension: 280, friction: 60 },
   })
 
@@ -114,7 +66,7 @@ function DocumentAnimation() {
       >
         <animated.div
           style={{ ...documentAnimation, width: '264px', height: '340px' }}
-          className="relative bg-white dark:bg-slate-900 rounded-xl p-6 border border-indigo-100 dark:border-slate-700 overflow-hidden"
+          className="relative bg-white dark:bg-slate-900 rounded-xl p-6 border border-indigo-100 dark:border-slate-700 overflow-hidden shadow-[0_12px_32px_rgba(0,0,0,0.16)]"
         >
           {/* Document Header with UK cues */}
           <div className="flex items-start justify-between mb-4">
@@ -193,19 +145,8 @@ function DocumentAnimation() {
 }
 
 export default function AnimatedBackground() {
-  const shapes = [
-    { color: '#6366f1', size: '90px', position: { x: '8%', y: '15%' }, delay: 0, duration: 4200 },
-    { color: '#8B5CF6', size: '65px', position: { x: '79%', y: '8%' }, delay: 900, duration: 3200 },
-    { color: '#10B981', size: '80px', position: { x: '82%', y: '66%' }, delay: 2000, duration: 3800 },
-    { color: '#F59E0B', size: '50px', position: { x: '12%', y: '76%' }, delay: 500, duration: 4600 },
-    { color: '#ef4444', size: '70px', position: { x: '3%', y: '46%' }, delay: 1500, duration: 3400 },
-  ]
-
   return (
     <div className="relative w-full h-full overflow-hidden bg-gradient-to-br from-indigo-50/60 via-purple-50/30 to-blue-100/50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-      {shapes.map((shape, i) => (
-        <FloatingShape key={i} {...shape} />
-      ))}
       <ParticleField />
       <DocumentAnimation />
       <div className="absolute inset-0 bg-gradient-to-t from-white/5 via-transparent to-white/3 dark:from-slate-900/20 dark:to-slate-800/10 pointer-events-none" />

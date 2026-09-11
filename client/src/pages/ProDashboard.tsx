@@ -43,10 +43,10 @@ const T = {
   sub:          "var(--muted-foreground)",
   muted:        "var(--muted-foreground)",
   activeText:   "var(--primary)",
-  emerald:      "#10B981",
-  amber:        "#F59E0B",
-  red:          "#EF4444",
-  cyan:         "#06B6D4",
+  emerald:      "var(--status-success)",
+  amber:        "var(--status-warning)",
+  red:          "var(--status-danger)",
+  cyan:         "var(--status-info)",
 } as const;
 
 const cardStyle: CSSProperties = {
@@ -54,11 +54,6 @@ const cardStyle: CSSProperties = {
   border: `1px solid var(--border)`,
   borderRadius: 16,
   boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.06)",
-};
-
-const glowCardStyle: CSSProperties = {
-  ...cardStyle,
-  boxShadow: `0 0 24px color-mix(in srgb, var(--primary) 8%, transparent), 0 4px 16px rgba(0,0,0,0.06)`,
 };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -140,22 +135,24 @@ function greeting() { const h = new Date().getHours(); return h<12?"Good morning
 
 function StatusPill({ status }: { status?: string }) {
   const s = status || "";
-  const cfg =
-    (s === "REMOVED_REVOKED" || s === "NOT_LISTED") ? { bg: "rgba(239,68,68,0.12)",   border: "rgba(239,68,68,0.25)",  color: "#FCA5A5", label: "Revoked" } :
-    s === "GRACE_PERIOD"    ? { bg: "rgba(245,158,11,0.12)",   border: "rgba(245,158,11,0.25)", color: "#FCD34D", label: "Grace" } :
-    s === "NEWLY_GRANTED"   ? { bg: "rgba(245,158,11,0.12)",   border: "rgba(245,158,11,0.25)", color: "#FCD34D", label: "New" } :
-    s === "ACTIVE"          ? { bg: "rgba(16,185,129,0.12)",   border: "rgba(16,185,129,0.25)", color: "#6EE7B7", label: "Active" } :
-                              { bg: "rgba(100,116,139,0.12)",  border: "rgba(100,116,139,0.25)",color: "#CBD5E1", label: "Unknown" };
-  return (
-    <span style={{ background: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.color, fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", padding: "2px 8px", borderRadius: 99, textTransform: "uppercase" }}>
-      {cfg.label}
-    </span>
-  );
+  // Theme-aware soft badges (AA in both themes); "unknown" never resembles "active".
+  const cls =
+    (s === "REMOVED_REVOKED" || s === "NOT_LISTED") ? "st-soft st-soft-danger" :
+    s === "GRACE_PERIOD"    ? "st-soft st-soft-warning" :
+    s === "NEWLY_GRANTED"   ? "st-soft st-soft-warning" :
+    s === "ACTIVE"          ? "st-soft st-soft-success" :
+                              "st-soft st-soft-neutral";
+  const label =
+    (s === "REMOVED_REVOKED" || s === "NOT_LISTED") ? "Revoked" :
+    s === "GRACE_PERIOD"    ? "Grace" :
+    s === "NEWLY_GRANTED"   ? "New" :
+    s === "ACTIVE"          ? "Active" : "Unknown";
+  return <span className={cls}>{label}</span>;
 }
 
 function PlanPill({ plan }: { plan: string }) {
   return (
-    <span style={{ background: "var(--primary)", color: "var(--primary-foreground)", fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 99, display: "inline-flex", alignItems: "center", gap: 4, boxShadow: "0 2px 8px color-mix(in srgb, var(--primary) 28%, transparent)" }}>
+    <span className="dash-btn-primary" style={{ fontSize: 11, padding: "3px 10px", gap: 4 }}>
       <Crown style={{ width: 11, height: 11 }} />
       {PLAN_LABEL[plan] || plan}
     </span>
@@ -172,13 +169,13 @@ function StatCard({ label, value, sub, gradient, Icon, loading }: StatCardProps)
       whileHover={{ y: -2, boxShadow: "0 0 28px color-mix(in srgb, var(--primary) 12%, transparent), 0 8px 24px rgba(0,0,0,0.1)" }}
       style={{ ...cardStyle, padding: 20, cursor: "default" }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+      <div className="flex items-start justify-between">
         <div>
-          <p style={{ fontSize: 11, color: T.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6, fontWeight: 600 }}>{label}</p>
+          <p className="dash-label mb-1.5">{label}</p>
           {loading
             ? <div style={{ background: T.border, height: 28, width: 56, borderRadius: 6, marginBottom: 4 }} />
             : <p style={{ fontSize: 26, fontWeight: 800, color: T.text, lineHeight: 1 }}>{value}</p>}
-          {sub && <p style={{ fontSize: 12, color: T.muted, marginTop: 5 }}>{sub}</p>}
+          {sub && <p className="dash-meta mt-1">{sub}</p>}
         </div>
         <div style={{ background: gradient, borderRadius: 10, padding: 9, boxShadow: "0 2px 12px rgba(0,0,0,0.35)", flexShrink: 0 }}>
           <Icon className="w-4 h-4 text-white" />
@@ -220,10 +217,10 @@ function OverviewTab({ user, setTab }: { user: any; setTab: (t: Tab) => void }) 
     <div>
       {/* Welcome */}
       <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: T.text, marginBottom: 4 }}>{greeting()}, {firstName} 👋</h1>
-        <p style={{ fontSize: 14, color: T.sub }}>
+        <h1 className="type-h2 mb-1">{greeting()}, {firstName} 👋</h1>
+        <p className="dash-body">
           {revokedN > 0
-            ? <span style={{ color: "#FCA5A5" }}>⚠ {revokedN} sponsor{revokedN>1?"s":""} in your watchlist ha{revokedN>1?"ve":"s"} been revoked</span>
+            ?             <span style={{ color: "var(--status-danger)" }}>⚠ {revokedN} sponsor{revokedN>1?"s":""} in your watchlist ha{revokedN>1?"ve":"s"} been revoked</span>
             : "All your monitored sponsors are active — you're good to go."}
         </p>
       </div>
@@ -240,9 +237,9 @@ function OverviewTab({ user, setTab }: { user: any; setTab: (t: Tab) => void }) 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Activity feed */}
         <div className="lg:col-span-2">
-          <p style={{ fontSize:11, fontWeight:700, color:T.muted, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:14 }}>Recent Activity</p>
+          <p className="dash-label mb-3">Recent Activity</p>
           {cL||vL ? (
-            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+            <div className="flex flex-col gap-2">
               {[...Array(5)].map((_,i) => <div key={i} style={{ ...cardStyle, height:56, borderRadius:12 }} />)}
             </div>
           ) : feed.length===0 ? (
@@ -251,7 +248,7 @@ function OverviewTab({ user, setTab }: { user: any; setTab: (t: Tab) => void }) 
               <p style={{ color:T.muted, fontSize:14 }}>No activity yet. Add a sponsor to start monitoring.</p>
             </div>
           ) : (
-            <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+            <div className="flex flex-col gap-1.5">
               {feed.map((item, idx) => (
                 <motion.div
                   key={item.key}
@@ -266,10 +263,10 @@ function OverviewTab({ user, setTab }: { user: any; setTab: (t: Tab) => void }) 
                     return <>
                       <MI style={{ width:16, height:16, color:meta.color, flexShrink:0 }} />
                       <div style={{ flex:1, minWidth:0 }}>
-                        <p style={{ fontSize:13, fontWeight:600, color:T.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.organisationName}</p>
-                        <p style={{ fontSize:12, color:T.muted }}>{meta.label}{c.previousValue&&c.newValue?<span> · {c.previousValue} → {c.newValue}</span>:null}</p>
+                        <p className="truncate text-sm font-semibold text-foreground">{c.organisationName}</p>
+                        <p className="dash-meta">{meta.label}{c.previousValue&&c.newValue?<span> · {c.previousValue} → {c.newValue}</span>:null}</p>
                       </div>
-                      <span style={{ fontSize:11, color:T.muted, flexShrink:0 }}>{fmtShort(c.detectedAt)}</span>
+                      <span className="dash-meta shrink-0">{fmtShort(c.detectedAt)}</span>
                     </>;
                   })() : (() => {
                     const v = item.data as Verification;
@@ -278,10 +275,10 @@ function OverviewTab({ user, setTab }: { user: any; setTab: (t: Tab) => void }) 
                     return <>
                       <RI style={{ width:16, height:16, color:col, flexShrink:0 }} />
                       <div style={{ flex:1, minWidth:0 }}>
-                        <p style={{ fontSize:13, fontWeight:600, color:T.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{v.filename}</p>
-                        <p style={{ fontSize:12, color:T.muted }}>CoS Verified · <span style={{ color:col }}>{v.result}</span></p>
+                        <p className="truncate text-sm font-semibold text-foreground">{v.filename}</p>
+                        <p className="dash-meta">CoS Verified · <span style={{ color:col }}>{v.result}</span></p>
                       </div>
-                      <span style={{ fontSize:11, color:T.muted, flexShrink:0 }}>{fmtShort(v.verifiedAt)}</span>
+                      <span className="dash-meta shrink-0">{fmtShort(v.verifiedAt)}</span>
                     </>;
                   })()}
                 </motion.div>
@@ -292,8 +289,8 @@ function OverviewTab({ user, setTab }: { user: any; setTab: (t: Tab) => void }) 
 
         {/* Quick actions + watchlist summary */}
         <div>
-          <p style={{ fontSize:11, fontWeight:700, color:T.muted, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:14 }}>Quick Actions</p>
-          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+          <p className="dash-label mb-3">Quick Actions</p>
+          <div className="flex flex-col gap-2">
             {QUICK.map(q => (
               <motion.button
                 key={q.tab} whileTap={{ scale:0.98 }} whileHover={{ y:-1 }}
@@ -304,8 +301,8 @@ function OverviewTab({ user, setTab }: { user: any; setTab: (t: Tab) => void }) 
                   <q.Icon className="w-4 h-4 text-white" />
                 </div>
                 <div style={{ flex:1, minWidth:0 }}>
-                  <p style={{ fontSize:13, fontWeight:700, color:T.text }}>{q.label}</p>
-                  <p style={{ fontSize:12, color:T.muted }}>{q.sub}</p>
+                  <p className="text-sm font-bold text-foreground">{q.label}</p>
+                  <p className="dash-meta">{q.sub}</p>
                 </div>
                 <ChevronRight style={{ width:14, height:14, color:T.muted, flexShrink:0 }} />
               </motion.button>
@@ -313,17 +310,17 @@ function OverviewTab({ user, setTab }: { user: any; setTab: (t: Tab) => void }) 
           </div>
 
           {watches && watches.length > 0 && (
-            <div style={{ ...cardStyle, marginTop:16, padding:16, borderRadius:14 }}>
-              <p style={{ fontSize:11, fontWeight:700, color:T.muted, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:12 }}>Watchlist Status</p>
-              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+            <div style={{ ...cardStyle, marginTop:16, padding:16 }}>
+              <p className="dash-label mb-3">Watchlist Status</p>
+              <div className="flex flex-col gap-2">
                 {watches.slice(0,4).map(w => (
-                  <div key={w.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:8 }}>
-                    <span style={{ fontSize:13, color:T.sub, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{w.organisationName}</span>
+                  <div key={w.id} className="flex items-center justify-between gap-2">
+                    <span className="truncate text-sm text-muted-foreground">{w.organisationName}</span>
                     <StatusPill status={w.currentStatus?.status} />
                   </div>
                 ))}
                 {watches.length > 4 && (
-                  <button onClick={() => setTab("monitor")} style={{ fontSize:12, color:T.activeText, textAlign:"left", cursor:"pointer", padding:0 }}>
+                  <button onClick={() => setTab("monitor")} className="text-xs text-left cursor-pointer p-0 bg-transparent border-none" style={{ color:"var(--primary)" }}>
                     +{watches.length-4} more →
                   </button>
                 )}
@@ -388,14 +385,14 @@ function MonitorTab({ user }: { user: any }) {
   return (
     <div>
       {/* Header */}
-      <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:24, gap:12 }}>
+      <div className="flex items-start justify-between gap-3 mb-6">
         <div>
-          <h2 style={{ fontSize:22, fontWeight:800, color:T.text, marginBottom:4 }}>Sponsor Monitor</h2>
-          <p style={{ fontSize:14, color:T.sub }}>Track UK sponsor licence status changes in real time</p>
+          <h2 className="dash-h2 mb-1">Sponsor Monitor</h2>
+          <p className="dash-body">Track UK sponsor licence status changes in real time</p>
         </div>
         <motion.button whileTap={{scale:0.97}}
           onClick={() => setShowSearch(!showSearch)}
-          style={{ background:"var(--primary)", color:"var(--primary-foreground)", border:"none", borderRadius:99, padding:"9px 18px", fontSize:13, fontWeight:700, display:"flex", alignItems:"center", gap:7, cursor:"pointer", flexShrink:0, boxShadow:"0 2px 12px color-mix(in srgb, var(--primary) 30%, transparent)" }}
+          className="dash-btn-primary shrink-0"
         >
           {showSearch ? <><X style={{width:14,height:14}}/> Cancel</> : <><Plus style={{width:14,height:14}}/> Add Sponsor</>}
         </motion.button>
@@ -406,7 +403,7 @@ function MonitorTab({ user }: { user: any }) {
         {showSearch && (
           <motion.div initial={{opacity:0,height:0}} animate={{opacity:1,height:"auto"}} exit={{opacity:0,height:0}} transition={{type:"spring",stiffness:120,damping:18}} style={{overflow:"hidden",marginBottom:20}}>
             <div style={{ background:"color-mix(in srgb, var(--primary) 5%, transparent)", border:`1px solid ${T.violetBorder}`, borderRadius:16, padding:20 }}>
-              <p style={{ fontSize:13, fontWeight:600, color:T.text, marginBottom:12 }}>Search the UK sponsor register</p>
+              <p className="text-sm font-semibold text-foreground mb-3">Search the UK sponsor register</p>
               <div style={{ position:"relative" }}>
                 <Search style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", width:15, height:15, color:T.muted }} />
                 <input value={query} onChange={e=>setQuery(e.target.value)} autoFocus placeholder="Company name..."
@@ -420,12 +417,12 @@ function MonitorTab({ user }: { user: any }) {
                   {results.map(s => {
                     const alreadyWatched = watched.has(s.fingerprint);
                     return (
-                      <div key={s.fingerprint} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:10, background:"var(--secondary)", border:`1px solid var(--border)`, borderRadius:10, padding:"10px 12px" }}>
+                      <div key={s.fingerprint} className="flex items-center justify-between gap-2.5 rounded-lg border border-border bg-secondary px-3 py-2.5">
                         <div style={{minWidth:0}}>
-                          <p style={{ fontSize:13, fontWeight:600, color:T.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{s.organisationName}</p>
-                          <p style={{ fontSize:12, color:T.muted }}>{s.townCity||"—"} · {s.typeRating||"Unknown"}</p>
+                          <p className="truncate text-sm font-semibold text-foreground">{s.organisationName}</p>
+                          <p className="dash-meta">{s.townCity||"—"} · {s.typeRating||"Unknown"}</p>
                         </div>
-                        <div style={{ display:"flex", alignItems:"center", gap:8, flexShrink:0 }}>
+                        <div className="flex items-center gap-2 shrink-0">
                           <StatusPill status={s.status} />
                           <button disabled={alreadyWatched||addM.isPending} onClick={() => !alreadyWatched && addM.mutate(s)}
                             style={{ background: alreadyWatched ? "var(--secondary)" : "var(--primary)", color: alreadyWatched ? "var(--muted-foreground)" : "var(--primary-foreground)", border:"none", borderRadius:8, padding:"5px 12px", fontSize:12, fontWeight:600, cursor: alreadyWatched ? "default" : "pointer" }}>
@@ -447,47 +444,47 @@ function MonitorTab({ user }: { user: any }) {
 
       {/* Watchlist */}
       {isLoading ? (
-        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        <div className="flex flex-col gap-2.5">
           {[...Array(4)].map((_,i) => <div key={i} style={{...cardStyle,height:72,borderRadius:16}} />)}
         </div>
       ) : !isPro ? (
         <div style={{ ...cardStyle, padding:48, textAlign:"center", borderStyle:"dashed", borderColor:T.violetBorder }}>
           <Crown style={{ width:32, height:32, color:T.violet, margin:"0 auto 12px" }} />
-          <p style={{ fontSize:16, fontWeight:700, color:T.text, marginBottom:6 }}>Upgrade to monitor sponsors</p>
-          <p style={{ fontSize:14, color:T.sub, marginBottom:20 }}>Get instant alerts when a sponsor's licence is revoked or downgraded.</p>
-          <a href="/pricing" style={{ background:"var(--primary)", color:"var(--primary-foreground)", padding:"10px 22px", borderRadius:99, fontSize:14, fontWeight:700, textDecoration:"none", boxShadow:"0 2px 12px color-mix(in srgb, var(--primary) 30%, transparent)" }}>View Plans</a>
+          <p className="text-base font-bold text-foreground mb-1.5">Upgrade to monitor sponsors</p>
+          <p className="dash-body mb-5">Get instant alerts when a sponsor's licence is revoked or downgraded.</p>
+          <a href="/pricing" className="dash-btn-primary no-underline" style={{ padding:"10px 22px", fontSize:14 }}>View Plans</a>
         </div>
       ) : watches?.length === 0 ? (
         <div style={{ ...cardStyle, padding:48, textAlign:"center", borderStyle:"dashed" }}>
           <Building2 style={{ width:32, height:32, color:T.muted, margin:"0 auto 12px" }} />
-          <p style={{ fontSize:16, fontWeight:700, color:T.text, marginBottom:6 }}>No sponsors in your watchlist</p>
-          <p style={{ fontSize:14, color:T.sub }}>Click "Add Sponsor" above to start monitoring.</p>
+          <p className="text-base font-bold text-foreground mb-1.5">No sponsors in your watchlist</p>
+          <p className="dash-body">Click "Add Sponsor" above to start monitoring.</p>
         </div>
       ) : (
         <div>
-          <p style={{ fontSize:11, fontWeight:700, color:T.muted, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:14 }}>
+          <p className="dash-label mb-3">
             Your Watchlist ({watches?.length})
           </p>
-          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+          <div className="flex flex-col gap-2.5">
             {(watches||[]).map((w, idx) => (
               <motion.div key={w.id} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{delay:idx*0.05,type:"spring",stiffness:120,damping:16}} style={{ ...cardStyle, borderRadius:16, overflow:"hidden" }}>
                 <button onClick={() => setExpanded(expanded===w.id?null:w.id)}
-                  style={{ display:"flex", alignItems:"center", gap:14, padding:"14px 16px", cursor:"pointer", width:"100%", background:"transparent", border:"none", textAlign:"left" }}>
-                  <div style={{ background:"rgba(59,130,246,0.12)", borderRadius:10, padding:9, flexShrink:0 }}>
-                    <Building2 style={{ width:16, height:16, color:"#60A5FA" }} />
+                  className="flex w-full cursor-pointer items-center gap-3.5 border-none bg-transparent px-4 py-3.5 text-left">
+                    <div style={{ background:"var(--status-info-bg)", borderRadius:8, padding:9, flexShrink:0 }}>
+                      <Building2 style={{ width:16, height:16, color:"var(--status-info)" }} />
                   </div>
                   <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
+                    <div className="flex flex-wrap items-center gap-2">
                       <span style={{ fontSize:14, fontWeight:700, color:T.text }}>{w.organisationName}</span>
                       <StatusPill status={w.currentStatus?.status} />
                     </div>
-                    <p style={{ fontSize:12, color:T.muted, marginTop:2 }}>
+                    <p className="dash-meta mt-0.5">
                       {w.townCity||"—"} · {w.currentStatus?.typeRating||"Unknown"} · {w.currentStatus?.route||"—"}
                     </p>
                   </div>
-                  <div style={{ display:"flex", alignItems:"center", gap:8, flexShrink:0 }}>
+                    <div className="flex items-center gap-2 shrink-0">
                     {w.recentChanges?.length > 0 && (
-                      <span style={{ background:"var(--secondary)", color:"var(--muted-foreground)", fontSize:11, fontWeight:600, padding:"2px 8px", borderRadius:99, border:`1px solid var(--border)` }}>{w.recentChanges.length} changes</span>
+                      <span className="dash-chip">{w.recentChanges.length} changes</span>
                     )}
                     <ChevronDown style={{ width:15, height:15, color:T.muted, transition:"transform 0.2s", transform: expanded===w.id ? "rotate(180deg)" : "none" }} />
                   </div>
@@ -499,40 +496,40 @@ function MonitorTab({ user }: { user: any }) {
                       <div style={{ padding:"14px 16px" }}>
                         {w.recentChanges?.length > 0 ? (
                           <>
-                            <p style={{ fontSize:11, fontWeight:700, color:T.muted, textTransform:"uppercase", letterSpacing:"0.07em", marginBottom:10 }}>Recent Changes</p>
-                            <div style={{ display:"flex", flexDirection:"column", gap:7 }}>
+                            <p className="dash-label mb-3">Recent Changes</p>
+                            <div className="flex flex-col gap-2">
                               {w.recentChanges.slice(0,5).map(c => {
                                 const meta = CHANGE_META[c.changeType] || { label:c.changeType, Icon:Activity, color:T.muted };
                                 const MI = meta.Icon;
                                 return (
-                                  <div key={c.id} style={{ display:"flex", alignItems:"center", gap:8 }}>
+                                  <div key={c.id} className="flex items-center gap-2">
                                     <MI style={{ width:13, height:13, color:meta.color, flexShrink:0 }} />
-                                    <span style={{ fontSize:13, color:T.text, fontWeight:500 }}>{meta.label}</span>
-                                    {c.previousValue && c.newValue && <span style={{ fontSize:12, color:T.muted }}>{c.previousValue} → {c.newValue}</span>}
-                                    <span style={{ fontSize:11, color:T.muted, marginLeft:"auto" }}>{fmtDate(c.detectedAt)}</span>
+                                    <span className="text-sm font-medium text-foreground">{meta.label}</span>
+                                    {c.previousValue && c.newValue && <span className="dash-meta">{c.previousValue} → {c.newValue}</span>}
+                                    <span className="dash-meta ml-auto">{fmtDate(c.detectedAt)}</span>
                                   </div>
                                 );
                               })}
                             </div>
                           </>
-                        ) : <p style={{ fontSize:13, color:T.muted }}>No changes detected yet.</p>}
+                        ) : <p className="dash-meta">No changes detected yet.</p>}
                         <div style={{ borderTop:`1px solid ${T.border}`, marginTop:12, paddingTop:12, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                          <span style={{ fontSize:12, color:T.muted }}>Watching since {fmtDate(w.createdAt)}</span>
-                          <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                          <span className="dash-meta">Watching since {fmtDate(w.createdAt)}</span>
+                          <div className="flex items-center gap-3">
                             {hasIntelligence && w.fingerprint ? (
                               <button
                                 onClick={() => setIntelligenceTarget({ fingerprint: w.fingerprint!, name: w.organisationName })}
-                                style={{ display:"flex", alignItems:"center", gap:5, fontSize:12, color:"var(--primary)", background:"none", border:"none", cursor:"pointer", fontWeight:600 }}
+                                className="flex cursor-pointer items-center gap-1 border-none bg-transparent text-xs font-semibold text-primary"
                               >
                                 <BarChart3 style={{width:12,height:12}}/> Company Intel
                               </button>
                             ) : !hasIntelligence && w.fingerprint && (
-                              <a href="/pricing" style={{ display:"flex", alignItems:"center", gap:5, fontSize:12, color:T.muted, textDecoration:"none" }}>
-                                <BarChart3 style={{width:12,height:12}}/> Company Intel <span style={{ fontSize:10, background:"color-mix(in srgb, var(--primary) 10%, transparent)", color:"var(--primary)", borderRadius:99, padding:"1px 6px", fontWeight:700 }}>Pro</span>
+                              <a href="/pricing" className="flex items-center gap-1 text-xs text-muted-foreground no-underline">
+                                <BarChart3 style={{width:12,height:12}}/> Company Intel <span className="dash-chip" style={{ color:"var(--primary)", borderColor:"color-mix(in srgb, var(--primary) 22%, transparent)", background:"color-mix(in srgb, var(--primary) 8%, transparent)" }}>Pro</span>
                               </a>
                             )}
                             <button onClick={() => delM.mutate(w.id)} disabled={delM.isPending}
-                              style={{ display:"flex", alignItems:"center", gap:5, fontSize:12, color:T.red, background:"none", border:"none", cursor:"pointer" }}>
+                                                              className="flex cursor-pointer items-center gap-1 border-none bg-transparent text-xs" style={{ color:"var(--status-danger)" }}>
                               <Trash2 style={{width:12,height:12}}/> Remove
                             </button>
                           </div>
@@ -594,20 +591,20 @@ function VerifyTab({ user }: { user: any }) {
   return (
     <div>
       <div style={{ marginBottom:24 }}>
-        <h2 style={{ fontSize:22, fontWeight:800, color:T.text, marginBottom:4 }}>Verify CoS Document</h2>
-        <p style={{ fontSize:14, color:T.sub }}>AI-powered forensic analysis of UK Certificate of Sponsorship PDFs</p>
+        <h2 className="dash-h2 mb-1">Verify CoS Document</h2>
+        <p className="dash-body">AI-powered forensic analysis of UK Certificate of Sponsorship PDFs</p>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-5">
         {/* Upload */}
         <div style={{ ...cardStyle, padding:24 }}>
-          <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:20 }}>
+          <div className="flex items-center gap-3 mb-5">
             <div style={{ background:"var(--primary)", borderRadius:12, padding:10, boxShadow:"0 2px 12px color-mix(in srgb, var(--primary) 25%, transparent)" }}>
               <Shield style={{ width:18, height:18, color:"#fff" }} />
             </div>
             <div>
               <p style={{ fontSize:15, fontWeight:700, color:T.text }}>Upload Document</p>
-              <p style={{ fontSize:12, color:T.muted }}>PDF files only · Deleted after analysis</p>
+              <p className="dash-meta">PDF files only · Deleted after analysis</p>
             </div>
           </div>
           <FileUploadSimple
@@ -622,7 +619,7 @@ function VerifyTab({ user }: { user: any }) {
 
         {/* Pipeline */}
         <div style={{ ...cardStyle, padding:24 }}>
-          <p style={{ fontSize:15, fontWeight:700, color:T.text, marginBottom:20 }}>Verification Pipeline</p>
+          <p className="text-base font-bold text-foreground mb-5">Verification Pipeline</p>
           <div style={{ display:"flex", flexDirection:"column", gap:0, position:"relative" }}>
             {/* Connecting line */}
             <div style={{ position:"absolute", left:13, top:14, bottom:14, width:2, background:`linear-gradient(to bottom, ${T.emerald}, ${T.violet}, ${T.border})`, opacity:0.4, borderRadius:2 }} />
@@ -633,14 +630,14 @@ function VerifyTab({ user }: { user: any }) {
               return (
                 <motion.div key={i} animate={{ opacity: running && s==="pending" ? 0.4 : 1 }} transition={{duration:0.3}}
                   style={{ display:"flex", alignItems:"flex-start", gap:12, paddingBottom:i<STEPS.length-1?20:0, position:"relative", zIndex:1 }}>
-                  <div style={{ width:28, height:28, borderRadius:"50%", background:circleBg, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, transition:"background 0.4s", boxShadow: s==="active"?"0 0 12px color-mix(in srgb, var(--primary) 45%, transparent)":"none" }}>
+                  <div style={{ width:28, height:28, borderRadius:"50%", background:circleBg, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, transition:"background-color 0.2s, box-shadow 0.2s", boxShadow: s==="active"?"0 0 12px color-mix(in srgb, var(--primary) 45%, transparent)":"none" }}>
                     {s==="done"   ? <CheckCircle2 style={{ width:15, height:15, color:"#fff" }} /> :
                      s==="active" ? <Loader2 style={{ width:14, height:14, color:"#fff" }} className="animate-spin" /> :
-                     <span style={{ fontSize:11, fontWeight:700, color:T.muted }}>{i+1}</span>}
+                     <span className="dash-label">{i+1}</span>}
                   </div>
                   <div>
-                    <p style={{ fontSize:13, fontWeight:600, color:titleCol, transition:"color 0.3s" }}>{step.title}</p>
-                    <p style={{ fontSize:12, color:T.muted }}>{step.desc}</p>
+                    <p className="text-sm font-semibold transition-colors duration-200" style={{ color:titleCol }}>{step.title}</p>
+                    <p className="dash-meta">{step.desc}</p>
                   </div>
                 </motion.div>
               );
@@ -654,20 +651,20 @@ function VerifyTab({ user }: { user: any }) {
               const RI = rc.Icon;
               return (
                 <motion.div initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0}}
-                  style={{ marginTop:20, background:rc.bg, border:`1px solid ${rc.border}`, borderRadius:14, padding:16 }}>
-                  <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:8 }}>
+                  className="mt-5 rounded-2xl p-4" style={{ background:rc.bg, border:`1px solid ${rc.border}` }}>
+                  <div className="flex items-center gap-2.5 mb-2">
                     <RI style={{ width:22, height:22, color:rc.title, flexShrink:0 }} />
                     <div>
-                      <p style={{ fontSize:15, fontWeight:700, color:rc.title }}>{rc.text}</p>
-                      <p style={{ fontSize:12, color:T.sub }}>{rc.sub}</p>
+                      <p className="text-base font-bold" style={{ color:rc.title }}>{rc.text}</p>
+                      <p className="dash-meta">{rc.sub}</p>
                     </div>
                   </div>
-                  <div style={{ background:"var(--muted)", borderRadius:99, height:6, overflow:"hidden", marginTop:10 }}>
-                    <div style={{ width:`${Math.round(result.confidence*100)}%`, height:"100%", background:rc.title, borderRadius:99, transition:"width 0.8s ease" }} />
+                  <div style={{ background:"var(--muted)", borderRadius:999, height:6, overflow:"hidden", marginTop:10 }}>
+                    <div style={{ width:`${Math.round(result.confidence*100)}%`, height:"100%", background:rc.title, borderRadius:999, transition:"width 0.8s ease" }} />
                   </div>
-                  <p style={{ fontSize:12, color:T.muted, marginTop:5 }}>{Math.round(result.confidence*100)}% confidence</p>
+                  <p className="dash-meta mt-1">{Math.round(result.confidence*100)}% confidence</p>
                   {result.mismatchedFields && result.mismatchedFields.length > 0 && (
-                    <ul style={{ marginTop:10, paddingLeft:16, color:T.sub, fontSize:12 }}>
+                    <ul className="dash-meta mt-2.5 pl-4">
                       {result.mismatchedFields.map((f,i) => <li key={i}>{f}</li>)}
                     </ul>
                   )}
@@ -712,29 +709,29 @@ function NotificationsTab() {
   return (
     <div>
       <div style={{ marginBottom:24 }}>
-        <h2 style={{ fontSize:22, fontWeight:800, color:T.text, marginBottom:4 }}>Notification Preferences</h2>
-        <p style={{ fontSize:14, color:T.sub }}>Choose which events trigger alerts and on which channels</p>
+        <h2 className="dash-h2 mb-1">Notification Preferences</h2>
+        <p className="dash-body">Choose which events trigger alerts and on which channels</p>
       </div>
 
       <div style={{ ...cardStyle, borderRadius:16, overflow:"hidden" }}>
         {/* Header row */}
-        <div style={{ display:"flex", alignItems:"center", padding:"12px 20px", background:"var(--secondary)", borderBottom:`1px solid var(--border)` }}>
-          <div style={{ flex:1, fontSize:11, fontWeight:700, color:T.muted, textTransform:"uppercase", letterSpacing:"0.08em" }}>Event</div>
+        <div className="flex items-center border-b border-border bg-secondary px-5 py-3">
+          <div className="dash-label flex-1">Event</div>
           {CH.map(ch => (
             <div key={ch.key} style={{ width:72, display:"flex", flexDirection:"column", alignItems:"center", gap:3 }}>
               <ch.Icon style={{ width:13, height:13, color:T.muted }} />
-              <span style={{ fontSize:10, fontWeight:600, color:T.muted, textTransform:"uppercase", letterSpacing:"0.06em" }}>{ch.label}</span>
+              <span className="dash-label" style={{ letterSpacing:"0.06em" }}>{ch.label}</span>
             </div>
           ))}
-          <div style={{ width:72, textAlign:"center", fontSize:10, fontWeight:700, color:T.muted, textTransform:"uppercase", letterSpacing:"0.06em" }}>Active</div>
+          <div className="dash-label text-center" style={{ width:72, letterSpacing:"0.06em" }}>Active</div>
         </div>
 
         {/* Rows */}
         {isLoading ? (
           EVENT_ROWS.map(r => (
-            <div key={r.key} style={{ display:"flex", alignItems:"center", padding:"16px 20px", borderBottom:`1px solid ${T.border}` }}>
+            <div key={r.key} className="flex items-center border-b border-border px-5 py-4">
               <div style={{ flex:1 }}><div style={{ background:T.border, height:14, width:120, borderRadius:4, marginBottom:6 }} /><div style={{ background:T.border, height:11, width:80, borderRadius:4 }} /></div>
-              {[...Array(4)].map((_,i) => <div key={i} style={{ width:72, display:"flex", justifyContent:"center" }}><div style={{ background:T.border, height:20, width:36, borderRadius:99 }} /></div>)}
+              {[...Array(4)].map((_,i) => <div key={i} style={{ width:72, display:"flex", justifyContent:"center" }}><div style={{ background:T.border, height:20, width:36, borderRadius:999 }} /></div>)}
             </div>
           ))
         ) : (
@@ -746,7 +743,7 @@ function NotificationsTab() {
                 style={{ display:"flex", alignItems:"center", padding:"14px 20px", borderBottom: idx<EVENT_ROWS.length-1?`1px solid ${T.border}`:"none", opacity: on ? 1 : 0.5, transition:"opacity 0.2s", borderLeft: on ? `3px solid ${T.violet}` : `3px solid transparent`, background: on ? T.violetDim : "transparent" }}>
                 <div style={{ flex:1, minWidth:0 }}>
                   <p style={{ fontSize:14, fontWeight:500, color:T.text }}>{row.label}</p>
-                  <p style={{ fontSize:12, color:T.muted }}>{row.sub}</p>
+                  <p className="dash-meta">{row.sub}</p>
                 </div>
                 {CH.map(ch => (
                   <div key={ch.key} style={{ width:72, display:"flex", justifyContent:"center" }}>
@@ -764,9 +761,9 @@ function NotificationsTab() {
         )}
 
         {patchM.isPending && (
-          <div style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 20px", background:"var(--muted)", borderTop:`1px solid var(--border)` }}>
+          <div className="flex items-center gap-2 border-t border-border bg-muted px-5 py-2.5">
             <Loader2 style={{ width:13, height:13, color:T.muted }} className="animate-spin" />
-            <span style={{ fontSize:12, color:T.muted }}>Saving…</span>
+            <span className="dash-meta">Saving…</span>
           </div>
         )}
       </div>
@@ -795,23 +792,23 @@ function HistoryTab() {
 
   return (
     <div>
-      <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:24, gap:12, flexWrap:"wrap" }}>
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
         <div>
-          <h2 style={{ fontSize:22, fontWeight:800, color:T.text, marginBottom:4 }}>Verification History</h2>
-          <p style={{ fontSize:14, color:T.sub }}>All CoS documents you've submitted for AI verification</p>
+          <h2 className="dash-h2 mb-1">Verification History</h2>
+          <p className="dash-body">All CoS documents you've submitted for AI verification</p>
         </div>
       </div>
 
       {/* Mini stats */}
       {total > 0 && (
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12, marginBottom:24 }}>
+        <div className="grid grid-cols-3 gap-3 mb-6">
           {[
             { label:"Total Verified", val:total,   col:"var(--muted-foreground)", bg:"var(--secondary)" },
             { label:"Genuine",        val:genuine,  col:T.emerald, bg:"rgba(16,185,129,0.07)" },
             { label:"Flagged",        val:flagged,  col:T.amber,  bg:"rgba(245,158,11,0.07)" },
           ].map(s => (
             <div key={s.label} style={{ background:s.bg, border:`1px solid ${T.border}`, borderRadius:12, padding:"12px 16px" }}>
-              <p style={{ fontSize:11, color:T.muted, textTransform:"uppercase", letterSpacing:"0.07em", fontWeight:600, marginBottom:4 }}>{s.label}</p>
+              <p className="dash-label mb-1">{s.label}</p>
               <p style={{ fontSize:22, fontWeight:800, color:s.col }}>{s.val}</p>
             </div>
           ))}
@@ -820,17 +817,17 @@ function HistoryTab() {
 
       {/* List */}
       {isLoading ? (
-        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        <div className="flex flex-col gap-2.5">
           {[...Array(5)].map((_,i) => <div key={i} style={{...cardStyle,height:72,borderRadius:16}} />)}
         </div>
       ) : !verifs || verifs.length===0 ? (
         <div style={{ ...cardStyle, padding:48, textAlign:"center", borderStyle:"dashed" }}>
           <FileText style={{ width:32, height:32, color:T.muted, margin:"0 auto 12px" }} />
-          <p style={{ fontSize:16, fontWeight:700, color:T.text, marginBottom:6 }}>No verifications yet</p>
-          <p style={{ fontSize:14, color:T.sub }}>Your CoS verification history will appear here.</p>
+          <p className="text-base font-bold text-foreground mb-1.5">No verifications yet</p>
+          <p className="dash-body">Your CoS verification history will appear here.</p>
         </div>
       ) : (
-        <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+        <div className="flex flex-col gap-2.5">
           {verifs.map((v, idx) => {
             const rc = RC[v.result] || RC.fake;
             const RI = rc.Icon;
@@ -843,20 +840,20 @@ function HistoryTab() {
               <motion.div key={v.id} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{delay:idx*0.04,type:"spring",stiffness:120,damping:16}}
                 style={{ background:rc.bg, border:`1px solid ${rc.border}`, borderRadius:16, overflow:"hidden" }}>
                 <button onClick={() => setExpanded(isOpen?null:v.id)}
-                  style={{ display:"flex", alignItems:"center", gap:14, padding:"14px 16px", cursor:"pointer", width:"100%", background:"transparent", border:"none", textAlign:"left" }}>
+                  className="flex w-full cursor-pointer items-center gap-3.5 border-none bg-transparent px-4 py-3.5 text-left">
                   <RI style={{ width:18, height:18, color:rc.icon, flexShrink:0 }} />
                   <div style={{ flex:1, minWidth:0 }}>
                     <p style={{ fontSize:13, fontWeight:700, color:T.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                       {v.filename.length>48 ? v.filename.slice(0,45)+"…" : v.filename}
                     </p>
-                    <div style={{ display:"flex", flexWrap:"wrap", gap:10, marginTop:4 }}>
-                      <span style={{ fontSize:11, color:T.muted, display:"flex", alignItems:"center", gap:3 }}><Clock style={{width:11,height:11}}/>{fmtShort(v.verifiedAt)}</span>
-                      {total>0 && <span style={{ fontSize:11, color:T.muted, display:"flex", alignItems:"center", gap:3 }}><Shield style={{width:11,height:11}}/>{passed}/{total} checks</span>}
-                      <span style={{ fontSize:11, color:T.muted, display:"flex", alignItems:"center", gap:3 }}><BarChart3 style={{width:11,height:11}}/>{pct}% confidence</span>
+                    <div className="flex flex-wrap gap-2.5 mt-1">
+                      <span className="dash-meta flex items-center gap-1"><Clock style={{width:11,height:11}}/>{fmtShort(v.verifiedAt)}</span>
+                      {total>0 && <span className="dash-meta flex items-center gap-1"><Shield style={{width:11,height:11}}/>{passed}/{total} checks</span>}
+                      <span className="dash-meta flex items-center gap-1"><BarChart3 style={{width:11,height:11}}/>{pct}% confidence</span>
                     </div>
                   </div>
-                  <div style={{ display:"flex", alignItems:"center", gap:8, flexShrink:0 }}>
-                    <span style={{ background:"var(--secondary)", border:`1px solid ${rc.border}`, color:rc.icon, fontSize:10, fontWeight:700, padding:"2px 8px", borderRadius:99, textTransform:"uppercase", letterSpacing:"0.06em" }}>{rc.label}</span>
+                    <div className="flex items-center gap-2 shrink-0">
+                    <span className="dash-chip" style={{ background:"var(--secondary)", borderColor:rc.border, color:rc.icon }}>{rc.label}</span>
                     <ChevronDown style={{ width:14, height:14, color:T.muted, transition:"transform 0.2s", transform:isOpen?"rotate(180deg)":"none" }} />
                   </div>
                 </button>
@@ -864,27 +861,27 @@ function HistoryTab() {
                 <AnimatePresence>
                   {isOpen && (
                     <motion.div initial={{height:0}} animate={{height:"auto"}} exit={{height:0}} transition={{type:"spring",stiffness:120,damping:18}} style={{overflow:"hidden",borderTop:`1px solid ${rc.border}`}}>
-                      <div style={{ padding:"14px 16px", display:"flex", flexDirection:"column", gap:10 }}>
+                          <div className="flex flex-col gap-2.5 px-4 py-3.5">
                         {v.receiptId && (
-                          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                            <span style={{ fontSize:12, color:T.muted }}>Receipt ID:</span>
-                            <span style={{ fontSize:12, fontFamily:"monospace", color:T.sub }}>{v.receiptId}</span>
-                            <button onClick={() => copy(v.receiptId!, "Receipt ID")} style={{ background:"none", border:"none", cursor:"pointer", color:T.muted, padding:0, display:"flex" }}>
+                          <div className="flex items-center gap-2">
+                            <span className="dash-meta">Receipt ID:</span>
+                            <span className="dash-meta font-mono">{v.receiptId}</span>
+                            <button onClick={() => copy(v.receiptId!, "Receipt ID")} aria-label="Copy receipt ID" className="flex cursor-pointer border-none bg-transparent p-0 text-muted-foreground transition-colors hover:text-foreground">
                               <Copy style={{width:12,height:12}} />
                             </button>
                           </div>
                         )}
                         {v.checks && v.checks.length > 0 && (
                           <div>
-                            <p style={{ fontSize:11, fontWeight:700, color:T.muted, textTransform:"uppercase", letterSpacing:"0.07em", marginBottom:8 }}>Check Details</p>
-                            <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+                            <p className="dash-label mb-3">Check Details</p>
+                            <div className="flex flex-col gap-1">
                               {v.checks.map((ch,i) => (
-                                <div key={i} style={{ display:"flex", alignItems:"center", gap:8 }}>
+                                <div key={i} className="flex items-center gap-2">
                                   {ch.passed
                                     ? <CheckCircle2 style={{ width:13, height:13, color:T.emerald, flexShrink:0 }} />
                                     : <XCircle     style={{ width:13, height:13, color:T.red,    flexShrink:0 }} />}
-                                  <span style={{ fontSize:13, color: ch.passed?T.sub:T.text, fontWeight: ch.passed?400:500 }}>{ch.name}</span>
-                                  {!ch.passed && <span style={{ marginLeft:"auto", fontSize:10, fontWeight:700, color: ch.severity==="critical"?T.red:ch.severity==="warning"?T.amber:T.cyan, textTransform:"uppercase", letterSpacing:"0.05em" }}>{ch.severity}</span>}
+                                  <span className="text-sm" style={{ color: ch.passed?"var(--muted-foreground)":"var(--foreground)", fontWeight: ch.passed?400:500 }}>{ch.name}</span>
+                                  {!ch.passed && <span className="dash-label ml-auto" style={{ letterSpacing:"0.05em", color: ch.severity==="critical"?"var(--status-danger)":ch.severity==="warning"?"var(--status-warning)":"var(--status-info)" }}>{ch.severity}</span>}
                                 </div>
                               ))}
                             </div>
@@ -925,26 +922,20 @@ function SupportTab() {
     onError: () => toast({ title: "Failed to send", description: "Please try again.", variant: "destructive" }),
   });
 
-  const inputStyle: CSSProperties = {
-    width: "100%", padding: "10px 14px", background: "var(--background)",
-    border: "1px solid var(--border)", borderRadius: 10, color: "var(--foreground)",
-    fontSize: 14, outline: "none", boxSizing: "border-box",
-  };
-
   const openCount = tickets?.filter(t => t.status === "open").length || 0;
 
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 22, fontWeight: 800, color: "var(--foreground)", marginBottom: 4 }}>Help & Support</h2>
+        <h2 className="dash-h2 mb-1">Help & Support</h2>
         <p style={{ fontSize: 14, color: "var(--muted-foreground)" }}>Ask a question or report an issue — our team replies within 24 hours</p>
       </div>
 
       {/* Toggle */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+      <div className="flex gap-2 mb-6">
         {(["new","history"] as const).map(v => (
           <button key={v} onClick={() => setView(v)}
-            style={{ padding: "8px 18px", borderRadius: 99, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer",
+            style={{ padding: "8px 18px", borderRadius: 999, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer",
               background: view === v ? "var(--primary)" : "var(--secondary)",
               color: view === v ? "var(--primary-foreground)" : "var(--muted-foreground)" }}>
             {v === "new" ? "New Request" : `My Tickets${openCount > 0 ? ` (${openCount} open)` : ""}`}
@@ -954,29 +945,29 @@ function SupportTab() {
 
       {view === "new" ? (
         <div style={{ ...cardStyle, padding: 28, maxWidth: 600 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22 }}>
+          <div className="flex items-center gap-3 mb-5">
             <div style={{ background: "var(--primary)", borderRadius: 10, padding: 9 }}>
               <MessageSquare style={{ width: 16, height: 16, color: "var(--primary-foreground)" }} />
             </div>
             <p style={{ fontSize: 15, fontWeight: 700, color: "var(--foreground)" }}>Submit a Support Request</p>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div className="flex flex-col gap-4">
             <div>
-              <p style={{ fontSize: 12, fontWeight: 600, color: "var(--muted-foreground)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>Subject</p>
-              <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="e.g. I'm not receiving alerts"
-                style={inputStyle} maxLength={120} />
+              <label htmlFor="pd-subject" className="dash-label mb-1.5 block">Subject</label>
+              <input id="pd-subject" value={subject} onChange={e => setSubject(e.target.value)} placeholder="e.g. I'm not receiving alerts"
+                className="dash-input" maxLength={120} />
             </div>
             <div>
-              <p style={{ fontSize: 12, fontWeight: 600, color: "var(--muted-foreground)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>Message</p>
-              <textarea value={message} onChange={e => setMessage(e.target.value)} placeholder="Describe your issue or question in detail…"
-                rows={5} style={{ ...inputStyle, resize: "vertical" as any, fontFamily: "inherit" }} maxLength={2000} />
-              <p style={{ fontSize: 11, color: "var(--muted-foreground)", textAlign: "right", marginTop: 4 }}>{message.length}/2000</p>
+              <label htmlFor="pd-message" className="dash-label mb-1.5 block">Message</label>
+              <textarea id="pd-message" value={message} onChange={e => setMessage(e.target.value)} placeholder="Describe your issue or question in detail…"
+                rows={5} className="dash-input resize-y" maxLength={2000} />
+              <p className="dash-meta mt-1 text-right">{message.length}/2000</p>
             </div>
             <motion.button whileTap={{ scale: 0.97 }}
               onClick={() => submitM.mutate()}
               disabled={submitM.isPending || !subject.trim() || !message.trim()}
-              style={{ background: "var(--primary)", color: "var(--primary-foreground)", border: "none", borderRadius: 99, padding: "11px 24px", fontSize: 14, fontWeight: 700, cursor: submitM.isPending || !subject.trim() || !message.trim() ? "not-allowed" : "pointer", opacity: submitM.isPending || !subject.trim() || !message.trim() ? 0.6 : 1, display: "flex", alignItems: "center", gap: 8, alignSelf: "flex-start" }}>
+              className="dash-btn-primary self-start">
               {submitM.isPending ? <><Loader2 style={{ width: 14, height: 14 }} className="animate-spin" /> Sending…</> : <><SendHorizonal style={{ width: 14, height: 14 }} /> Send Request</>}
             </motion.button>
           </div>
@@ -984,40 +975,37 @@ function SupportTab() {
       ) : (
         <div>
           {isLoading ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {[...Array(3)].map((_,i) => <div key={i} style={{ ...cardStyle, height: 80, borderRadius: 14 }} />)}
+            <div className="flex flex-col gap-2.5">
+              {[...Array(3)].map((_,i) => <div key={i} style={{ ...cardStyle, height: 80 }} />)}
             </div>
           ) : !tickets || tickets.length === 0 ? (
             <div style={{ ...cardStyle, padding: 48, textAlign: "center", borderStyle: "dashed" }}>
               <HelpCircle style={{ width: 32, height: 32, color: "var(--muted-foreground)", margin: "0 auto 12px" }} />
-              <p style={{ fontSize: 16, fontWeight: 700, color: "var(--foreground)", marginBottom: 6 }}>No tickets yet</p>
+              <p className="text-base font-bold text-foreground mb-1.5">No tickets yet</p>
               <p style={{ fontSize: 14, color: "var(--muted-foreground)" }}>Submit a request and we'll reply here.</p>
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div className="flex flex-col gap-2.5">
               {tickets.map((t, idx) => (
                 <motion.div key={t.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}
-                  style={{ ...cardStyle, borderRadius: 14, padding: 20 }}>
-                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
+                  style={{ ...cardStyle, padding: 20 }}>
+                  <div className="flex items-start justify-between gap-3 mb-2">
                     <p style={{ fontSize: 14, fontWeight: 700, color: "var(--foreground)" }}>{t.subject}</p>
-                    <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 10px", borderRadius: 99, textTransform: "uppercase", letterSpacing: "0.06em", flexShrink: 0,
-                      background: t.status === "resolved" ? "rgba(16,185,129,0.1)" : "color-mix(in srgb, var(--primary) 8%, transparent)",
-                      color: t.status === "resolved" ? T.emerald : "var(--primary)",
-                      border: `1px solid ${t.status === "resolved" ? "rgba(16,185,129,0.25)" : "color-mix(in srgb, var(--primary) 22%, transparent)"}` }}>
+                    <span className={t.status === "resolved" ? "st-soft st-soft-success shrink-0" : "st-soft st-soft-info shrink-0"}>
                       {t.status === "resolved" ? "Resolved" : "Open"}
                     </span>
                   </div>
-                  <p style={{ fontSize: 13, color: "var(--muted-foreground)", marginBottom: t.adminReply ? 14 : 0 }}>{t.message}</p>
+                  <p className="text-sm text-muted-foreground" style={{ marginBottom: t.adminReply ? 14 : 0 }}>{t.message}</p>
                   {t.adminReply && (
-                    <div style={{ background: "color-mix(in srgb, var(--primary) 5%, transparent)", border: "1px solid color-mix(in srgb, var(--primary) 18%, transparent)", borderRadius: 10, padding: "12px 14px", marginTop: 12 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                    <div className="rounded-lg border p-3 mt-3" style={{ background: "color-mix(in srgb, var(--primary) 5%, transparent)", borderColor: "color-mix(in srgb, var(--primary) 18%, transparent)" }}>
+                      <div className="flex items-center gap-1.5 mb-1.5">
                         <CheckCheck style={{ width: 13, height: 13, color: T.emerald }} />
-                        <p style={{ fontSize: 11, fontWeight: 700, color: T.emerald, textTransform: "uppercase", letterSpacing: "0.06em" }}>Admin Reply</p>
+                        <p className="dash-label" style={{ color:"var(--status-success)" }}>Admin Reply</p>
                       </div>
-                      <p style={{ fontSize: 13, color: "var(--foreground)" }}>{t.adminReply}</p>
+                      <p className="text-sm text-foreground">{t.adminReply}</p>
                     </div>
                   )}
-                  <p style={{ fontSize: 11, color: "var(--muted-foreground)", marginTop: 10 }}>
+                  <p className="dash-meta mt-2.5">
                     <Clock style={{ width: 11, height: 11, display: "inline", marginRight: 4 }} />
                     {fmtShort(t.createdAt)}
                   </p>
@@ -1050,7 +1038,7 @@ export default function ProDashboard() {
   };
 
   if (authLoading) return (
-    <div style={{ background:"var(--background)", height:"100vh", display:"flex", alignItems:"center", justifyContent:"center" }}>
+    <div className="flex h-screen items-center justify-center bg-background">
       <div style={{ textAlign:"center" }}>
         <div style={{ width:44, height:44, borderRadius:12, background:"var(--primary)", margin:"0 auto 14px", animation:"pulse 1.5s infinite" }} />
         <p style={{ fontSize:14, color:T.muted }}>Loading your dashboard…</p>
@@ -1104,15 +1092,15 @@ export default function ProDashboard() {
       </nav>
 
       {/* User */}
-      <div style={{ padding:"12px 8px", borderTop:`1px solid ${T.border}`, display:"flex", flexDirection:"column", gap:6 }}>
-        <div style={{ display:"flex", alignItems:"center", gap:10, padding:"6px 10px" }}>
+      <div className="flex flex-col gap-1.5 border-t border-border px-2 py-3">
+        <div className="flex items-center gap-2.5 px-2.5 py-1.5">
           <div style={{ width:32, height:32, borderRadius:"50%", background:"var(--primary)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:"var(--primary-foreground)", flexShrink:0 }}>{initials}</div>
           <div style={{ minWidth:0 }}>
-            <p style={{ fontSize:13, fontWeight:600, color:T.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{fullName}</p>
+            <p className="truncate text-sm font-semibold text-foreground">{fullName}</p>
             <PlanPill plan={plan} />
           </div>
         </div>
-        <button onClick={handleLogout} style={{ display:"flex", alignItems:"center", gap:9, padding:"8px 10px", borderRadius:10, border:"none", cursor:"pointer", width:"100%", background:"transparent", color:T.muted, fontSize:13, transition:"color 0.15s" }}>
+        <button onClick={handleLogout} className="flex w-full cursor-pointer items-center gap-2 rounded-lg border-none bg-transparent px-2.5 py-2 text-sm text-muted-foreground transition-colors duration-200 hover:text-foreground">
           <LogOut style={{ width:14, height:14 }} /> Sign out
         </button>
       </div>
@@ -1146,8 +1134,8 @@ export default function ProDashboard() {
       <div style={{ flex:1, display:"flex", flexDirection:"column", minWidth:0, overflow:"hidden" }}>
         {/* Topbar */}
         <header style={{ height:54, flexShrink:0, background:"var(--card)", borderBottom:`1px solid var(--border)`, display:"flex", alignItems:"center", justifyContent:"space-between", padding:"0 20px", gap:12 }}>
-          <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-            <button className="lg:hidden" onClick={() => setDrawerOpen(true)} style={{ background:"var(--secondary)", border:"none", borderRadius:8, padding:7, cursor:"pointer", color:"var(--muted-foreground)", display:"flex" }}>
+          <div className="flex items-center gap-3">
+            <button className="lg:hidden flex cursor-pointer rounded-lg border-none bg-secondary p-2 text-muted-foreground" onClick={() => setDrawerOpen(true)} aria-label="Open navigation menu">
               <Menu style={{ width:16, height:16 }} />
             </button>
             <div className="hidden sm:flex" style={{ alignItems:"center", gap:6, fontSize:13, color:T.muted }}>
@@ -1156,7 +1144,7 @@ export default function ProDashboard() {
               <span style={{ color:T.text, fontWeight:500, textTransform:"capitalize" }}>{activeTab.replace("-"," ")}</span>
             </div>
           </div>
-          <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+          <div className="flex items-center gap-3">
             <div className="hidden sm:block"><PlanPill plan={plan} /></div>
             <div style={{ width:32, height:32, borderRadius:"50%", background:"var(--primary)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:"var(--primary-foreground)", flexShrink:0 }}>{initials}</div>
           </div>

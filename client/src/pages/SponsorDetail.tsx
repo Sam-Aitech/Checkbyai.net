@@ -417,7 +417,7 @@ export default function SponsorDetail() {
               <Briefcase className="w-4 h-4 text-muted-foreground" />
               <h2 className="text-base font-semibold text-foreground">Companies House</h2>
               {data.enrichment.companiesHouseSource && (
-                <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 text-[10px] font-semibold px-2 py-0.5 rounded-full">Verified</Badge>
+                <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 text-xs font-semibold px-2 py-0.5 rounded-full">Verified</Badge>
               )}
             </div>
             <div className="grid sm:grid-cols-2 gap-3">
@@ -496,7 +496,7 @@ export default function SponsorDetail() {
                   <h3 className="font-bold text-lg mb-1 leading-snug">
                     Be the first to know if {data.currentName} reapplies
                   </h3>
-                  <p className="text-sm text-white/70 leading-relaxed">
+                  <p className="text-sm hero-text-secondary leading-relaxed">
                     The Home Office updates the register at midnight without notifying
                     anyone. Our system checks every night and will alert you within
                     30 minutes — via WhatsApp, email, or SMS — the moment this
@@ -564,26 +564,26 @@ export default function SponsorDetail() {
           /* ── CTA: active company ──────────────────────────────────────── */
           <div className="bg-slate-900 dark:bg-slate-800 rounded-xl p-6 text-white">
             <div className="flex items-start gap-4">
-              <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center shrink-0">
-                <Bell className="w-5 h-5 text-emerald-400" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-semibold mb-1">
-                  Get instant alerts if {data.currentName} changes
-                </h3>
-                <p className="text-sm text-white/70 mb-4">
+                <div className="w-10 h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center shrink-0" aria-hidden="true">
+                  <Bell className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div>
+                  <h3 className="font-semibold mb-1">
+                    Get instant alerts if {data.currentName} changes
+                  </h3>
+                <p className="text-sm hero-text-secondary mb-4">
                   The Home Office updates the register at midnight without warning. Our
                   Notification Engine checks every night and alerts you within 30 minutes
                   via WhatsApp, email, or SMS.
                 </p>
                 <div className="flex gap-3 flex-wrap">
                   <Link href={`/pricing?plan=starter&company=${encodeURIComponent(data.currentName)}`}>
-                    <Button className="bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-full px-6" data-testid="button-set-alert-cta">
+                    <Button className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-full px-6" data-testid="button-set-alert-cta">
                       Set Up Alerts — from £24.99/mo
                     </Button>
                   </Link>
                   <Link href="/sponsors">
-                    <Button variant="outline" className="border-white/20 text-white hover:bg-white/10 rounded-full bg-transparent">
+                    <Button variant="outline" className="border-white/20 text-white hover:bg-white/10 bg-transparent">
                       <ArrowLeft className="w-4 h-4 mr-1.5" />Browse Register
                     </Button>
                   </Link>

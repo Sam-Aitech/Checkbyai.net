@@ -24,6 +24,7 @@ import Footer from '@/components/Footer'
 import LandingDigest from '@/components/LandingDigest'
 import CosSamplePreview from '@/components/CosSamplePreview'
 import { COMPANY_DETAILS } from '@/lib/companyDetails'
+import { LANDING_COPY } from '@shared/landingCopy'
 
 const AnimatedBackground = lazy(() => import('./AnimatedBackground'))
 const Enhanced3DDemo = lazy(() => import('./Enhanced3DDemo'))
@@ -36,7 +37,7 @@ function FeatureCard({ icon, title, description, index }: { icon: React.ReactNod
   return (
     <motion.div ref={ref} initial={{ opacity: 0, y: 40 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ ...spring, delay: Math.min(index * 0.06, 0.18), duration: 0.45 }} className="group theme-card p-8 overflow-hidden">
       <div className="relative z-10">
-        <div className="mb-6 inline-flex items-center justify-center w-12 h-12 bg-primary/10 rounded-[8px] [&_svg]:w-6 [&_svg]:h-6">{icon}</div>
+        <div className="mb-6 inline-flex items-center justify-center w-12 h-12 bg-primary/10 rounded-lg [&_svg]:w-6 [&_svg]:h-6" aria-hidden="true">{icon}</div>
         <h3 className="text-lg editorial-subheading text-foreground mb-3">{title}</h3>
         <p className="text-sm editorial-body text-muted-foreground">{description}</p>
       </div>
@@ -102,10 +103,10 @@ function RecentlyRevokedSection() {
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <XCircle className="w-5 h-5 text-red-500" />
-                <h2 className="text-xl font-bold text-foreground">Recently Revoked Licences</h2>
+                <h2 className="text-xl font-bold text-foreground">{LANDING_COPY.revoked.title}</h2>
               </div>
               <p className="text-sm text-muted-foreground">
-                Latest removals from the Home Office register, updated nightly.
+                {LANDING_COPY.revoked.sub}
                 {!statsLoading && stats?.lastRunDate && (
                   <span className="ml-1 text-xs text-muted-foreground">
                     Register last checked: {formatRunDate(stats.lastRunDate)}.
@@ -114,8 +115,8 @@ function RecentlyRevokedSection() {
               </p>
             </div>
             <Link href="/sponsor-changes">
-              <Button variant="outline" size="sm" className="rounded-full text-xs">
-                View All Changes <ArrowRight className="w-3 h-3 ml-1" />
+              <Button variant="outline" size="sm" className="text-xs">
+                {LANDING_COPY.revoked.cta} <ArrowRight className="w-3 h-3 ml-1" aria-hidden="true" />
               </Button>
             </Link>
           </div>
@@ -123,7 +124,7 @@ function RecentlyRevokedSection() {
           {isLoading && (
             <div className="space-y-3">
               {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="h-[56px] rounded-[8px] bg-muted animate-pulse" />
+                <div key={i} className="h-14 rounded-lg bg-muted animate-pulse" />
               ))}
             </div>
           )}
@@ -161,13 +162,13 @@ function RecentlyRevokedSection() {
             </div>
           )}
 
-            <div className="mt-5 bg-slate-50 dark:bg-slate-900/50 border border-border rounded-[8px] px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+            <div className="mt-5 bg-slate-50 dark:bg-slate-900/50 border border-border rounded-lg px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
             <p className="text-sm text-muted-foreground">
               <Bell className="w-3.5 h-3.5 inline mr-1 text-emerald-500" />
               Get instant WhatsApp or email alerts when any sponsor revokes.
             </p>
             <Link href="/pricing">
-              <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-full text-xs font-bold">
+              <Button size="sm" className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold">
                 Set Up Alerts
               </Button>
             </Link>
@@ -388,7 +389,7 @@ function UrgencyBanner() {
   if (removedCount > 0) {
     return (
       <div className="bg-red-800 text-white">
-        <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2.5 text-center">
+        <div className="container-wide py-2 flex items-center justify-center gap-2.5 text-center">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
           <p className="text-xs sm:text-sm font-medium">
             <span className="font-bold">{removedCount} sponsor licence{removedCount !== 1 ? "s" : ""} revoked</span>{" "}
@@ -402,8 +403,8 @@ function UrgencyBanner() {
 
   if (changesCount > 0) {
     return (
-      <div className="bg-amber-600 text-white">
-        <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2.5 text-center">
+      <div className="bg-amber-700 text-white">
+        <div className="container-wide py-2 flex items-center justify-center gap-2.5 text-center">
           <Activity className="w-3.5 h-3.5 shrink-0 animate-pulse" aria-hidden="true" />
           <p className="text-xs sm:text-sm font-medium">
             <span className="font-bold">{changesCount} licence change{changesCount !== 1 ? "s" : ""}</span>{" "}
@@ -418,7 +419,7 @@ function UrgencyBanner() {
   if (addedCount > 0) {
     return (
       <div className="bg-emerald-700 text-white">
-        <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2.5 text-center">
+        <div className="container-wide py-2 flex items-center justify-center gap-2.5 text-center">
           <CheckCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
           <p className="text-xs sm:text-sm font-medium">
             <span className="font-bold">{addedCount} new sponsor{addedCount !== 1 ? "s" : ""}</span>{" "}
@@ -435,7 +436,7 @@ function UrgencyBanner() {
   if (data.staleDays >= 3) {
     return (
       <div className="bg-amber-900 text-amber-100">
-        <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2 text-center">
+        <div className="container-wide py-2 flex items-center justify-center gap-2 text-center">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-300" aria-hidden="true" />
           <p className="text-xs sm:text-sm font-medium">
             Register data may be out of date, last checked {formatRunDate(lastRunDate)}. The nightly update may have been delayed.
@@ -447,8 +448,8 @@ function UrgencyBanner() {
 
   // No changes and data is fresh — show a calm confirmation strip
   return (
-    <div className="bg-slate-800 text-slate-200">
-      <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2 text-center">
+      <div className="bg-slate-800 text-slate-200">
+        <div className="container-wide py-2 flex items-center justify-center gap-2 text-center">
         <CheckCircle className="w-3.5 h-3.5 shrink-0 text-emerald-400" aria-hidden="true" />
         <p className="text-xs sm:text-sm font-medium">
           Register checked {formatRunDate(lastRunDate)}, no changes detected.
@@ -482,7 +483,7 @@ function HeroNavDropdown({ label, items }: { label: string; items: HeroNavItem[]
         onClick={() => setOpen(v => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="flex items-center gap-1 px-4 py-2 text-sm text-white/70 hover:text-white font-medium rounded-full hover:bg-white/10 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+        className="flex items-center gap-1 px-4 py-2 text-sm hero-text-secondary hover:text-white font-medium rounded-full hover:bg-white/10 transition-[color,background-color] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
       >
         {label}
         <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
@@ -509,8 +510,8 @@ function HeroNavDropdown({ label, items }: { label: string; items: HeroNavItem[]
                   role="menuitem"
                   className="flex flex-col gap-0.5 px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors group"
                 >
-                  <span className="text-sm font-semibold text-white group-hover:text-emerald-300 transition-colors">{item.label}</span>
-                  <span className="text-xs text-white/50">{item.desc}</span>
+                  <span className="text-sm font-semibold hero-text group-hover:text-emerald-300 transition-colors">{item.label}</span>
+                  <span className="text-xs hero-text-tertiary">{item.desc}</span>
                 </Link>
               ))}
             </div>
@@ -733,10 +734,10 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
             <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-white/5 rounded-full blur-3xl" />
           </div>
 
-          <div className="relative z-10 max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
-            <nav className="flex justify-between items-center py-4 mb-6">
+          <div className="relative z-10 container-wide">
+            <nav className="flex justify-between items-center py-4 mb-6" aria-label="Primary">
               <Link href="/" className="flex items-center shrink-0">
-                <img src={logoImg} alt="CheckByAi.net" width={160} height={40} className="h-10 sm:h-12 w-auto object-contain" />
+                <img src={logoImg} alt="CheckByAi.net" width={160} height={40} className="h-10 w-auto object-contain" />
               </Link>
 
               {/* Desktop grouped nav */}
@@ -749,8 +750,8 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                     { href: "/sponsor-changes", label: "Licence Changes",   desc: "Recent additions and revocations" },
                   ]}
                 />
-                <Link href="/dashboard" className="px-4 py-2 text-sm text-white/70 hover:text-white font-medium rounded-full hover:bg-white/10 transition-all duration-200">Verify CoS</Link>
-                <Link href="/pricing"   className="px-4 py-2 text-sm text-white/70 hover:text-white font-medium rounded-full hover:bg-white/10 transition-all duration-200">Pricing</Link>
+                <Link href="/dashboard" className="px-4 py-2 text-sm hero-text-secondary hover:text-white font-medium rounded-full hover:bg-white/10 transition-[color,background-color] duration-200">Verify CoS</Link>
+                <Link href="/pricing"   className="px-4 py-2 text-sm hero-text-secondary hover:text-white font-medium rounded-full hover:bg-white/10 transition-[color,background-color] duration-200">Pricing</Link>
                 <HeroNavDropdown
                   label="Resources"
                   items={[
@@ -763,10 +764,10 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
               </div>
 
               <div className="flex items-center gap-2">
-                <Link href="/pricing" className="hidden sm:flex items-center gap-1.5 px-4 py-2 text-sm text-white/70 hover:text-white font-medium rounded-full hover:bg-white/10 transition-all duration-200">
+                <Link href="/pricing" className="hidden sm:flex items-center gap-1.5 px-4 py-2 text-sm hero-text-secondary hover:text-white font-medium rounded-full hover:bg-white/10 transition-[color,background-color] duration-200">
                   <Bell className="w-3.5 h-3.5" />Get Alerts
                 </Link>
-                <Link href="/login" className="px-4 py-2 text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-all">Sign In</Link>
+                <Link href="/login" className="px-4 py-2 text-sm font-medium hero-text-secondary hover:text-white hover:bg-white/10 rounded-full transition-[color,background-color] duration-200">Sign In</Link>
               </div>
             </nav>
 
@@ -775,59 +776,60 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                 <motion.div initial={{ opacity: 0, x: -20 }} animate={isLoaded ? { opacity: 1, x: 0 } : {}} transition={{ ...springGentle, delay: 0.1 }}>
                   <span className="inline-flex items-center gap-2 text-indigo-200 text-xs font-bold bg-indigo-500/20 px-4 py-2 rounded-full backdrop-blur-sm tracking-wider uppercase">
                     <ShieldCheck className="w-3.5 h-3.5" />
-                    Automated UK Sponsor Licence Monitoring
+                    {LANDING_COPY.hero.eyebrow}
                   </span>
                 </motion.div>
 
-                <motion.h1 initial={{ opacity: 0, y: 30 }} animate={isLoaded ? { opacity: 1, y: 0 } : {}} transition={{ ...spring, delay: 0.2 }} className="text-4xl sm:text-5xl lg:text-[3.4rem] editorial-heading text-white leading-[1.1]">
-                  Automated UK Sponsor Licence{' '}
-                  <span className="text-gradient-indigo">& Integrity Monitoring</span>
+                <motion.h1 initial={{ opacity: 0, y: 30 }} animate={isLoaded ? { opacity: 1, y: 0 } : {}} transition={{ ...spring, delay: 0.2 }} className="type-display hero-text">
+                  {LANDING_COPY.hero.titleMain}{' '}
+                  <span className="text-gradient-indigo">{LANDING_COPY.hero.titleAccent}</span>
                 </motion.h1>
 
-                <motion.p initial={{ opacity: 0, y: 20 }} animate={isLoaded ? { opacity: 1, y: 0 } : {}} transition={{ ...springGentle, delay: 0.35 }} className="text-base text-white/70 max-w-lg leading-relaxed">
-                  We check the sponsor register every weeknight at ~00:30 UTC and alert you when your employer's status changes: Pro subscribers twice daily at 07:00 and 19:00 UTC, Starter subscribers by 18:00 UTC the same day.
+                <motion.p initial={{ opacity: 0, y: 20 }} animate={isLoaded ? { opacity: 1, y: 0 } : {}} transition={{ ...springGentle, delay: 0.35 }} className="type-body-sm hero-text-secondary max-w-lg">
+                  {LANDING_COPY.hero.sub}
                 </motion.p>
 
                 {/* ── Hero search box ───────────────────────────────────── */}
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={isLoaded ? { opacity: 1, y: 0 } : {}} transition={{ ...spring, delay: 0.45 }} className="space-y-3">
                   <div className="relative">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40 pointer-events-none" />
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 hero-text-tertiary pointer-events-none" aria-hidden="true" />
                     <input
                       type="text"
                       ref={searchInputRef}
-                      placeholder="Search any employer, e.g. NHS, Tata, Deloitte…"
+                      placeholder={LANDING_COPY.hero.searchPlaceholder}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && handleSearchSubmit()}
-                      className="w-full pl-11 pr-28 h-14 bg-white/10 border border-white/20 rounded-xl text-white placeholder:text-white/40 text-sm focus:outline-none focus:border-emerald-400 focus:bg-white/15 transition-all"
+                      aria-label="Search the UK sponsor register by employer name"
+                      className="hero-input w-full pl-11 pr-28 h-14 min-h-[56px] bg-white/10 border border-white/20 rounded-xl hero-text text-sm hover:bg-white/15 focus:bg-white/15 focus:border-white/40 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-transparent transition-[background-color,border-color,box-shadow] duration-200"
                     />
                     <button
                       onClick={handleSearchSubmit}
                       disabled={searchQuery.trim().length < 3 || searchLoading}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-white rounded-lg px-4 h-10 text-sm font-semibold transition-colors flex items-center gap-1.5"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg px-4 h-10 text-sm font-semibold transition-colors flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
                     >
                       {heroSearchButtonLabel(searchLoading, alertMeOnSubmit)}
                     </button>
                   </div>
                   <div className="flex items-center justify-between gap-3 flex-wrap">
-                    <p className="text-xs text-white/50">Free, unlimited searches. No login required. 124,000+ licensed sponsors.</p>
-                    <label className="flex items-center gap-2 text-xs text-white/70 cursor-pointer select-none">
-                      <Switch checked={alertMeOnSubmit} onCheckedChange={setAlertMeOnSubmit} className="scale-90" />
+                    <p className="text-xs hero-text-tertiary">{LANDING_COPY.hero.searchHelper}</p>
+                    <label className="flex items-center gap-2 min-h-[44px] text-xs hero-text-secondary cursor-pointer select-none">
+                      <Switch checked={alertMeOnSubmit} onCheckedChange={setAlertMeOnSubmit} aria-label="Also alert me when this employer's licence changes" className="focus-visible:ring-white focus-visible:ring-offset-transparent" />
                       Also alert me when this employer's licence changes
                     </label>
                   </div>
 
                   {/* Hero search results */}
                   {searchLoading && (
-                    <div className="flex items-center gap-2 text-white/60 text-sm py-2">
-                      <Loader2 className="w-4 h-4 animate-spin" />Searching…
+                    <div className="flex items-center gap-2 hero-text-tertiary text-sm py-2" role="status">
+                      <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />Searching…
                     </div>
                   )}
                   {searchUnavailable && (
                     <p className="text-amber-300 text-xs py-1">Search temporarily unavailable. Please try again.</p>
                   )}
                   {!searchLoading && !searchUnavailable && hasSearched && searchResults.length === 0 && !historicalLoading && historicalResults.length === 0 && (
-                    <p className="text-white/60 text-xs py-1">No sponsors found. Try a different name.</p>
+                    <p className="hero-text-tertiary text-xs py-1" role="status">No sponsors found. Try a different name.</p>
                   )}
                   {!searchLoading && searchResults.length > 0 && (
                     <div className="space-y-1.5 max-h-64 overflow-y-auto pr-0.5">
@@ -843,16 +845,16 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                           <div className="bg-white/10 border border-white/15 rounded-lg px-3.5 py-2.5 flex items-center justify-between gap-2 hover:bg-white/15 transition-colors">
                             <div className="min-w-0">
                               <p className="font-semibold text-white text-sm truncate">{r.organisationName}</p>
-                              <p className="text-xs text-white/55 mt-0.5 truncate">
+                              <p className="text-xs hero-text-tertiary mt-0.5 truncate">
                                 {[r.townCity, r.route, grantedYear ? `since ${grantedYear}` : null].filter(Boolean).join(" · ")}
                               </p>
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0">
-                              {isNew && <span className="bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">New</span>}
-                              {isActive && !isNew && <span className="bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">Active</span>}
-                              {isGrace && <span className="bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">Review</span>}
-                              {isRemoved && <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">Revoked</span>}
-                              {isBRated && <span className="bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">B</span>}
+                              {isNew && <span className="bg-blue-600 text-white text-xs font-semibold px-2 py-0.5 rounded-full">New</span>}
+                              {isActive && !isNew && <span className="bg-emerald-700 text-white text-xs font-semibold px-2 py-0.5 rounded-full">Active</span>}
+                              {isGrace && <span className="bg-amber-700 text-white text-xs font-semibold px-2 py-0.5 rounded-full">Review</span>}
+                              {isRemoved && <span className="bg-red-600 text-white text-xs font-semibold px-2 py-0.5 rounded-full">Revoked</span>}
+                              {isBRated && <span className="bg-amber-700 text-white text-xs font-semibold px-2 py-0.5 rounded-full">B</span>}
                             </div>
                           </div>
                         );
@@ -870,8 +872,8 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
 
                   {/* ── Historical / revoked results tier ───────────────── */}
                   {historicalLoading && (
-                    <div className="flex items-center gap-2 text-white/50 text-xs py-1.5">
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />Checking historical register…
+                    <div className="flex items-center gap-2 hero-text-tertiary text-xs py-1.5" role="status">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />Checking historical register…
                     </div>
                   )}
                   {!historicalLoading && historicalResults.length > 0 && (
@@ -895,14 +897,14 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                                     {removedDate ? `Licence revoked · ${removedDate}` : "Licence revoked"}{r.townCity ? ` · ${r.townCity}` : ""}
                                   </p>
                                 </div>
-                                <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 mt-0.5">Revoked</span>
+                                <span className="bg-red-600 text-white text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 mt-0.5">Revoked</span>
                               </div>
                               <div className="mt-2 flex items-center justify-between gap-2">
-                                <p className="text-[11px] text-white/50">Get notified if this licence is restored</p>
+                                <p className="text-xs hero-text-tertiary">Get notified if this licence is restored</p>
                                 <Link
                                   href="/pricing?plan=starter"
                                   onClick={(e) => e.stopPropagation()}
-                                  className="text-[11px] font-bold text-emerald-300 hover:text-emerald-200 whitespace-nowrap"
+                                  className="text-xs font-bold text-emerald-300 hover:text-emerald-200 whitespace-nowrap"
                                 >
                                   Subscribe for alerts →
                                 </Link>
@@ -919,10 +921,10 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                 </motion.div>
 
                 <div className="flex flex-col sm:flex-row sm:items-center gap-x-4 gap-y-2">
-                  <p className="text-xs text-white/60">
+                  <p className="text-xs hero-text-tertiary">
                     CheckByAI is an independent monitoring service and is not affiliated with the UK Home Office or UKVI.
                   </p>
-                  <a href="#cos-verification" className="text-xs text-white/70 hover:text-white underline underline-offset-2 whitespace-nowrap">
+                  <a href="#cos-verification" className="text-xs hero-text-secondary hover:text-white underline underline-offset-2 whitespace-nowrap">
                     Need to verify a CoS document instead? →
                   </a>
                 </div>
@@ -935,15 +937,14 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                     ...(COMPANY_DETAILS.companyNumber ? [{ icon: <Building2 className="w-5 h-5 flex-shrink-0" />, label: COMPANY_DETAILS.companyNumber, colorClass: "text-slate-200", borderClass: "border-slate-400/20 bg-slate-400/10 shadow-[0_0_15px_rgba(148,163,184,0.1)]" }] : []),
                     ...(COMPANY_DETAILS.icoRegistration ? [{ icon: <BadgeCheck className="w-5 h-5 flex-shrink-0" />, label: COMPANY_DETAILS.icoRegistration, colorClass: "text-emerald-200", borderClass: "border-emerald-500/20 bg-emerald-500/10 shadow-[0_0_15px_rgba(16,185,129,0.1)]" }] : []),
                   ].map((item, i) => (
-                    <div key={i} className="flex items-center gap-2.5 text-white/90 hover:text-white transition-all duration-300 md:hover:-translate-y-0.5 group">
+                    <div key={i} className="flex items-center gap-2.5">
                       <span className={cn(
-                        "p-2 rounded-xl border backdrop-blur-md transition-all duration-500",
-                        item.borderClass,
-                        "group-hover:brightness-125 group-hover:shadow-lg"
-                      )}>
+                        "p-2 rounded-lg border",
+                        item.borderClass
+                      )} aria-hidden="true">
                         {item.icon}
                       </span>
-                      <span className={cn("text-[13px] font-semibold tracking-wide drop-shadow-sm", item.colorClass)}>
+                      <span className={cn("text-sm font-semibold tracking-wide drop-shadow-sm", item.colorClass)}>
                         {item.label}
                       </span>
                     </div>
@@ -964,15 +965,15 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
       <LandingDigest />
 
       <section className="py-16 sm:py-20 bg-background">
-        <div className="max-w-3xl mx-auto px-6 text-center">
+        <div className="container-reading text-center">
           <span className="inline-flex items-center gap-2 text-xs font-bold tracking-wider uppercase text-red-600 dark:text-red-400 mb-4">
-            <AlertTriangle className="w-4 h-4" /> Is Your Employer Still Licensed?
+            <AlertTriangle className="w-4 h-4" aria-hidden="true" /> {LANDING_COPY.check.eyebrow}
           </span>
           <h2 className="text-3xl sm:text-4xl editorial-subheading text-foreground mb-3">
-            Check Your Sponsor Right Now
+            {LANDING_COPY.check.title}
           </h2>
           <p className="text-base text-muted-foreground mb-8 max-w-xl mx-auto">
-            124,000+ licensed sponsors from the official UK Home Office Register. Free, unlimited, no login required.
+            {LANDING_COPY.check.sub}
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link href="/sponsors">
@@ -993,19 +994,19 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
       </section>
 
       <section className="py-16 sm:py-20 bg-slate-50 dark:bg-slate-950/50">
-        <div className="max-w-5xl mx-auto px-6 sm:px-8 lg:px-12">
+        <div className="container-content">
           <div className="text-center max-w-2xl mx-auto mb-14">
-            <span className="editorial-caption text-emerald-600 dark:text-emerald-400 block mb-4">Why You Need Alerts</span>
+            <span className="editorial-caption text-emerald-700 dark:text-emerald-400 block mb-4">{LANDING_COPY.why.eyebrow}</span>
             <h2 className="text-3xl sm:text-4xl editorial-subheading text-foreground mb-4">
-              The Home Office Will Not Warn You
+              {LANDING_COPY.why.title}
             </h2>
             <p className="text-base editorial-body text-muted-foreground">
-              When a sponsor licence is revoked, your visa application is silently rejected. We make sure you know first.
+              {LANDING_COPY.why.sub}
             </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
-            <Card className="border-slate-200 dark:border-slate-800 glow-red transition-all duration-300">
+            <Card className="border-slate-200 dark:border-slate-800 glow-red transition-[border-color,box-shadow] duration-200">
               <CardContent className="py-8 px-6">
                 <div className="w-14 h-14 rounded-2xl bg-red-50 dark:bg-red-950/40 flex items-center justify-center mb-5 shadow-sm">
                   <TimelineClockIcon size={30} />
@@ -1014,7 +1015,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                 <p className="text-sm text-muted-foreground leading-relaxed">We check the register at ~00:30 UTC. Letters are posted at 9 AM. Pro subscribers receive a WhatsApp alert by 07:00 UTC, well before their employer's letter arrives. Starter subscribers are alerted by 18:00 UTC, still the same day.</p>
               </CardContent>
             </Card>
-            <Card className="border-slate-200 dark:border-slate-800 glow-amber transition-all duration-300">
+            <Card className="border-slate-200 dark:border-slate-800 glow-amber transition-[border-color,box-shadow] duration-200">
               <CardContent className="py-8 px-6">
                 <div className="w-14 h-14 rounded-2xl bg-amber-50 dark:bg-amber-950/40 flex items-center justify-center mb-5 shadow-sm">
                   <EarlyWarningIcon size={30} />
@@ -1023,7 +1024,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                 <p className="text-sm text-muted-foreground leading-relaxed">We track 90 days of history. See if your employer was downgraded to B-rating last month. A downgrade often comes before a full revocation.</p>
               </CardContent>
             </Card>
-            <Card className="border-slate-200 dark:border-slate-800 glow-teal transition-all duration-300">
+            <Card className="border-slate-200 dark:border-slate-800 glow-teal transition-[border-color,box-shadow] duration-200">
               <CardContent className="py-8 px-6">
                 <div className="w-14 h-14 rounded-2xl bg-teal-50 dark:bg-teal-950/40 flex items-center justify-center mb-5 shadow-sm">
                   <TripleChannelIcon size={30} />
@@ -1037,7 +1038,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
       </section>
 
       <section className="py-12 bg-background border-y border-border/50">
-        <div className="max-w-4xl mx-auto px-6">
+        <div className="container-content">
           <LatestChangeToast />
           <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
             <CardContent className="py-8">
@@ -1058,30 +1059,30 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
       </section>
 
       <section className="py-16 sm:py-20 bg-background">
-        <div className="max-w-4xl mx-auto px-6">
-          <h2 className="text-2xl sm:text-3xl font-bold text-center text-foreground mb-2">Choose Your Protection Level</h2>
+        <div className="container-content">
+          <h2 className="type-h2 text-center text-foreground mb-2">Choose Your Protection Level</h2>
           <p className="text-center text-muted-foreground mb-12">Keep your visa safe. Cancel anytime.</p>
 
           <div className="grid md:grid-cols-3 gap-5">
             <Card className="border-amber-300/50 bg-amber-50/30 dark:bg-amber-950/10 dark:border-amber-800/30 opacity-80">
               <CardContent className="py-6">
-                <p className="text-xs font-bold uppercase tracking-wider text-amber-600 mb-2">Search Only</p>
+                <p className="editorial-caption text-amber-700 dark:text-amber-400 mb-2">Search Only</p>
                 <p className="text-3xl font-extrabold text-foreground mb-1">Free</p>
                 <p className="text-xs text-muted-foreground mb-6">No protection</p>
                 <ul className="space-y-2.5 text-sm mb-6">
                   <li className="flex items-center gap-2 text-muted-foreground"><CheckCircle className="w-4 h-4 text-amber-500" />Check today's status</li>
-                  <li className="flex items-center gap-2 text-muted-foreground/60"><Lock className="w-4 h-4 text-slate-300 dark:text-slate-600" /><span className="line-through">No alerts</span></li>
-                  <li className="flex items-center gap-2 text-muted-foreground/60"><Lock className="w-4 h-4 text-slate-300 dark:text-slate-600" /><span className="line-through">No history</span></li>
-                  <li className="flex items-center gap-2 text-muted-foreground/60"><Lock className="w-4 h-4 text-slate-300 dark:text-slate-600" /><span className="line-through">No monitoring</span></li>
+                  <li className="flex items-center gap-2 text-muted-foreground"><Lock className="w-4 h-4 text-slate-400 dark:text-slate-500" aria-hidden="true" /><span className="line-through">No alerts</span></li>
+                  <li className="flex items-center gap-2 text-muted-foreground"><Lock className="w-4 h-4 text-slate-400 dark:text-slate-500" aria-hidden="true" /><span className="line-through">No history</span></li>
+                  <li className="flex items-center gap-2 text-muted-foreground"><Lock className="w-4 h-4 text-slate-400 dark:text-slate-500" aria-hidden="true" /><span className="line-through">No monitoring</span></li>
                 </ul>
                 <Button variant="outline" disabled className="w-full opacity-60">Free Plan</Button>
               </CardContent>
             </Card>
 
             <Card className="border-emerald-500 dark:border-emerald-400 ring-2 ring-emerald-500/30 relative shadow-lg shadow-emerald-500/10">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2"><Badge className="bg-emerald-600 text-white font-bold text-[10px] uppercase tracking-wider px-3 py-1 shadow-sm">Best Value</Badge></div>
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2"><Badge className="bg-emerald-700 text-white font-bold text-xs uppercase tracking-[0.08em] px-3 py-1 shadow-sm">Best Value</Badge></div>
               <CardContent className="py-6">
-                <p className="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-2">Starter</p>
+                <p className="editorial-caption text-emerald-700 dark:text-emerald-400 mb-2">Starter</p>
                 <div className="mb-1"><span className="text-3xl font-extrabold text-foreground">£24.99</span><span className="text-sm text-muted-foreground">/month</span></div>
                 <p className="text-xs text-muted-foreground mb-6">£239.99/year (save 20%)</p>
                 <ul className="space-y-2.5 text-sm mb-6">
@@ -1090,7 +1091,7 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />30-day history</li>
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />Same-day alerts (18:00 UTC)</li>
                 </ul>
-                <Link href="/pricing?plan=starter"><Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-5 text-base shadow-md"><Zap className="w-4 h-4 mr-2" />Get Same-Day Alerts</Button></Link>
+                <Link href="/pricing?plan=starter"><Button className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-5 text-base shadow-md"><Zap className="w-4 h-4 mr-2" />Get Same-Day Alerts</Button></Link>
               </CardContent>
             </Card>
 
@@ -1115,8 +1116,8 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
       </section>
 
       <section className="py-16 sm:py-20 bg-slate-50 dark:bg-slate-950/50">
-        <div className="max-w-2xl mx-auto px-6">
-          <h2 className="text-2xl sm:text-3xl font-bold text-center text-foreground mb-10">Common Questions</h2>
+        <div className="container-reading">
+          <h2 className="type-h2 text-center text-foreground mb-10">Common Questions</h2>
           <Accordion type="single" collapsible className="space-y-2">
             <AccordionItem value="q1" className="border rounded-xl px-4 bg-white dark:bg-slate-900">
               <AccordionTrigger className="text-sm font-semibold text-foreground hover:no-underline py-4">What if my company is revoked while I sleep?</AccordionTrigger>
@@ -1165,14 +1166,14 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
       </section>
 
       <section id="cos-verification" className="py-16 sm:py-20 bg-background border-t border-border/50 scroll-mt-20">
-        <div className="max-w-5xl mx-auto px-6 sm:px-8 lg:px-12">
+        <div className="container-content">
           <div className="text-center max-w-2xl mx-auto mb-14">
-            <span className="editorial-caption text-primary block mb-4">Also Available</span>
+            <span className="editorial-caption text-primary block mb-4">{LANDING_COPY.cos.eyebrow}</span>
             <h2 className="text-3xl sm:text-4xl editorial-subheading text-foreground mb-4">
-              AI-Assisted Certificate of Sponsorship Authenticity Check
+              {LANDING_COPY.cos.title}
             </h2>
             <p className="text-base editorial-body text-muted-foreground">
-              Received a Certificate of Sponsorship from a prospective employer? Upload the PDF to assess whether the document appears unaltered or has been modified. No personal data is retained at any stage.
+              {LANDING_COPY.cos.sub}
             </p>
           </div>
 
@@ -1186,11 +1187,11 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
 
           <div className="text-center">
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-              <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 px-8 py-3 rounded-full font-semibold shadow-lg transition-all duration-200" onClick={onStartVerification}>
+              <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 px-8 py-3 font-semibold shadow-lg" onClick={onStartVerification}>
                 Verify a Document
                 <ArrowRight className="ml-2 w-4 h-4" />
               </Button>
-              <Button variant="outline" size="lg" className="rounded-full px-6 py-3 font-semibold transition-all duration-200" onClick={() => setShowDemo(true)}>
+              <Button variant="outline" size="lg" className="px-6 py-3 font-semibold" onClick={() => setShowDemo(true)}>
                 <Play className="mr-2 w-4 h-4" />Watch Demo
               </Button>
             </div>
@@ -1204,15 +1205,15 @@ export default function HeroSection({ onStartVerification }: HeroSectionProps) {
       <RecentlyRevokedSection />
 
       <section className="bg-slate-950 text-white py-16">
-        <div className="max-w-2xl mx-auto px-6 text-center">
-          <h2 className="text-2xl sm:text-3xl font-bold mb-3">Stay Ahead of Sponsor Licence Changes</h2>
+        <div className="container-reading text-center">
+          <h2 className="type-h2 hero-text mb-3">Stay Ahead of Sponsor Licence Changes</h2>
           <p className="text-slate-300 mb-8 max-w-lg mx-auto">Get automated alerts the moment a sponsor licence changes status, before it affects your visa, your career, or your future in the UK.</p>
           <Link href="/pricing">
-            <Button size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-base px-10 py-6 rounded-xl shadow-lg shadow-emerald-500/20">
+            <Button size="lg" className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-base px-10 py-6 shadow-lg shadow-emerald-500/20">
               <ShieldCheck className="w-5 h-5 mr-2" />Start Monitoring Now
             </Button>
           </Link>
-          <p className="text-xs text-slate-500 mt-4">Free to start. Cancel anytime.</p>
+          <p className="text-xs text-slate-400 mt-4">Free to start. Cancel anytime.</p>
         </div>
       </section>
 

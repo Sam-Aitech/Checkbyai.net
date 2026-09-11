@@ -55,7 +55,7 @@ const StatusBadge = memo(function StatusBadge({ status, typeRating }: { status: 
   if (status === "REMOVED_REVOKED" || status === "NOT_LISTED") {
     return (
       <Badge className="bg-red-600 text-white border-red-700 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em] whitespace-nowrap">
-        <XCircle className="w-3 h-3 mr-1" />
+        <XCircle className="w-3 h-3 mr-1" aria-hidden="true" />
         Removed
       </Badge>
     );
@@ -64,24 +64,24 @@ const StatusBadge = memo(function StatusBadge({ status, typeRating }: { status: 
     // If newly granted, check if it's a re-activation (not strictly in DB status yet, but logic-wise)
     // For now, we use a single badge, but we can refine if the DB status differentiates.
     return (
-      <Badge className="bg-orange-500 text-white border-orange-600 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em] whitespace-nowrap">
-        <Zap className="w-3 h-3 mr-1" />
+      <Badge className="bg-blue-600 text-white border-blue-700 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em] whitespace-nowrap">
+        <Zap className="w-3 h-3 mr-1" aria-hidden="true" />
         Newly Granted
       </Badge>
     );
   }
   if (status === "REINSTATED") {
      return (
-      <Badge className="bg-emerald-500 text-white border-emerald-600 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em] whitespace-nowrap">
-        <RefreshCw className="w-3 h-3 mr-1" />
+      <Badge className="bg-emerald-700 text-white border-emerald-800 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em] whitespace-nowrap">
+        <RefreshCw className="w-3 h-3 mr-1" aria-hidden="true" />
         Reinstated
       </Badge>
     );
   }
   if (status === "GRACE_PERIOD") {
     return (
-      <Badge className="bg-yellow-500 text-white border-yellow-600 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em] whitespace-nowrap">
-        <Clock className="w-3 h-3 mr-1" />
+      <Badge className="bg-amber-700 text-white border-amber-800 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em] whitespace-nowrap">
+        <Clock className="w-3 h-3 mr-1" aria-hidden="true" />
         Under Review
       </Badge>
     );
@@ -89,13 +89,13 @@ const StatusBadge = memo(function StatusBadge({ status, typeRating }: { status: 
   if (status === "ACTIVE") {
     return (
       <div className="flex items-center gap-1 flex-wrap">
-        <Badge className="bg-emerald-600 text-white border-emerald-700 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em] whitespace-nowrap">
-          <CheckCircle className="w-3 h-3 mr-1" />
+        <Badge className="bg-emerald-700 text-white border-emerald-800 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em] whitespace-nowrap">
+          <CheckCircle className="w-3 h-3 mr-1" aria-hidden="true" />
           Active
         </Badge>
         {isBRated && (
-          <Badge className="bg-amber-500 text-white border-amber-600 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em] whitespace-nowrap">
-            <AlertTriangle className="w-3 h-3 mr-1" />
+          <Badge className="bg-amber-700 text-white border-amber-800 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em] whitespace-nowrap">
+            <AlertTriangle className="w-3 h-3 mr-1" aria-hidden="true" />
             B-Rated
           </Badge>
         )}
@@ -104,7 +104,7 @@ const StatusBadge = memo(function StatusBadge({ status, typeRating }: { status: 
   }
   return (
     <Badge className="bg-slate-500 text-white border-slate-600 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em] whitespace-nowrap">
-      <HelpCircle className="w-3 h-3 mr-1" />
+      <HelpCircle className="w-3 h-3 mr-1" aria-hidden="true" />
       Unknown
     </Badge>
   );
@@ -130,7 +130,7 @@ const StatCard = memo(function StatCard({
         <Icon className="w-5 h-5" />
       </div>
       <div>
-        <p className="text-xl font-bold tabular-nums leading-none">
+        <p className="text-xl font-bold tabular-nums leading-tight">
           {value !== undefined ? value.toLocaleString() : <span className="inline-block w-16 h-5 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />}
         </p>
         <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
@@ -387,7 +387,7 @@ export default function SponsorDirectory() {
           {/* A–Z quick filter */}
           <div className="border-t pt-3">
             <div className="flex items-center gap-1 flex-wrap">
-              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mr-1">A–Z</span>
+              <span className="type-caption text-muted-foreground mr-1">A–Z</span>
               {ALPHABET.map((l) => (
                 <button
                   key={l}

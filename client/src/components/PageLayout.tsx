@@ -79,7 +79,7 @@ function NavDropdown({ item, dark = false }: NavDropdownProps) {
         onClick={() => setOpen(v => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className={`flex items-center gap-1 px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+        className={`flex items-center gap-1 px-4 py-2 text-sm font-medium rounded-full transition-[color,background-color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
           dark
             ? isChildActive ? "text-white bg-white/10 font-semibold" : "text-slate-300 hover:text-white hover:bg-white/5"
             : isChildActive ? "text-primary bg-primary/10 font-semibold" : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -212,7 +212,7 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
                       key={item.href}
                       href={item.href!}
                       aria-current={isActive ? "page" : undefined}
-                      className={`px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                      className={`px-4 py-2 text-sm font-medium rounded-full transition-[color,background-color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                         darkNav
                           ? isActive ? "text-white bg-white/10 font-semibold" : "text-slate-300 hover:text-white hover:bg-white/5"
                           : isActive ? "text-primary bg-primary/10 font-semibold" : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -231,7 +231,7 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
                     {(isPro || isAdmin) && (
                       <Link
                         href="/pro-dashboard"
-                        className="hidden sm:flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-full shadow-sm shadow-emerald-500/20 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
+                        className="hidden sm:flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-emerald-700 hover:bg-emerald-800 rounded-full shadow-sm shadow-emerald-500/20 transition-[color,background-color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2"
                       >
                         <LayoutDashboard className="w-4 h-4" />
                         My Dashboard
@@ -243,14 +243,14 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
                   <>
                     <Link
                       href="/login"
-                      className={`hidden sm:block px-4 py-2 text-sm font-medium rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${darkNav ? "text-slate-300 hover:text-white hover:bg-white/5" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+                      className={`hidden sm:block px-4 py-2 text-sm font-medium rounded-full transition-[color,background-color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${darkNav ? "text-slate-300 hover:text-white hover:bg-white/5" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
                     >
                       Sign In
                     </Link>
                     {location !== "/pricing" && (
                       <Link
                         href="/pricing"
-                        className="hidden sm:flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-full shadow-sm shadow-emerald-500/20 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
+                        className="hidden sm:flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-white bg-emerald-700 hover:bg-emerald-800 rounded-full shadow-sm shadow-emerald-500/20 transition-[color,background-color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2"
                       >
                         <Bell className="w-3.5 h-3.5" />
                         Get Alerts
@@ -358,7 +358,7 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
                         <Link
                           href="/pro-dashboard"
                           onClick={closeMobileMenu}
-                          className="flex items-center justify-center gap-2 w-full px-4 py-3 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all"
+                            className="flex items-center justify-center gap-2 w-full px-4 py-3 text-sm font-bold text-white bg-emerald-700 hover:bg-emerald-800 rounded-xl transition-[color,background-color] duration-200"
                         >
                           <LayoutDashboard className="w-4 h-4" />
                           My Dashboard
@@ -377,7 +377,7 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
                           <Link
                             href="/pricing"
                             onClick={closeMobileMenu}
-                            className="flex items-center justify-center gap-2 w-full px-4 py-3 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all"
+                          className="flex items-center justify-center gap-2 w-full px-4 py-3 text-sm font-bold text-white bg-emerald-700 hover:bg-emerald-800 rounded-xl transition-[color,background-color] duration-200"
                           >
                             <Bell className="w-4 h-4" />
                             Get Licence Alerts

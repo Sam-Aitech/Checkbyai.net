@@ -51,7 +51,7 @@ export default function VerificationResults({ result, verificationId }: Verifica
       accent: "text-emerald-600 dark:text-emerald-400",
       bg: "bg-emerald-500/5 dark:bg-emerald-500/10",
       border: "border-emerald-500/20",
-      badgeBg: "bg-emerald-500",
+      badgeBg: "bg-emerald-700",
       icon: <CheckCircle className="w-5 h-5" />,
     },
     suspicious: {
@@ -59,7 +59,7 @@ export default function VerificationResults({ result, verificationId }: Verifica
       accent: "text-amber-600 dark:text-amber-400",
       bg: "bg-amber-500/5 dark:bg-amber-500/10",
       border: "border-amber-500/20",
-      badgeBg: "bg-amber-500",
+      badgeBg: "bg-amber-700",
       icon: <AlertTriangle className="w-5 h-5" />,
     },
     fake: {
@@ -67,7 +67,7 @@ export default function VerificationResults({ result, verificationId }: Verifica
       accent: "text-red-600 dark:text-red-400",
       bg: "bg-red-500/5 dark:bg-red-500/10",
       border: "border-red-500/20",
-      badgeBg: "bg-red-500",
+      badgeBg: "bg-red-600",
       icon: <XCircle className="w-5 h-5" />,
     },
   };
@@ -79,7 +79,7 @@ export default function VerificationResults({ result, verificationId }: Verifica
 
   const severityConfig = {
     critical: { color: "text-red-600 dark:text-red-400", bg: "bg-red-500/10", label: "Critical" },
-    warning: { color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10", label: "Warning" },
+    warning: { color: "text-amber-700 dark:text-amber-400", bg: "bg-amber-500/10", label: "Warning" },
     info: { color: "text-primary", bg: "bg-primary/10", label: "Info" },
   };
 
@@ -156,10 +156,10 @@ export default function VerificationResults({ result, verificationId }: Verifica
               {result.receiptId && (
                 <div className="flex items-center justify-between bg-muted/50 rounded-xl px-3 py-2">
                   <div>
-                    <span className="text-[10px] text-muted-foreground block uppercase tracking-widest">Receipt ID</span>
+                    <span className="type-caption text-muted-foreground block">Receipt ID</span>
                     <span className="text-sm font-mono text-foreground">{result.receiptId}</span>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => copyToClipboard(result.receiptId!, "Receipt ID")} className="h-8 w-8 p-0 rounded-xl">
+                    <Button variant="ghost" size="sm" aria-label="Copy receipt ID" onClick={() => copyToClipboard(result.receiptId!, "Receipt ID")} className="h-8 w-8 p-0">
                     <Copy className="w-3.5 h-3.5" />
                   </Button>
                 </div>
@@ -180,12 +180,12 @@ export default function VerificationResults({ result, verificationId }: Verifica
               {result.documentHash && (
                 <div className="flex items-center justify-between bg-muted/50 rounded-xl px-3 py-2">
                   <div>
-                    <span className="text-[10px] text-muted-foreground block uppercase tracking-widest">Document Hash</span>
+                    <span className="type-caption text-muted-foreground block">Document Hash</span>
                     <span className="text-sm font-mono text-foreground">
                       {result.documentHash.length > 16 ? `${result.documentHash.slice(0, 8)}...${result.documentHash.slice(-8)}` : result.documentHash}
                     </span>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => copyToClipboard(result.documentHash!, "Document Hash")} className="h-8 w-8 p-0 rounded-xl">
+                    <Button variant="ghost" size="sm" aria-label="Copy document hash" onClick={() => copyToClipboard(result.documentHash!, "Document Hash")} className="h-8 w-8 p-0">
                     <Copy className="w-3.5 h-3.5" />
                   </Button>
                 </div>
@@ -220,12 +220,12 @@ export default function VerificationResults({ result, verificationId }: Verifica
                     >
                       <div className="flex items-center gap-3 flex-1 min-w-0">
                         {check.passed ? (
-                          <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                          <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" aria-hidden="true" />
                         ) : (
-                          <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                          <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" aria-hidden="true" />
                         )}
                         <span className="text-sm font-medium text-foreground truncate">{check.name}</span>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold tracking-wider uppercase flex-shrink-0 ${sev.bg} ${sev.color}`}>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold tracking-wider uppercase flex-shrink-0 ${sev.bg} ${sev.color}`}>
                           {sev.label}
                         </span>
                       </div>
@@ -329,10 +329,10 @@ export default function VerificationResults({ result, verificationId }: Verifica
         <div className="flex items-start gap-2">
           <Info className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-[11px] text-blue-800 dark:text-blue-300 leading-relaxed font-medium mb-1">
+            <p className="text-xs text-blue-800 dark:text-blue-300 leading-relaxed font-medium mb-1">
               Technical Analysis Only — Not Legal or Immigration Advice
             </p>
-            <p className="text-[11px] text-blue-700 dark:text-blue-400 leading-relaxed">
+            <p className="text-xs text-blue-700 dark:text-blue-400 leading-relaxed">
               This is a forensic analysis of document metadata and structure only. It does not constitute legal or immigration advice and should not be used as the sole basis for any immigration decision. If you have concerns about a document, consult an{' '}
               <a
                 href="https://www.gov.uk/find-immigration-adviser"
@@ -351,7 +351,7 @@ export default function VerificationResults({ result, verificationId }: Verifica
       <div className="px-4 py-3 bg-primary/[0.03] dark:bg-primary/[0.06] border border-border rounded-xl">
         <div className="flex items-start gap-2">
           <Lock className="w-3.5 h-3.5 text-primary flex-shrink-0 mt-0.5" />
-          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            <p className="text-xs text-muted-foreground leading-relaxed">
             UK GDPR and Data Protection Act 2018: Your original document has been permanently deleted from our servers. Only metadata was processed. Free users: these results will not be saved. Paid account holders: only the verification result is retained for your records.
           </p>
         </div>
@@ -363,7 +363,7 @@ export default function VerificationResults({ result, verificationId }: Verifica
             variant="outline"
             size="sm"
             onClick={() => setShowFeedback(!showFeedback)}
-            className="w-full flex items-center justify-center gap-2 rounded-xl border border-border"
+            className="w-full flex items-center justify-center gap-2 border border-border"
             data-testid="toggle-feedback"
           >
             <span className="text-xs font-medium">Rate this verification</span>

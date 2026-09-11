@@ -223,7 +223,7 @@ function EnrichmentQueueTab() {
                   <span>{data.completed.toLocaleString()} / {data.total.toLocaleString()} ({progressPct}%)</span>
                 </div>
                 <div className="h-2 bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                  <div className="h-full bg-violet-500 rounded-full transition-all" style={{ width: `${progressPct}%` }} />
+                  <div className="h-full bg-violet-500 rounded-full transition-[width] duration-300" style={{ width: `${progressPct}%` }} />
                 </div>
               </div>
 
@@ -267,7 +267,7 @@ function EnrichmentQueueTab() {
                       <div className="flex flex-col gap-1">
                         {rows.map(({ status, count }) => (
                           <div key={status} className="flex justify-between items-center text-xs">
-                            <Badge variant="outline" className={`${STATUS_COLORS[status] ?? ''} text-[10px] py-0`}>{status}</Badge>
+                            <Badge variant="outline" className={`${STATUS_COLORS[status] ?? ''} text-xs py-0`}>{status}</Badge>
                             <span className="text-gray-500 dark:text-slate-400">{count.toLocaleString()}</span>
                           </div>
                         ))}
@@ -297,7 +297,7 @@ function EnrichmentQueueTab() {
                       <tbody>
                         {data.stalled.map((row, i) => (
                           <tr key={i} className="border-b border-gray-100 dark:border-slate-700/50">
-                            <td className="py-2 px-3 font-mono text-[10px] max-w-[160px] truncate text-gray-700 dark:text-slate-300">{row.fingerprint}</td>
+                            <td className="py-2 px-3 font-mono text-xs max-w-[160px] truncate text-gray-700 dark:text-slate-300">{row.fingerprint}</td>
                             <td className="py-2 px-3 text-gray-600 dark:text-slate-400">{row.job_type}</td>
                             <td className="py-2 px-3 text-amber-500">{new Date(row.locked_at).toLocaleString()}</td>
                             <td className="py-2 px-3 text-gray-400 dark:text-slate-500 truncate max-w-[120px]">{row.locked_by ?? '—'}</td>
@@ -328,10 +328,10 @@ function EnrichmentQueueTab() {
                       <tbody>
                         {data.recentFailures.map((row, i) => (
                           <tr key={i} className="border-b border-gray-100 dark:border-slate-700/50 hover:bg-gray-50 dark:hover:bg-slate-700/20">
-                            <td className="py-2 px-3 font-mono text-[10px] max-w-[140px] truncate text-gray-700 dark:text-slate-300">{row.fingerprint}</td>
+                            <td className="py-2 px-3 font-mono text-xs max-w-[140px] truncate text-gray-700 dark:text-slate-300">{row.fingerprint}</td>
                             <td className="py-2 px-3 text-gray-600 dark:text-slate-400">{row.job_type}</td>
                             <td className="py-2 px-3">
-                              <Badge variant="outline" className={`${STATUS_COLORS[row.status] ?? ''} text-[10px] py-0`}>{row.status}</Badge>
+                                <Badge variant="outline" className={`${STATUS_COLORS[row.status] ?? ''} text-xs py-0`}>{row.status}</Badge>
                             </td>
                             <td className="py-2 px-3 text-gray-500 dark:text-slate-400">{row.attempt_count}</td>
                             <td className="py-2 px-3 text-red-400 max-w-[200px] truncate" title={row.error_message ?? ''}>{row.error_message ?? '—'}</td>
@@ -2221,7 +2221,7 @@ export default function SimpleAdmin() {
                                 <div className="flex flex-col gap-1">
                                   {getStatusBadge(log.result, log.confidence)}
                                   {(log as any).adminStatus === 'fake' && (
-                                    <span className="text-[10px] font-medium text-red-500 dark:text-red-400 uppercase tracking-wide">Admin override</span>
+                                    <span className="text-xs font-medium text-red-600 dark:text-red-400 uppercase tracking-wide">Admin override</span>
                                   )}
                                 </div>
                               </td>
@@ -3236,7 +3236,7 @@ export default function SimpleAdmin() {
                           onDragOver={(e) => { e.preventDefault(); setDragOverId(rule.id); }}
                           onDrop={() => handleRuleDrop(rule.id)}
                           onDragEnd={() => { setDragId(null); setDragOverId(null); }}
-                          className={`rounded-lg border transition-all ${
+                          className={`rounded-lg border transition-[border-color,background-color,opacity,transform] duration-200 ${
                             dragOverId === rule.id && dragId !== rule.id
                               ? 'border-pink-400 bg-pink-50/30 dark:bg-pink-900/10'
                               : rule.isActive
@@ -3285,19 +3285,19 @@ export default function SimpleAdmin() {
                               {/* Content */}
                               <div className="flex-1 min-w-0">
                                 <div className="flex flex-wrap items-center gap-1.5 mb-1">
-                                  <Badge className="bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20 rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap">
+                                    <Badge className="bg-pink-500/10 text-pink-700 dark:text-pink-400 border-pink-500/20 rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap">
                                     {rule.category}
                                   </Badge>
                                   {rule.isActive ? (
-                                    <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
+                                      <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20 rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wide whitespace-nowrap">
                                       <CheckCircle className="w-3 h-3 mr-1 inline" />Active
                                     </Badge>
                                   ) : (
-                                    <Badge className="bg-gray-400/10 text-gray-500 dark:text-slate-500 border-gray-400/20 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
+                                      <Badge className="bg-gray-400/10 text-gray-500 dark:text-slate-400 border-gray-400/20 rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wide whitespace-nowrap">
                                       <XCircle className="w-3 h-3 mr-1 inline" />Disabled
                                     </Badge>
                                   )}
-                                  <span className="font-mono text-[10px] text-gray-400 dark:text-slate-500">p={rule.priority}</span>
+                                  <span className="font-mono text-xs text-gray-500 dark:text-slate-400">p={rule.priority}</span>
                                 </div>
                                 <p className="text-sm text-gray-700 dark:text-slate-300 leading-snug">{rule.ruleText}</p>
                               </div>
@@ -3542,10 +3542,10 @@ export default function SimpleAdmin() {
                               <td className="py-1.5 pr-3 text-gray-700 dark:text-slate-300 font-mono">{run.runDate}</td>
                               <td className="py-1.5 pr-3 text-gray-500 dark:text-slate-400 capitalize">{run.source}</td>
                               <td className="py-1.5 pr-3">
-                                <span className={`inline-block px-1.5 py-0.5 rounded text-[11px] font-medium
+                                <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium
                                   ${run.status === 'success'
-                                    ? 'bg-green-500/10 text-green-500 dark:text-green-400'
-                                    : 'bg-red-500/10 text-red-500 dark:text-red-400'}`}>
+                                    ? 'bg-green-500/10 text-green-700 dark:text-green-400'
+                                    : 'bg-red-500/10 text-red-600 dark:text-red-400'}`}>
                                   {run.status}
                                 </span>
                               </td>
@@ -3581,7 +3581,7 @@ export default function SimpleAdmin() {
                       {jobHistory.some((r: any) => r.errorMessage) && (
                         <div className="mt-3 space-y-1 border-t border-gray-100 dark:border-slate-700 pt-2">
                           {jobHistory.filter((r: any) => r.errorMessage).slice(0, 3).map((r: any) => (
-                            <p key={r.id} className="text-[11px] text-red-400 font-mono truncate">
+                            <p key={r.id} className="text-xs text-red-500 dark:text-red-400 font-mono truncate">
                               {r.runDate}: {r.errorMessage}
                             </p>
                           ))}
@@ -3616,7 +3616,7 @@ export default function SimpleAdmin() {
                       <div className="space-y-3">
                         <div className="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2.5">
                           <div
-                            className="bg-emerald-500 h-2.5 rounded-full transition-all duration-500"
+                            className="bg-emerald-500 h-2.5 rounded-full transition-[width] duration-500"
                             style={{ width: `${initProgress.progressPct}%` }}
                           />
                         </div>
@@ -3941,7 +3941,7 @@ export default function SimpleAdmin() {
                                 </div>
                                 <div className="w-full bg-gray-200 dark:bg-slate-600 rounded-full h-2 mb-2">
                                   <div
-                                    className="bg-green-500 h-2 rounded-full transition-all"
+                                    className="bg-green-500 h-2 rounded-full transition-[width] duration-300"
                                     style={{ width: `${successRate}%` }}
                                   />
                                 </div>

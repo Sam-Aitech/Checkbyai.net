@@ -156,7 +156,7 @@ function StatusBadge({ status, typeRating }: { status: string; typeRating: strin
   if (status === "REMOVED_REVOKED" || status === "NOT_LISTED") {
     return (
       <Badge className="bg-red-600 text-white border-red-700 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em]">
-        <XCircle className="w-3 h-3 mr-1" />
+        <XCircle className="w-3 h-3 mr-1" aria-hidden="true" />
         Removed
       </Badge>
     );
@@ -164,8 +164,8 @@ function StatusBadge({ status, typeRating }: { status: string; typeRating: strin
 
   if (status === "NEWLY_GRANTED") {
     return (
-      <Badge className="bg-orange-500 text-white border-orange-600 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em]">
-        <Zap className="w-3 h-3 mr-1" />
+      <Badge className="bg-blue-600 text-white border-blue-700 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em]">
+        <Zap className="w-3 h-3 mr-1" aria-hidden="true" />
         Newly Granted
       </Badge>
     );
@@ -173,8 +173,8 @@ function StatusBadge({ status, typeRating }: { status: string; typeRating: strin
 
   if (status === "GRACE_PERIOD") {
     return (
-      <Badge className="bg-yellow-500 text-white border-yellow-600 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em]">
-        <Clock className="w-3 h-3 mr-1" />
+      <Badge className="bg-amber-700 text-white border-amber-800 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em]">
+        <Clock className="w-3 h-3 mr-1" aria-hidden="true" />
         Under Review
       </Badge>
     );
@@ -183,13 +183,13 @@ function StatusBadge({ status, typeRating }: { status: string; typeRating: strin
   if (status === "ACTIVE") {
     return (
       <div className="flex items-center gap-1.5 flex-wrap">
-        <Badge className="bg-emerald-600 text-white border-emerald-700 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em]">
-          <CheckCircle className="w-3 h-3 mr-1" />
+        <Badge className="bg-emerald-700 text-white border-emerald-800 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em]">
+          <CheckCircle className="w-3 h-3 mr-1" aria-hidden="true" />
           Active
         </Badge>
         {isBRated && (
-          <Badge className="bg-amber-500 text-white border-amber-600 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em]">
-            <AlertTriangle className="w-3 h-3 mr-1" />
+          <Badge className="bg-amber-700 text-white border-amber-800 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em]">
+            <AlertTriangle className="w-3 h-3 mr-1" aria-hidden="true" />
             B-Rated
           </Badge>
         )}
@@ -199,8 +199,8 @@ function StatusBadge({ status, typeRating }: { status: string; typeRating: strin
 
   // Unknown / future status — render neutral grey badge, NEVER silently as Active.
   return (
-    <Badge className="bg-slate-500 text-white border-slate-600 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em]">
-      <HelpCircle className="w-3 h-3 mr-1" />
+      <Badge className="bg-slate-500 text-white border-slate-600 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em]">
+      <HelpCircle className="w-3 h-3 mr-1" aria-hidden="true" />
       Unknown
     </Badge>
   );
@@ -486,10 +486,10 @@ function HeroSection({ onScrollToSearch }: { onScrollToSearch: () => void }) {
     <section className="relative overflow-hidden bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/20 via-transparent to-transparent" />
       <div className="relative max-w-4xl mx-auto px-4 py-16 sm:py-24 text-center">
-        <p className="text-[11px] sm:text-xs font-bold tracking-wide uppercase text-indigo-300 mb-6">
+        <p className="editorial-caption text-indigo-300 mb-6">
           Automated UK Sponsor Licence Monitoring
         </p>
-        <h1 className="text-3xl md:text-4xl font-bold tracking-tight leading-[1.1] mb-6">
+        <h1 className="type-h1 hero-text mb-6">
           Know the Moment Your Sponsor's Licence Status Changes
         </h1>
         <p className="text-base sm:text-lg text-slate-300 max-w-2xl mx-auto mb-10 leading-relaxed">
@@ -505,7 +505,7 @@ function HeroSection({ onScrollToSearch }: { onScrollToSearch: () => void }) {
             <span>Search &amp; Start Monitoring (Free)</span>
           </Button>
         </div>
-        <p className="text-xs text-slate-500 mt-6">
+        <p className="text-xs text-slate-400 mt-6">
           Free plan monitors 1 company with email alerts, no card required. CheckByAI is not affiliated with the UK Home Office or UKVI.
         </p>
       </div>
@@ -792,7 +792,7 @@ function PricingSection({ isAuthenticated, tier }: { isAuthenticated: boolean; t
 
           <Card className="border-emerald-500 dark:border-emerald-400 ring-2 ring-emerald-500/30 relative shadow-lg shadow-emerald-500/10">
             <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-              <Badge className="bg-emerald-600 text-white font-bold text-[10px] uppercase tracking-wider px-3 py-1 shadow-sm">Best Value</Badge>
+              <Badge className="bg-emerald-700 text-white font-bold text-xs uppercase tracking-[0.08em] px-3 py-1 shadow-sm">Best Value</Badge>
             </div>
             <CardContent className="py-6">
               <p className="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-2">Starter</p>
@@ -1294,8 +1294,8 @@ export default function SponsorMonitor() {
                             <StatusBadge status={result.status} typeRating={result.typeRating} />
                           </div>
                           {result.isNew && (
-                            <p className="text-[11px] font-semibold text-orange-600 dark:text-orange-400 mb-1.5 flex items-center gap-1">
-                              <Zap className="w-3 h-3" /> Recently added to the UK sponsor register
+                            <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-1.5 flex items-center gap-1">
+                              <Zap className="w-3 h-3" aria-hidden="true" /> Recently added to the UK sponsor register
                             </p>
                           )}
                           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
@@ -1450,7 +1450,7 @@ export default function SponsorMonitor() {
                                   <div className="flex items-center gap-2">
                                     <Briefcase className="w-3.5 h-3.5 text-violet-500" />
                                     <span className="text-xs font-medium text-foreground">Job Opening Alerts</span>
-                                    <Badge className="text-[9px] px-1.5 py-0 bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-950 dark:text-violet-300 dark:border-violet-800">Pro</Badge>
+                                    <Badge className="text-xs px-1.5 py-0 bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-950 dark:text-violet-300 dark:border-violet-800">Pro</Badge>
                                   </div>
                                   <div className="flex items-center gap-2">
                                     {toggleJobAlertMutation.isPending && toggleJobAlertMutation.variables?.fingerprint === watch.fingerprint
@@ -1706,7 +1706,7 @@ function NotificationSettings({ user }: { user: any }) {
                   <p className="text-xs text-muted-foreground ml-7">Receiving browser push notifications</p>
                 )}
                 {!pushSubscribed && Notification.permission === "denied" && (
-                  <p className="text-xs text-amber-600 dark:text-amber-400 ml-7">Push permission was denied. Update your browser site settings to re-enable.</p>
+                  <p className="text-xs text-amber-700 dark:text-amber-400 ml-7">Push permission was denied. Update your browser site settings to re-enable.</p>
                 )}
               </div>
             </>
@@ -1741,16 +1741,16 @@ function getChangeColor(changeType: string) {
 
 function getChannelBadge(channel: string) {
   switch (channel) {
-    case "email": return <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1"><Mail className="w-3 h-3" />Email</Badge>;
-    case "whatsapp": return <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1"><MessageSquare className="w-3 h-3" />WhatsApp</Badge>;
-    case "sms": return <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1"><Phone className="w-3 h-3" />SMS</Badge>;
-    default: return <Badge variant="outline" className="text-[10px] px-1.5 py-0">{channel}</Badge>;
+    case "email": return <Badge variant="outline" className="text-xs px-1.5 py-0 gap-1"><Mail className="w-3 h-3" aria-hidden="true" />Email</Badge>;
+    case "whatsapp": return <Badge variant="outline" className="text-xs px-1.5 py-0 gap-1"><MessageSquare className="w-3 h-3" aria-hidden="true" />WhatsApp</Badge>;
+    case "sms": return <Badge variant="outline" className="text-xs px-1.5 py-0 gap-1"><Phone className="w-3 h-3" aria-hidden="true" />SMS</Badge>;
+    default: return <Badge variant="outline" className="text-xs px-1.5 py-0">{channel}</Badge>;
   }
 }
 
 function getDeliveryStatus(status: string) {
   switch (status) {
-    case "sent": case "delivered": return <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400"><CheckCheck className="w-3 h-3" />{status === "delivered" ? "Delivered" : "Sent"}</span>;
+    case "sent": case "delivered": return <span className="inline-flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-400"><CheckCheck className="w-3 h-3" aria-hidden="true" />{status === "delivered" ? "Delivered" : "Sent"}</span>;
     case "failed": return <span className="inline-flex items-center gap-1 text-xs text-red-600 dark:text-red-400"><XOctagon className="w-3 h-3" />Failed</span>;
     case "queued": return <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Clock3 className="w-3 h-3" />Queued</span>;
     default: return <span className="text-xs text-muted-foreground">{status}</span>;
@@ -1791,7 +1791,7 @@ function NotificationHistory() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap mb-1.5">
                             <h4 className="font-semibold text-foreground text-sm">{entry.organisationName}</h4>
-                            <Badge className={`text-[10px] px-1.5 py-0 ${colors.bg} ${colors.text} ${colors.border}`}>
+                            <Badge className={`text-xs px-1.5 py-0 ${colors.bg} ${colors.text} ${colors.border}`}>
                               {entry.changeType === "ROUTE_CHANGE" ? "Route Change" : entry.changeType.charAt(0) + entry.changeType.slice(1).toLowerCase()}
                             </Badge>
                           </div>

@@ -32,7 +32,7 @@ function StatusBadge({ status, typeRating }: { status: string; typeRating: strin
 
   if (status === 'REMOVED_REVOKED' || status === 'NOT_LISTED') {
     return (
-      <Badge className="bg-red-500/20 text-red-400 border-red-500/30 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
+      <Badge className="bg-red-500/20 text-red-400 border-red-500/30 rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.08em] whitespace-nowrap">
         <XCircle className="w-3 h-3 mr-1" />
         Removed
       </Badge>
@@ -40,7 +40,7 @@ function StatusBadge({ status, typeRating }: { status: string; typeRating: strin
   }
   if (status === 'NEWLY_GRANTED') {
     return (
-      <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
+      <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30 rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.08em] whitespace-nowrap">
         <Zap className="w-3 h-3 mr-1" />
         Newly Granted
       </Badge>
@@ -48,7 +48,7 @@ function StatusBadge({ status, typeRating }: { status: string; typeRating: strin
   }
   if (status === 'GRACE_PERIOD') {
     return (
-      <Badge className="bg-yellow-500/20 text-yellow-500 border-yellow-500/30 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
+      <Badge className="bg-yellow-500/20 text-yellow-500 border-yellow-500/30 rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.08em] whitespace-nowrap">
         <Clock className="w-3 h-3 mr-1" />
         Under Review
       </Badge>
@@ -57,12 +57,12 @@ function StatusBadge({ status, typeRating }: { status: string; typeRating: strin
   if (status === 'ACTIVE') {
     return (
       <div className="flex items-center gap-1 flex-wrap">
-        <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
+        <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.08em] whitespace-nowrap">
           <CheckCircle className="w-3 h-3 mr-1" />
           Active
         </Badge>
         {isBRated && (
-          <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
+          <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.08em] whitespace-nowrap">
             <AlertTriangle className="w-3 h-3 mr-1" />
             B-Rated
           </Badge>
@@ -71,7 +71,7 @@ function StatusBadge({ status, typeRating }: { status: string; typeRating: strin
     );
   }
   return (
-    <Badge className="bg-slate-500/20 text-slate-400 border-slate-500/30 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
+    <Badge className="bg-slate-500/20 text-slate-400 border-slate-500/30 rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.08em] whitespace-nowrap">
       <HelpCircle className="w-3 h-3 mr-1" />
       Unknown
     </Badge>

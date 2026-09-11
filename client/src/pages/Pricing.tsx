@@ -136,10 +136,9 @@ function PlanCard<T extends PlanCardData>({ plan, index, isLoggedIn, loading, on
       ref={ref}
       initial={{ opacity: 0, y: 32 }}
       animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 32 }}
-      transition={{ ...spring, delay: index * 0.1 }}
-      whileHover={{ y: -4, transition: { type: "spring", stiffness: 300, damping: 20 } }}
+      transition={{ ...spring, delay: Math.min(index * 0.06, 0.18) }}
       className={`relative overflow-hidden flex flex-col theme-card bg-card ${
-        highlighted ? 'ring-2 ring-emerald-500 border-emerald-500 shadow-lg shadow-emerald-500/20' :
+        highlighted ? 'ring-2 ring-emerald-700 border-emerald-700 shadow-lg shadow-emerald-500/20' :
         plan.popular ? 'border-primary lg:scale-105 z-10' : ''
       }`}
     >
@@ -152,7 +151,7 @@ function PlanCard<T extends PlanCardData>({ plan, index, isLoggedIn, loading, on
       )}
 
       <div className="p-6 pb-4">
-        <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 ${getIconWrapClass(plan.name)}`}>
+        <div className={`w-12 h-12 rounded-lg flex items-center justify-center mb-3 ${getIconWrapClass(plan.name)}`}>
           <plan.icon className="w-6 h-6" />
         </div>
         <h3 className="text-xl font-bold text-foreground">

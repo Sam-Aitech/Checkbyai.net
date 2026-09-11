@@ -132,13 +132,13 @@ export default function UserPortal() {
             {verificationSteps.map((step, index) => (
               <div key={step.id} className="flex items-start space-x-4">
                 <div className="flex-shrink-0">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-500 ${
-                    step.status === 'completed' 
-                      ? 'bg-green-500 text-white scale-110' 
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-[background-color,transform] duration-300 ${
+                    step.status === 'completed'
+                      ? 'bg-green-600 text-white scale-110'
                       : step.status === 'processing'
-                      ? 'bg-blue-500 text-white animate-pulse'
+                      ? 'bg-blue-600 text-white animate-pulse'
                       : 'bg-muted text-muted-foreground'
-                  }`}>
+                  }`} aria-hidden="true">
                     {step.status === 'completed' ? (
                       <CheckCircle className="w-5 h-5" />
                     ) : step.status === 'processing' ? (
@@ -225,12 +225,12 @@ export default function UserPortal() {
           <h3 className="text-lg font-semibold mb-4 text-foreground">Verification Result</h3>
           
           <div className="flex items-center gap-3 mb-4">
-            <div className={`px-4 py-2 rounded-full text-base font-semibold transition-all duration-700 ease-in-out transform hover:scale-105 ${
-              verificationResult.type === 'genuine' 
-                ? 'bg-gradient-to-r from-green-400 to-emerald-500 text-white shadow-lg shadow-green-500/25 animate-pulse'
+            <div role="status" className={`px-4 py-2 rounded-full text-base font-semibold ${
+              verificationResult.type === 'genuine'
+                ? 'bg-gradient-to-r from-green-700 to-emerald-700 text-white shadow-lg shadow-green-500/25 animate-pulse'
                 : verificationResult.type === 'suspicious'
-                ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white shadow-lg shadow-yellow-500/25 animate-pulse'
-                : 'bg-gradient-to-r from-red-400 to-rose-500 text-white shadow-lg shadow-red-500/25 animate-pulse'
+                ? 'bg-gradient-to-r from-amber-700 to-amber-800 text-white shadow-lg shadow-amber-500/25 animate-pulse'
+                : 'bg-gradient-to-r from-red-600 to-rose-700 text-white shadow-lg shadow-red-500/25 animate-pulse'
             }`}>
               {verificationResult.type.charAt(0).toUpperCase() + verificationResult.type.slice(1)}
             </div>
