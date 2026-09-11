@@ -1,7 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import * as os from "node:os";
-import * as crypto from "node:crypto";
+import * as tmp from "tmp";
 import type { Job } from "bullmq";
 import { db } from "../db";
 import { sql, eq } from "drizzle-orm";
@@ -57,7 +56,13 @@ export async function processPdfVerifyJob(job: Job<PdfVerifyJobData>): Promise<{
 
   const maxAttempts = job.opts.attempts ?? 1;
   const isLastAttempt = job.attemptsMade + 1 >= maxAttempts;
-  const scratchPath = path.join(os.tmpdir(), `pdf-verify-${job.id}-${crypto.randomBytes(4).toString('hex')}.pdf`);
+  // tmp.fileSync() (rather than a hand-built os.tmpdir() path) creates the
+  // file atomically with the O_EXCL flag and restrictive 0600 permissions in
+  // one syscall, closing both the symlink-race and other-users-can-read
+  // classes of "insecure temporary file" — a manually constructed path can't
+  // guarantee either regardless of how random the filename is.
+  const scratchFile = tmp.fileSync({ postfix: '.pdf' });
+  const scratchPath = scratchFile.name;
 
   let result: string = "genuine";
   let analysis: any = null;
@@ -71,12 +76,7 @@ export async function processPdfVerifyJob(job: Job<PdfVerifyJobData>): Promise<{
     if (!upload) {
       throw new Error(`PDF upload ${uploadId} not found — already consumed or expired`);
     }
-    // `wx` (exclusive create) rather than the default `w`: if anything already
-    // exists at this randomized scratch path — including a symlink planted by
-    // another process in the shared OS temp dir — the write fails instead of
-    // following it, closing the classic insecure-temp-file/symlink-race class
-    // of vulnerability regardless of how unpredictable the path already is.
-    await fs.promises.writeFile(scratchPath, upload.fileBytes, { flag: 'wx' });
+    await fs.promises.writeFile(scratchPath, upload.fileBytes);
 
     const priorFlag = await storage.getAdminFlaggedVerificationByHash(documentHash);
     const priorApproval = priorFlag ? undefined : await storage.getAdminApprovedVerificationByHash(documentHash);
@@ -201,6 +201,7 @@ export async function processPdfVerifyJob(job: Job<PdfVerifyJobData>): Promise<{
   } finally {
     // The scratch file is disposable and re-creatable from the durable row
     // on any retry, so it's always safe to clean up after every attempt.
-    await fs.promises.unlink(scratchPath).catch(() => {});
+    // removeCallback() also closes the fd tmp.fileSync() opened.
+    try { scratchFile.removeCallback(); } catch { /* already gone */ }
   }
 }
