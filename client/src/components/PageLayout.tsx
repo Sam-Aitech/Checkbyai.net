@@ -70,7 +70,7 @@ function NavDropdown({ item, dark = false }: NavDropdownProps) {
         onClick={() => setOpen(v => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className={`flex items-center gap-1 px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+        className={`flex items-center gap-1 px-4 py-2 text-sm font-medium rounded-full transition-[color,background-color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
           dark
             ? isChildActive ? "text-white bg-white/10 font-semibold" : "text-slate-300 hover:text-white hover:bg-white/5"
             : isChildActive ? "text-primary bg-primary/10 font-semibold" : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -186,14 +186,14 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
     <div className="min-h-screen flex flex-col bg-background">
       {!hideNav && (
         <nav className={`sticky top-0 z-50 backdrop-blur-xl border-b ${darkNav ? "bg-slate-950/95 border-slate-800" : "bg-white/80 dark:bg-background/80 border-border/50"}`}>
-          <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
+          <div className="max-w-7xl mx-auto px-6 md:px-8">
             <div className="flex justify-between items-center h-16">
 
               {/* Logo */}
               <Link href="/" className="flex items-center shrink-0">
                 {darkNav
                   ? <BrandLogo variant="dark" />
-                  : <img src={logoImg} alt="CheckByAi.net" width={160} height={40} className="h-10 sm:h-12 w-auto object-contain" />}
+                  : <img src={logoImg} alt="CheckByAi.net" width={160} height={40} className="h-10 w-auto object-contain" />}
               </Link>
 
               {/* Desktop nav */}
@@ -206,7 +206,7 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
                       key={item.href}
                       href={item.href!}
                       aria-current={isActive ? "page" : undefined}
-                      className={`px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                      className={`px-4 py-2 text-sm font-medium rounded-full transition-[color,background-color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                         darkNav
                           ? isActive ? "text-white bg-white/10 font-semibold" : "text-slate-300 hover:text-white hover:bg-white/5"
                           : isActive ? "text-primary bg-primary/10 font-semibold" : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -237,7 +237,7 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
                   <>
                     <Link
                       href="/login"
-                      className={`hidden sm:block px-4 py-2 text-sm font-medium rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${darkNav ? "text-slate-300 hover:text-white hover:bg-white/5" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+                      className={`hidden sm:block px-4 py-2 text-sm font-medium rounded-full transition-[color,background-color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${darkNav ? "text-slate-300 hover:text-white hover:bg-white/5" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
                     >
                       Sign In
                     </Link>

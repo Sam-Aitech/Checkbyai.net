@@ -101,6 +101,31 @@
   --text-caption-tracking: 0.06em;
   --text-caption-weight: 600;
   --text-caption-size: 0.6875rem;
+
+  /* Aliases + a tinted "soft badge" status palette for .dash-*/.st-soft-*
+     (CompanyIntelligencePanel.tsx only) — distinct from the solid-fill
+     --success/--warning/--info above, which are for safe white-text fills. */
+  --surface-page: var(--background);
+  --surface-card: var(--card);
+  --surface-subtle: var(--muted);
+  --text-primary: var(--foreground);
+  --text-secondary: var(--muted-foreground);
+  --border-default: var(--border);
+  --border-interactive: var(--primary);
+  --radius-control: var(--radius-sm);
+  --radius-panel: 1rem;
+  --radius-pill: 999px;
+  --motion-fast: 120ms;
+  --motion-base: 180ms;
+  --motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --status-success: #047857;
+  --status-success-bg: rgba(4, 120, 87, 0.1);
+  --status-warning: #b45309;
+  --status-warning-bg: rgba(180, 83, 9, 0.1);
+  --status-danger: #dc2626;
+  --status-danger-bg: rgba(220, 38, 38, 0.1);
+  --status-info: #2563eb;
+  --status-info-bg: rgba(37, 99, 235, 0.1);
 }
 
 .dark {
@@ -162,6 +187,28 @@
   --gradient-mid: hsl(240, 40%, 20%);
   --gradient-end: hsl(240, 35%, 35%);
   --gradient-light: hsl(235, 25%, 12%);
+
+  --surface-page: var(--background);
+  --surface-card: var(--card);
+  --surface-subtle: var(--muted);
+  --text-primary: var(--foreground);
+  --text-secondary: var(--muted-foreground);
+  --border-default: var(--border);
+  --border-interactive: var(--primary);
+  --radius-control: var(--radius-sm);
+  --radius-panel: 1rem;
+  --radius-pill: 999px;
+  --motion-fast: 120ms;
+  --motion-base: 180ms;
+  --motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --status-success: #34d399;
+  --status-success-bg: rgba(52, 211, 153, 0.12);
+  --status-warning: #fbbf24;
+  --status-warning-bg: rgba(251, 191, 36, 0.12);
+  --status-danger: #f87171;
+  --status-danger-bg: rgba(248, 113, 113, 0.12);
+  --status-info: #60a5fa;
+  --status-info-bg: rgba(96, 165, 250, 0.12);
 }
 
 @layer utilities {
@@ -540,5 +587,92 @@
 }
 .dark .otp-box:not(:placeholder-shown) {
   background: hsl(235, 25%, 12%);
+}
+
+/* ─── Soft status badges + dashboard primitives (CompanyIntelligencePanel.tsx) ── */
+@layer utilities {
+  .st-soft {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: var(--radius-pill);
+    border: 1px solid transparent;
+    white-space: nowrap;
+  }
+  .st-soft-success { color: var(--status-success); background: var(--status-success-bg); border-color: color-mix(in srgb, var(--status-success) 30%, transparent); }
+  .st-soft-warning { color: var(--status-warning); background: var(--status-warning-bg); border-color: color-mix(in srgb, var(--status-warning) 30%, transparent); }
+  .st-soft-danger { color: var(--status-danger); background: var(--status-danger-bg); border-color: color-mix(in srgb, var(--status-danger) 30%, transparent); }
+  .st-soft-info { color: var(--status-info); background: var(--status-info-bg); border-color: color-mix(in srgb, var(--status-info) 30%, transparent); }
+  .st-soft-neutral { color: var(--text-secondary); background: var(--surface-subtle); border-color: var(--border-default); }
+
+  .dash-card {
+    background: var(--surface-card);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-panel);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 4px 16px rgba(0, 0, 0, 0.06);
+  }
+  .dash-label {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .dash-title { font-size: 1.375rem; font-weight: 800; color: var(--text-primary); line-height: 1.2; }
+  .dash-h2 { font-size: 1.125rem; font-weight: 800; color: var(--text-primary); line-height: 1.25; }
+  .dash-body { font-size: 0.875rem; color: var(--text-secondary); line-height: 1.55; }
+  .dash-meta { font-size: 0.75rem; color: var(--text-secondary); line-height: 1.4; }
+  .dash-row { display: flex; align-items: center; gap: 0.75rem; }
+  .dash-col { display: flex; flex-direction: column; }
+  .dash-btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4375rem;
+    background: var(--primary);
+    color: var(--primary-foreground);
+    border: none;
+    border-radius: var(--radius-pill);
+    padding: 0.5625rem 1.125rem;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 2px 12px color-mix(in srgb, var(--primary) 30%, transparent);
+    transition: background-color var(--motion-fast) var(--motion-ease), box-shadow var(--motion-base) var(--motion-ease);
+  }
+  .dash-btn-primary:hover { filter: brightness(1.08); }
+  .dash-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+  .dash-input {
+    width: 100%;
+    padding: 0.625rem 0.875rem;
+    background: var(--surface-page);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-control);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    outline: none;
+    box-sizing: border-box;
+    transition: border-color var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) var(--motion-ease);
+  }
+  .dash-input:focus-visible {
+    border-color: var(--border-interactive);
+    box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
+  }
+  .dash-chip {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--border-default);
+    background: var(--surface-subtle);
+    color: var(--text-secondary);
+    white-space: nowrap;
+  }
 }
 

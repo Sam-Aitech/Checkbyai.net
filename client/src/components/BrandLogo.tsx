@@ -29,7 +29,7 @@ export default function BrandLogo({
   return (
     <div className={cn("flex items-center select-none", sizeClasses[size].container, className)}>
       <div className={cn(
-        "flex items-center justify-center rounded-lg shadow-sm transition-all duration-300",
+        "flex items-center justify-center rounded-lg shadow-sm",
         size === 'sm' ? "w-6 h-6 p-1" : size === 'md' ? "w-8 h-8 p-1.5" : "w-10 h-10 p-2",
         // Distinctive icon background styling
         isDark 

@@ -231,10 +231,10 @@ export default function Submit() {
           <div className="max-w-lg text-center theme-card overflow-hidden">
             <div className="p-6 border-b border-border">
               <CheckCircle className="w-10 h-10 text-emerald-500 mx-auto mb-4" />
-              <h3 className="editorial-subheading text-emerald-600 dark:text-emerald-400 text-2xl">
+              <h3 className="editorial-subheading text-emerald-700 dark:text-emerald-400 text-2xl">
                 Submission Complete!
               </h3>
-              <p className="text-muted-foreground text-sm mt-1 text-lg">
+              <p className="text-muted-foreground mt-1 text-lg editorial-body">
                 Thank you for your submission. Our expert team will review your documents.
               </p>
             </div>

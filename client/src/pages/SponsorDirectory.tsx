@@ -68,7 +68,7 @@ const StatCard = memo(function StatCard({
         <Icon className="w-5 h-5" />
       </div>
       <div>
-        <p className="text-xl font-bold tabular-nums leading-none">
+        <p className="text-xl font-bold tabular-nums leading-tight">
           {value !== undefined ? value.toLocaleString() : <span className="inline-block w-16 h-5 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />}
         </p>
         <p className="text-xs text-muted-foreground mt-0.5">{label}</p>

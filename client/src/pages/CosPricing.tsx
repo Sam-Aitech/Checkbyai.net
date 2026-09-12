@@ -167,8 +167,7 @@ function PricingCard({ plan, index, isLoggedIn, loading, onSelect, available }: 
       ref={ref}
       initial={{ opacity: 0, y: 32 }}
       animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 32 }}
-      transition={{ ...spring, delay: index * 0.1 }}
-      whileHover={{ y: -4, transition: { type: "spring", stiffness: 300, damping: 20 } }}
+      transition={{ ...spring, delay: Math.min(index * 0.06, 0.18) }}
       className={`relative overflow-hidden flex flex-col theme-card bg-card ${
         plan.popular ? 'border-primary ring-1 ring-primary/30 shadow-lg shadow-primary/10 z-10' : ''
       }`}
@@ -182,7 +181,7 @@ function PricingCard({ plan, index, isLoggedIn, loading, onSelect, available }: 
       )}
 
       <div className="p-6 pb-4">
-        <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mb-3">
+        <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-3">
           <plan.icon className="w-6 h-6 text-foreground" />
         </div>
         <h3 className="text-xl font-bold text-foreground">

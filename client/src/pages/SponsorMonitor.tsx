@@ -448,7 +448,7 @@ function HeroSection({ onScrollToSearch }: { onScrollToSearch: () => void }) {
             <span>Search &amp; Start Monitoring (Free)</span>
           </Button>
         </div>
-        <p className="text-xs text-slate-500 mt-6">
+        <p className="text-xs text-slate-400 mt-6">
           Free plan monitors 1 company with email alerts, no card required. CheckByAI is not affiliated with the UK Home Office or UKVI.
         </p>
       </div>
@@ -1237,8 +1237,8 @@ export default function SponsorMonitor() {
                             <SponsorStatusBadge status={result.status} typeRating={result.typeRating} />
                           </div>
                           {result.isNew && (
-                            <p className="text-xs font-semibold text-orange-700 dark:text-orange-400 mb-1.5 flex items-center gap-1">
-                              <Zap className="w-3 h-3" /> Recently added to the UK sponsor register
+                            <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-1.5 flex items-center gap-1">
+                              <Zap className="w-3 h-3" aria-hidden="true" /> Recently added to the UK sponsor register
                             </p>
                           )}
                           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
@@ -1650,7 +1650,7 @@ function NotificationSettings({ user }: { user: any }) {
                   <p className="text-xs text-muted-foreground ml-7">Receiving browser push notifications</p>
                 )}
                 {!pushSubscribed && Notification.permission === "denied" && (
-                  <p className="text-xs text-amber-600 dark:text-amber-400 ml-7">Push permission was denied. Update your browser site settings to re-enable.</p>
+                  <p className="text-xs text-amber-700 dark:text-amber-400 ml-7">Push permission was denied. Update your browser site settings to re-enable.</p>
                 )}
               </div>
             </>
@@ -1685,16 +1685,16 @@ function getChangeColor(changeType: string) {
 
 function getChannelBadge(channel: string) {
   switch (channel) {
-    case "email": return <Badge variant="outline" className="text-xs px-1.5 py-0 gap-1"><Mail className="w-3 h-3" />Email</Badge>;
-    case "whatsapp": return <Badge variant="outline" className="text-xs px-1.5 py-0 gap-1"><MessageSquare className="w-3 h-3" />WhatsApp</Badge>;
-    case "sms": return <Badge variant="outline" className="text-xs px-1.5 py-0 gap-1"><Phone className="w-3 h-3" />SMS</Badge>;
+    case "email": return <Badge variant="outline" className="text-xs px-1.5 py-0 gap-1"><Mail className="w-3 h-3" aria-hidden="true" />Email</Badge>;
+    case "whatsapp": return <Badge variant="outline" className="text-xs px-1.5 py-0 gap-1"><MessageSquare className="w-3 h-3" aria-hidden="true" />WhatsApp</Badge>;
+    case "sms": return <Badge variant="outline" className="text-xs px-1.5 py-0 gap-1"><Phone className="w-3 h-3" aria-hidden="true" />SMS</Badge>;
     default: return <Badge variant="outline" className="text-xs px-1.5 py-0">{channel}</Badge>;
   }
 }
 
 function getDeliveryStatus(status: string) {
   switch (status) {
-    case "sent": case "delivered": return <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400"><CheckCheck className="w-3 h-3" />{status === "delivered" ? "Delivered" : "Sent"}</span>;
+    case "sent": case "delivered": return <span className="inline-flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-400"><CheckCheck className="w-3 h-3" aria-hidden="true" />{status === "delivered" ? "Delivered" : "Sent"}</span>;
     case "failed": return <span className="inline-flex items-center gap-1 text-xs text-red-600 dark:text-red-400"><XOctagon className="w-3 h-3" />Failed</span>;
     case "queued": return <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Clock3 className="w-3 h-3" />Queued</span>;
     default: return <span className="text-xs text-muted-foreground">{status}</span>;

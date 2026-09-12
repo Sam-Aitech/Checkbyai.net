@@ -7,7 +7,7 @@ const HeroSection = lazy(() => import("@/components/HeroSection"));
 function LoadingSpinner() {
   return (
     <div className="flex items-center justify-center py-8">
-      <div className="animate-spin h-8 w-8 bg-primary/10 rounded-xl"></div>
+      <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full"></div>
     </div>
   );
 }

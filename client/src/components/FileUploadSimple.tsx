@@ -431,7 +431,7 @@ export default function FileUploadSimple({
           <h3 className="text-lg font-semibold mb-4 text-foreground">Verification Result</h3>
 
           <div className="flex items-center gap-3 mb-4">
-            <div className={`px-4 py-2 rounded-full text-base font-semibold border animate-in fade-in zoom-in-95 duration-200 ${verificationToneBadgeClasses[getVerificationResultTone(result.type)]}`}>
+            <div role="status" className={`px-4 py-2 rounded-full text-base font-semibold border animate-in fade-in zoom-in-95 duration-200 ${verificationToneBadgeClasses[getVerificationResultTone(result.type)]}`}>
               {result.type}
             </div>
           </div>

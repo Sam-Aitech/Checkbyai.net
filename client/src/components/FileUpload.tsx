@@ -135,7 +135,7 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={spring}
-        className={`border border-border rounded-xl p-10 text-center cursor-pointer transition-all duration-200 relative overflow-hidden ${
+        className={`border border-border rounded-xl p-10 text-center cursor-pointer transition-[border-color,background-color] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] relative overflow-hidden ${
           isDragging 
             ? 'border-primary bg-primary/[0.03] dark:bg-primary/[0.06]' 
             : 'hover:border-foreground/30'
@@ -146,7 +146,7 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
         onDrop={handleDrop}
       >
         <div className="relative z-10">
-          <div className="mx-auto w-12 h-12 flex items-center justify-center border border-border rounded-xl mb-6">
+          <div className="mx-auto w-12 h-12 flex items-center justify-center border border-border rounded-lg mb-6" aria-hidden="true">
             <Upload className="w-5 h-5 text-muted-foreground" />
           </div>
           
