@@ -117,31 +117,14 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 - `client/src/pages/SponsorDirectory.tsx`: `memo(StatusBadge/StatCard)`, `useVirtualizer` (64px, overscan 8, 640px viewport) for 50-row pages.
 - `client/src/pages/VerificationHistory.tsx`: `memo(VerificationCard)`, `useVirtualizer` (160px, 720px viewport), animation delay clamped to 0.3s.
 
-#### Phase 6 — Frontend Craft Audit Remediation (P0+P1)
+#### Phase 6 — Landing Usability Audit (16 heuristics)
 
-**Scope:** P0+P1 visual defects from ruthless frontend audit; global pill buttons; SSR→CSS-var migration.
-
-- `server/ssr/renderLanding.ts`: all hardcoded hex (`#2563eb/#6b7280/#1f2937/#f9fafb/#e5e7eb/#2563eb10`) → `var(--primary/foreground/muted/muted-foreground/border/card/primary-foreground)`; `1280px/2rem` → `80rem/1.5rem` to match client `max-w-7xl px-6`; CTAs `0.75rem` → pill `999px`; step tiles use `var(--muted)` + `0.5rem` radius.
-- Containers: `NightlyStatsBar` `-mt-16` removed, `max-w-5xl px-4` → `max-w-7xl px-6 md:px-8`; `RecentlyRevokedSection` wrapped in shared `max-w-7xl px-6 md:px-8` with inner `max-w-4xl` preserved for readability; `PageLayout` nav `px-6 sm:px-8 lg:px-12` → `px-6 md:px-8`; logo `h-10 sm:h-12` → `h-10` (no nav jump).
-- Type/contrast: status badges `text-[11px]/text-[10px] font-bold tracking-wide` → `text-xs font-semibold tracking-[0.08em]` (`SponsorMonitor.tsx` 6×, `SponsorDirectory.tsx` 7×); `text-muted-foreground/70` timestamp → solid `text-xs`; `badge-live` `#10b981→#047857`, `11px→12px`; mobile menu labels `/50` → solid; `Submit.tsx` dead `text-sm+text-lg` conflict + `emerald-600→700` fixed; `home.tsx` dead `text-2xl font-bold` removed (editorial class owns size).
-- Components: `home.tsx` fake spinner → border spinner; modal spring → `0.2s [0.16,1,0.3,1]` tween; close `w-8 rounded-xl` → `w-11 rounded-full`; result badge `transition-all 300` → scoped `200ms`; `ui/button.tsx` global `rounded-md→rounded-full` (`h-10 px-5 / h-9 px-4 / h-12 px-8`), scoped transition + `active:scale-[0.98]`; `ui/input.tsx` `rounded-full px-4`, `placeholder/60`, `min-h-[44px]`; `FeatureCard` tile `w-16 rounded-2xl` → `w-12 rounded-[8px]`; revoked rows `px-5 py-3.5` → `px-4 py-3`; skeletons `h-14 rounded-xl` → `h-[56px] rounded-[8px]`.
-- Motion: `FeatureCard` stagger capped `min(index*0.06,0.18)`; `theme-card`/`icon-tile`/`otp-box` transitions use `cubic-bezier(0.16,1,0.3,1)` scoped properties (never `all`/`ease`); `icon-tile` gains `:focus-visible` parity; `float` reduced to `translateY(-6px)` `6s` (was `-20px` + `180deg` spin); OTP `2px/10px` → `1px/8px` + two-ring focus; mobile 44px media-query hack narrowed to non-button elements.
-- Verify: `eslint` clean on all 10 touched files. Full `npm run lint` has 732 pre-existing backend errors (untouched). `tsc` fails pre-existing missing `@react-three/fiber`/`vite/client` types. `vitest` unrunnable (no `node_modules` in worktree).
-
-#### Phase 7 — Full Frontend Visual-System Remediation (audit of 82089bb)
-
-**Scope:** Re-audited 82089bb (30 findings: 12 fixed, 14 open, 2 regressed, 2 N/A); implemented complete system below. Verified with headless Chromium (390/1280px, no overflow), computed WCAG ratios, `lint` 0 errors, `tsc` clean, 475 tests pass, `vite build` OK.
-
-- Tokens (`index.css`): surfaces, text, borders, status (+bg) light/dark, hero fg/secondary/tertiary/placeholder, radii (control 8/card 12/panel 16/hero 24/pill), motion (120/180/260ms + `[0.16,1,0.3,1]`), containers (75/60/45rem + `px-6 md:px-8`), type roles, `.st-soft-*` badges, `.hero-*` utilities, `.dash-*` dashboard primitives, icon gradient vars. Deleted dead: `pulse-glow`, `shimmer`, `urgency-dot`, `glass-card`.
-- Contrast (measured): hero tokens 5.8–17:1 vs gradient; muted 5.12:1; emerald/red/blue-600+ and amber-700 white-text ≥4.8:1; placeholders solid (muted/hero-tertiary). Footer overlay deepened (`to-black/50`) + hero tokens.
-- Hero: H1 → `type-display` (no leading override); search gets `focus-visible:ring-white`, `aria-label`, `role=status` loaders; switch `scale-90` removed, 44px label, visible ring; chips → AA shades + `text-xs`; trust tiles static (no fake hover); AnimatedBackground shapes deleted, 12 particles, static doc shadow.
-- Components: `theme-card` static / `theme-card-interactive` (NavigationLinks); buttons semantic (default+lg pill, base control, sm compact); CardTitle `leading-tight`; inputs/select/textarea control radius + solid placeholders; OTP slots scoped + 8px; progress width-only; tabs trigger nested-radius 4px; toast transform+opacity; accordion/content scoped; sidebar rail scoped; chart dots pill.
-- Badges: solid `-700/-600` whites + `st-soft-*` tinted (Pro/Intel/Admin); `unknown` neutral never resembles `active`; icons + text (never color-alone); `aria-hidden` on decorative icons.
-- Dashboards: T hexes → status vars; StatusPill/licence maps → `st-soft` classes; ~120 inline patterns → `dash-*`/Tailwind; `borderRadius:99→999`; data-driven geometry kept inline (virtualizers, widths, state colors); dead `glowCardStyle`/`inputStyle` removed.
-- SSR: `shared/landingCopy.ts` shared by client + server; section order mirrors client (nav/hero/check/why/how/cos/revoked/footer); gradient wrapper + static search form + trust (invented 99.9% stats grid removed); mobile nav hides secondary links ≤640px.
-- Login: single BrandLogo (2 dup imgs removed), modal tween, input follows system radius.
-- Motion policy: scoped properties only, ≤260ms routine, springs for spatial entrances only, one ambient language per viewport, reduced-motion intact.
-- Remaining (documented exceptions): radix-internal `rounded-md` geometry; admin-internal dark tint badges; illustration mock micro-type (`AnimatedBackground` doc, UK-flag spec colors); gradient display text (`text-gradient-*`); `leading-none` on icon-paired micro-glyphs; 26px stat display + fixed avatar/skeleton dims; footer/hero share hero tokens by design.
+- **Buttons:** new `brand` variant in `ui/button.tsx` (`bg-emerald-600 hover:bg-emerald-700 rounded-full font-bold`); all landing primary CTAs migrated to it (#4, #14).
+- **Type/colour/radii:** no `text-[…]` arbitraries left on landing (`text-xs` min), `lg:text-[3.4rem]` → `text-5xl`; trust-strip colour explosion removed (single `text-white/60` list); `rounded-lg` cards → `rounded-xl`, `.icon-tile` → `var(--radius)` (#1–3).
+- **Typography:** long all-caps → sentence case (hero badge, digest date, sample label); short-label caps kept (#5, #9).
+- **Headings:** decorative mock `h3` → `p` + `aria-hidden`; footer `h4`/`h5` → `h2` in labelled `nav`s (#10–11).
+- **Grouping:** CoS link moved directly under search input; trust strip demoted to 3-item `ul[aria-label]` (#12–13).
+- **Spacing/density:** revoked rows `py-4` + relaxed leading (#15); `#cos-verification` split into demo/CTA + `cos-features` sections (#16).
 
 ### Remaining (Not Yet Scoped)
 - Fuse.js search index versioning for instant CDV cache bust on rebuild.
@@ -174,3 +157,9 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 | `server/routes/pushSubscriptions.ts` | Push API endpoints |
 | `migrations/0022_push_subscriptions.sql` | Push subscriptions table |
 | `migrations/0023_notification_preferences_webhook.sql` | Webhook prefs columns |
+| `client/src/components/HeroSection.tsx` | Landing hero, CoS section, revoked list (Phase 6) |
+| `client/src/components/AnimatedBackground.tsx` | Decorative CoS mock (Phase 6) |
+| `client/src/components/CosSamplePreview.tsx` | CoS demo/result preview (Phase 6) |
+| `client/src/components/Footer.tsx` | Footer nav + heading outline (Phase 6) |
+| `client/src/components/ui/button.tsx` | `brand` button variant (Phase 6) |
+| `client/src/index.css` | `.icon-tile` radius token (Phase 6) |

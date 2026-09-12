@@ -325,8 +325,8 @@ export default function SponsorDetail() {
                   </p>
                   <p>
                     If <strong>{data.currentName}</strong> reapplies and is re-granted a licence,
-                    it will appear on the register overnight. CheckByAI detects this within
-                    minutes and can notify you before anyone else.
+                    it will appear on the register overnight. CheckByAI detects this and can
+                    notify you before anyone else.
                   </p>
                 </div>
               </div>
@@ -335,7 +335,7 @@ export default function SponsorDetail() {
               {[
                 { label: "60 days",        sub: "Grace period to find a new sponsor" },
                 { label: "Midnight check", sub: "Home Office updates the register nightly" },
-                { label: "30 min alert",   sub: "Pro subscribers notified within 30 minutes" },
+                { label: "Same-day alert", sub: "Pro subscribers notified same-day or twice-daily" },
               ].map((item) => (
                 <div key={item.label} className="text-center">
                   <p className="text-base font-bold text-destructive">{item.label}</p>
@@ -489,10 +489,10 @@ export default function SponsorDetail() {
                   <h3 className="font-bold text-lg mb-1 leading-snug">
                     Be the first to know if {data.currentName} reapplies
                   </h3>
-                  <p className="text-sm hero-text-secondary leading-relaxed">
+                  <p className="text-sm text-white/70 leading-relaxed">
                     The Home Office updates the register at midnight without notifying
-                    anyone. Our system checks every night and will alert you within
-                    30 minutes — via WhatsApp, email, or SMS — the moment this
+                    anyone. Our system checks every night and alerts you same-day or
+                    twice-daily — via WhatsApp, email, or SMS — when this
                     company reappears on the register.
                   </p>
                 </div>

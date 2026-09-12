@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import * as THREE from 'three';
+import { Button } from '@/components/ui/button';
 
 interface Enhanced3DDemoProps {
   isVisible: boolean;
@@ -233,28 +234,30 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
   };
 
   const scenarioResults = {
-    genuine: { color: colors.secondary, label: 'GENUINE DOCUMENT', confidence: 98 },
-    edited: { color: colors.caution, label: 'EDITED DOCUMENT', confidence: 75 },
-    fake: { color: '#dc2626', label: 'FAKE DOCUMENT', confidence: 15 }
+    genuine: { tone: 'success' as const, label: 'GENUINE DOCUMENT', confidence: 98 },
+    edited: { tone: 'warning' as const, label: 'EDITED DOCUMENT', confidence: 75 },
+    fake: { tone: 'destructive' as const, label: 'FAKE DOCUMENT', confidence: 15 }
+  };
+
+  const toneClasses = {
+    success: { bg: 'bg-success', text: 'text-success-foreground', bar: 'bg-success' },
+    warning: { bg: 'bg-warning', text: 'text-warning-foreground', bar: 'bg-warning' },
+    destructive: { bg: 'bg-destructive', text: 'text-destructive-foreground', bar: 'bg-destructive' },
   };
 
   if (!isVisible) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-95 flex items-center justify-center z-50 p-4">
-      <div 
-        className="bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800 rounded-2xl p-8 max-w-7xl w-full max-h-[95vh] overflow-y-auto relative"
-        style={{ backgroundColor: colors.background }}
+    <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50 p-4">
+      <div
+        className="bg-surface-inverse rounded-2xl p-8 max-w-7xl w-full max-h-[95vh] overflow-y-auto relative"
       >
         {/* Enhanced Header */}
         <div className="text-center mb-8">
-          <h2 
-            className="text-4xl font-bold mb-4 bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-600 bg-clip-text text-transparent"
-            style={{ color: colors.primary }}
-          >
+          <h2 className="text-4xl font-bold mb-4 text-surface-inverse-foreground">
             Interactive COS Verification System
           </h2>
-          <p className="text-blue-200 text-lg max-w-4xl mx-auto mb-6">
+          <p className="text-surface-inverse-muted text-lg max-w-4xl mx-auto mb-6">
             Explore our AI-powered document verification ecosystem with real-time 3D visualization
           </p>
 
@@ -262,15 +265,15 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
           <div className="flex flex-wrap justify-center gap-4 mb-6">
             {/* View Mode Toggle */}
             <div className="flex items-center bg-white/10 rounded-lg p-2">
-              <span className="text-white text-sm mr-3">View Mode:</span>
+              <span className="text-surface-inverse-foreground text-sm mr-3">View Mode:</span>
               <button
                 onClick={() => {
                   setViewMode(viewMode === 'simplified' ? 'technical' : 'simplified');
                 }}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-[color,background-color] duration-200 ${
-                  viewMode === 'simplified' 
-                    ? 'bg-blue-600 text-white' 
-                    : 'bg-gray-600 text-gray-300'
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                  viewMode === 'simplified'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-surface-inverse-border text-surface-inverse-muted'
                 }`}
               >
                 {viewMode === 'simplified' ? 'Simplified' : 'Technical'}
@@ -279,13 +282,13 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
 
             {/* Scenario Selection */}
             <div className="flex items-center bg-white/10 rounded-lg p-2">
-              <span className="text-white text-sm mr-3">Scenario:</span>
+              <span className="text-surface-inverse-foreground text-sm mr-3">Scenario:</span>
               <select
                 value={selectedScenario}
                 onChange={(e) => {
                   setSelectedScenario(e.target.value as 'genuine' | 'edited' | 'fake');
                 }}
-                className="bg-gray-700 text-white rounded-lg px-3 py-2 text-sm min-h-[44px]"
+                className="bg-surface-inverse-border text-surface-inverse-foreground rounded-md px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 <option value="genuine">Genuine Document</option>
                 <option value="edited">Edited Document</option>
@@ -296,8 +299,8 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
 
           {/* Step Indicator */}
           <div className="flex justify-center items-center space-x-2 mb-6">
-            <span className="text-blue-300 text-sm">Step {demoStep} of 5:</span>
-            <span className="text-white font-semibold">
+            <span className="text-surface-inverse-muted text-sm">Step {demoStep} of 5:</span>
+            <span className="text-surface-inverse-foreground font-semibold">
               {demoStep === 0 && "Ready to Start"}
               {demoStep === 1 && "Document Upload & Initial Processing"}
               {demoStep === 2 && "Metadata Analysis & Pattern Matching"}
@@ -309,7 +312,7 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
         </div>
 
         {/* Main 3D Visualization Area */}
-        <div className="relative bg-gradient-to-br from-gray-900/50 to-blue-900/30 rounded-2xl p-8 mb-8 min-h-[600px] overflow-hidden border border-blue-500/20">
+        <div className="relative bg-surface-inverse/60 rounded-2xl p-8 mb-8 min-h-[600px] overflow-hidden border border-surface-inverse-border">
           {/* Three.js Canvas Container */}
           <div 
             ref={mountRef} 
@@ -319,20 +322,20 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
 
           {/* Interactive Overlay Elements */}
           <div className="absolute top-4 left-4 space-y-3">
-            <h3 className="text-white font-bold text-lg">Processing Pipeline Status</h3>
+            <h3 className="text-surface-inverse-foreground font-bold text-lg">Processing Pipeline Status</h3>
             {['Upload', 'Extract', 'Analyze', 'Verify', 'Report'].map((stage, index) => (
-              <div 
-                key={stage} 
-                className={`flex items-center space-x-3 transition-opacity duration-300 cursor-pointer ${
+              <div
+                key={stage}
+                className={`flex items-center space-x-3 transition-opacity duration-200 cursor-pointer ${
                   demoStep > index ? 'opacity-100' : 'opacity-30'
                 }`}
                 onMouseEnter={() => setShowTooltip(`${stage}: ${getStageDescription(stage)}`)}
                 onMouseLeave={() => setShowTooltip(null)}
               >
-                <div className={`w-4 h-4 rounded-full transition-[background-color,box-shadow] duration-300 ${
-                  demoStep > index ? 'bg-green-500 animate-pulse shadow-lg shadow-green-500/50' : 'bg-gray-500'
+                <div className={`w-4 h-4 rounded-full transition-colors duration-200 ${
+                  demoStep > index ? 'bg-success animate-pulse shadow-lg shadow-success/50' : 'bg-surface-inverse-border'
                 }`} />
-                <span className="text-white text-sm font-medium">{stage}</span>
+                <span className="text-surface-inverse-foreground text-sm font-medium">{stage}</span>
               </div>
             ))}
           </div>
@@ -340,18 +343,18 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
           {/* Technical Information Panel */}
           {viewMode === 'technical' && (
             <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-sm rounded-lg p-4 max-w-sm">
-              <h4 className="text-white font-bold mb-3">Technical Details</h4>
+              <h4 className="text-surface-inverse-foreground font-bold mb-3">Technical Details</h4>
               <div className="space-y-2 text-sm">
-                <div className="text-blue-300">
+                <div className="text-info">
                   <span className="font-medium">Algorithm:</span> Multi-layer verification
                 </div>
-                <div className="text-green-300">
+                <div className="text-success">
                   <span className="font-medium">Accuracy:</span> 99.2% detection rate
                 </div>
-                <div className="text-yellow-300">
+                <div className="text-surface-inverse-muted">
                   <span className="font-medium">Processing:</span> ~2.5 seconds avg
                 </div>
-                <div className="text-purple-300">
+                <div className="text-surface-inverse-muted">
                   <span className="font-medium">Features:</span> 150+ metadata points
                 </div>
               </div>
@@ -361,26 +364,19 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
           {/* Result Display */}
           {demoStep >= 4 && (
             <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 text-center">
-              <div 
-                className="inline-block px-8 py-4 rounded-full text-white font-bold text-xl shadow-2xl transition-[background-color,box-shadow] duration-300 animate-pulse"
-                style={{ 
-                  backgroundColor: scenarioResults[selectedScenario].color,
-                  boxShadow: `0 0 30px ${scenarioResults[selectedScenario].color}50`
-                }}
+              <div
+                className={`inline-block px-8 py-4 rounded-full font-bold text-xl shadow-lg animate-in fade-in zoom-in-95 duration-200 ${toneClasses[scenarioResults[selectedScenario].tone].bg} ${toneClasses[scenarioResults[selectedScenario].tone].text}`}
               >
                 {scenarioResults[selectedScenario].label}
               </div>
-              
-              <div className="mt-4 bg-gray-700 rounded-full h-4 w-64 mx-auto overflow-hidden">
-                <div 
-                  className="h-full rounded-full transition-[width] duration-2000 ease-out"
-                  style={{ 
-                    width: `${scenarioResults[selectedScenario].confidence}%`,
-                    backgroundColor: scenarioResults[selectedScenario].color
-                  }}
+
+              <div className="mt-4 bg-surface-inverse-border rounded-full h-4 w-64 mx-auto overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-200 ease-out ${toneClasses[scenarioResults[selectedScenario].tone].bar}`}
+                  style={{ width: `${scenarioResults[selectedScenario].confidence}%` }}
                 />
               </div>
-              <p className="text-white mt-2 font-semibold">
+              <p className="text-surface-inverse-foreground mt-2 font-semibold">
                 Confidence: {scenarioResults[selectedScenario].confidence}%
               </p>
             </div>
@@ -389,25 +385,25 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
           {/* Floating Tooltip */}
           {showTooltip && (
             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-black/80 backdrop-blur-sm rounded-lg p-4 max-w-xs z-10">
-              <p className="text-white text-sm">{showTooltip}</p>
+              <p className="text-surface-inverse-foreground text-sm">{showTooltip}</p>
             </div>
           )}
         </div>
 
         {/* Data Flow Visualization */}
         <div className="mb-8">
-          <h3 className="text-white text-xl font-bold mb-4 text-center">Real-time Data Flow</h3>
+          <h3 className="text-surface-inverse-foreground text-xl font-bold mb-4 text-center">Real-time Data Flow</h3>
           <div className="flex justify-center items-center space-x-4">
             {['Input', 'Processing', 'Analysis', 'Output'].map((phase, index) => (
               <div key={phase} className="flex items-center">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-[background-color] duration-300 ${
-                  demoStep > index ? 'bg-blue-600 animate-pulse' : 'bg-gray-600'
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors duration-200 ${
+                  demoStep > index ? 'bg-primary animate-pulse' : 'bg-surface-inverse-border'
                 }`}>
-                  <span className="text-white text-xs font-bold">{index + 1}</span>
+                  <span className="text-primary-foreground text-xs font-bold">{index + 1}</span>
                 </div>
                 {index < 3 && (
-                  <div className={`w-16 h-1 mx-2 transition-[background-color] duration-300 ${
-                    demoStep > index ? 'bg-blue-400 animate-pulse' : 'bg-gray-600'
+                  <div className={`w-16 h-1 mx-2 transition-colors duration-200 ${
+                    demoStep > index ? 'bg-primary animate-pulse' : 'bg-surface-inverse-border'
                   }`} />
                 )}
               </div>
@@ -418,32 +414,34 @@ export default function Enhanced3DDemo({ isVisible, onClose, onTryFreeCheck }: E
         {/* Control Buttons */}
         <div className="text-center space-y-4">
           <div className="flex justify-center space-x-4">
-            <button 
+            <Button
               onClick={() => {
                 startAnimation();
               }}
               disabled={isAnimating}
-              className="px-8 py-4 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-full text-white font-bold text-lg hover:shadow-xl hover:shadow-blue-500/50 transition-[box-shadow,transform] duration-200 hover:-translate-y-1 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+              size="lg"
+              className="rounded-full px-8 py-4 text-lg"
             >
               {isAnimating ? 'Animation Running...' : 'Start Interactive Demo'}
-            </button>
-            
-            <button 
+            </Button>
+
+            <Button
               onClick={() => {
                 onClose();
                 onTryFreeCheck();
               }}
-              className="px-8 py-4 bg-gradient-to-r from-green-600 to-emerald-600 rounded-full text-white font-bold text-lg hover:shadow-xl hover:shadow-green-500/50 transition-[box-shadow,transform] duration-200 hover:-translate-y-1"
+              size="lg"
+              className="rounded-full px-8 py-4 text-lg bg-success text-success-foreground hover:bg-success/90"
             >
               Try Free Verification
-            </button>
+            </Button>
           </div>
 
           <button
             onClick={() => {
               onClose();
             }}
-            className="px-6 py-3 bg-gray-600 hover:bg-gray-500 rounded-lg text-white font-medium transition-colors duration-200"
+            className="px-6 py-3 bg-surface-inverse-border hover:bg-surface-inverse-border/70 rounded-lg text-surface-inverse-foreground font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             Close Demo
           </button>

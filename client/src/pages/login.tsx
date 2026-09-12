@@ -9,6 +9,7 @@ import { Loader2, Mail, ArrowLeft, CheckCircle, AlertCircle } from "lucide-react
 import PageLayout from "@/components/PageLayout";
 import SEOHead from "@/components/SEOHead";
 import { motion, AnimatePresence } from "framer-motion";
+import logoImg from "@assets/logo_material.png";
 import { queryClient, getQueryFn } from "@/lib/queryClient";
 import { isPaidTier } from "@shared/planTiers";
 import BrandLogo from "@/components/BrandLogo";
@@ -280,10 +281,20 @@ export default function LoginPage() {
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-          className="w-full max-w-md shimmer-border theme-card bg-card p-0"
+          transition={{ type: "spring", stiffness: 100, damping: 15 }}
+          className="w-full max-w-md theme-card bg-card p-0"
         >
           <div className="text-center p-6 pb-0">
+            <div className="flex justify-center mb-6">
+              <img 
+                src={logoImg} 
+                alt="CheckByAi.net Logo - AI-powered Certificate of Sponsorship Verification" 
+                className="h-16 w-auto sm:h-20"
+                width={250}
+                height={80}
+                loading="eager"
+              />
+            </div>
             <div className="flex justify-center mt-2 mb-2">
               <BrandLogo size="lg" variant="auto" />
             </div>
@@ -324,7 +335,7 @@ export default function LoginPage() {
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           required
-                          className="pl-10"
+                          className="pl-10 rounded-xl"
                           data-testid="input-email"
                         />
                       </div>
@@ -386,9 +397,10 @@ export default function LoginPage() {
                   transition={fadeUp.transition}
                 >
                   <form onSubmit={handleVerifyOTP} className="space-y-4">
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Code sent to <strong className="text-foreground">{email}</strong>
-                    </p>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+                    <img src={logoImg} alt="CheckByAi" width={160} height={40} className="h-12 w-auto mb-6 object-contain" />
+                      <span>Code sent to <strong className="text-foreground">{email}</strong></span>
+                    </div>
 
                     <div className="space-y-2">
                       <Label htmlFor="otp-0">Verification Code</Label>

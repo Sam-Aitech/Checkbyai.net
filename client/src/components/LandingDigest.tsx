@@ -77,7 +77,7 @@ export default function LandingDigest() {
   if (isLoading) {
     return (
       <section className="py-12 sm:py-16">
-      <div className="container-content">
+        <div className="max-w-4xl mx-auto px-4">
           <div className="animate-pulse space-y-4">
             <div className="h-10 bg-muted rounded w-1/3 mx-auto" />
             <div className="h-6 bg-muted rounded w-2/3 mx-auto" />
@@ -132,7 +132,7 @@ export default function LandingDigest() {
           </div>
 
           <div className="text-center mb-4">
-            <p className="editorial-caption text-muted-foreground mb-4">
+            <p className="text-sm text-muted-foreground mb-4">
               {formattedDate}
             </p>
 
@@ -141,7 +141,7 @@ export default function LandingDigest() {
                 value={activeSponsors}
                 label="Active Licensed Sponsors on the UK Register"
                 icon={<ShieldMonitorIcon size={20} />}
-                color="bg-emerald-500/15"
+                color="bg-success/15"
                 large
               />
             )}
@@ -165,19 +165,19 @@ export default function LandingDigest() {
                   value={counts.removed}
                   label="Revoked"
                   icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4 11H8v-2h8v2z" fill="#ef4444" opacity="0.8"/></svg>}
-                  color="bg-red-500/10"
+                  color="bg-destructive/10"
                 />
                 <AnimatedCounter
                   value={counts.updated}
                   label="Updated"
                   icon={<TripleChannelIcon size={20} />}
-                  color="bg-amber-500/10"
+                  color="bg-warning/10"
                 />
                 <AnimatedCounter
                   value={counts.added}
                   label="New Licences"
                   icon={<ShieldMonitorIcon size={20} />}
-                  color="bg-emerald-500/10"
+                  color="bg-success/10"
                 />
               </>
             ) : (
@@ -186,19 +186,19 @@ export default function LandingDigest() {
                   value={counts.added}
                   label="Active Licences"
                   icon={<ShieldMonitorIcon size={20} />}
-                  color="bg-emerald-500/10"
+                  color="bg-success/10"
                 />
                 <AnimatedCounter
                   value={counts.removed}
                   label="Revoked"
                   icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4 11H8v-2h8v2z" fill="#ef4444" opacity="0.8"/></svg>}
-                  color="bg-red-500/10"
+                  color="bg-destructive/10"
                 />
                 <AnimatedCounter
                   value={counts.updated}
                   label="Changes Today"
                   icon={<TripleChannelIcon size={20} />}
-                  color="bg-amber-500/10"
+                  color="bg-warning/10"
                 />
               </>
             )}
@@ -206,7 +206,7 @@ export default function LandingDigest() {
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link href="/pricing">
-              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-full px-6 font-bold gap-2">
+              <Button variant="brand" className="px-6 gap-2">
                 <Bell className="w-4 h-4" />
                 Get Alerts
                 <ArrowRight className="w-4 h-4" />

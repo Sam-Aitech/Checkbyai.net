@@ -429,10 +429,10 @@ function HeroSection({ onScrollToSearch }: { onScrollToSearch: () => void }) {
     <section className="relative overflow-hidden bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/20 via-transparent to-transparent" />
       <div className="relative max-w-4xl mx-auto px-4 py-16 sm:py-24 text-center">
-        <p className="editorial-caption text-indigo-300 mb-6">
+        <p className="text-xs font-bold tracking-wide uppercase text-indigo-300 mb-6">
           Automated UK Sponsor Licence Monitoring
         </p>
-        <h1 className="type-h1 hero-text mb-6">
+        <h1 className="editorial-heading text-3xl md:text-4xl mb-6">
           Know the Moment Your Sponsor's Licence Status Changes
         </h1>
         <p className="text-base sm:text-lg text-slate-300 max-w-2xl mx-auto mb-10 leading-relaxed">

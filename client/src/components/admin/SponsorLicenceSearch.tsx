@@ -1,14 +1,13 @@
 import { useState, useRef } from 'react';
 import {
-  Search, ChevronLeft, ChevronRight, RefreshCw,
-  CheckCircle, XCircle, Clock, AlertTriangle, Zap, Building2, HelpCircle,
+  Search, ChevronLeft, ChevronRight, RefreshCw, Building2, XCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { unwrapApiEnvelope } from '@/lib/apiEnvelope';
+import SponsorStatusBadge from '@/components/SponsorStatusBadge';
 
 interface DirectoryResult {
   fingerprint: string;
@@ -27,61 +26,11 @@ interface DirectoryResponse {
   totalPages: number;
 }
 
-function StatusBadge({ status, typeRating }: { status: string; typeRating: string | null }) {
-  const isBRated = (typeRating || '').toLowerCase().includes('b');
-
-  if (status === 'REMOVED_REVOKED' || status === 'NOT_LISTED') {
-    return (
-      <Badge className="bg-red-500/20 text-red-400 border-red-500/30 rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.08em] whitespace-nowrap">
-        <XCircle className="w-3 h-3 mr-1" />
-        Removed
-      </Badge>
-    );
-  }
-  if (status === 'NEWLY_GRANTED') {
-    return (
-      <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30 rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.08em] whitespace-nowrap">
-        <Zap className="w-3 h-3 mr-1" />
-        Newly Granted
-      </Badge>
-    );
-  }
-  if (status === 'GRACE_PERIOD') {
-    return (
-      <Badge className="bg-yellow-500/20 text-yellow-500 border-yellow-500/30 rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.08em] whitespace-nowrap">
-        <Clock className="w-3 h-3 mr-1" />
-        Under Review
-      </Badge>
-    );
-  }
-  if (status === 'ACTIVE') {
-    return (
-      <div className="flex items-center gap-1 flex-wrap">
-        <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.08em] whitespace-nowrap">
-          <CheckCircle className="w-3 h-3 mr-1" />
-          Active
-        </Badge>
-        {isBRated && (
-          <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.08em] whitespace-nowrap">
-            <AlertTriangle className="w-3 h-3 mr-1" />
-            B-Rated
-          </Badge>
-        )}
-      </div>
-    );
-  }
-  return (
-    <Badge className="bg-slate-500/20 text-slate-400 border-slate-500/30 rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.08em] whitespace-nowrap">
-      <HelpCircle className="w-3 h-3 mr-1" />
-      Unknown
-    </Badge>
-  );
-}
-
 const STATUS_OPTIONS = [
   { value: 'all',             label: 'All statuses'   },
   { value: 'ACTIVE',          label: 'Active'         },
   { value: 'NEWLY_GRANTED',   label: 'Newly Granted'  },
+  { value: 'REINSTATED',      label: 'Reinstated'     },
   { value: 'REMOVED_REVOKED', label: 'Removed'        },
   { value: 'GRACE_PERIOD',    label: 'Under Review'   },
 ];
@@ -188,7 +137,7 @@ export default function SponsorLicenceSearch() {
       <CardContent>
         {/* Error */}
         {error && (
-          <div className="flex flex-col gap-3 p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm mb-4">
+          <div className="flex flex-col gap-3 p-4 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm mb-4">
             <div className="flex items-center gap-2">
               <XCircle className="w-4 h-4 shrink-0" />
               <span>{error}</span>
@@ -273,7 +222,7 @@ export default function SponsorLicenceSearch() {
                         {r.route || '—'}
                       </td>
                       <td className="py-3 px-3">
-                        <StatusBadge status={r.status} typeRating={r.typeRating} />
+                        <SponsorStatusBadge status={r.status} typeRating={r.typeRating} />
                       </td>
                     </tr>
                   ))}

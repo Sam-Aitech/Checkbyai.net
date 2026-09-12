@@ -339,7 +339,7 @@ export default function SponsorDirectory() {
           {/* A–Z quick filter */}
           <div className="border-t pt-3">
             <div className="flex items-center gap-1.5 flex-wrap" role="group" aria-label="Filter by first letter">
-              <span className="type-caption text-muted-foreground mr-1">A–Z</span>
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mr-1">A–Z</span>
               {ALPHABET.map((l) => (
                 <button
                   key={l}

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { CheckCircle, XCircle, AlertTriangle, Info, Shield, Copy, ChevronDown, ChevronUp, Lock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,10 @@ export default function VerificationResults({ result, verificationId }: Verifica
   const [showFeedback, setShowFeedback] = useState(false);
   const [expandedChecks, setExpandedChecks] = useState<Record<number, boolean>>({});
   const { toast } = useToast();
+  const shouldReduceMotion = useReducedMotion();
+  const entrance = shouldReduceMotion
+    ? { initial: { opacity: 0 }, animate: { opacity: 1 }, transition: { duration: 0.15 } }
+    : { initial: { opacity: 0, y: 24 }, animate: { opacity: 1, y: 0 }, transition: spring };
 
   const checks = result.checks || [];
   const passedCount = checks.filter(c => c.passed).length;
@@ -48,26 +52,32 @@ export default function VerificationResults({ result, verificationId }: Verifica
   const statusConfig = {
     genuine: {
       label: "Genuine",
-      accent: "text-emerald-600 dark:text-emerald-400",
-      bg: "bg-emerald-500/5 dark:bg-emerald-500/10",
-      border: "border-emerald-500/20",
-      badgeBg: "bg-emerald-700",
+      accent: "text-success",
+      bg: "bg-success/5",
+      border: "border-success/20",
+      pillBg: "bg-success/10",
+      pillBorder: "border-success/30",
+      solid: "bg-success",
       icon: <CheckCircle className="w-5 h-5" />,
     },
     suspicious: {
       label: "Suspicious",
-      accent: "text-amber-600 dark:text-amber-400",
-      bg: "bg-amber-500/5 dark:bg-amber-500/10",
-      border: "border-amber-500/20",
-      badgeBg: "bg-amber-700",
+      accent: "text-warning",
+      bg: "bg-warning/5",
+      border: "border-warning/20",
+      pillBg: "bg-warning/10",
+      pillBorder: "border-warning/30",
+      solid: "bg-warning",
       icon: <AlertTriangle className="w-5 h-5" />,
     },
     fake: {
       label: "Fake",
-      accent: "text-red-600 dark:text-red-400",
-      bg: "bg-red-500/5 dark:bg-red-500/10",
-      border: "border-red-500/20",
-      badgeBg: "bg-red-600",
+      accent: "text-destructive",
+      bg: "bg-destructive/5",
+      border: "border-destructive/20",
+      pillBg: "bg-destructive/10",
+      pillBorder: "border-destructive/30",
+      solid: "bg-destructive",
       icon: <XCircle className="w-5 h-5" />,
     },
   };
@@ -78,9 +88,9 @@ export default function VerificationResults({ result, verificationId }: Verifica
   const strokeOffset = circumference - (result.confidence * circumference);
 
   const severityConfig = {
-    critical: { color: "text-red-600 dark:text-red-400", bg: "bg-red-500/10", label: "Critical" },
-    warning: { color: "text-amber-700 dark:text-amber-400", bg: "bg-amber-500/10", label: "Warning" },
-    info: { color: "text-primary", bg: "bg-primary/10", label: "Info" },
+    critical: { color: "text-destructive", bg: "bg-destructive/10", label: "Critical" },
+    warning: { color: "text-warning", bg: "bg-warning/10", label: "Warning" },
+    info: { color: "text-info", bg: "bg-info/10", label: "Info" },
   };
 
   const getExplanation = () => {
@@ -96,9 +106,9 @@ export default function VerificationResults({ result, verificationId }: Verifica
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 24 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={spring}
+      initial={entrance.initial}
+      animate={entrance.animate}
+      transition={entrance.transition}
       className="space-y-4"
     >
       <div className={`border border-border rounded-xl overflow-hidden ${config.bg}`}>
@@ -135,7 +145,7 @@ export default function VerificationResults({ result, verificationId }: Verifica
               </p>
             </div>
 
-            <div className={`editorial-caption px-4 py-2 rounded-full ${config.badgeBg} text-white flex-shrink-0 relative overflow-hidden`}>
+            <div className={`editorial-caption px-4 py-2 rounded-full border ${config.pillBg} ${config.pillBorder} ${config.accent} flex-shrink-0 relative overflow-hidden`}>
               <div className="relative z-10 flex items-center gap-1.5">
                 <Shield className="w-3.5 h-3.5" />
                 {config.label}
@@ -156,10 +166,10 @@ export default function VerificationResults({ result, verificationId }: Verifica
               {result.receiptId && (
                 <div className="flex items-center justify-between bg-muted/50 rounded-xl px-3 py-2">
                   <div>
-                    <span className="type-caption text-muted-foreground block">Receipt ID</span>
+                    <span className="text-xs text-muted-foreground block uppercase tracking-widest">Receipt ID</span>
                     <span className="text-sm font-mono text-foreground">{result.receiptId}</span>
                   </div>
-                    <Button variant="ghost" size="sm" aria-label="Copy receipt ID" onClick={() => copyToClipboard(result.receiptId!, "Receipt ID")} className="h-8 w-8 p-0">
+                  <Button variant="ghost" size="sm" onClick={() => copyToClipboard(result.receiptId!, "Receipt ID")} className="h-8 w-8 p-0 rounded-xl">
                     <Copy className="w-3.5 h-3.5" />
                   </Button>
                 </div>
@@ -169,7 +179,7 @@ export default function VerificationResults({ result, verificationId }: Verifica
                   href={`/receipt/${result.receiptId}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline px-1 pt-1"
+                  className="flex items-center gap-1.5 text-xs text-info hover:underline px-1 pt-1"
                 >
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -180,12 +190,12 @@ export default function VerificationResults({ result, verificationId }: Verifica
               {result.documentHash && (
                 <div className="flex items-center justify-between bg-muted/50 rounded-xl px-3 py-2">
                   <div>
-                    <span className="type-caption text-muted-foreground block">Document Hash</span>
+                    <span className="text-xs text-muted-foreground block uppercase tracking-widest">Document Hash</span>
                     <span className="text-sm font-mono text-foreground">
                       {result.documentHash.length > 16 ? `${result.documentHash.slice(0, 8)}...${result.documentHash.slice(-8)}` : result.documentHash}
                     </span>
                   </div>
-                    <Button variant="ghost" size="sm" aria-label="Copy document hash" onClick={() => copyToClipboard(result.documentHash!, "Document Hash")} className="h-8 w-8 p-0">
+                  <Button variant="ghost" size="sm" onClick={() => copyToClipboard(result.documentHash!, "Document Hash")} className="h-8 w-8 p-0 rounded-xl">
                     <Copy className="w-3.5 h-3.5" />
                   </Button>
                 </div>
@@ -212,17 +222,17 @@ export default function VerificationResults({ result, verificationId }: Verifica
                     initial={{ opacity: 0, x: -8 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ ...spring, delay: index * 0.05 }}
-                    className={`border border-border rounded-xl transition-colors ${check.passed ? "bg-emerald-500/[0.02] dark:bg-emerald-500/[0.04]" : "bg-red-500/[0.02] dark:bg-red-500/[0.04]"}`}
+                    className={`border border-border rounded-xl transition-colors ${check.passed ? "bg-success/[0.04]" : "bg-destructive/[0.04]"}`}
                   >
                     <button
                       onClick={() => toggleCheck(index)}
-                      className="w-full flex items-center justify-between px-4 py-3 text-left"
+                      className="w-full flex items-center justify-between px-4 py-3 text-left rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     >
                       <div className="flex items-center gap-3 flex-1 min-w-0">
                         {check.passed ? (
-                          <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" aria-hidden="true" />
+                          <CheckCircle className="w-4 h-4 text-success flex-shrink-0" />
                         ) : (
-                          <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" aria-hidden="true" />
+                          <XCircle className="w-4 h-4 text-destructive flex-shrink-0" />
                         )}
                         <span className="text-sm font-medium text-foreground truncate">{check.name}</span>
                         <span className={`text-xs px-2 py-0.5 rounded-full font-semibold tracking-wider uppercase flex-shrink-0 ${sev.bg} ${sev.color}`}>
@@ -265,7 +275,7 @@ export default function VerificationResults({ result, verificationId }: Verifica
               <div className="flex items-center gap-3">
                 <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
                   <motion.div
-                    className={`h-full rounded-full ${config.badgeBg}`}
+                    className={`h-full rounded-full ${config.solid}`}
                     initial={{ width: 0 }}
                     animate={{ width: `${confidencePercent}%` }}
                     transition={{ duration: 1, ease: "easeOut", delay: 0.5 }}
@@ -281,11 +291,11 @@ export default function VerificationResults({ result, verificationId }: Verifica
               </p>
               <div className="flex gap-4">
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <CheckCircle className="w-3 h-3 text-emerald-500" />
+                  <CheckCircle className="w-3 h-3 text-success" />
                   <span>{passedCount} passed</span>
                 </div>
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <XCircle className="w-3 h-3 text-red-500" />
+                  <XCircle className="w-3 h-3 text-destructive" />
                   <span>{totalChecks - passedCount} failed</span>
                 </div>
               </div>
@@ -295,16 +305,16 @@ export default function VerificationResults({ result, verificationId }: Verifica
       )}
 
       {result.mismatchedFields && result.mismatchedFields.length > 0 && (
-        <Card className="border border-border border-amber-500/20 rounded-xl shadow-none">
+        <Card className="border border-warning/20 rounded-xl shadow-none">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-3">
-              <AlertTriangle className="w-4 h-4 text-amber-500" />
-              <h4 className="editorial-caption text-amber-600 dark:text-amber-400">Mismatched Fields</h4>
+              <AlertTriangle className="w-4 h-4 text-warning" />
+              <h4 className="editorial-caption text-warning">Mismatched Fields</h4>
             </div>
             <ul className="space-y-1.5">
               {result.mismatchedFields.map((field, index) => (
                 <li key={index} className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <XCircle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
+                  <XCircle className="w-3.5 h-3.5 text-warning flex-shrink-0 mt-0.5" />
                   {field}
                 </li>
               ))}
@@ -325,14 +335,14 @@ export default function VerificationResults({ result, verificationId }: Verifica
         </CardContent>
       </Card>
 
-      <div className="px-4 py-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 rounded-xl">
+      <div className="px-4 py-3 bg-info/10 border border-info/20 rounded-xl">
         <div className="flex items-start gap-2">
-          <Info className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+          <Info className="w-3.5 h-3.5 text-info flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-xs text-blue-800 dark:text-blue-300 leading-relaxed font-medium mb-1">
+            <p className="text-xs text-info leading-relaxed font-medium mb-1">
               Technical Analysis Only — Not Legal or Immigration Advice
             </p>
-            <p className="text-xs text-blue-700 dark:text-blue-400 leading-relaxed">
+            <p className="text-xs text-info leading-relaxed">
               This is a forensic analysis of document metadata and structure only. It does not constitute legal or immigration advice and should not be used as the sole basis for any immigration decision. If you have concerns about a document, consult an{' '}
               <a
                 href="https://www.gov.uk/find-immigration-adviser"
@@ -351,7 +361,7 @@ export default function VerificationResults({ result, verificationId }: Verifica
       <div className="px-4 py-3 bg-primary/[0.03] dark:bg-primary/[0.06] border border-border rounded-xl">
         <div className="flex items-start gap-2">
           <Lock className="w-3.5 h-3.5 text-primary flex-shrink-0 mt-0.5" />
-            <p className="text-xs text-muted-foreground leading-relaxed">
+          <p className="text-xs text-muted-foreground leading-relaxed">
             UK GDPR and Data Protection Act 2018: Your original document has been permanently deleted from our servers. Only metadata was processed. Free users: these results will not be saved. Paid account holders: only the verification result is retained for your records.
           </p>
         </div>
@@ -363,7 +373,7 @@ export default function VerificationResults({ result, verificationId }: Verifica
             variant="outline"
             size="sm"
             onClick={() => setShowFeedback(!showFeedback)}
-            className="w-full flex items-center justify-center gap-2 border border-border"
+            className="w-full flex items-center justify-center gap-2 rounded-xl border border-border"
             data-testid="toggle-feedback"
           >
             <span className="text-xs font-medium">Rate this verification</span>
