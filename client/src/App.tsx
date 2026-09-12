@@ -28,7 +28,13 @@ const SponsorDirectory = lazy(() => import("@/pages/SponsorDirectory"));
 const CheckFakeCoS = lazy(() => import("@/pages/CheckFakeCoS"));
 const WhatToDoFakeCoS = lazy(() => import("@/pages/WhatToDoFakeCoS"));
 const About = lazy(() => import("@/pages/About"));
-const ProDashboard = lazy(() => import("@/pages/ProDashboard"));
+const ProDashboardOverview = lazy(() => import("@/pages/pro-dashboard/Overview"));
+const ProDashboardMonitor = lazy(() => import("@/pages/pro-dashboard/Monitor"));
+const ProDashboardJobs = lazy(() => import("@/pages/pro-dashboard/Jobs"));
+const ProDashboardAlerts = lazy(() => import("@/pages/pro-dashboard/Alerts"));
+const ProDashboardHistory = lazy(() => import("@/pages/pro-dashboard/History"));
+const ProDashboardSupport = lazy(() => import("@/pages/pro-dashboard/Support"));
+const ProDashboardAccount = lazy(() => import("@/pages/pro-dashboard/Account"));
 const SponsorDetail = lazy(() => import("@/pages/SponsorDetail"));
 const ReceiptPage = lazy(() => import("@/pages/ReceiptPage"));
 const NotFound = lazy(() => import("@/pages/not-found"));
@@ -71,7 +77,13 @@ function Router() {
         <Route path="/check-fake-cos" component={CheckFakeCoS} />
         <Route path="/what-to-do-fake-cos" component={WhatToDoFakeCoS} />
         <Route path="/about" component={About} />
-        <Route path="/pro-dashboard" component={ProDashboard} />
+        <Route path="/pro-dashboard" component={ProDashboardOverview} />
+        <Route path="/pro-dashboard/monitor" component={ProDashboardMonitor} />
+        <Route path="/pro-dashboard/jobs" component={ProDashboardJobs} />
+        <Route path="/pro-dashboard/alerts" component={ProDashboardAlerts} />
+        <Route path="/pro-dashboard/history" component={ProDashboardHistory} />
+        <Route path="/pro-dashboard/support" component={ProDashboardSupport} />
+        <Route path="/pro-dashboard/account" component={ProDashboardAccount} />
         <Route path="/sponsor/:id/:slug" component={SponsorDetail} />
         <Route path="/sponsor/:id" component={SponsorDetail} />
         <Route path="/receipt/:receiptId" component={ReceiptPage} />

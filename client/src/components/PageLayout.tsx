@@ -6,6 +6,7 @@ import BrandLogo from "./BrandLogo";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
+import { useHoverDropdown } from "@/hooks/useHoverDropdown";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import logoImg from "@assets/logo_material.png";
 
@@ -34,11 +35,10 @@ const navItems: NavItem[] = [
     label: "Monitor",
     children: [
       { href: "/sponsors",        label: "Sponsor Register",  desc: "Search 124,000+ licensed UK sponsors",          icon: <Search className="w-4 h-4" /> },
-      { href: "/sponsor-monitor", label: "Sponsor Monitor",   desc: "Get instant alerts when a licence changes",      icon: <Bell className="w-4 h-4" /> },
+      { href: "/sponsor-monitor", label: "Sponsor Monitor",   desc: "Get alerted when a licence changes",      icon: <Bell className="w-4 h-4" /> },
       { href: "/sponsor-changes", label: "Licence Changes",   desc: "Recent additions, revocations and downgrades",   icon: <TrendingUp className="w-4 h-4" /> },
     ],
   },
-  { href: "/dashboard", label: "Verify CoS" },
   { href: "/pricing",   label: "Pricing" },
   {
     label: "Resources",
@@ -47,6 +47,7 @@ const navItems: NavItem[] = [
       { href: "/ai-guide",    label: "AI Guide",    desc: "How our AI verification works",           icon: <Cpu className="w-4 h-4" /> },
       { href: "/technology",  label: "Technology",  desc: "The tech behind CheckByAI",               icon: <FileCheck className="w-4 h-4" /> },
       { href: "/api-docs",    label: "API Docs",    desc: "Integrate via our REST API",              icon: <Code2 className="w-4 h-4" /> },
+      { href: "/dashboard",   label: "Verify CoS",  desc: "Check a Certificate of Sponsorship",      icon: <FileCheck className="w-4 h-4" /> },
     ],
   },
 ];
@@ -57,25 +58,15 @@ interface NavDropdownProps {
 }
 
 function NavDropdown({ item, dark = false }: NavDropdownProps) {
-  const [open, setOpen] = useState(false);
   const [location] = useLocation();
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  const { open, setOpen, wrapperRef, triggerRef, wrapperHandlers } = useHoverDropdown<HTMLButtonElement>();
 
   const isChildActive = item.children?.some(c => location === c.href);
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={wrapperRef} className="relative" {...wrapperHandlers}>
       <button
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
+        ref={triggerRef}
         onClick={() => setOpen(v => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
@@ -91,40 +82,43 @@ function NavDropdown({ item, dark = false }: NavDropdownProps) {
 
       <AnimatePresence>
         {open && (
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 6 }}
-            transition={{ duration: 0.15 }}
-            onMouseEnter={() => setOpen(true)}
-            onMouseLeave={() => setOpen(false)}
-            role="menu"
-            className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 bg-white dark:bg-card rounded-xl border border-border shadow-xl shadow-black/10 overflow-hidden z-50"
-          >
-            <div className="p-1.5">
-              {item.children?.map(child => (
-                <Link
-                  key={child.href}
-                  href={child.href}
-                  onClick={() => setOpen(false)}
-                  role="menuitem"
-                  className={`flex items-start gap-3 p-3 rounded-lg transition-colors group ${
-                    location === child.href
-                      ? "bg-primary/10 text-primary"
-                      : "hover:bg-muted text-foreground"
-                  }`}
-                >
-                  <span className={`mt-0.5 shrink-0 ${location === child.href ? "text-primary" : "text-muted-foreground group-hover:text-foreground"}`}>
-                    {child.icon}
-                  </span>
-                  <div>
-                    <p className="text-sm font-semibold leading-none mb-1">{child.label}</p>
-                    <p className="text-xs text-muted-foreground leading-snug">{child.desc}</p>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </motion.div>
+          // pt-2 (not mt-2) keeps the same 8px visual gap while keeping the
+          // gap itself inside this element's hit-test area, so the pointer
+          // can travel from trigger to menu without a mouseleave firing.
+          <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 w-64 z-50">
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 6 }}
+              transition={{ duration: 0.15 }}
+              role="menu"
+              className="bg-white dark:bg-card rounded-xl border border-border shadow-xl shadow-black/10 overflow-hidden"
+            >
+              <div className="p-1.5">
+                {item.children?.map(child => (
+                  <Link
+                    key={child.href}
+                    href={child.href}
+                    onClick={() => setOpen(false)}
+                    role="menuitem"
+                    className={`flex items-start gap-3 p-3 rounded-lg transition-colors group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                      location === child.href
+                        ? "bg-primary/10 text-primary"
+                        : "hover:bg-muted text-foreground"
+                    }`}
+                  >
+                    <span className={`mt-0.5 shrink-0 ${location === child.href ? "text-primary" : "text-muted-foreground group-hover:text-foreground"}`}>
+                      {child.icon}
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold leading-none mb-1">{child.label}</p>
+                      <p className="text-xs text-muted-foreground leading-snug">{child.desc}</p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>
@@ -186,7 +180,7 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
     : { initial: { opacity: 0, y: 15 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -15 } };
 
   const monitorGroup = navItems[0];
-  const resourcesGroup = navItems[3];
+  const resourcesGroup = navItems[2];
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -231,7 +225,7 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
                     {(isPro || isAdmin) && (
                       <Link
                         href="/pro-dashboard"
-                        className="hidden sm:flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-emerald-700 hover:bg-emerald-800 rounded-full shadow-sm shadow-emerald-500/20 transition-[color,background-color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2"
+                        className="hidden sm:flex items-center gap-2 px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-full shadow-sm shadow-primary/20 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                       >
                         <LayoutDashboard className="w-4 h-4" />
                         My Dashboard
@@ -250,7 +244,7 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
                     {location !== "/pricing" && (
                       <Link
                         href="/pricing"
-                        className="hidden sm:flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-white bg-emerald-700 hover:bg-emerald-800 rounded-full shadow-sm shadow-emerald-500/20 transition-[color,background-color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2"
+                        className="hidden sm:flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-full shadow-sm shadow-primary/20 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                       >
                         <Bell className="w-3.5 h-3.5" />
                         Get Alerts
@@ -279,8 +273,6 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
               <motion.div
                 id="mobile-nav"
                 ref={mobileMenuRef}
-                role="dialog"
-                aria-modal="true"
                 aria-label="Navigation menu"
                 initial={menuVariants.initial}
                 animate={menuVariants.animate}
@@ -292,7 +284,7 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
 
                   {/* Monitor group */}
                   <div>
-                    <p className={`text-xs font-semibold tracking-[0.08em] uppercase px-3 mb-1 ${darkNav ? "text-slate-500" : "text-muted-foreground"}`}>Monitor</p>
+                    <p className={`text-xs font-bold tracking-widest uppercase px-3 mb-1 ${darkNav ? "text-slate-500" : "text-muted-foreground/50"}`}>Monitor</p>
                     {monitorGroup.children?.map(child => (
                       <Link
                         key={child.href}
@@ -313,7 +305,7 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
 
                   {/* Standalone links */}
                   <div className={`border-t pt-3 ${darkNav ? "border-slate-800" : "border-border/50"}`}>
-                    {[navItems[1], navItems[2]].map(item => (
+                    {[navItems[1]].map(item => (
                       <Link
                         key={item.href}
                         href={item.href!}
@@ -332,7 +324,7 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
 
                   {/* Resources group */}
                   <div className={`border-t pt-3 ${darkNav ? "border-slate-800" : "border-border/50"}`}>
-                    <p className={`text-xs font-semibold tracking-[0.08em] uppercase px-3 mb-1 ${darkNav ? "text-slate-500" : "text-muted-foreground"}`}>Resources</p>
+                    <p className={`text-xs font-bold tracking-widest uppercase px-3 mb-1 ${darkNav ? "text-slate-500" : "text-muted-foreground/50"}`}>Resources</p>
                     {resourcesGroup.children?.map(child => (
                       <Link
                         key={child.href}
@@ -358,7 +350,7 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
                         <Link
                           href="/pro-dashboard"
                           onClick={closeMobileMenu}
-                            className="flex items-center justify-center gap-2 w-full px-4 py-3 text-sm font-bold text-white bg-emerald-700 hover:bg-emerald-800 rounded-xl transition-[color,background-color] duration-200"
+                          className="flex items-center justify-center gap-2 w-full px-4 py-3 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-xl transition-all"
                         >
                           <LayoutDashboard className="w-4 h-4" />
                           My Dashboard
@@ -377,7 +369,7 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
                           <Link
                             href="/pricing"
                             onClick={closeMobileMenu}
-                          className="flex items-center justify-center gap-2 w-full px-4 py-3 text-sm font-bold text-white bg-emerald-700 hover:bg-emerald-800 rounded-xl transition-[color,background-color] duration-200"
+                            className="flex items-center justify-center gap-2 w-full px-4 py-3 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-xl transition-all"
                           >
                             <Bell className="w-4 h-4" />
                             Get Licence Alerts

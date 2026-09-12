@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { apiRequest } from '@/lib/queryClient';
 import { unwrapApiEnvelope } from '@/lib/apiEnvelope';
-import { isPaidTier, isUnlimitedWatchTier } from '@shared/planTiers';
+import { isPaidTier, isUnlimitedWatchTier, ALERT_TIMING_SHORT } from '@shared/planTiers';
 import PageLayout from '@/components/PageLayout';
 import SEOHead from '@/components/SEOHead';
 
@@ -59,17 +59,17 @@ export default function CheckoutSuccess() {
     verifySession();
   }, [sessionId, queryClient]);
 
-  const isNotificationPlan = ['notification_starter', 'notification_pro', 'alert_annual', 'alert_annual_pro'].includes(verifyResult?.packageType ?? '');
+  // ALERT-PASS FAMILY: `alert_annual`/`alert_annual_pro` (annual) and the
+  // legacy `notification_starter`/`notification_pro` (monthly) SKUs. This
+  // grouping is kept ONLY for behavior that is genuinely shared across the
+  // whole family regardless of exact SKU — the company-watch confirmation
+  // card and the "go to dashboard" CTA routing/label below. Receipt COPY
+  // (what exactly they get) is branched per exact `packageType` instead, see
+  // `getAlertPassReceiptDetails`.
+  const ALERT_PASS_PACKAGE_TYPES = ['notification_starter', 'notification_pro', 'alert_annual', 'alert_annual_pro'];
+  const isAlertPassFamily = ALERT_PASS_PACKAGE_TYPES.includes(verifyResult?.packageType ?? '');
 
   const sponsorDashboardUrl = '/pro-dashboard';
-
-  // Auto-redirect notification plan purchases to sponsor dashboard after 2s
-  useEffect(() => {
-    if (!isVerifying && verifyResult?.success && isNotificationPlan) {
-      const timer = setTimeout(() => setLocation(sponsorDashboardUrl), 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [isVerifying, verifyResult?.success, isNotificationPlan, sponsorDashboardUrl, setLocation]);
 
   const getPackageLabel = (type?: string) => {
     switch (type) {
@@ -83,6 +83,28 @@ export default function CheckoutSuccess() {
       case 'alert_annual_pro': return 'Alert Pass - Pro Annual (5 companies)';
       case 'cos_check_single': return 'CoS Check (1 verification)';
       default: return 'Package';
+    }
+  };
+
+  // Exact packageType branching for Alert-Pass receipt copy — replaces the
+  // old binary isNotificationPlan-driven text so each SKU confirms what it
+  // actually grants. Alert timing always comes from ALERT_TIMING_SHORT
+  // (shared/planTiers.ts), never a hardcoded "immediate"/"instant" string —
+  // alert_annual/notification_starter grant the 'starter' tier and
+  // alert_annual_pro/notification_pro grant the 'pro' tier (see
+  // applyPackageGrant in server/routes/billing.ts).
+  const getAlertPassReceiptDetails = (type?: string): string | null => {
+    switch (type) {
+      case 'alert_annual':
+        return `1 company monitored • ${ALERT_TIMING_SHORT.starter}`;
+      case 'alert_annual_pro':
+        return `5 companies monitored • Sponsored job alerts • ${ALERT_TIMING_SHORT.pro}`;
+      case 'notification_starter':
+        return `1 company monitored • ${ALERT_TIMING_SHORT.starter}`;
+      case 'notification_pro':
+        return `5 companies monitored • 5 CoS checks/month • ${ALERT_TIMING_SHORT.pro}`;
+      default:
+        return null;
     }
   };
 
@@ -169,9 +191,17 @@ export default function CheckoutSuccess() {
                     </span>
                   </div>
                 )}
+
+                {isAlertPassFamily && getAlertPassReceiptDetails(verifyResult.packageType) && (
+                  <div className="pt-1 border-t border-border/60">
+                    <p className="text-xs text-muted-foreground">
+                      {getAlertPassReceiptDetails(verifyResult.packageType)}
+                    </p>
+                  </div>
+                )}
               </div>
 
-              {verifyResult.companyName && isNotificationPlan && (
+              {verifyResult.companyName && isAlertPassFamily && (
                 <div
                   className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4 flex items-start gap-3"
                   data-testid="checkout-success-company-watch"
@@ -182,7 +212,9 @@ export default function CheckoutSuccess() {
                       Now monitoring <span className="font-bold">{verifyResult.companyName}</span>
                     </p>
                     <p className="text-xs text-emerald-600/80 dark:text-emerald-400/80 mt-1">
-                      We'll alert you the moment anything changes on their sponsor licence.
+                      {verifyResult.subscriptionStatus && verifyResult.subscriptionStatus in ALERT_TIMING_SHORT
+                        ? `We'll include any changes to their sponsor licence in your next scheduled alert: ${ALERT_TIMING_SHORT[verifyResult.subscriptionStatus as keyof typeof ALERT_TIMING_SHORT].toLowerCase()}.`
+                        : "We'll include any changes to their sponsor licence in your next scheduled alert digest."}
                     </p>
                   </div>
                 </div>
@@ -191,9 +223,9 @@ export default function CheckoutSuccess() {
               <Button
                 className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full"
                 size="lg"
-                onClick={() => setLocation(isNotificationPlan ? sponsorDashboardUrl : '/')}
+                onClick={() => setLocation(isAlertPassFamily ? sponsorDashboardUrl : '/')}
               >
-                {isNotificationPlan ? 'Go to Dashboard' : 'Start Verifying Documents'}
+                {isAlertPassFamily ? 'Go to Dashboard' : 'Start Verifying Documents'}
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </div>

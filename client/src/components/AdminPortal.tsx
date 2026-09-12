@@ -1648,7 +1648,7 @@ export default function AdminPortal() {
                                           <div className="flex flex-wrap gap-1 text-xs text-gray-400">
                                             <span className="bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">Free: 1 watch</span>
                                             <span className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded">Starter: 2 watches, same-day</span>
-                                            <span className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 px-2 py-0.5 rounded">Pro: 5 watches, immediate</span>
+                                            <span className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 px-2 py-0.5 rounded">Pro: 5 watches, twice-daily</span>
                                           </div>
                                           <Select
                                             value={dropdownValue}
@@ -1952,7 +1952,6 @@ export default function AdminPortal() {
                         Cancel
                       </AlertDialogCancel>
                       <AlertDialogAction
-                        className={pendingPlanChange?.newPlan === 'pro' ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : pendingPlanChange?.newPlan === 'starter' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-gray-600 hover:bg-gray-700 text-white'}
                         disabled={sponsorMonitorPlanMutation.isPending}
                         onClick={() => {
                           if (!pendingPlanChange) return;
@@ -2169,7 +2168,6 @@ export default function AdminPortal() {
                         });
                       }}
                       disabled={updateSubmissionMutation.isPending}
-                      className="bg-green-600 hover:bg-green-700"
                     >
                       <Save className="w-4 h-4 mr-2" />
                       Complete Review
@@ -2177,7 +2175,6 @@ export default function AdminPortal() {
                     <Button
                       onClick={() => sendReportMutation.mutate(selectedSubmission.id)}
                       disabled={sendReportMutation.isPending || selectedSubmission.reviewStatus !== 'completed'}
-                      className="bg-blue-600 hover:bg-blue-700"
                     >
                       <Download className="w-4 h-4 mr-2" />
                       {sendReportMutation.isPending ? 'Sending...' : 'Send Report to User'}

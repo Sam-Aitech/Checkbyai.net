@@ -20,7 +20,7 @@ export default function Footer() {
               <img src={logoImg} alt="CheckByAi.net" width={160} height={40} className="h-10 w-auto object-contain" loading="lazy" />
             </div>
             <p className="text-sm editorial-body hero-text-secondary mb-8 max-w-md">
-              UK sponsor licence monitoring with instant WhatsApp, email and SMS alerts.
+              UK sponsor licence monitoring with same-day and twice-daily WhatsApp, email and SMS alerts.
               Plus AI-powered Certificate of Sponsorship verification for visa applicants.
             </p>
             <a
@@ -35,8 +35,8 @@ export default function Footer() {
             </a>
           </div>
 
-          <div>
-            <h4 className="editorial-caption mb-6 hero-text-tertiary">Products</h4>
+          <nav aria-label="Products">
+            <h2 className="editorial-caption mb-6 hero-text-tertiary tracking-widest">Products</h2>
             <ul className="space-y-3">
               {[
                 { href: "/sponsor-monitor", label: "Sponsor Monitor" },
@@ -52,10 +52,10 @@ export default function Footer() {
                 </li>
               ))}
             </ul>
-          </div>
+          </nav>
 
-          <div>
-            <h4 className="editorial-caption mb-6 hero-text-tertiary">Resources</h4>
+          <nav aria-label="Resources">
+            <h2 className="editorial-caption mb-6 hero-text-tertiary tracking-widest">Resources</h2>
             <ul className="space-y-3">
               {[
                 { href: "/check-fake-cos", label: "Spot a Fake CoS" },
@@ -82,14 +82,14 @@ export default function Footer() {
                 </li>
               ))}
             </ul>
-          </div>
+          </nav>
         </div>
 
         <div className="pt-8 footer-divider">
           <div className={`grid grid-cols-1 gap-8 mb-8 ${companyDetailLines.length > 0 ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
             {companyDetailLines.length > 0 && (
               <div>
-                <h5 className="editorial-caption mb-3 hero-text-tertiary">Company Details</h5>
+                <h2 className="editorial-caption mb-3 hero-text-tertiary">Company Details</h2>
                 <p className="text-xs hero-text-tertiary leading-relaxed">
                   {companyDetailLines.map((line, i) => (
                     <span key={line}>
@@ -101,7 +101,7 @@ export default function Footer() {
               </div>
             )}
             <div>
-              <h5 className="editorial-caption mb-3 hero-text-tertiary">Data Protection</h5>
+              <h2 className="editorial-caption mb-3 hero-text-tertiary">Data Protection</h2>
               <p className="text-xs hero-text-tertiary leading-relaxed">
                 Compliant with UK GDPR 🇬🇧 and the Data Protection Act 2018. We process document metadata only.
                 Original documents are deleted immediately after verification. Free users: results are removed
@@ -110,7 +110,7 @@ export default function Footer() {
               </p>
             </div>
             <div className="md:text-right">
-              <h5 className="editorial-caption mb-3 hero-text-tertiary">Legal</h5>
+              <h2 className="editorial-caption mb-3 hero-text-tertiary">Legal</h2>
               <p className="text-xs hero-text-tertiary leading-relaxed">
                 This tool provides technical analysis only and does not constitute legal or immigration advice.
                 Processing is carried out under Article 6(1)(f) UK GDPR (legitimate interests) for fraud

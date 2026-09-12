@@ -6,6 +6,7 @@ import { apiRequest } from '@/lib/queryClient';
 import { unwrapApiEnvelope } from '@/lib/apiEnvelope';
 import { usePackagePrices } from '@/hooks/usePackagePrices';
 import { LEGACY_PAYMENT_LINKS } from '@/lib/legacyPaymentLinks';
+import { ALERT_TIMING_SHORT } from '@shared/planTiers';
 
 interface AlertAddOnModalProps {
   open: boolean;
@@ -16,7 +17,7 @@ interface AlertAddOnModalProps {
 
 const ANNUAL_PLANS = [
   { packageType: 'alert_annual', name: 'Alert Pass (Annual)', price: '£9.99', period: '/yr', description: '1 company, email + WhatsApp, same-day alerts', icon: Bell },
-  { packageType: 'alert_annual_pro', name: 'Alert Pass Pro (Annual)', price: '£19.99', period: '/yr', description: 'Up to 5 companies, instant alerts + SMS', icon: Zap },
+  { packageType: 'alert_annual_pro', name: 'Alert Pass Pro (Annual)', price: '£19.99', period: '/yr', description: `Up to 5 companies, ${ALERT_TIMING_SHORT.pro.toLowerCase()} + SMS`, icon: Zap },
 ] as const;
 
 const LEGACY_PLANS = [

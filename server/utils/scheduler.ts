@@ -21,6 +21,7 @@ import { runJobAlertJob } from "./jobAlertJob";
 import { runSponsorMonitorJob } from "./sponsorMonitorJob";
 import { runConsolidatedNotificationJob } from "../services/consolidatedNotificationEngine";
 import { finishJobRun, startJobRun } from "./jobTelemetry";
+import { sweepStalePdfUploads } from "./pdfUploadStore";
 import { logger } from "./logger";
 
 const log = logger.child({ module: "Scheduler" });
@@ -154,6 +155,18 @@ export function startCentralScheduler(): void {
     }, opts);
     log.info("Central scheduler: CONSOLIDATED_NOTIFICATIONS registered (0 7,19 * * * UTC).");
   }
+
+  // Not a CUTOVER_* job — there's no prior inline cron to migrate away from,
+  // this is new functionality — so it's registered unconditionally. Safety
+  // net for pdf_verify_uploads rows a worker failed to clean up (crash, bug):
+  // deletes anything older than 1 hour, comfortably past the queue's
+  // attempts:3 exponential-backoff retry window.
+  cron.schedule("*/30 * * * *", () => {
+    sweepStalePdfUploads(60 * 60 * 1000)
+      .then((count) => { if (count > 0) log.warn({ count }, "Swept stale pdf_verify_uploads rows."); })
+      .catch((err) => log.error({ err }, "pdfVerifyUploads sweep failed."));
+  }, opts);
+  log.info("Central scheduler: PDF_VERIFY_UPLOADS_SWEEP registered (*/30 * * * * UTC).");
 
   const active = getCutoverStatusSnapshot().filter((s) => s.cutover).map((s) => s.job);
   if (active.length === 0) {

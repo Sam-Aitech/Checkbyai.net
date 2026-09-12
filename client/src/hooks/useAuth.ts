@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import type { User } from "@shared/schema";
-import { resolveTier, isPaidTier, type PlanTier } from "@shared/planTiers";
+import { resolveTier, isPaidTier, isPastDue, type PlanTier } from "@shared/planTiers";
 
 export function useAuth() {
   const { data: user, isLoading, error } = useQuery<User>({
@@ -24,5 +24,6 @@ export function useAuth() {
     isAdmin: user?.role === 'admin',
     tier,
     isPro: isAuthenticated && isPaidTier(user?.subscriptionStatus),
+    isPastDue: isPastDue(user?.subscriptionStatus),
   };
 }

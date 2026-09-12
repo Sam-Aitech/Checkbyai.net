@@ -15,6 +15,13 @@ import PageLayout from "@/components/PageLayout";
 import SEOHead from "@/components/SEOHead";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import {
+  getSponsorStatusPresentation,
+  isSponsorBRated,
+  SPONSOR_B_RATED_PRESENTATION,
+  sponsorToneBadgeClasses,
+  sponsorToneBannerClasses,
+} from "@/lib/sponsorStatus";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -57,13 +64,13 @@ interface SponsorDetailData {
 // ── Change type display helpers ───────────────────────────────────────────────
 
 const CHANGE_META: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
-  NEW_LICENCE:      { label: "Licence Granted",    icon: <CheckCircle className="w-4 h-4" />,      color: "text-emerald-600 dark:text-emerald-400" },
-  RE_ACTIVATED:     { label: "Licence Reinstated", icon: <RefreshCw className="w-4 h-4" />,         color: "text-blue-600 dark:text-blue-400" },
-  REMOVED_REVOKED:  { label: "Licence Revoked",    icon: <XCircle className="w-4 h-4" />,           color: "text-red-600 dark:text-red-400" },
-  UPGRADED:         { label: "Rating Upgraded",    icon: <ArrowUpCircle className="w-4 h-4" />,     color: "text-emerald-600 dark:text-emerald-400" },
-  DOWNGRADED:       { label: "Rating Downgraded",  icon: <ArrowDownCircle className="w-4 h-4" />,   color: "text-amber-600 dark:text-amber-400" },
-  ROUTE_CHANGE:     { label: "Route Updated",      icon: <Tag className="w-4 h-4" />,               color: "text-indigo-600 dark:text-indigo-400" },
-  NAME_CHANGE:      { label: "Company Renamed",    icon: <FileText className="w-4 h-4" />,          color: "text-slate-600 dark:text-slate-400" },
+  NEW_LICENCE:      { label: "Licence Granted",    icon: <CheckCircle className="w-4 h-4" />,      color: "text-success" },
+  RE_ACTIVATED:     { label: "Licence Reinstated", icon: <RefreshCw className="w-4 h-4" />,         color: "text-info" },
+  REMOVED_REVOKED:  { label: "Licence Revoked",    icon: <XCircle className="w-4 h-4" />,           color: "text-destructive" },
+  UPGRADED:         { label: "Rating Upgraded",    icon: <ArrowUpCircle className="w-4 h-4" />,     color: "text-success" },
+  DOWNGRADED:       { label: "Rating Downgraded",  icon: <ArrowDownCircle className="w-4 h-4" />,   color: "text-warning" },
+  ROUTE_CHANGE:     { label: "Route Updated",      icon: <Tag className="w-4 h-4" />,               color: "text-info" },
+  NAME_CHANGE:      { label: "Company Renamed",    icon: <FileText className="w-4 h-4" />,          color: "text-muted-foreground" },
 };
 
 function formatDate(dateStr: string): string {
@@ -73,21 +80,6 @@ function formatDate(dateStr: string): string {
     });
   } catch {
     return dateStr;
-  }
-}
-
-// ── Status config ─────────────────────────────────────────────────────────────
-
-function getStatusConfig(status: string) {
-  switch (status) {
-    case "ACTIVE":
-      return { label: "Active", icon: <CheckCircle className="w-4 h-4" />, badge: "bg-emerald-600", banner: "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200" };
-    case "NEWLY_GRANTED":
-      return { label: "Newly Granted", icon: <CheckCircle className="w-4 h-4" />, badge: "bg-blue-600", banner: "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200" };
-    case "GRACE_PERIOD":
-      return { label: "Under Review", icon: <AlertTriangle className="w-4 h-4" />, badge: "bg-amber-500", banner: "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200" };
-    default:
-      return { label: "Revoked", icon: <XCircle className="w-4 h-4" />, badge: "bg-red-600", banner: "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800 text-red-800 dark:text-red-200" };
   }
 }
 
@@ -197,8 +189,9 @@ export default function SponsorDetail() {
   }
 
   // ── Render ──────────────────────────────────────────────────────────────────
-  const statusConfig = getStatusConfig(data.status);
-  const isBRated = (data.typeRating || "").toLowerCase().includes("b");
+  const statusPresentation = getSponsorStatusPresentation(data.status);
+  const StatusIcon = statusPresentation.icon;
+  const isBRated = isSponsorBRated(data.typeRating);
   const grantedYear = data.grantedAt ? new Date(data.grantedAt).getFullYear() : null;
   const isRevoked = data.status === "REMOVED_REVOKED";
 
@@ -206,10 +199,10 @@ export default function SponsorDetail() {
   const slug = data.currentName.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim().replace(/\s+/g, "-").slice(0, 80);
   const canonicalUrl = `${baseUrl}/sponsor/${data.id}/${slug}`;
 
-  const seoTitle = `${data.currentName} — ${statusConfig.label} UK Sponsor Licence | CheckByAI`;
+  const seoTitle = `${data.currentName} — ${statusPresentation.label} UK Sponsor Licence | CheckByAI`;
   const seoDesc = isRevoked
     ? `${data.currentName}${data.townCity ? ` in ${data.townCity}` : ""} had their UK sponsor licence revoked. See the full licence history on CheckByAI.`
-    : `${data.currentName}${data.townCity ? ` in ${data.townCity}` : ""} holds a ${statusConfig.label} UK sponsor licence${data.route ? ` (${data.route})` : ""}${grantedYear ? `, active since ${grantedYear}` : ""}. Get instant alerts if their status changes.`;
+    : `${data.currentName}${data.townCity ? ` in ${data.townCity}` : ""} holds a ${statusPresentation.label} UK sponsor licence${data.route ? ` (${data.route})` : ""}${grantedYear ? `, active since ${grantedYear}` : ""}. Get alerted if their status changes.`;
 
   return (
     <PageLayout>
@@ -227,8 +220,8 @@ export default function SponsorDetail() {
         </nav>
 
         {/* Status banner */}
-        <div className={`flex items-center gap-3 border rounded-xl px-5 py-4 ${statusConfig.banner}`}>
-          {statusConfig.icon}
+        <div className={`flex items-center gap-3 border rounded-xl px-5 py-4 ${sponsorToneBannerClasses[statusPresentation.tone]}`}>
+          <StatusIcon className="w-4 h-4" />
           <div className="flex-1">
             <p className="font-semibold text-sm">
               {isRevoked
@@ -259,15 +252,15 @@ export default function SponsorDetail() {
               </div>
             </div>
             <div className="flex items-center gap-1.5 flex-wrap">
-              <Badge className={`${statusConfig.badge} text-white text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1`}>
-                {statusConfig.icon}
-                {statusConfig.label}
+              <Badge className={`${sponsorToneBadgeClasses[statusPresentation.tone]} text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1`}>
+                <StatusIcon className="w-3.5 h-3.5" />
+                {statusPresentation.label}
               </Badge>
               {isBRated && (
-                <Badge className="bg-amber-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">B-Rated</Badge>
+                <Badge className={`${sponsorToneBadgeClasses[SPONSOR_B_RATED_PRESENTATION.tone]} text-xs font-bold px-2.5 py-1 rounded-full`}>B-Rated</Badge>
               )}
               <Link href={`/pricing?plan=starter&company=${encodeURIComponent(data.currentName)}`}>
-                <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-full px-3 h-7 text-xs gap-1" data-testid="button-set-alert-header">
+                <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-full px-3 h-7 text-xs gap-1" data-testid="button-set-alert-header">
                   <Bell className="w-3 h-3" />Set Alert
                 </Button>
               </Link>
@@ -313,14 +306,14 @@ export default function SponsorDetail() {
 
         {/* ── Revoked: what this means for workers ─────────────────────── */}
         {isRevoked && (
-          <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-xl p-6 space-y-4">
+          <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-6 space-y-4">
             <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+              <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
               <div>
-                <h2 className="text-base font-semibold text-red-900 dark:text-red-200 mb-3">
+                <h2 className="text-base font-semibold text-destructive mb-3">
                   What does this mean for sponsored workers?
                 </h2>
-                <div className="space-y-2 text-sm text-red-800 dark:text-red-300">
+                <div className="space-y-2 text-sm text-destructive">
                   <p>
                     When the Home Office revokes a sponsor licence, any workers currently
                     sponsored by that company are given a <strong>60-day window</strong> to find a
@@ -338,15 +331,15 @@ export default function SponsorDetail() {
                 </div>
               </div>
             </div>
-            <div className="grid sm:grid-cols-3 gap-3 pt-2 border-t border-red-200 dark:border-red-800">
+            <div className="grid sm:grid-cols-3 gap-3 pt-2 border-t border-destructive/20">
               {[
                 { label: "60 days",        sub: "Grace period to find a new sponsor" },
                 { label: "Midnight check", sub: "Home Office updates the register nightly" },
                 { label: "30 min alert",   sub: "Pro subscribers notified within 30 minutes" },
               ].map((item) => (
                 <div key={item.label} className="text-center">
-                  <p className="text-base font-bold text-red-900 dark:text-red-200">{item.label}</p>
-                  <p className="text-xs text-red-700 dark:text-red-400 mt-0.5">{item.sub}</p>
+                  <p className="text-base font-bold text-destructive">{item.label}</p>
+                  <p className="text-xs text-destructive/80 mt-0.5">{item.sub}</p>
                 </div>
               ))}
             </div>
@@ -417,7 +410,7 @@ export default function SponsorDetail() {
               <Briefcase className="w-4 h-4 text-muted-foreground" />
               <h2 className="text-base font-semibold text-foreground">Companies House</h2>
               {data.enrichment.companiesHouseSource && (
-                <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 text-xs font-semibold px-2 py-0.5 rounded-full">Verified</Badge>
+                <Badge className="bg-info/10 text-info text-xs font-semibold px-2 py-0.5 rounded-full">Verified</Badge>
               )}
             </div>
             <div className="grid sm:grid-cols-2 gap-3">
@@ -489,8 +482,8 @@ export default function SponsorDetail() {
             <div className="p-6 space-y-5">
               {/* Value proposition */}
               <div className="flex items-start gap-4">
-                <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center shrink-0">
-                  <Bell className="w-5 h-5 text-emerald-400" />
+                <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center shrink-0">
+                  <Bell className="w-5 h-5 text-primary-foreground" />
                 </div>
                 <div>
                   <h3 className="font-bold text-lg mb-1 leading-snug">
@@ -508,7 +501,7 @@ export default function SponsorDetail() {
               {/* Feature checklist */}
               <div className="grid sm:grid-cols-2 gap-2 text-sm">
                 {[
-                  "Instant alert when licence is restored",
+                  "Same-day alert when licence is restored",
                   "WhatsApp, email & SMS notifications",
                   "Monitor multiple employers at once",
                   "Access full licence change history",
@@ -532,7 +525,7 @@ export default function SponsorDetail() {
                     </div>
                   ) : (
                     <Button
-                      className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-full px-6 py-5 text-base shadow-lg shadow-emerald-900/40"
+                      className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-full px-6 py-5 text-base shadow-lg shadow-primary/30"
                       disabled={watchMutation.isPending}
                       onClick={() => watchMutation.mutate({ organisation_name: data.currentName, fingerprint: data.fingerprint })}
                     >
@@ -542,7 +535,7 @@ export default function SponsorDetail() {
                   )
                 ) : (
                   <Link href={`/pricing?plan=starter&company=${encodeURIComponent(data.currentName)}`} className="flex-1">
-                    <Button className="w-full bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-full px-6 py-5 text-base shadow-lg shadow-emerald-900/40">
+                    <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-full px-6 py-5 text-base shadow-lg shadow-primary/30">
                       <Bell className="w-4 h-4 mr-2" />
                       Subscribe for alerts — from £24.99/mo
                     </Button>
@@ -564,21 +557,21 @@ export default function SponsorDetail() {
           /* ── CTA: active company ──────────────────────────────────────── */
           <div className="bg-slate-900 dark:bg-slate-800 rounded-xl p-6 text-white">
             <div className="flex items-start gap-4">
-                <div className="w-10 h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center shrink-0" aria-hidden="true">
-                  <Bell className="w-5 h-5 text-emerald-400" />
-                </div>
-                <div>
-                  <h3 className="font-semibold mb-1">
-                    Get instant alerts if {data.currentName} changes
-                  </h3>
-                <p className="text-sm hero-text-secondary mb-4">
+              <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center shrink-0">
+                <Bell className="w-5 h-5 text-primary-foreground" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold mb-1">
+                  Get same-day alerts if {data.currentName} changes
+                </h3>
+                <p className="text-sm text-white/70 mb-4">
                   The Home Office updates the register at midnight without warning. Our
-                  Notification Engine checks every night and alerts you within 30 minutes
-                  via WhatsApp, email, or SMS.
+                  Notification Engine checks every night and alerts you same-day or
+                  twice-daily via WhatsApp, email, or SMS.
                 </p>
                 <div className="flex gap-3 flex-wrap">
                   <Link href={`/pricing?plan=starter&company=${encodeURIComponent(data.currentName)}`}>
-                    <Button className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-full px-6" data-testid="button-set-alert-cta">
+                    <Button className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-full px-6" data-testid="button-set-alert-cta">
                       Set Up Alerts — from £24.99/mo
                     </Button>
                   </Link>

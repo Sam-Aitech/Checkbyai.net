@@ -9,12 +9,12 @@ import {
   Bell, Mail, MessageSquare, Phone, CheckCircle2, Send, Save, History, CheckCheck, XOctagon, Clock3,
   ExternalLink, Linkedin, CheckCircle, FileText, Lock, X, Zap, ShieldCheck, Smartphone,
   ChevronDown, ChevronRight, Activity, Timer, FileSearch, Wifi, ArrowRight, Briefcase, BarChart3,
-  HelpCircle,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import SponsorStatusBadge from "@/components/SponsorStatusBadge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -147,70 +147,11 @@ function useDebounce<T>(value: T, delay: number): T {
 
 const spring = { type: "spring" as const, stiffness: 100, damping: 15 };
 
-function StatusBadge({ status, typeRating }: { status: string; typeRating: string | null }) {
-  const rating = (typeRating || "").toLowerCase();
-  const isBRated = rating.includes("b rating") || rating.includes("b-rating") || rating === "b";
-
-  // NOT_LISTED is a retired legacy status that means the company is no longer
-  // on the register. Treat it as REMOVED so it never silently renders as Active.
-  if (status === "REMOVED_REVOKED" || status === "NOT_LISTED") {
-    return (
-      <Badge className="bg-red-600 text-white border-red-700 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em]">
-        <XCircle className="w-3 h-3 mr-1" aria-hidden="true" />
-        Removed
-      </Badge>
-    );
-  }
-
-  if (status === "NEWLY_GRANTED") {
-    return (
-      <Badge className="bg-blue-600 text-white border-blue-700 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em]">
-        <Zap className="w-3 h-3 mr-1" aria-hidden="true" />
-        Newly Granted
-      </Badge>
-    );
-  }
-
-  if (status === "GRACE_PERIOD") {
-    return (
-      <Badge className="bg-amber-700 text-white border-amber-800 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em]">
-        <Clock className="w-3 h-3 mr-1" aria-hidden="true" />
-        Under Review
-      </Badge>
-    );
-  }
-
-  if (status === "ACTIVE") {
-    return (
-      <div className="flex items-center gap-1.5 flex-wrap">
-        <Badge className="bg-emerald-700 text-white border-emerald-800 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em]">
-          <CheckCircle className="w-3 h-3 mr-1" aria-hidden="true" />
-          Active
-        </Badge>
-        {isBRated && (
-          <Badge className="bg-amber-700 text-white border-amber-800 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em]">
-            <AlertTriangle className="w-3 h-3 mr-1" aria-hidden="true" />
-            B-Rated
-          </Badge>
-        )}
-      </div>
-    );
-  }
-
-  // Unknown / future status — render neutral grey badge, NEVER silently as Active.
-  return (
-      <Badge className="bg-slate-500 text-white border-slate-600 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em]">
-      <HelpCircle className="w-3 h-3 mr-1" aria-hidden="true" />
-      Unknown
-    </Badge>
-  );
-}
-
 function getWatchStatusBadge(currentStatus: WatchEntry["currentStatus"]) {
   // If the live canonical status is missing, render Unknown rather than guessing
   // ACTIVE — a missing status usually means we lost the canonical row.
   const canonicalStatus = currentStatus?.status || "UNKNOWN";
-  return <StatusBadge status={canonicalStatus} typeRating={currentStatus?.typeRating} />;
+  return <SponsorStatusBadge status={canonicalStatus} typeRating={currentStatus?.typeRating} />;
 }
 
 function getChangeIcon(changeType: string) {
@@ -313,11 +254,12 @@ function PhoneVerificationField({
       {channelAllowed && (
         <div className="ml-7 space-y-2">
           <div className="flex items-center gap-2">
-            <Input type="tel" placeholder="+447700900000" value={phoneNumber} onChange={(e) => onPhoneChange(e.target.value)} className="max-w-[220px] h-9 text-sm" disabled={!channelAllowed} />
+            <Label htmlFor={`${channel}-phone`} className="sr-only">{label} phone number</Label>
+            <Input id={`${channel}-phone`} type="tel" placeholder="+447700900000" value={phoneNumber} onChange={(e) => onPhoneChange(e.target.value)} inputSize="sm" className="max-w-[220px]" disabled={!channelAllowed} />
             {verified ? (
-              <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium"><CheckCircle2 className="w-4 h-4" />Verified</span>
+              <span className="inline-flex items-center gap-1 text-xs text-success font-medium"><CheckCircle2 className="w-4 h-4" />Verified</span>
             ) : (
-              <Button size="sm" variant="outline" disabled={!phoneNumber || phoneNumber.length < 8 || sendOtpMutation.isPending} onClick={() => sendOtpMutation.mutate()} className="h-9">
+              <Button size="sm" variant="outline" disabled={!phoneNumber || phoneNumber.length < 8 || sendOtpMutation.isPending} onClick={() => sendOtpMutation.mutate()}>
                 {sendOtpMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Send className="w-3.5 h-3.5 mr-1" />}Verify
               </Button>
             )}
@@ -326,12 +268,13 @@ function PhoneVerificationField({
             {otpSent && !verified && (
               <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} transition={spring} className="overflow-hidden">
                 <div className="flex items-center gap-2 mt-1">
-                  <Input type="text" inputMode="numeric" placeholder="Enter 6-digit code" value={otpCode} onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))} className="max-w-[160px] h-9 text-sm tracking-widest text-center" maxLength={6} />
-                  <Button size="sm" disabled={otpCode.length !== 6 || confirmOtpMutation.isPending} onClick={() => confirmOtpMutation.mutate()} className="h-9">
+                  <Label htmlFor={`${channel}-otp`} className="sr-only">Verification code</Label>
+                  <Input id={`${channel}-otp`} type="text" inputMode="numeric" placeholder="Enter 6-digit code" value={otpCode} onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))} inputSize="sm" className="max-w-[160px] tracking-widest text-center" maxLength={6} aria-describedby={`${channel}-otp-hint`} />
+                  <Button size="sm" disabled={otpCode.length !== 6 || confirmOtpMutation.isPending} onClick={() => confirmOtpMutation.mutate()}>
                     {confirmOtpMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <CheckCircle2 className="w-3.5 h-3.5 mr-1" />}Confirm
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">Enter the 6-digit code sent to {phoneNumber}</p>
+                <p id={`${channel}-otp-hint`} className="text-xs text-muted-foreground mt-1">Enter the 6-digit code sent to {phoneNumber}</p>
               </motion.div>
             )}
           </AnimatePresence>
@@ -376,7 +319,7 @@ function CompanyHistoryDialog({ fingerprint, companyName, open, onOpenChange, is
         {data && (
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2">
-              <StatusBadge status={data.status} typeRating={data.typeRating} />
+              <SponsorStatusBadge status={data.status} typeRating={data.typeRating} />
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
               {data.townCity && <span className="inline-flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {data.townCity}</span>}
@@ -618,7 +561,7 @@ function ManualVsAutomated() {
               <ul className="space-y-3 text-sm text-muted-foreground">
                 <li className="flex items-start gap-2"><CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />Add company to watchlist</li>
                 <li className="flex items-start gap-2"><CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />We check the register every weeknight (~00:30 UTC)</li>
-                <li className="flex items-start gap-2"><CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />Alert sent instantly on Pro, or by 18:00 same-day on Starter</li>
+                <li className="flex items-start gap-2"><CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />{ALERT_TIMING_SHORT.pro} on Pro, or {ALERT_TIMING_SHORT.starter.toLowerCase()} on Starter</li>
                 <li className="flex items-start gap-2"><CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />Take action before letter arrives</li>
               </ul>
               <div className="mt-5 p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg border border-emerald-200 dark:border-emerald-800">
@@ -790,12 +733,12 @@ function PricingSection({ isAuthenticated, tier }: { isAuthenticated: boolean; t
             </CardContent>
           </Card>
 
-          <Card className="border-emerald-500 dark:border-emerald-400 ring-2 ring-emerald-500/30 relative shadow-lg shadow-emerald-500/10">
+          <Card className="border-primary ring-2 ring-primary/30 relative shadow-lg shadow-primary/10">
             <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-              <Badge className="bg-emerald-700 text-white font-bold text-xs uppercase tracking-[0.08em] px-3 py-1 shadow-sm">Best Value</Badge>
+              <Badge className="bg-primary text-primary-foreground font-bold text-xs uppercase tracking-wider px-3 py-1 shadow-sm">Best Value</Badge>
             </div>
             <CardContent className="py-6">
-              <p className="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-2">Starter</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-primary mb-2">Starter</p>
               <div className="mb-1">
                 <span className="text-3xl font-extrabold text-foreground">£24.99</span>
                 <span className="text-sm text-muted-foreground">/month</span>
@@ -902,7 +845,7 @@ function MobileStickyBar() {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 sm:hidden bg-slate-900 border-t border-slate-700 px-4 py-3 flex items-center justify-between gap-2 shadow-2xl">
-      <Button onClick={() => setLocation("/pricing")} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-5 text-sm rounded-lg">
+      <Button onClick={() => setLocation("/pricing")} className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-5 text-sm rounded-lg">
         <ShieldCheck className="w-4 h-4 mr-2" />Get Alerts from £24.99/mo
       </Button>
       <button onClick={() => setDismissed(true)} className="p-2 text-slate-400 hover:text-white" aria-label="Dismiss">
@@ -1195,7 +1138,7 @@ export default function SponsorMonitor() {
               placeholder="e.g., 'Deloitte' or your employer name..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 h-14 text-base border-2 border-slate-200 dark:border-slate-700 focus-visible:ring-emerald-500 focus-visible:border-emerald-500"
+              className="pl-10 h-14 text-base border-2 border-input focus-visible:ring-primary focus-visible:border-primary"
             />
             {effectiveFetching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground animate-spin" />}
           </div>
@@ -1210,7 +1153,7 @@ export default function SponsorMonitor() {
                 </p>
                 <div className="flex gap-3 justify-center flex-wrap">
                   <Link href="/pricing">
-                    <Button className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-full px-5 font-bold">
+                    <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full px-5 font-bold">
                       <Bell className="w-4 h-4 mr-2" />View Plans from £24.99/mo
                     </Button>
                   </Link>
@@ -1291,7 +1234,7 @@ export default function SponsorMonitor() {
                           <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                             <Building2 className="w-4 h-4 text-primary shrink-0" />
                             <h3 className="font-semibold text-foreground truncate">{result.organisationName}</h3>
-                            <StatusBadge status={result.status} typeRating={result.typeRating} />
+                            <SponsorStatusBadge status={result.status} typeRating={result.typeRating} />
                           </div>
                           {result.isNew && (
                             <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-1.5 flex items-center gap-1">
@@ -1522,7 +1465,7 @@ export default function SponsorMonitor() {
           <p className="text-slate-300 mb-8 max-w-lg mx-auto">
             Get alerted when a sponsor licence changes. Protect your visa, your career, and your future in the UK.
           </p>
-          <Button onClick={() => setLocation("/pricing")} size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-base px-10 py-6 rounded-xl shadow-lg shadow-emerald-500/20">
+          <Button onClick={() => setLocation("/pricing")} size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-base px-10 py-6 rounded-xl shadow-lg shadow-primary/20">
             <ShieldCheck className="w-5 h-5 mr-2" />Start Monitoring Now
           </Button>
           <p className="text-xs text-slate-500 mt-4">From £24.99/month. Cancel anytime.</p>
@@ -1691,9 +1634,10 @@ function NotificationSettings({ user }: { user: any }) {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <Smartphone className="w-4 h-4 text-muted-foreground" />
-                    <Label className="font-medium cursor-pointer">Push Notifications</Label>
+                    <Label htmlFor="push-toggle" className="font-medium cursor-pointer">Push Notifications</Label>
                   </div>
                   <Switch
+                    id="push-toggle"
                     checked={pushSubscribed}
                     disabled={pushSubscribeMutation.isPending || pushUnsubscribeMutation.isPending}
                     onCheckedChange={(v) => {

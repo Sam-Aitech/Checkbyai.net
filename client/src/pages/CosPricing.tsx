@@ -169,7 +169,7 @@ function PricingCard({ plan, index, isLoggedIn, loading, onSelect, available }: 
       animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 32 }}
       transition={{ ...spring, delay: Math.min(index * 0.06, 0.18) }}
       className={`relative overflow-hidden flex flex-col theme-card bg-card ${
-        plan.popular ? 'border-primary lg:scale-105 z-10' : ''
+        plan.popular ? 'border-primary ring-1 ring-primary/30 shadow-lg shadow-primary/10 z-10' : ''
       }`}
     >
       {plan.popular && (
@@ -218,8 +218,8 @@ function PricingCard({ plan, index, isLoggedIn, loading, onSelect, available }: 
         </ul>
 
         {plan.bundleBadge && (
-          <div className="mt-4 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-            <div className="flex items-start gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-400">
+          <div className="mt-4 p-3 bg-success/10 border border-success/20 rounded-lg">
+            <div className="flex items-start gap-2 text-sm font-medium text-success">
               <Bell className="w-4 h-4 mt-0.5 flex-shrink-0" />
               <span>{plan.bundleBadge}</span>
             </div>
@@ -498,7 +498,7 @@ export default function CosPricing() {
               </p>
               <button
                 onClick={() => setLocation('/pricing')}
-                className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded"
               >
                 View Notification Engine Plans <ArrowRight className="w-4 h-4" />
               </button>
