@@ -1,11 +1,11 @@
 import express from "express";
 import compression from "compression";
 import rateLimit from "express-rate-limit";
-import helmet from "helmet";
 import * as Sentry from "@sentry/node";
 import { makeRateLimitStore } from "./utils/redisRateLimitStore";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { createSecurityHeadersMiddleware } from "./securityHeaders";
 import { storage } from "./storage";
 import { pool } from "./db";
 import { logger } from "./utils/logger";
@@ -118,44 +118,8 @@ if (isSentryEnabled) {
   app.use(Sentry.Handlers.tracingHandler());
 }
 
-// Helmet is applied first to enforce baseline browser hardening before any other middleware:
-// CSP allows only self + Stripe + Cloudflare Turnstile (with narrowly scoped unsafe-inline/unsafe-eval
-// kept only where required by existing inline SEO JSON-LD + inline styles in client/index.html and Vite dev HMR), HSTS is enabled
-// in production, and frame-ancestors/x-frame-options deny embedding to prevent clickjacking on sensitive pages/PDF flows.
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: isProduction
-        ? ["'self'", "'unsafe-inline'", "https://js.stripe.com", "https://challenges.cloudflare.com"]
-        : ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://js.stripe.com", "https://challenges.cloudflare.com"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
-      imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: isProduction
-        ? ["'self'", "https://api.stripe.com", "https://challenges.cloudflare.com"]
-        : ["'self'", "https://api.stripe.com", "https://challenges.cloudflare.com", "ws:", "wss:"],
-      frameSrc: ["https://js.stripe.com", "https://hooks.stripe.com", "https://challenges.cloudflare.com"],
-      workerSrc: ["'self'", "blob:"],
-      objectSrc: ["'none'"],
-      baseUri: ["'self'"],
-      formAction: ["'self'"],
-      // Replit's development Preview renders the app in an iframe. Keep
-      // clickjacking protection strict in production without blocking Preview.
-      frameAncestors: isProduction ? ["'none'"] : null,
-      upgradeInsecureRequests: isProduction ? [] : null,
-    },
-  },
-  hsts: isProduction
-    ? {
-        maxAge: 63072000,
-        includeSubDomains: true,
-        preload: true,
-      }
-    : false,
-  xFrameOptions: isProduction ? { action: "deny" } : false,
-  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
-}));
+// Helmet is applied first to enforce baseline browser hardening before any other middleware.
+app.use(createSecurityHeadersMiddleware(isProduction));
 
 app.use(compression({
   level: 6,
