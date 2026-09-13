@@ -327,6 +327,18 @@ Modified to use `VerificationResultsTabbed` instead of plain `VerificationResult
 - [ ] Admin sees full forensic data; non-admin sees verdict only
 - [ ] cosCheckApproved gate blocks users without access
 - [ ] API response includes cosCheck field in JSON
+- [ ] Trusted reference: real `genuinePdfBinary()` bytes yield all six mandatory
+  checks passing (`trustedReferenceFlow.test.ts` derives fixtures from the live
+  chain — no hand-stubbed check lists)
+- [ ] Trusted reference: same bytes → `VALIDATED` row → exact SHA-256 match →
+  `GENUINE` end to end (admin-upload simulation → customer-upload simulation,
+  `server/utils/__tests__/trustedReferenceFlow.test.ts` byte-level block)
+- [ ] Trusted reference: one flipped byte → different hash → no match
+- [ ] Trusted reference: match + current `EDITED` → `TRUSTED_REFERENCE_CONFLICT`
+  sub-state, never auto-genuine (byte-level conflict is unconstructible —
+  identical bytes re-derive identical verdicts — so conflict is covered at
+  resolver level with a real derived `EDITED` run)
+- [ ] Trusted reference: missing `trustType` never matches (strictly required)
 
 ---
 
