@@ -2,20 +2,30 @@ import Stripe from 'stripe';
 import { logger } from '../utils/logger';
 
 /**
- * DEPRECATED / legacy-only. This only seeds the original 4 packageTypes
- * (starter, pro, unlimited, master). The 6 newer packageTypes actually live
- * in Stripe — notification_starter, notification_pro, alert_annual,
- * alert_annual_pro, cos_check, cos_check_single — were created manually via
- * the Stripe Dashboard and are NOT covered here. Do not extend this list to
- * "catch up" without first confirming in the Dashboard that you won't create
- * duplicate/conflicting products next to the ones GET /api/packages already
- * serves live traffic from.
- *
- * Also uses process.env.STRIPE_SECRET_KEY directly (same credential every
- * other Stripe call in this app uses — server/routes/billing.ts) rather than
- * the Replit-connector client this script used previously. If this Replit
+ * Idempotent (search-by-name before create, safe to re-run). Uses
+ * process.env.STRIPE_SECRET_KEY directly — the same credential every other
+ * Stripe call in this app uses (server/routes/billing.ts) — rather than the
+ * Replit-connector client this script used previously. If this Replit
  * deployment's connector points at a different Stripe account/mode than
  * STRIPE_SECRET_KEY, re-verify that before relying on this script.
+ *
+ * Covers every packageType that GET /api/checkout/credits + GET /api/packages
+ * need live in Stripe for the dynamic-Checkout-Session flow (Alert Pass
+ * annual plans + the single CoS check) to work — confirmed 2026-09-13 that
+ * production's GET /api/packages was returning an empty packages array,
+ * meaning these had never actually been created (or existed in the wrong
+ * Stripe mode), which is why the Alert Pass cards showed "Coming soon" on
+ * live pricing pages.
+ *
+ * Deliberately does NOT include notification_starter/notification_pro or the
+ * legacy starter/pro/unlimited/master CoS packages that also sell through
+ * hardcoded Stripe Payment Links (Pricing.tsx/CosPricing.tsx/
+ * AlertAddOnModal.tsx's paymentLinks maps) — those Payment Links can't
+ * function without their underlying product/price already existing, so if
+ * their buttons already work live, the products already exist; re-running
+ * this for them would risk a second, disconnected product next to the one
+ * the live Payment Link actually points at. Also excludes `cos_check`
+ * (admin-granted only, never created via checkout).
  */
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
@@ -38,41 +48,33 @@ interface Product {
 
 const products: Product[] = [
   {
-    name: 'Starter Package',
-    description: '50 verification credits for occasional use. One-time purchase, credits never expire.',
-    priceAmount: 2499, // £24.99 in pence
+    name: 'Alert Pass (Annual)',
+    description: 'Low-commitment sponsor-licence monitoring for a single employer. Monitor 1 company for 12 months, email + WhatsApp alerts, same-day (18:00 UTC), 30-day change history.',
+    priceAmount: 999, // £9.99 in pence
     currency: 'gbp',
     metadata: {
-      packageType: 'starter',
-      credits: '50',
+      packageType: 'alert_annual',
     },
+    recurring: { interval: 'year' },
   },
   {
-    name: 'Pro Package',
-    description: '100 verification credits — best value. One-time purchase, credits never expire.',
-    priceAmount: 3999, // £39.99 in pence
+    name: 'Alert Pass Pro (Annual)',
+    description: 'Full sponsor-licence protection, billed once a year. Monitor up to 5 companies for 12 months, email + WhatsApp + SMS, twice-daily alerts, 90-day change history, sponsored job alerts.',
+    priceAmount: 1999, // £19.99 in pence
     currency: 'gbp',
     metadata: {
-      packageType: 'pro',
-      credits: '100',
+      packageType: 'alert_annual_pro',
     },
+    recurring: { interval: 'year' },
   },
   {
-    name: 'Unlimited Monthly',
-    description: 'Unlimited verifications for businesses. One-time purchase, no recurring charge.',
-    priceAmount: 9999, // £99.99 in pence
+    name: 'CoS Check (Single)',
+    description: 'One Certificate of Sponsorship authenticity check. One-time purchase, no subscription.',
+    priceAmount: 499, // £4.99 in pence
     currency: 'gbp',
     metadata: {
-      packageType: 'unlimited',
-    },
-  },
-  {
-    name: 'Master Package - Expert Review',
-    description: 'Priority expert human review with 24-hour SLA and detailed analysis report',
-    priceAmount: 9999, // £99.99 in pence
-    currency: 'gbp',
-    metadata: {
-      packageType: 'master',
+      packageType: 'cos_check_single',
+      credits: '1',
     },
   },
 ];

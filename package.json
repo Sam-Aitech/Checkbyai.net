@@ -15,6 +15,7 @@
     "db:push": "drizzle-kit push",
     "db:migrate": "drizzle-kit migrate",
     "setup:binaries": "bash scripts/setup-binaries.sh",
+    "seed:products": "tsx server/scripts/seedProducts.ts",
     "check:binaries": "tsx -e \"import('./server/utils/binaryRunner.ts').then(m => m.checkBinaryHealth()).then(r => console.log(JSON.stringify(r, null, 2)))\"",
     "start:with-migrate": "npm run db:migrate && NODE_ENV=production node dist/index.js",
     "audit": "audit-ci --config audit-ci.jsonc",
