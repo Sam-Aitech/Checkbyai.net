@@ -1,0 +1,1 @@
+- [Development preview framing](development-preview-framing.md) — keep production anti-framing headers strict, but do not emit them in Replit development Preview.
