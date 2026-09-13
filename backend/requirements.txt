@@ -27,7 +27,7 @@ sentence-transformers>=6.0.1    # optional: semantic embeddings (cos_verifier.py
 
 # ── Database ──────────────────────────────────────────────────────────────────
 duckdb>=1.5.5                 # in-process analytics DB (sponsor register)
-psycopg2-binary>=2.9.12        # direct PostgreSQL writes in sponsor_etl_cron.py
+psycopg2-binary>=2.9.13        # direct PostgreSQL writes in sponsor_etl_cron.py
 # sqlite3                     # stdlib — was used by sponsor_etl.py (now retired)
 
 # ── Validation ────────────────────────────────────────────────────────────────
