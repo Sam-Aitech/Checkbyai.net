@@ -25,6 +25,7 @@ import { requireRole } from "../middleware/roleGuard";
 import { isAuthenticated } from "../auth";
 import { storage } from "../storage";
 import { PDFAnalyzer } from "../services/pdfAnalyzer";
+import { COSAuthenticityChecker } from "../services/cosAuthenticityChecker";
 import { upload } from "./verification";
 import { sendEmailReliably } from "../utils/resilientEmail";
 import { getAppUrl } from "../utils/appUrl";
@@ -40,6 +41,8 @@ import { rebuildSponsorIndex } from "../utils/sponsorSearch";
 import { isQueueAvailable, getSponsorRefreshQueue } from "../services/jobQueue";
 import { cacheFlushPattern } from "../utils/redisClient";
 import { getWatchLimit } from "../utils/tierConfig";
+
+const TRUSTED_COS_FORENSIC_VERSION = 1;
 
 function sanitizeForPrompt(text: string): string {
   return text.replace(/[<>`{}]/g, '');
@@ -123,7 +126,35 @@ export function registerAdminRoutes(app: Express): void {
       const pdfAnalyzer = new PDFAnalyzer();
       // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
       const metadata = await pdfAnalyzer.extractMetadata(safeFilePath);
-      const patterns = { metadata, documentType: 'trusted_cos' };
+      // SHA-256 over exact uploaded bytes — identity for exact-hash trust matching.
+      const fileBytes = await fs.promises.readFile(safeFilePath); // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
+      const documentHash = crypto.createHash('sha256').update(fileBytes).digest('hex');
+      const pdfBinary = fileBytes.toString('binary');
+      // Mandatory forensic gate: same six-check engine as customer verification.
+      // Reference becomes VALIDATED only when ALL six pass. No bypass.
+      const cosCheck = new COSAuthenticityChecker().check(pdfBinary, metadata);
+      if (cosCheck.verdict !== 'GENUINE') {
+        const failedChecks = cosCheck.checks.filter((c) => !c.passed).map((c) => ({ name: c.name, detail: c.detail }));
+        return res.status(422).json({
+          message: 'Trusted reference cannot be approved. Mandatory forensic checks failed.',
+          documentHash,
+          forensicVersion: TRUSTED_COS_FORENSIC_VERSION,
+          cosVerdict: cosCheck.verdict,
+          cosReason: cosCheck.reason,
+          failedChecks,
+          allChecks: cosCheck.checks,
+        });
+      }
+      const patterns = {
+        metadata,
+        documentType: 'trusted_cos',
+        trustType: 'admin_reference',
+        documentHash,
+        forensicVersion: TRUSTED_COS_FORENSIC_VERSION,
+        trustStatus: 'VALIDATED',
+        validatedAt: new Date().toISOString(),
+        cosVerdict: cosCheck.verdict,
+      };
 
       const aiInstructions = req.body?.aiInstructions || null;
 
@@ -134,7 +165,7 @@ export function registerAdminRoutes(app: Express): void {
         aiInstructions
       );
 
-      res.json({ id: patternId, message: 'Trusted pattern created successfully', aiInstructions: !!aiInstructions });
+      res.json({ id: patternId, message: 'Trusted reference validated and created successfully', aiInstructions: !!aiInstructions, documentHash, trustStatus: 'VALIDATED', forensicVersion: TRUSTED_COS_FORENSIC_VERSION });
     } catch (error) {
       logger.error({ err: error }, "Error creating trusted pattern:");
       const statusCode = (error as any)?.statusCode || 500;
@@ -161,6 +192,34 @@ export function registerAdminRoutes(app: Express): void {
     } catch (error) {
       logger.error({ err: error }, "Error deleting trusted pattern:");
       res.status(500).json({ message: "Failed to delete trusted pattern" });
+    }
+  });
+
+  app.post('/api/admin/trusted-patterns/revalidate', requireRole("admin"), async (_req, res) => {
+    try {
+      const all = await storage.getTrustedPatterns();
+      let validated = 0;
+      let markedUnverified = 0;
+      for (const p of all) {
+        const inner: any = (p as any).patterns || {};
+        if (inner.trustStatus === 'VALIDATED' && typeof inner.documentHash === 'string' && inner.documentHash.length === 64) {
+          validated++;
+          continue;
+        }
+        const next = {
+          ...(inner && typeof inner === 'object' ? inner : {}),
+          trustStatus: 'UNVERIFIED',
+          trustType: inner.trustType ?? 'admin_reference',
+          forensicVersion: inner.forensicVersion ?? TRUSTED_COS_FORENSIC_VERSION,
+          revalidatedAt: new Date().toISOString(),
+        };
+        await storage.updateTrustedPatternTrust((p as any).id, next);
+        markedUnverified++;
+      }
+      res.json({ validated, markedUnverified, total: all.length, message: 'Legacy references marked UNVERIFIED. Only VALIDATED exact-SHA-256 references participate in trust matching. Re-upload a forensic-valid PDF to create a VALIDATED reference.' });
+    } catch (error) {
+      logger.error({ err: error }, "Error revalidating trusted patterns:");
+      res.status(500).json({ message: "Failed to revalidate trusted patterns" });
     }
   });
 
@@ -248,7 +307,14 @@ export function registerAdminRoutes(app: Express): void {
 
   app.post('/api/admin/analyze-reasoning/:id', requireRole("admin"), async (req: any, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id, 10);
+      if (!Number.isFinite(id)) {
+        return res.status(404).json({ message: "Verification not found" });
+      }
+      const { createChatCompletionWithFallback, getAvailableProviders, hasAnyProvider } = await import('../services/aiService');
+      if (!hasAnyProvider()) {
+        return res.status(503).json({ message: 'AI analysis unavailable. No AI providers are configured. The verification itself completed successfully — configure at least one AI integration and retry.' });
+      }
       const verification = await storage.getVerificationById(id);
 
       if (!verification) {
@@ -301,20 +367,29 @@ export function registerAdminRoutes(app: Express): void {
         knowledgeContext += '</pattern_specific_instructions>\n';
       }
 
-      res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache');
-      res.setHeader('Connection', 'keep-alive');
-
-      const { createChatCompletionWithFallback, getAvailableProviders, hasAnyProvider } = await import('../services/aiService');
-
-      if (!hasAnyProvider()) {
-        return res.status(503).json({ message: 'No AI providers are currently available. Please configure at least one AI integration.' });
+      const analysisDetails: any = (verification as any).analysisDetails || {};
+      const trustedRef = analysisDetails.trustedReference || null;
+      const cosCheck = analysisDetails.cosCheck || null;
+      let trustedContext = '';
+      if (trustedRef?.matched) {
+        trustedContext += '\n<trusted_reference>\n';
+        trustedContext += `Exact trusted match: true\nPattern: ${trustedRef.filename || 'unknown'} (id ${trustedRef.patternId ?? 'unknown'})\nSHA-256: ${trustedRef.documentHash || (verification as any).documentHash || 'unknown'}\n`;
+        trustedContext += 'This document is byte-identical to an admin-approved reference that passed all six mandatory forensic checks. Explain this fact; do not change the verdict.\n</trusted_reference>\n';
+      } else {
+        trustedContext += '\n<trusted_reference>\nExact trusted match: false\nNo VALIDATED admin reference shares this document SHA-256. Assess on forensic evidence alone.\n</trusted_reference>\n';
+      }
+      if (cosCheck) {
+        const checksSummary = Array.isArray(cosCheck.checks)
+          ? cosCheck.checks.map((c: any) => `- ${c.name}: ${c.passed ? 'PASS' : 'FAIL'} — ${c.detail || ''}`).join('\n')
+          : 'No MIS checks recorded.';
+        trustedContext += `\n<deterministic_mis>\nVerdict: ${cosCheck.verdict || 'unknown'}${cosCheck.reason ? ` (${cosCheck.reason})` : ''}\n${checksSummary}\nFinal deterministic result: ${(verification as any).result} (${(verification as any).confidence}%)\n</deterministic_mis>\n`;
       }
 
       const systemPrompt = `You are a forensic document analyst specializing in UK Certificate of Sponsorship (COS) documents.
 Analyze documents based on metadata AND the specific forensic knowledge base provided below.
 
 ${knowledgeContext ? `<knowledge_base>\n${knowledgeContext}\n</knowledge_base>` : ''}
+${trustedContext}
 
 CRITICAL INSTRUCTIONS:
 1. Your previous outputs have been OVERCONFIDENT. You must now PRIORITIZE 'Forensic Metadata' over visual appearance.
@@ -322,14 +397,16 @@ CRITICAL INSTRUCTIONS:
 3. If human experts have previously flagged similar patterns as FAKE, lower your confidence and flag the document accordingly.
 4. For example: "Per Admin Rule #3 regarding Sunday modifications, this document is flagged as suspicious."
 5. Or: "Per Human Expert Correction Case #2, this producer pattern was previously identified as fake."
-6. Be conservative - it is better to flag a genuine document as suspicious than to miss a fake.`;
+6. Be conservative - it is better to flag a genuine document as suspicious than to miss a fake.
+7. EXPLAIN ONLY: the deterministic verdict (${(verification as any).result}, ${(verification as any).confidence}%) is final under mandatory forensic policy. You must NOT propose a different verdict. Explain the evidence behind the existing result.`;
 
-      const prompt = `Analyze the following verification result and provide expert insights.
+      const prompt = `Analyze the following verification result and provide expert insights. Do NOT change the verdict — explain it.
 
-Verification Result:
+Verification Result (FINAL, do not alter):
 - Status: ${verification.result}
 - Confidence: ${verification.confidence}%
 - Filename: ${verification.filename}
+- Trusted reference matched: ${trustedRef?.matched ? `yes (${trustedRef.filename})` : 'no'}
 
 Metadata:
 ${JSON.stringify(verification.metadata, null, 2)}
@@ -348,18 +425,39 @@ Provide a detailed forensic analysis covering:
 
 Format your response in clear, professional markdown.`;
 
-      const { stream, provider } = await createChatCompletionWithFallback([
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: prompt }
-      ], { maxTokens: 2000 });
+      let stream: any;
+      let provider: string;
+      try {
+        const created = await createChatCompletionWithFallback([
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: prompt }
+        ], { maxTokens: 2000 });
+        stream = created.stream;
+        provider = created.provider;
+      } catch (err) {
+        logger.error({ err }, "AI provider failed before streaming:");
+        return res.status(502).json({ message: 'AI analysis unavailable. All configured AI providers failed. The verification itself completed successfully — please retry.' });
+      }
+
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no');
 
       res.write(`data: ${JSON.stringify({ provider, availableProviders: getAvailableProviders() })}\n\n`);
 
-      for await (const chunk of stream) {
-        const content = chunk.choices[0]?.delta?.content || '';
-        if (content) {
-          res.write(`data: ${JSON.stringify({ content })}\n\n`);
+      try {
+        for await (const chunk of stream) {
+          const content = chunk.choices[0]?.delta?.content || '';
+          if (content) {
+            res.write(`data: ${JSON.stringify({ content })}\n\n`);
+          }
         }
+      } catch (err) {
+        logger.error({ err }, "AI stream failed mid-response:");
+        res.write(`data: ${JSON.stringify({ error: "AI analysis unavailable. The stream failed during generation. The verification itself completed successfully — please retry." })}\n\n`);
+        res.end();
+        return;
       }
 
       res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
@@ -367,9 +465,11 @@ Format your response in clear, professional markdown.`;
     } catch (error) {
       logger.error({ err: error }, "Error in AI analysis:");
       if (!res.headersSent) {
-        res.status(500).json({ message: "Failed to analyze verification" });
+        res.status(500).json({ message: "AI analysis unavailable. The verification itself completed successfully — please retry." });
       } else {
-        res.write(`data: ${JSON.stringify({ error: "Analysis failed" })}\n\n`);
+        try {
+          res.write(`data: ${JSON.stringify({ error: "AI analysis unavailable. The verification itself completed successfully — please retry." })}\n\n`);
+        } catch {}
         res.end();
       }
     }

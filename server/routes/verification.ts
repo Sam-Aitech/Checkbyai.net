@@ -15,6 +15,7 @@ import { COSAuthenticityChecker } from "../services/cosAuthenticityChecker";
 import { getClientIp, hashIpAddress } from "../ipRateLimit";
 import { sanitizeUploadPath, assertSafeUploadFilename, assertPdfMagicBytes } from "../utils/uploadGuard";
 import { combineWithCosVerdict } from "../utils/cosVerdictCombiner";
+import { findValidatedTrustedMatch } from "../utils/trustedReference";
 import { success } from "../lib/response";
 import { asyncHandler } from "../lib/errorHandler";
 import { ApiError } from "../lib/apiError";
@@ -315,11 +316,30 @@ export function registerVerificationRoutes(app: Express): void {
         ]);
         analysis = analysisResult;
         analysis.cosCheck = cosCheckResult;
-        const combined = combineWithCosVerdict(analysisResult.result, analysis.confidence as number, cosCheckResult.verdict);
-        if (combined.result !== analysisResult.result) logger.info(`[COS] cosCheck ${cosCheckResult.verdict} overrides pattern analysis '${analysisResult.result}' — treating as ${combined.result}`);
-        result = combined.result;
-        analysis.result = combined.result;
-        analysis.confidence = combined.confidence;
+        const trustedMatch = findValidatedTrustedMatch(trustedPatterns as any[], documentHash);
+        if (trustedMatch) {
+          analysis.checks = [
+            ...(Array.isArray(analysis.checks) ? analysis.checks : []),
+            {
+              name: 'Admin Trusted Reference Match',
+              passed: true,
+              severity: 'info',
+              message: `Exact match to admin-approved document "${trustedMatch.filename}" (SHA-256 ${trustedMatch.documentHash.slice(0, 16)}…). Reference was forensic-validated; original MIS findings preserved.`,
+            },
+          ];
+          analysis.trustedReference = { matched: true, ...trustedMatch };
+          result = 'genuine';
+          analysis.result = 'genuine';
+          analysis.confidence = 99;
+          logger.info(`[COS] exact trusted reference match pattern ${trustedMatch.patternId} -> genuine 99 (MIS preserved)`);
+        } else {
+          analysis.trustedReference = { matched: false, documentHash };
+          const combined = combineWithCosVerdict(analysisResult.result, analysis.confidence as number, cosCheckResult.verdict);
+          if (combined.result !== analysisResult.result) logger.info(`[COS] cosCheck ${cosCheckResult.verdict} overrides pattern analysis '${analysisResult.result}' — treating as ${combined.result}`);
+          result = combined.result;
+          analysis.result = combined.result;
+          analysis.confidence = combined.confidence;
+        }
         metadata = {
           format: 'Pdf', mimeType: 'application/pdf', pdfVersion: extractedMetadata.pdfVersion || null, title: extractedMetadata.title || null,
           author: extractedMetadata.author || null, subject: extractedMetadata.subject || null, creator: extractedMetadata.creator || null,

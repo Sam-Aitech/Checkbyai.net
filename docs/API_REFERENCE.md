@@ -835,7 +835,11 @@ Lists all admin-uploaded trusted COS patterns.
 ---
 
 ### `POST /api/admin/trusted-patterns`
-Uploads a genuine COS document as a trusted pattern.
+Uploads a genuine COS document as a forensic-validated trusted reference.
+The server computes `SHA-256` over the exact bytes and runs all six
+`COSAuthenticityChecker` checks. Only `GENUINE` uploads are stored with
+`patterns = { trustType: 'admin_reference', documentHash, forensicVersion,
+trustStatus: 'VALIDATED', validatedAt }`.
 
 **Content-Type:** `multipart/form-data`
 
@@ -844,6 +848,24 @@ Uploads a genuine COS document as a trusted pattern.
 |---|---|---|
 | `document` | file | PDF of genuine COS document |
 | `aiInstructions` | text | Pattern-specific AI instructions |
+
+**Response 422:** mandatory forensic checks failed; body includes
+`failedChecks`, `cosVerdict`, `cosReason`, `documentHash`. Nothing is stored.
+
+---
+
+### `POST /api/admin/trusted-patterns/revalidate`
+Marks legacy rows without a 64-char `documentHash` + `trustStatus:
+'VALIDATED'` as `UNVERIFIED`. Only `VALIDATED` exact-`SHA-256` references
+participate in customer trust matching.
+
+---
+
+### `POST /api/admin/analyze-reasoning/:id` (SSE)
+Streams AI forensic explanation for a verification. Provider availability is
+checked before SSE headers: no provider → `503 JSON`; provider failure →
+`502 JSON` or `data: { error }`. The prompt carries trusted-reference context
+and instructs the model to explain, never rewrite, the deterministic verdict.
 
 ---
 

@@ -35,6 +35,13 @@ interface TrustedPattern {
   id: number;
   filename: string;
   uploadedAt: string;
+  patterns?: {
+    documentHash?: string;
+    trustStatus?: string;
+    trustType?: string;
+    forensicVersion?: number;
+    validatedAt?: string;
+  };
   metadata?: {
     producer?: string;
     creator?: string;
@@ -383,6 +390,7 @@ export default function SimpleAdmin() {
   const [aiAnalysis, setAiAnalysis] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const [aiError, setAiError] = useState('');
   
   // System health state
   const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null);
@@ -1509,11 +1517,17 @@ export default function SimpleAdmin() {
       });
 
       if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.message || `Server error ${response.status}`);
+        const errData = await response.json().catch(() => ({} as any));
+        if (response.status === 422 && (errData as any)?.failedChecks) {
+          const failed = ((errData as any).failedChecks as Array<{ name: string; detail: string }>)
+            .map((c) => `${c.name}: ${c.detail}`)
+            .join('\n');
+          throw new Error(`${(errData as any).message || 'Trusted reference cannot be approved.'}\n${failed}`);
+        }
+        throw new Error((errData as any).message || `Server error ${response.status}`);
       }
 
-      toast({ title: 'Upload successful', description: 'Document added to trusted patterns with AI instructions' });
+      toast({ title: 'Upload successful', description: 'Forensic-validated trusted reference added (exact SHA-256 match required for customer trust)' });
       setUploadPreview(null);
       setAiInstructions('');
       loadData();
@@ -1595,16 +1609,39 @@ export default function SimpleAdmin() {
     setSelectedLog(log);
     setAiPanelOpen(true);
     setAiAnalysis('');
+    setAiError('');
     setAiLoading(true);
+
+    const classifyStatus = (status: number): string => {
+      if (status === 404) return 'Verification not found. It may have been deleted — refresh the logs and retry.';
+      if (status === 503) return 'AI analysis unavailable. No AI providers are configured. The verification itself completed successfully.';
+      if (status === 502) return 'AI provider failed. All configured providers failed. The verification itself completed successfully.';
+      return 'Could not analyze verification. The verification itself completed successfully.';
+    };
 
     try {
       const response = await fetch(`/api/admin/analyze-reasoning/${log.id}`, {
         method: 'POST',
         credentials: 'include',
+        headers: { Accept: 'text/event-stream' },
       });
 
+      const contentType = response.headers.get('content-type') || '';
       if (!response.ok) {
-        throw new Error('Analysis failed');
+        let serverMessage = '';
+        try {
+          if (contentType.includes('application/json')) {
+            const body = await response.json();
+            serverMessage = (body as any)?.message || '';
+          } else {
+            serverMessage = await response.text();
+          }
+        } catch {}
+        const friendly = serverMessage || classifyStatus(response.status);
+        setAiError(friendly);
+        toast({ title: 'AI analysis unavailable', description: friendly, variant: 'destructive' });
+        setAiLoading(false);
+        return;
       }
 
       const reader = response.body?.getReader();
@@ -1614,34 +1651,70 @@ export default function SimpleAdmin() {
         throw new Error('No response body');
       }
 
+      let buffer = '';
+      let streamFailed = false;
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
+        buffer += decoder.decode(value, { stream: true });
+        let boundary = buffer.indexOf('\n\n');
+        while (boundary !== -1) {
+          const rawEvent = buffer.slice(0, boundary);
+          buffer = buffer.slice(boundary + 2);
+          const lines = rawEvent.split('\n');
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const payload = line.slice(6).trim();
+            if (!payload || payload === '[DONE]') continue;
+            let data: any;
             try {
-              const data = JSON.parse(line.slice(6));
-              if (data.provider) {
-                setAiAnalysis(prev => prev + `*Using ${data.provider} AI*\n\n`);
-              }
-              if (data.content) {
-                setAiAnalysis(prev => prev + data.content);
-              }
-              if (data.done) {
-                setAiLoading(false);
-              }
-            } catch (e) {
-              // Ignore parse errors
+              data = JSON.parse(payload);
+            } catch {
+              continue;
+            }
+            if (data.provider) {
+              setAiAnalysis(prev => prev + `*Using ${data.provider} AI*\n\n`);
+            }
+            if (data.content) {
+              setAiAnalysis(prev => prev + data.content);
+            }
+            if (data.error) {
+              const msg = typeof data.error === 'string' ? data.error : 'AI analysis unavailable. The verification itself completed successfully.';
+              setAiError(msg);
+              streamFailed = true;
+            }
+            if (data.done) {
+              setAiLoading(false);
             }
           }
+          boundary = buffer.indexOf('\n\n');
         }
       }
+      buffer += decoder.decode();
+      const tail = buffer.trim();
+      if (tail) {
+        for (const line of tail.split('\n')) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const data = JSON.parse(line.slice(6).trim());
+            if (data.content) setAiAnalysis(prev => prev + data.content);
+            if (data.error) {
+              setAiError(typeof data.error === 'string' ? data.error : 'AI analysis unavailable.');
+              streamFailed = true;
+            }
+            if (data.done) setAiLoading(false);
+          } catch {}
+        }
+      }
+      if (streamFailed) {
+        toast({ title: 'AI analysis unavailable', description: 'The verification itself completed successfully. You can retry.', variant: 'destructive' });
+      }
+      setAiLoading(false);
     } catch (error) {
-      toast({ title: 'Analysis failed', description: 'Could not analyze verification', variant: 'destructive' });
+      const msg = 'Stream failed before completion. The verification itself completed successfully — please retry.';
+      setAiError(msg);
+      toast({ title: 'AI analysis unavailable', description: msg, variant: 'destructive' });
       setAiLoading(false);
     }
   };
@@ -2928,7 +3001,7 @@ export default function SimpleAdmin() {
               <CardHeader>
                 <CardTitle className="text-gray-900 dark:text-white">Trusted COS Patterns</CardTitle>
                 <CardDescription className="text-gray-500 dark:text-slate-400">
-                  These documents are used as reference for verification
+                  Forensic-validated admin references. Customer trust requires an exact SHA-256 byte match to a VALIDATED reference — metadata or producer similarity alone never grants trust.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -2961,7 +3034,16 @@ export default function SimpleAdmin() {
                               <p className="text-gray-900 dark:text-white font-medium">{pattern.filename}</p>
                               <p className="text-sm text-gray-500 dark:text-slate-400">
                                 Uploaded: {new Date(pattern.uploadedAt).toLocaleDateString()}
+                                {' · '}
+                                <span className={pattern.patterns?.trustStatus === 'VALIDATED' ? 'font-semibold text-emerald-600 dark:text-emerald-400' : 'font-semibold text-amber-600 dark:text-amber-400'}>
+                                  {pattern.patterns?.trustStatus === 'VALIDATED' ? 'Admin trusted reference · VALIDATED' : 'UNVERIFIED — re-upload a forensic-valid reference'}
+                                </span>
                               </p>
+                              {pattern.patterns?.documentHash && (
+                                <p className="text-xs text-gray-500 dark:text-slate-400 font-mono truncate" title={pattern.patterns.documentHash}>
+                                  SHA-256: {pattern.patterns.documentHash.slice(0, 32)}…
+                                </p>
+                              )}
                             </div>
                           </div>
                           <Button
@@ -3971,13 +4053,30 @@ export default function SimpleAdmin() {
           </SheetHeader>
           
           <div className="mt-6">
-            {aiLoading && !aiAnalysis && (
+            {aiLoading && !aiAnalysis && !aiError && (
               <div className="flex items-center gap-3 text-gray-500 dark:text-slate-400">
                 <div className="w-5 h-5 border-2 border-purple-400 border-t-transparent rounded-full animate-spin"></div>
                 <span>Analyzing document...</span>
               </div>
             )}
-            
+
+            {aiError && (
+              <div className="rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 p-4">
+                <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">AI analysis unavailable</p>
+                <p className="mt-1 text-sm text-amber-700 dark:text-amber-300">{aiError}</p>
+                <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">The verification itself completed successfully.</p>
+                {selectedLog && (
+                  <button
+                    type="button"
+                    onClick={() => runAiAnalysis(selectedLog)}
+                    className="mt-3 inline-flex items-center rounded-full bg-amber-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-amber-700"
+                  >
+                    Retry AI analysis
+                  </button>
+                )}
+              </div>
+            )}
+
             {aiAnalysis && (
               <div className="prose dark:prose-invert prose-sm max-w-none">
                 <div className="whitespace-pre-wrap text-gray-600 dark:text-slate-300 leading-relaxed">

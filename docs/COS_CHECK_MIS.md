@@ -1,6 +1,6 @@
 # COS Check — Metadata Inspector (MIS) Feature
 
-**Last Updated:** 2026-05-02
+**Last Updated:** 2026-09-13
 **Status:** Shipped (Beta)
 **Entry Points:** `/api/verify` endpoint, client COS Check tab
 
@@ -329,6 +329,75 @@ Modified to use `VerificationResultsTabbed` instead of plain `VerificationResult
 - [ ] API response includes cosCheck field in JSON
 
 ---
+
+## Trusted COS Reference (exact SHA-256)
+
+Locked forensic policy: the six checks above are mandatory acceptance criteria
+and are never weakened, removed, downgraded, bypassed, or reclassified.
+A document is GENUINE only when these requirements pass — except for one
+narrow, audited path: an exact byte match to a previously forensic-validated
+admin reference (see below).
+
+### Admin upload — `POST /api/admin/trusted-patterns`
+
+1. Compute `SHA-256` over the exact uploaded PDF bytes.
+2. Run the same `COSAuthenticityChecker` (all six checks) against the upload.
+3. Only when `verdict === 'GENUINE'` store the reference with:
+   `patterns = { metadata, documentType: 'trusted_cos', trustType:
+   'admin_reference', documentHash, forensicVersion: 1, trustStatus:
+   'VALIDATED', validatedAt, cosVerdict }` (no schema migration; JSONB only).
+4. If any check fails, return `422` with `failedChecks` and create nothing.
+   The admin UI shows the exact failed check(s) and blocks approval until a
+   valid reference is uploaded.
+
+### Customer verification — `POST /api/verify` + `pdfVerifyWorker`
+
+1. Compute `documentHash = SHA-256(bytes)` (already done).
+2. `findValidatedTrustedMatch(trustedPatterns, documentHash)` matches only
+   when `patterns.documentHash === documentHash AND trustStatus ===
+   'VALIDATED' AND trustType === 'admin_reference'`.
+3. On match: still run `PDFAnalyzer` + `COSAuthenticityChecker` in parallel
+   and preserve all MIS findings; append an `Admin Trusted Reference Match`
+   evidence check; return `genuine / 99`; store
+   `analysisDetails.trustedReference = { matched: true, patternId, filename,
+   documentHash }`. `combineWithCosVerdict()` is bypassed for this case only.
+4. No match (different hash, same producer/metadata, same filename/different
+   bytes, legacy `UNVERIFIED`/`INVALID` rows): existing forensic logic runs
+   unchanged, including the `EDITED + genuine → suspicious / 50%` downgrade.
+
+### Migration — `POST /api/admin/trusted-patterns/revalidate`
+
+Existing `trusted_patterns` rows are never auto-trusted. The revalidate
+endpoint marks every row without a 64-char `documentHash` + `trustStatus ===
+'VALIDATED'` as `UNVERIFIED` (JSONB-only update). Only `VALIDATED` references
+participate in exact-hash matching. Re-upload a forensic-valid PDF to mint a
+new `VALIDATED` reference.
+
+### AI reasoning — `POST /api/admin/analyze-reasoning/:id` (SSE)
+
+- `hasAnyProvider()` is checked before SSE headers; no provider → `503 JSON`
+  with an actionable message (verification itself already succeeded).
+- Provider create-failure → `502 JSON`; mid-stream failure → `data: { error }`
+  diagnostic. No API keys/secrets are exposed; provider fallback preserved.
+- Prompt includes trusted-reference context (matched true/false, filename,
+  hash), deterministic MIS checks, and the final deterministic result, with an
+  explicit instruction to explain only and never rewrite the verdict.
+- Client (`SimpleAdmin runAiAnalysis()`) uses a persistent SSE buffer with
+  `TextDecoder(..., { stream: true })`, `\n\n` framing, handles
+  `provider/content/done/error` events, distinguishes
+  unavailable/provider-failed/stream-failed/not-found, and offers
+  `[Retry AI analysis]`.
+
+### Admin UX
+
+- Patterns list shows `Admin trusted reference · VALIDATED` vs `UNVERIFIED —
+  re-upload a forensic-valid reference`, plus filename, upload date, and the
+  SHA-256 fingerprint. Copy states exact-hash trust only; metadata/producer
+  similarity alone never grants trust.
+- Exact-match results show `GENUINE 99%` + `Trusted reference match / Exact
+  match to admin-approved document`, with forensic checks underneath (never
+  hidden). AI failures show `AI analysis unavailable / verification completed
+  successfully / [Retry AI analysis]`.
 
 ## Related Documentation
 
