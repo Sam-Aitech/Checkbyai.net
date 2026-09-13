@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { findValidatedTrustedMatch } from "../trustedReference";
+import { findValidatedTrustedMatch, buildTrustedReferenceCheck } from "../trustedReference";
 
 const HASH_A = "a".repeat(64);
 const HASH_B = "b".repeat(64);
@@ -74,5 +74,24 @@ describe("findValidatedTrustedMatch", () => {
     expect(findValidatedTrustedMatch([], HASH_A)).toBeNull();
     expect(findValidatedTrustedMatch(null as any, HASH_A)).toBeNull();
     expect(findValidatedTrustedMatch([], "")).toBeNull();
+  });
+
+  test("missing trustType does NOT match (strictly required)", () => {
+    const patterns = [
+      row(6, "no-trust-type.pdf", { documentHash: HASH_A, trustStatus: "VALIDATED" }),
+    ];
+    expect(findValidatedTrustedMatch(patterns as any, HASH_A)).toBeNull();
+  });
+
+  test("evidence helper is verdict-neutral reference identity", () => {
+    const check = buildTrustedReferenceCheck({
+      patternId: 1,
+      filename: "cos-ref.pdf",
+      documentHash: HASH_A,
+    });
+    expect(check.name).toBe("Admin Trusted Reference Match");
+    expect(check.passed).toBe(true);
+    expect(check.message).toContain("cos-ref.pdf");
+    expect(check.message).not.toMatch(/genuine 99|override/i);
   });
 });

@@ -355,13 +355,21 @@ admin reference (see below).
 1. Compute `documentHash = SHA-256(bytes)` (already done).
 2. `findValidatedTrustedMatch(trustedPatterns, documentHash)` matches only
    when `patterns.documentHash === documentHash AND trustStatus ===
-   'VALIDATED' AND trustType === 'admin_reference'`.
-3. On match: still run `PDFAnalyzer` + `COSAuthenticityChecker` in parallel
-   and preserve all MIS findings; append an `Admin Trusted Reference Match`
-   evidence check; return `genuine / 99`; store
-   `analysisDetails.trustedReference = { matched: true, patternId, filename,
-   documentHash }`. `combineWithCosVerdict()` is bypassed for this case only.
-4. No match (different hash, same producer/metadata, same filename/different
+   'VALIDATED' AND trustType === 'admin_reference'` (`trustType` strictly
+   required; a missing `trustType` never matches).
+3. Always run `PDFAnalyzer` + `COSAuthenticityChecker` in parallel and
+   `combineWithCosVerdict()` normally — the hash alone never overrides the
+   final verdict. An exact match only appends an `Admin Trusted Reference
+   Match` evidence check (reference identity, verdict-neutral).
+4. Match + current six-check `GENUINE` → `genuine`, with
+   `analysisDetails.trustedReference = { matched: true, status: 'validated',
+   patternId, filename, documentHash }`.
+5. Match + current six-check `EDITED` → `TRUSTED_REFERENCE_CONFLICT`
+   sub-state: `result`/`confidence` follow the normal forensic path
+   (typically `suspicious`, counted as suspicious in dashboards);
+   `trustedReference = { matched: true, status: 'conflict', conflictReason,
+   conflictChecks }`; all MIS findings retained for human review.
+6. No match (different hash, same producer/metadata, same filename/different
    bytes, legacy `UNVERIFIED`/`INVALID` rows): existing forensic logic runs
    unchanged, including the `EDITED + genuine → suspicious / 50%` downgrade.
 
@@ -394,10 +402,12 @@ new `VALIDATED` reference.
   re-upload a forensic-valid reference`, plus filename, upload date, and the
   SHA-256 fingerprint. Copy states exact-hash trust only; metadata/producer
   similarity alone never grants trust.
-- Exact-match results show `GENUINE 99%` + `Trusted reference match / Exact
-  match to admin-approved document`, with forensic checks underneath (never
-  hidden). AI failures show `AI analysis unavailable / verification completed
-  successfully / [Retry AI analysis]`.
+- Exact-match + current PASS shows `GENUINE` + `Trusted reference match`,
+  with forensic checks underneath (never hidden). Exact-match + current FAIL
+  shows the normal forensic result plus a `TRUSTED_REFERENCE_CONFLICT`
+  indicator (conflict reason + failing checks) for human review. AI failures
+  show `AI analysis unavailable / verification completed successfully /
+  [Retry AI analysis]`.
 
 ## Related Documentation
 

@@ -857,7 +857,11 @@ trustStatus: 'VALIDATED', validatedAt }`.
 ### `POST /api/admin/trusted-patterns/revalidate`
 Marks legacy rows without a 64-char `documentHash` + `trustStatus:
 'VALIDATED'` as `UNVERIFIED`. Only `VALIDATED` exact-`SHA-256` references
-participate in customer trust matching.
+with `trustType: 'admin_reference'` (strictly required) participate in
+customer trust matching. A hash match never overrides the verdict: match +
+current six-check `FAIL` yields a `TRUSTED_REFERENCE_CONFLICT` sub-state in
+`analysisDetails.trustedReference` (result follows normal forensics,
+typically `suspicious`).
 
 ---
 
