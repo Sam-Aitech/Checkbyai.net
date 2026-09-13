@@ -725,87 +725,84 @@ Enables or disables job alerts for a specific company.
 
 ## 8. Billing & Subscriptions
 
-### `GET /api/stripe/publishable-key`
-Returns the Stripe publishable key for the frontend.
+All responses are wrapped in the standard envelope: `{ "success": true, "data": {...} }` on success, `{ "success": false, "error": "..." }` on failure (see `server/lib/response.ts`).
 
-**Response 200:** `{ "key": "pk_live_..." }`
+### `GET /api/packages`
+Public. Lists live Stripe products/prices, grouped by product. Source of truth for price IDs — `usePackagePrices()` (client) resolves a `packageType` → `priceId` by matching each package's `metadata.packageType`.
+
+**Response 200:** `{ "success": true, "data": { "packages": [{ "id": "prod_...", "name": "...", "metadata": { "packageType": "alert_annual" }, "prices": [{ "id": "price_...", "unit_amount": 999, "currency": "gbp", "recurring": { "interval": "year" } }] }] } }`
 
 ---
 
-### `POST /api/create-subscription`
-Creates a Stripe Checkout Session for a subscription plan.
+### `GET /api/stripe/publishable-key`
+Rate-limited (10/min). Returns `STRIPE_PUBLISHABLE_KEY`, falling back to the Replit Stripe connector if unset.
 
-**Auth required:** Yes
+**Response 200:** `{ "success": true, "data": { "publishableKey": "pk_live_..." } }`
 
-**Body:**
-```json
-{
-  "planId": "notification_pro",
-  "billingPeriod": "monthly"
-}
-```
+---
 
-**Response 200:**
-```json
-{ "url": "https://checkout.stripe.com/pay/cs_live_..." }
-```
+### `POST /api/checkout/sign`
+**Auth required:** Yes. Mints an HMAC-signed `client_reference_id` (via `CHECKOUT_HMAC_SECRET`) for the hardcoded Stripe **Payment Link** flow — used by the legacy monthly Notification Engine plans and the COS credit packs (`starter`/`pro`/`unlimited`/`master`), which redirect to a `buy.stripe.com/...` URL carrying this reference.
+
+**Body:** `{ "packageType": "starter" | "pro" | "unlimited" | "master" | "notification_starter" | "notification_pro", "companyName"?: string }`
+
+**Response 200:** `{ "success": true, "data": { "clientReferenceId": "..." } }`
+**Response 400:** Invalid package type
 
 ---
 
 ### `POST /api/checkout/credits`
-Creates a Stripe Checkout Session for purchasing COS Check credits.
+**Auth required:** Yes. Creates a dynamic Stripe Checkout Session for a client-selected `priceId` (obtained from `GET /api/packages`). Used for `alert_annual`, `alert_annual_pro`, and `cos_check_single`.
 
-**Auth required:** Yes
+**Body:** `{ "priceId": "price_...", "packageType": "alert_annual" | "alert_annual_pro" | "cos_check_single", "companyName"?: string }`
 
-**Body:**
-```json
-{ "pack": "5" }
-```
+Server verifies the given `priceId`'s Stripe `metadata.packageType` (checked on the price, falling back to the product) matches the asserted `packageType` before creating the session — a mismatch is rejected, it does not silently proceed with the client's claim.
 
-**Response 200:** `{ "url": "https://checkout.stripe.com/..." }`
+**Response 200:** `{ "success": true, "data": { "url": "https://checkout.stripe.com/...", "sessionId": "cs_..." } }`
+**Response 400:** Missing `priceId`/`packageType`, invalid `priceId`, or `packageType` does not match the selected price
 
 ---
 
 ### `GET /api/checkout/verify/:sessionId`
-Verifies a completed Stripe checkout and applies credits/subscription.
+**Auth required:** Yes. Client-side fallback that retrieves the Checkout Session from Stripe and, if paid, claims + grants entitlement (idempotent — shares the same claim table as the webhook, so it never double-grants alongside `POST /api/stripe-webhook`).
 
-**Auth required:** Yes
-
-**Response 200:**
-```json
-{
-  "status": "fulfilled",
-  "creditsAdded": 5,
-  "newBalance": 9
-}
-```
-
-**Response 409:** Already processed (idempotency)
+**Response 200 (paid):** `{ "success": true, "data": { "success": true, "packageType": "alert_annual", "credits": 4, "subscriptionStatus": "starter" } }`
+**Response 200 (not yet paid):** `{ "success": true, "data": { "success": false, "status": "unpaid" } }`
+**Response 403:** Session does not belong to the requesting user
 
 ---
 
 ### `GET /api/credits`
-Returns the current user's credit balance.
+**Auth required:** Yes. Returns the current user's credit balance and subscription status.
 
-**Auth required:** Yes
+**Response 200:** `{ "success": true, "data": { "credits": 4, "subscriptionStatus": "starter", "isUnlimited": false } }`
 
-**Response 200:** `{ "credits": 4 }`
+---
+
+### `POST /api/billing/portal`
+**Auth required:** Yes. Creates a Stripe Customer Portal session (manage card, view invoices, cancel subscription) for the user's `stripeCustomerId`.
+
+**Response 200:** `{ "success": true, "data": { "url": "https://billing.stripe.com/..." } }`
+**Response 400:** No Stripe customer on file (user has never checked out)
 
 ---
 
 ### `POST /api/stripe-webhook`
-Stripe webhook endpoint. Verified via `stripe.webhooks.constructEvent()`.
+No auth (public — Stripe calls this directly). Verified via `stripe.webhooks.constructEvent()`; `STRIPE_WEBHOOK_SECRET` is required at boot — without it every event fails signature verification and no paid plan is ever activated via webhook.
 
 **Headers required:** `Stripe-Signature`
-**Content-Type:** `application/json` (raw body preserved)
+**Content-Type:** `application/json` (raw body preserved for signature verification)
 
 **Handled events:**
-- `checkout.session.completed` — fulfil credits/subscription
-- `customer.subscription.updated` — sync subscription status
-- `customer.subscription.deleted` — downgrade to free
+- `checkout.session.completed` — idempotently claims the session and grants credits/subscription
+- `customer.subscription.updated` — syncs subscription status
+- `customer.subscription.deleted` — downgrades user to `free`
+- `invoice.payment_succeeded` — re-syncs subscription; tops up credits on `notification_pro` renewal
+- `invoice.payment_failed` — sets subscription status to `past_due`
 
 **Response 200:** `{ "received": true }`
-**Response 400:** Invalid signature
+**Response 400:** Invalid/missing signature
+**Response 500:** Handler error (Stripe will retry)
 
 ---
 

@@ -26,6 +26,7 @@ const REQUIRED_ENV_VARS = [
   "IP_HASH_SALT",
   "CHECKOUT_HMAC_SECRET",
   "DIGEST_SIGNING_KEY",
+  "STRIPE_WEBHOOK_SECRET",
 ];
 
 const missingVars = REQUIRED_ENV_VARS.filter((v) => !process.env[v]);
@@ -55,16 +56,6 @@ async function checkPythonBackend() {
       "Python ETL agent is OFFLINE. CSV discovery fallback to Scrapling will be unavailable."
     );
   }
-}
-
-// STRIPE_WEBHOOK_SECRET is not hard-required (app starts without it) but webhooks
-// will silently return 400 and plans will never activate if it is missing.
-if (!process.env.STRIPE_WEBHOOK_SECRET) {
-  logger.warn(
-    "STRIPE_WEBHOOK_SECRET is not set. Stripe webhooks will fail signature verification " +
-    "and all plan activations via webhook will silently fail. " +
-    "Set this to the whsec_... value from your Stripe dashboard → Webhooks.",
-  );
 }
 
 const isProduction = process.env.NODE_ENV === "production";

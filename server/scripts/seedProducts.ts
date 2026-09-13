@@ -1,5 +1,28 @@
+import Stripe from 'stripe';
 import { logger } from '../utils/logger';
-import { getUncachableStripeClient } from '../stripeClient';
+
+/**
+ * DEPRECATED / legacy-only. This only seeds the original 4 packageTypes
+ * (starter, pro, unlimited, master). The 6 newer packageTypes actually live
+ * in Stripe — notification_starter, notification_pro, alert_annual,
+ * alert_annual_pro, cos_check, cos_check_single — were created manually via
+ * the Stripe Dashboard and are NOT covered here. Do not extend this list to
+ * "catch up" without first confirming in the Dashboard that you won't create
+ * duplicate/conflicting products next to the ones GET /api/packages already
+ * serves live traffic from.
+ *
+ * Also uses process.env.STRIPE_SECRET_KEY directly (same credential every
+ * other Stripe call in this app uses — server/routes/billing.ts) rather than
+ * the Replit-connector client this script used previously. If this Replit
+ * deployment's connector points at a different Stripe account/mode than
+ * STRIPE_SECRET_KEY, re-verify that before relying on this script.
+ */
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
+}
+const stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: '2025-11-17.clover' as any,
+});
 
 interface Product {
   name: string;
@@ -58,10 +81,8 @@ async function seedProducts() {
   logger.info('Starting Stripe product seeding...');
   
   try {
-    const stripe = await getUncachableStripeClient();
-    
     for (const productData of products) {
-      const existingProducts = await stripe.products.search({
+      const existingProducts = await stripeClient.products.search({
         query: `name:"${productData.name}"`,
       });
 
@@ -70,7 +91,7 @@ async function seedProducts() {
         continue;
       }
 
-      const product = await stripe.products.create({
+      const product = await stripeClient.products.create({
         name: productData.name,
         description: productData.description,
         metadata: productData.metadata,
@@ -89,7 +110,7 @@ async function seedProducts() {
         priceData.recurring = productData.recurring;
       }
 
-      const price = await stripe.prices.create(priceData);
+      const price = await stripeClient.prices.create(priceData);
       logger.info(`Created price: ${price.id} - £${(productData.priceAmount / 100).toFixed(2)}`);
     }
 
