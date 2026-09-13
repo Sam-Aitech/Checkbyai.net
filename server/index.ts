@@ -140,7 +140,9 @@ app.use(helmet({
       objectSrc: ["'none'"],
       baseUri: ["'self'"],
       formAction: ["'self'"],
-      frameAncestors: ["'none'"],
+      // Replit's development Preview renders the app in an iframe. Keep
+      // clickjacking protection strict in production without blocking Preview.
+      frameAncestors: isProduction ? ["'none'"] : null,
       upgradeInsecureRequests: isProduction ? [] : null,
     },
   },
@@ -151,7 +153,7 @@ app.use(helmet({
         preload: true,
       }
     : false,
-  xFrameOptions: { action: "deny" },
+  xFrameOptions: isProduction ? { action: "deny" } : false,
   referrerPolicy: { policy: "strict-origin-when-cross-origin" },
 }));
 
