@@ -1187,7 +1187,8 @@ Format your response in clear, professional markdown.`;
       res.json({
         message: `Verification limit set to: ${limitDescription}`,
         userId,
-        verificationLimit: limit
+        verificationLimit: limit,
+        cosEntitlement: await storage.getCosEntitlement(userId),
       });
     } catch (error) {
       logger.error({ err: error }, "Error updating user verification limit:");
@@ -1253,6 +1254,7 @@ Format your response in clear, professional markdown.`;
         message: approved ? 'Beta access granted' : 'Beta access revoked',
         userId,
         cosCheckApproved: approved,
+        cosEntitlement: await storage.getCosEntitlement(userId),
       });
     } catch (error) {
       logger.error({ err: error }, "Error updating CoS Check approval:");
@@ -1350,7 +1352,12 @@ Format your response in clear, professional markdown.`;
         );
       }
 
-      res.json({ message: active ? 'COS check subscription activated' : 'COS check subscription deactivated', userId, cosCheckSubscription: active });
+      res.json({
+        message: active ? 'COS check subscription activated' : 'COS check subscription deactivated',
+        userId,
+        cosCheckSubscription: active,
+        cosEntitlement: await storage.getCosEntitlement(userId),
+      });
     } catch (error) {
       logger.error({ err: error }, "Error updating COS check subscription:");
       res.status(500).json({ message: "Failed to update COS check subscription" });
@@ -2346,6 +2353,7 @@ Format your response in clear, professional markdown.`;
         userId,
         creditsBefore: prevCredits,
         creditsAfter: newCredits,
+        cosEntitlement: await storage.getCosEntitlement(userId),
       });
     } catch (error) {
       logger.error({ err: error }, 'Error updating credits:');

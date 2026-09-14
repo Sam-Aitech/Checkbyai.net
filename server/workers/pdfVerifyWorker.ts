@@ -176,7 +176,12 @@ export async function processPdfVerifyJob(job: Job<PdfVerifyJobData>): Promise<{
         const today = new Date().toISOString().split('T')[0];
         const [currentUser] = await tx.select({ dailyVerificationsUsed: users.dailyVerificationsUsed, lastVerificationDate: users.lastVerificationDate }).from(users).where(eq(users.id, userId));
         const usageToday = currentUser?.lastVerificationDate === today ? (currentUser.dailyVerificationsUsed || 0) + 1 : 1;
-        await tx.update(users).set({ dailyVerificationsUsed: usageToday, lastVerificationDate: today, updatedAt: new Date() }).where(eq(users.id, userId));
+        await tx.update(users).set({
+          dailyVerificationsUsed: usageToday,
+          totalVerificationsUsed: sql`COALESCE(${users.totalVerificationsUsed}, 0) + 1`,
+          lastVerificationDate: today,
+          updatedAt: new Date(),
+        }).where(eq(users.id, userId));
       }
       const insertValues: any = {
         userId,

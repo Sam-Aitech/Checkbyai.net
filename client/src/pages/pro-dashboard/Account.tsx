@@ -104,7 +104,12 @@ function AccountContent() {
 
         {summary.hasCosAccess && (
           <div style={{ marginTop: 18, paddingTop: 16, borderTop: `1px solid ${T.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div><p style={{ fontSize: 11, color: T.muted, textTransform: "uppercase", marginBottom: 3 }}>CoS Checks</p><p style={{ fontSize: 14, color: T.text }}>{summary.credits} remaining</p></div>
+            <div>
+              <p style={{ fontSize: 11, color: T.muted, textTransform: "uppercase", marginBottom: 3 }}>CoS Checks</p>
+              <p style={{ fontSize: 14, color: T.text }}>
+                {summary.isCosUnlimited ? "Unlimited" : `${summary.cosChecksRemaining} remaining`}
+              </p>
+            </div>
           </div>
         )}
 

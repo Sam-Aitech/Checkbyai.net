@@ -21,6 +21,7 @@ import type {
   SupportTicket,
   InsertSupportTicket,
 } from "@shared/schema";
+import type { CosEntitlement } from "@shared/cosEntitlement";
 import { userRepository } from "./repositories/userRepository";
 import { verificationRepository } from "./repositories/verificationRepository";
 import { trustedPatternRepository } from "./repositories/trustedPatternRepository";
@@ -52,6 +53,7 @@ export interface IStorage {
   getCredits(userId: string): Promise<number>;
   updateDailyVerificationUsage(userId: string): Promise<User>;
   checkDailyLimit(userId: string): Promise<boolean>;
+  getCosEntitlement(userId: string): Promise<CosEntitlement | undefined>;
   updateUserVerificationLimit(userId: string, limit: number | null): Promise<User | undefined>;
   updateCosCheckApproval(userId: string, approved: boolean): Promise<void>;
   updateIpExempt(userId: string, exempt: boolean): Promise<void>;
@@ -138,6 +140,7 @@ class DatabaseStorage implements IStorage {
   getCredits(userId: string) { return userRepository.getCredits(userId); }
   updateDailyVerificationUsage(userId: string) { return userRepository.updateDailyVerificationUsage(userId); }
   checkDailyLimit(userId: string) { return userRepository.checkDailyLimit(userId, (key) => this.getSystemSetting(key)); }
+  getCosEntitlement(userId: string) { return userRepository.getCosEntitlement(userId, (key) => this.getSystemSetting(key)); }
   updateUserVerificationLimit(userId: string, limit: number | null) { return userRepository.updateUserVerificationLimit(userId, limit); }
   updateCosCheckApproval(userId: string, approved: boolean) { return userRepository.updateCosCheckApproval(userId, approved); }
   updateIpExempt(userId: string, exempt: boolean) { return userRepository.updateIpExempt(userId, exempt); }

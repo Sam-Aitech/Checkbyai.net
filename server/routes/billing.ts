@@ -755,14 +755,11 @@ export function registerBillingRoutes(app: Express): void {
 
   app.get('/api/credits', isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.id;
-    const credits = await storage.getCredits(userId);
-    const user = await storage.getUser(userId);
-
-    success(res, {
-      credits,
-      subscriptionStatus: user?.subscriptionStatus || 'free',
-      isUnlimited: user?.subscriptionStatus === 'unlimited' || user?.subscriptionStatus === 'enterprise' || user?.verificationLimit === -1
-    });
+    const entitlement = await storage.getCosEntitlement(userId);
+    if (!entitlement) {
+      throw new ApiError(404, "User not found");
+    }
+    success(res, entitlement);
   }));
 
   app.get('/api/checkout/verify/:sessionId', isAuthenticated, asyncHandler(async (req: any, res) => {

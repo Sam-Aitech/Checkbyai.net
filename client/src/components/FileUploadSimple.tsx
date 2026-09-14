@@ -175,6 +175,9 @@ export default function FileUploadSimple({
           setAccessDenied('upgrade');
           return;
         }
+        if (response.status === 403 && errorData.code === 'account_restricted') {
+          throw new Error(errorData.error || 'Your account is restricted. Please contact support.');
+        }
 
         // Handle daily limit (429) with helpful message
         if (response.status === 429 && errorData.daysRemaining) {

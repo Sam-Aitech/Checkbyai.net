@@ -1,6 +1,7 @@
 import { users, type User, type UpsertUser, type SubscriptionAuditLogEntry, type NotifPrefs, type NotifEventType, DEFAULT_NOTIF_PREFS, subscriptionAuditLog } from "@shared/schema";
 import { db } from "../db";
 import { eq, desc, count, sql, and, isNull } from "drizzle-orm";
+import { resolveCosEntitlement, type CosEntitlement } from "@shared/cosEntitlement";
 
 export class UserRepository {
   async getUser(id: string): Promise<User | undefined> {
@@ -169,6 +170,7 @@ export class UserRepository {
       .update(users)
       .set({
         dailyVerificationsUsed: usageToday,
+        totalVerificationsUsed: sql`COALESCE(${users.totalVerificationsUsed}, 0) + 1`,
         lastVerificationDate: today,
         updatedAt: new Date(),
       })
@@ -179,27 +181,18 @@ export class UserRepository {
   }
 
   async checkDailyLimit(userId: string, getSystemSetting: (key: string) => Promise<string | null>): Promise<boolean> {
+    const entitlement = await this.getCosEntitlement(userId, getSystemSetting);
+    return entitlement?.canVerify ?? false;
+  }
+
+  async getCosEntitlement(
+    userId: string,
+    getSystemSetting: (key: string) => Promise<string | null>,
+  ): Promise<CosEntitlement | undefined> {
     const user = await this.getUser(userId);
-    if (!user) return false;
-
-    if (user.subscriptionStatus === 'unlimited' || user.subscriptionStatus === 'enterprise') return true;
-
-    if (user.cosCheckSubscription) return true;
-
-    if (user.verificationLimit === -1) return true;
-
-    if (user.verificationLimit !== null && user.verificationLimit > 0) {
-      return (user.totalVerificationsUsed || 0) < user.verificationLimit;
-    }
-
-    const today = new Date().toISOString().split('T')[0];
-
-    if (user.lastVerificationDate !== today) return true;
-
-    const limitSetting = await getSystemSetting('defaultDailyLimit');
-    const defaultDailyLimit = limitSetting ? parseInt(limitSetting, 10) : 1;
-    if (defaultDailyLimit === -1) return true;
-    return (user.dailyVerificationsUsed || 0) < defaultDailyLimit;
+    if (!user) return undefined;
+    const defaultDailyLimit = await getSystemSetting("defaultDailyLimit");
+    return resolveCosEntitlement(user, defaultDailyLimit);
   }
 
   async updateUserVerificationLimit(userId: string, limit: number | null): Promise<User | undefined> {
