@@ -681,6 +681,35 @@ export function registerBillingRoutes(app: Express): void {
     }
 
     let customerId = user.stripeCustomerId;
+    if (customerId) {
+      // A stored customer can become invalid when switching from Stripe
+      // Sandbox/Test mode to Live mode (or when a customer is deleted). Do
+      // not send that stale ID to Checkout: Stripe returns "No such
+      // customer" and the payment button fails before a session is created.
+      try {
+        const existingCustomer = await stripe.customers.retrieve(customerId);
+        if ('deleted' in existingCustomer && existingCustomer.deleted) {
+          logger.warn(
+            { userId, staleCustomerId: customerId },
+            '[Checkout] Stored Stripe customer is deleted; creating a replacement',
+          );
+          customerId = null;
+        }
+      } catch (err: any) {
+        const isMissingCustomer =
+          err?.code === 'resource_missing' ||
+          err?.statusCode === 404 ||
+          err?.status === 404;
+        if (!isMissingCustomer) throw err;
+
+        logger.warn(
+          { userId, staleCustomerId: customerId },
+          '[Checkout] Stored Stripe customer is not in the active account; creating a replacement',
+        );
+        customerId = null;
+      }
+    }
+
     if (!customerId) {
       const customer = await stripe.customers.create({
         email: user.email,
