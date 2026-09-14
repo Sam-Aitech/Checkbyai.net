@@ -7,7 +7,7 @@ import { storage } from "../storage";
 import { db } from "../db";
 import { sql, eq } from "drizzle-orm";
 import { withRetry } from "../utils/dbRetry";
-import { users, verificationResults } from "@shared/schema";
+import { users, verificationResults, type TrustedPattern } from "@shared/schema";
 import { isAuthenticated } from "../auth";
 import { verifyLimiter } from "../middleware/rateLimiter";
 import { PDFAnalyzer } from "../services/pdfAnalyzer";
@@ -15,6 +15,7 @@ import { COSAuthenticityChecker } from "../services/cosAuthenticityChecker";
 import { getClientIp, hashIpAddress } from "../ipRateLimit";
 import { sanitizeUploadPath, assertSafeUploadFilename, assertPdfMagicBytes } from "../utils/uploadGuard";
 import { combineWithCosVerdict } from "../utils/cosVerdictCombiner";
+import { resolveVerificationWithTrust } from "../utils/trustedReference";
 import { success } from "../lib/response";
 import { asyncHandler } from "../lib/errorHandler";
 import { ApiError } from "../lib/apiError";
@@ -315,11 +316,26 @@ export function registerVerificationRoutes(app: Express): void {
         ]);
         analysis = analysisResult;
         analysis.cosCheck = cosCheckResult;
-        const combined = combineWithCosVerdict(analysisResult.result, analysis.confidence as number, cosCheckResult.verdict);
-        if (combined.result !== analysisResult.result) logger.info(`[COS] cosCheck ${cosCheckResult.verdict} overrides pattern analysis '${analysisResult.result}' — treating as ${combined.result}`);
-        result = combined.result;
-        analysis.result = combined.result;
-        analysis.confidence = combined.confidence;
+        const outcome = resolveVerificationWithTrust(
+          {
+            patternResult: analysisResult.result,
+            patternConfidence: analysis.confidence as number,
+            patternChecks: Array.isArray(analysis.checks) ? analysis.checks : [],
+            cosVerdict: cosCheckResult.verdict,
+            cosReason: cosCheckResult.reason,
+            cosChecks: Array.isArray(cosCheckResult.checks) ? cosCheckResult.checks : [],
+            trustedPatterns: trustedPatterns as TrustedPattern[],
+            documentHash,
+          },
+          combineWithCosVerdict,
+        );
+        if (outcome.result !== analysisResult.result) logger.info(`[COS] cosCheck ${cosCheckResult.verdict} overrides pattern analysis '${analysisResult.result}' — treating as ${outcome.result}`);
+        if (outcome.trustedReference.matched && outcome.trustedReference.status === 'conflict') logger.info(`[COS] TRUSTED_REFERENCE_CONFLICT pattern ${outcome.trustedReference.patternId}: hash matches but current six-check FAILS (${(outcome.trustedReference.conflictChecks || []).join(', ')}) -> ${outcome.result} for human review`);
+        result = outcome.result;
+        analysis.result = outcome.result;
+        analysis.confidence = outcome.confidence;
+        analysis.checks = outcome.checks;
+        analysis.trustedReference = outcome.trustedReference;
         metadata = {
           format: 'Pdf', mimeType: 'application/pdf', pdfVersion: extractedMetadata.pdfVersion || null, title: extractedMetadata.title || null,
           author: extractedMetadata.author || null, subject: extractedMetadata.subject || null, creator: extractedMetadata.creator || null,

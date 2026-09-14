@@ -1,11 +1,11 @@
 import express from "express";
 import compression from "compression";
 import rateLimit from "express-rate-limit";
-import helmet from "helmet";
 import * as Sentry from "@sentry/node";
 import { makeRateLimitStore } from "./utils/redisRateLimitStore";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { createSecurityHeadersMiddleware } from "./securityHeaders";
 import { storage } from "./storage";
 import { pool } from "./db";
 import { logger } from "./utils/logger";
@@ -26,6 +26,7 @@ const REQUIRED_ENV_VARS = [
   "IP_HASH_SALT",
   "CHECKOUT_HMAC_SECRET",
   "DIGEST_SIGNING_KEY",
+  "STRIPE_WEBHOOK_SECRET",
 ];
 
 const missingVars = REQUIRED_ENV_VARS.filter((v) => !process.env[v]);
@@ -55,16 +56,6 @@ async function checkPythonBackend() {
       "Python ETL agent is OFFLINE. CSV discovery fallback to Scrapling will be unavailable."
     );
   }
-}
-
-// STRIPE_WEBHOOK_SECRET is not hard-required (app starts without it) but webhooks
-// will silently return 400 and plans will never activate if it is missing.
-if (!process.env.STRIPE_WEBHOOK_SECRET) {
-  logger.warn(
-    "STRIPE_WEBHOOK_SECRET is not set. Stripe webhooks will fail signature verification " +
-    "and all plan activations via webhook will silently fail. " +
-    "Set this to the whsec_... value from your Stripe dashboard → Webhooks.",
-  );
 }
 
 const isProduction = process.env.NODE_ENV === "production";
@@ -127,42 +118,8 @@ if (isSentryEnabled) {
   app.use(Sentry.Handlers.tracingHandler());
 }
 
-// Helmet is applied first to enforce baseline browser hardening before any other middleware:
-// CSP allows only self + Stripe + Cloudflare Turnstile (with narrowly scoped unsafe-inline/unsafe-eval
-// kept only where required by existing inline SEO JSON-LD + inline styles in client/index.html and Vite dev HMR), HSTS is enabled
-// in production, and frame-ancestors/x-frame-options deny embedding to prevent clickjacking on sensitive pages/PDF flows.
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: isProduction
-        ? ["'self'", "'unsafe-inline'", "https://js.stripe.com", "https://challenges.cloudflare.com"]
-        : ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://js.stripe.com", "https://challenges.cloudflare.com"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
-      imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: isProduction
-        ? ["'self'", "https://api.stripe.com", "https://challenges.cloudflare.com"]
-        : ["'self'", "https://api.stripe.com", "https://challenges.cloudflare.com", "ws:", "wss:"],
-      frameSrc: ["https://js.stripe.com", "https://hooks.stripe.com", "https://challenges.cloudflare.com"],
-      workerSrc: ["'self'", "blob:"],
-      objectSrc: ["'none'"],
-      baseUri: ["'self'"],
-      formAction: ["'self'"],
-      frameAncestors: ["'none'"],
-      upgradeInsecureRequests: isProduction ? [] : null,
-    },
-  },
-  hsts: isProduction
-    ? {
-        maxAge: 63072000,
-        includeSubDomains: true,
-        preload: true,
-      }
-    : false,
-  xFrameOptions: { action: "deny" },
-  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
-}));
+// Helmet is applied first to enforce baseline browser hardening before any other middleware.
+app.use(createSecurityHeadersMiddleware(isProduction));
 
 app.use(compression({
   level: 6,

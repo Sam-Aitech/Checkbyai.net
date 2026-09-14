@@ -353,64 +353,6 @@ async function sendSubscriptionNotifications(
 }
 
 export function registerBillingRoutes(app: Express): void {
-  app.post('/api/create-subscription', isAuthenticated, asyncHandler(async (req: any, res) => {
-    const userId = req.user.id;
-    const user = await storage.getUser(userId);
-
-    if (!user) {
-      throw new ApiError(404, "User not found");
-    }
-
-    if (user.stripeSubscriptionId) {
-      const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
-      if (subscription.status === 'active') {
-        success(res, { subscriptionId: subscription.id, status: 'active' });
-        return;
-      }
-    }
-
-    if (!user.email) {
-      throw new ApiError(400, 'No user email on file');
-    }
-
-    let customerId = user.stripeCustomerId;
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: user.email,
-        name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
-      });
-      await storage.updateUserStripeInfo(userId, customer.id);
-      customerId = customer.id;
-    }
-
-    const allPrices = await stripe.prices.list({ active: true, limit: 50, expand: ['data.product'] });
-    const unlimitedPrice = allPrices.data.find(p => {
-      const prod = p.product as any;
-      return prod?.metadata?.packageType === 'unlimited' && p.recurring;
-    });
-
-    if (!unlimitedPrice) {
-      success(res, {
-        message: 'Unlimited subscription plan not configured in Stripe. Please use the checkout flow instead.',
-        redirect: '/pricing'
-      });
-      return;
-    }
-
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const session = await stripe.checkout.sessions.create({
-      customer: customerId,
-      payment_method_types: ['card'],
-      line_items: [{ price: unlimitedPrice.id, quantity: 1 }],
-      mode: 'subscription',
-      success_url: `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${baseUrl}/pricing`,
-      metadata: { userId, packageType: 'unlimited' },
-    });
-
-    success(res, { url: session.url, status: 'redirect' });
-  }));
-
   app.post('/api/stripe-webhook', async (req, res) => {
     const sig = req.headers['stripe-signature'];
     let event;
@@ -747,6 +689,25 @@ export function registerBillingRoutes(app: Express): void {
       });
       await storage.updateUserStripeCustomer(userId, customer.id);
       customerId = customer.id;
+    }
+
+    // The client picks priceId+packageType itself (from GET /api/packages), so
+    // verify the price it's paying for actually is the package it claims to be
+    // before we ever create a session metadata later grants entitlement from —
+    // otherwise a user could pay for a cheap price while asserting an expensive
+    // packageType and still receive full entitlement.
+    let priceForValidation: Stripe.Price;
+    try {
+      priceForValidation = await stripe.prices.retrieve(priceId, { expand: ['product'] });
+    } catch {
+      throw new ApiError(400, 'Invalid priceId');
+    }
+    const priceProduct = priceForValidation.product as Stripe.Product | string;
+    const actualPackageType =
+      priceForValidation.metadata?.packageType ||
+      (typeof priceProduct === 'object' ? priceProduct.metadata?.packageType : undefined);
+    if (actualPackageType !== packageType) {
+      throw new ApiError(400, 'Package type does not match the selected price');
     }
 
     // alert_annual/alert_annual_pro are billed once a year but modeled as a

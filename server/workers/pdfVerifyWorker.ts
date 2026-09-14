@@ -4,11 +4,12 @@ import * as tmp from "tmp";
 import type { Job } from "bullmq";
 import { db } from "../db";
 import { sql, eq } from "drizzle-orm";
-import { users, verificationResults } from "@shared/schema";
+import { users, verificationResults, type TrustedPattern } from "@shared/schema";
 import { storage } from "../storage";
 import { PDFAnalyzer } from "../services/pdfAnalyzer";
 import { COSAuthenticityChecker } from "../services/cosAuthenticityChecker";
 import { combineWithCosVerdict } from "../utils/cosVerdictCombiner";
+import { resolveVerificationWithTrust } from "../utils/trustedReference";
 import { withRetry } from "../utils/dbRetry";
 import { emitToUser } from "../services/socketGateway";
 import { logger } from "../utils/logger";
@@ -120,13 +121,30 @@ export async function processPdfVerifyJob(job: Job<PdfVerifyJobData>): Promise<{
       ]);
       analysis = analysisResult;
       (analysis as any).cosCheck = cosCheckResult;
-      const combined = combineWithCosVerdict(analysisResult.result, analysis.confidence as number, cosCheckResult.verdict);
-      if (combined.result !== analysisResult.result) {
-        logger.info(`[PDFWorker] cosCheck ${cosCheckResult.verdict} overrides '${analysisResult.result}' -> ${combined.result}`);
+      const outcome = resolveVerificationWithTrust(
+        {
+          patternResult: analysisResult.result,
+          patternConfidence: analysis.confidence as number,
+          patternChecks: Array.isArray(analysis.checks) ? analysis.checks : [],
+          cosVerdict: cosCheckResult.verdict,
+          cosReason: cosCheckResult.reason,
+          cosChecks: Array.isArray(cosCheckResult.checks) ? cosCheckResult.checks : [],
+          trustedPatterns: trustedPatterns as TrustedPattern[],
+          documentHash,
+        },
+        combineWithCosVerdict,
+      );
+      if (outcome.result !== analysisResult.result) {
+        logger.info(`[PDFWorker] cosCheck ${cosCheckResult.verdict} overrides '${analysisResult.result}' -> ${outcome.result}`);
       }
-      result = combined.result;
-      analysis.result = combined.result;
-      analysis.confidence = combined.confidence;
+      if (outcome.trustedReference.matched && outcome.trustedReference.status === 'conflict') {
+        logger.info(`[PDFWorker] TRUSTED_REFERENCE_CONFLICT pattern ${outcome.trustedReference.patternId}: hash matches but current six-check FAILS (${(outcome.trustedReference.conflictChecks || []).join(', ')}) -> ${outcome.result} for human review`);
+      }
+      result = outcome.result;
+      analysis.result = outcome.result;
+      analysis.confidence = outcome.confidence;
+      analysis.checks = outcome.checks;
+      (analysis as any).trustedReference = outcome.trustedReference;
       metadata = {
         format: 'Pdf',
         mimeType: 'application/pdf',

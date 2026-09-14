@@ -67,6 +67,7 @@ export interface IStorage {
   getTrustedPatterns(): Promise<TrustedPattern[]>;
   createTrustedPattern(filename: string, metadata: any, patterns: any, aiInstructions?: string): Promise<number>;
   updateTrustedPatternInstructions(id: number, aiInstructions: string): Promise<void>;
+  updateTrustedPatternTrust(id: number, patterns: any): Promise<void>;
   deleteTrustedPattern(id: number): Promise<void>;
   getGlobalAiRules(): Promise<GlobalAiRule[]>;
   getActiveGlobalAiRules(): Promise<GlobalAiRule[]>;
@@ -170,6 +171,7 @@ class DatabaseStorage implements IStorage {
   getTrustedPatterns() { return trustedPatternRepository.getTrustedPatterns(); }
   createTrustedPattern(filename: string, metadata: any, patterns: any, aiInstructions?: string) { return trustedPatternRepository.createTrustedPattern(filename, metadata, patterns, aiInstructions); }
   updateTrustedPatternInstructions(id: number, aiInstructions: string) { return trustedPatternRepository.updateTrustedPatternInstructions(id, aiInstructions); }
+  updateTrustedPatternTrust(id: number, patterns: any) { return trustedPatternRepository.updateTrustedPatternTrust(id, patterns); }
   deleteTrustedPattern(id: number) { return trustedPatternRepository.deleteTrustedPattern(id); }
 
   getGlobalAiRules() { return globalAiRuleRepository.getGlobalAiRules(); }

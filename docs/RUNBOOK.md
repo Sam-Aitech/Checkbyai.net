@@ -85,6 +85,19 @@ PYTHON_BACKEND_URL="http://localhost:8000"
       Events: checkout.session.completed, customer.subscription.*
       Copy secret → set as STRIPE_WEBHOOK_SECRET
 
+□ 6a. Seed the Alert Pass / CoS-single Stripe products (first run only,
+      required — without this GET /api/packages returns an empty array
+      and the Alert Pass pricing cards show "Coming soon" forever):
+      npm run seed:products
+      Creates alert_annual (£9.99/yr), alert_annual_pro (£19.99/yr), and
+      cos_check_single (£4.99) with metadata.packageType set — idempotent,
+      safe to re-run. The legacy Starter/Pro/Unlimited/Master CoS packages
+      and the monthly Notification Starter/Pro plans sell through separate,
+      manually-configured Stripe Payment Links and are NOT covered by this
+      script — verify those already exist in Dashboard → Products if their
+      pricing cards don't work either.
+      Verify with: GET /api/packages should list 3+ packages.
+
 □ 7. Verify cron is running:
       GET /api/health at 00:35 UTC → lastRunSuccess should be true
 ```

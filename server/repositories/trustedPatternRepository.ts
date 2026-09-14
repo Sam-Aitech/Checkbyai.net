@@ -27,6 +27,13 @@ export class TrustedPatternRepository {
       .where(eq(trustedPatterns.id, id));
   }
 
+  async updateTrustedPatternTrust(id: number, patterns: any): Promise<void> {
+    await db
+      .update(trustedPatterns)
+      .set({ patterns, lastUpdated: new Date() })
+      .where(eq(trustedPatterns.id, id));
+  }
+
   async deleteTrustedPattern(id: number): Promise<void> {
     await db.update(trustedPatterns).set({ status: 'deleted' }).where(eq(trustedPatterns.id, id));
   }
