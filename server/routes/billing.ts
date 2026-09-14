@@ -16,6 +16,7 @@ import { normalizeName, generateFingerprint } from "../utils/sponsorListFetcher"
 import { success } from "../lib/response";
 import { asyncHandler } from "../lib/errorHandler";
 import { ApiError } from "../lib/apiError";
+import { fulfillPaidCheckoutOnce, getCosCreditPackageGrant } from "../services/checkoutFulfillment";
 
 /**
  * Best-effort: after a successful Notification Engine checkout, auto-create
@@ -212,18 +213,15 @@ async function applyPackageGrant(
 ): Promise<void> {
   const base = { stripeSubscriptionId, stripeCustomerId, updatedAt: new Date() };
   const withNotifPrefs = { notifPrefs: sql`COALESCE(${users.notifPrefs}, ${JSON.stringify(DEFAULT_NOTIF_PREFS)}::jsonb)` };
+  const cosCreditGrant = getCosCreditPackageGrant(packageType);
 
-  if (packageType === 'starter') {
-    // COS-only credit package (£24.99/50 checks). Does NOT write
+  if (cosCreditGrant !== null) {
+    // COS-only credit packages (£24.99/50 or £39.99/100 checks). Do NOT write
     // subscriptionStatus: that field drives Alert-Pass tier resolution
     // (shared/planTiers.ts), and this buyer purchased COS credits, not
     // Alert-Pass monitoring — granting Alert-Pass-Starter perks here was a
     // stale coupling bug. COS access is already fully covered by `credits`.
-    await tx.update(users).set({ ...base, credits: sql`COALESCE(${users.credits}, 0) + 50` }).where(eq(users.id, userId));
-  } else if (packageType === 'pro') {
-    // COS-only credit package (£39.99/100 checks). Same rationale as
-    // 'starter' above — do not write subscriptionStatus.
-    await tx.update(users).set({ ...base, credits: sql`COALESCE(${users.credits}, 0) + 100` }).where(eq(users.id, userId));
+    await tx.update(users).set({ ...base, credits: sql`COALESCE(${users.credits}, 0) + ${cosCreditGrant}` }).where(eq(users.id, userId));
   } else if (packageType === 'unlimited') {
     // COS Unlimited (£99.99, one-time, grants zero credits). Locked product
     // decision: keep subscriptionStatus:'unlimited' as-is (an accepted,
@@ -542,12 +540,11 @@ export function registerBillingRoutes(app: Express): void {
           // before this transaction started: if the grant then threw, Stripe's
           // retry saw the session already claimed, skipped re-granting, and
           // got a 200 back — the customer paid and silently received nothing.
-          const granted = await withRetry(() => db.transaction(async (tx) => {
-            if (!(await tryClaimSession(session.id, tx))) {
-              return false; // already processed by a prior successful delivery
-            }
-            await applyPackageGrant(tx, userId, packageType, session.subscription ?? null, session.customer ?? null);
-            return true;
+          const granted = await withRetry(() => fulfillPaidCheckoutOnce<DbOrTx>({
+            paymentStatus: session.payment_status,
+            runInTransaction: (work) => db.transaction(work),
+            claim: (tx) => tryClaimSession(session.id, tx),
+            grant: (tx) => applyPackageGrant(tx, userId, packageType, session.subscription ?? null, session.customer ?? null),
           }), 'webhook-checkout-session');
 
           // Side effects are deliberately outside the transaction — best-effort,
@@ -809,12 +806,11 @@ export function registerBillingRoutes(app: Express): void {
           // Claim + grant in one transaction — see tryClaimSession's docstring.
           // Reloading this page after a failed grant must not silently report
           // stale pre-grant credits as "payment successful."
-          const granted = await withRetry(() => db.transaction(async (tx) => {
-            if (!(await tryClaimSession(sessionId, tx))) {
-              return false;
-            }
-            await applyPackageGrant(tx, sessionUserId, packageType, (session.subscription as string) ?? null, (session.customer as string) ?? null);
-            return true;
+          const granted = await withRetry(() => fulfillPaidCheckoutOnce<DbOrTx>({
+            paymentStatus: session.payment_status,
+            runInTransaction: (work) => db.transaction(work),
+            claim: (tx) => tryClaimSession(sessionId, tx),
+            grant: (tx) => applyPackageGrant(tx, sessionUserId, packageType, (session.subscription as string) ?? null, (session.customer as string) ?? null),
           }), 'checkout-verify-session');
 
           const AUTO_WATCH_TYPES = ['notification_starter', 'notification_pro', 'alert_annual', 'alert_annual_pro'];
