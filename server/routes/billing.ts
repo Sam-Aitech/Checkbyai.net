@@ -140,6 +140,18 @@ function subStatusForSubscriptionPackage(subPkgType: string | undefined): 'start
   return 'unlimited';
 }
 
+const LEGACY_STRIPE_PRODUCT_PACKAGE_TYPES: Record<string, string> = {
+  'Starter Package': 'starter',
+  'Pro Package': 'pro',
+  'Unlimited Monthly': 'unlimited',
+};
+
+function resolveStripePackageType(price: Stripe.Price, product: Stripe.Product | string): string | undefined {
+  return price.metadata?.packageType
+    || (typeof product === 'object' ? product.metadata?.packageType : undefined)
+    || (typeof product === 'object' ? LEGACY_STRIPE_PRODUCT_PACKAGE_TYPES[product.name] : undefined);
+}
+
 const CHECKOUT_HMAC_SECRET = process.env.CHECKOUT_HMAC_SECRET;
 if (!CHECKOUT_HMAC_SECRET) {
   throw new Error("CHECKOUT_HMAC_SECRET is required");
@@ -642,11 +654,15 @@ export function registerBillingRoutes(app: Express): void {
         }));
 
       if (productPrices.length > 0) {
+        const packageType = product.metadata?.packageType || LEGACY_STRIPE_PRODUCT_PACKAGE_TYPES[product.name];
         productsMap.set(product.id, {
           id: product.id,
           name: product.name,
           description: product.description,
-          metadata: product.metadata,
+          metadata: {
+            ...product.metadata,
+            ...(packageType ? { packageType } : {}),
+          },
           prices: productPrices,
         });
       }
@@ -721,9 +737,7 @@ export function registerBillingRoutes(app: Express): void {
       throw new ApiError(400, 'Invalid priceId');
     }
     const priceProduct = priceForValidation.product as Stripe.Product | string;
-    const actualPackageType =
-      priceForValidation.metadata?.packageType ||
-      (typeof priceProduct === 'object' ? priceProduct.metadata?.packageType : undefined);
+    const actualPackageType = resolveStripePackageType(priceForValidation, priceProduct);
     if (actualPackageType !== packageType) {
       throw new ApiError(400, 'Package type does not match the selected price');
     }
@@ -732,8 +746,7 @@ export function registerBillingRoutes(app: Express): void {
     // Stripe subscription with a hard cancel_at 12 months out — this lets the
     // existing customer.subscription.deleted webhook auto-downgrade the user
     // back to free at expiry instead of needing a separate cron job.
-    const ANNUAL_PASS_TYPES = ['alert_annual', 'alert_annual_pro'];
-    const isSubscription = packageType === 'unlimited' || ANNUAL_PASS_TYPES.includes(packageType);
+    const isSubscription = priceForValidation.type === 'recurring';
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     const cancelUrl = buildCheckoutCancelUrl(baseUrl, packageType, companyName);
 

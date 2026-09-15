@@ -8,3 +8,9 @@ Sponsor Monitor subscription tiers and CoS verification entitlement are separate
 **Why:** Mixing the Sponsor Monitor tier with CoS allowance caused the admin panel and customer dashboard to disagree, and risked changing one product when administering the other.
 
 **How to apply:** Any backend gate, usage counter, API response, or customer-facing count for CoS checks should use the shared CoS entitlement contract. Preserve purchased credits, finite admin limits, daily allowances, and unlimited grants as distinct sources.
+
+The product named “Unlimited Monthly” is a £99.99 one-time CoS purchase despite its legacy name. Checkout mode must follow the Stripe price type rather than infer recurrence from this package name.
+
+**Why:** The live Stripe price is non-recurring and the pricing page explicitly promises no recurring charge; forcing subscription mode prevents Checkout from opening for that price.
+
+**How to apply:** Create CoS Checkout Sessions from the selected, server-validated Stripe price. Use payment mode for one-time prices and subscription mode only for recurring prices.

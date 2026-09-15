@@ -122,7 +122,7 @@ export default function CheckoutSuccess() {
     switch (type) {
       case 'starter': return 'Starter Package (50 credits)';
       case 'pro': return 'Pro Package (100 credits)';
-      case 'unlimited': return 'Unlimited Monthly Subscription';
+      case 'unlimited': return 'Unlimited CoS Access';
       case 'master': return 'Master Package - Expert Review';
       case 'notification_starter': return 'Notification Engine - Starter';
       case 'notification_pro': return 'Notification Engine - Pro (5 CoS checks/month)';
