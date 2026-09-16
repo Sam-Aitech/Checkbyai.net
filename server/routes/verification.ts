@@ -299,7 +299,7 @@ export function registerVerificationRoutes(app: Express): void {
           }
         }
         const pdfAnalyzer = new PDFAnalyzer();
-        const pdfBinary = await fs.promises.readFile(safeFilePath).then(b => b.toString('binary')).catch(()=> ""); // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
+        const pdfBinary = await fs.promises.readFile(toConfinedFsPath(safeFilePath)).then(b => b.toString('binary')).catch(()=> "");
         const [extractedMetadata, trustedPatterns] = await Promise.all([
           pdfAnalyzer.extractMetadata(safeFilePath),
           storage.getTrustedPatterns(),
