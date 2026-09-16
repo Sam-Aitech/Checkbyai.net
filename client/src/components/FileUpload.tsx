@@ -99,15 +99,24 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
       const envelope = await response.json();
       const data = unwrapApiEnvelope<Record<string, any>>(envelope);
 
-      const typeMapping: Record<string, 'genuine' | 'suspicious' | 'fake'> = {
+      const typeMapping: Record<string, 'genuine' | 'suspicious' | 'fake' | 'inconclusive'> = {
         'genuine': 'genuine',
         'suspicious': 'suspicious',
-        'fake': 'fake'
+        'fake': 'fake',
+        'inconclusive': 'inconclusive',
       };
 
+      const rawType = typeof data.result === 'string' ? data.result.toLowerCase() : '';
+      const mappedType = typeMapping[rawType] || 'inconclusive';
+      if (!typeMapping[rawType]) {
+        console.error('[FileUpload] Unknown verdict from backend, showing inconclusive:', data.result);
+      }
+      const rawConfidence = typeof data.confidence === 'number' ? data.confidence : 0;
+      const normalizedConfidence = rawConfidence > 1 ? rawConfidence / 100 : rawConfidence;
+
       const transformedResult = {
-        type: typeMapping[data.result] || 'fake',
-        confidence: (data.confidence || 0) / 100,
+        type: mappedType,
+        confidence: normalizedConfidence,
         mismatchedFields: data.mismatchedFields || []
       };
 

@@ -105,7 +105,7 @@ export default function InlineEmailCheckout({ onVerified, onCancel }: Readonly<I
             className="space-y-2.5"
           >
             <div className="relative">
-              <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" aria-hidden="true" />
               <Input
                 type="email"
                 placeholder="you@example.com"
@@ -114,12 +114,14 @@ export default function InlineEmailCheckout({ onVerified, onCancel }: Readonly<I
                 className="pl-10 rounded-xl"
                 autoFocus
                 aria-label="Email address"
+                aria-invalid={!!error}
+                aria-describedby={error ? "inline-email-error" : undefined}
                 data-testid="inline-checkout-email"
               />
             </div>
 
             {TURNSTILE_SITE_KEY && (
-              <div className="flex justify-center">
+              <div className="flex justify-center" role="group" aria-label="Spam protection challenge">
                 <Turnstile
                   ref={turnstileRef}
                   siteKey={TURNSTILE_SITE_KEY}
@@ -131,7 +133,7 @@ export default function InlineEmailCheckout({ onVerified, onCancel }: Readonly<I
               </div>
             )}
 
-            {error && <p className="text-xs text-red-500">{error}</p>}
+            {error && <p id="inline-email-error" role="alert" className="text-xs text-red-500">{error}</p>}
 
             <div className="flex gap-2">
               <Button
@@ -168,10 +170,13 @@ export default function InlineEmailCheckout({ onVerified, onCancel }: Readonly<I
               className="rounded-xl text-center tracking-[0.3em] font-mono"
               autoFocus
               aria-label="Verification code"
+              aria-invalid={!!error}
+              aria-describedby={error ? "inline-otp-error" : undefined}
+              autoComplete="one-time-code"
               data-testid="inline-checkout-code"
             />
 
-            {error && <p className="text-xs text-red-500">{error}</p>}
+            {error && <p id="inline-otp-error" role="alert" className="text-xs text-red-500">{error}</p>}
 
             <div className="flex gap-2">
               <Button

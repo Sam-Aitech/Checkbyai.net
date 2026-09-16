@@ -41,7 +41,7 @@ const plans: PricingPlan[] = [
     name: 'CoS Check (single)',
     price: '£4.99',
     priceValue: 499,
-    description: 'Pay only for the document check you need, no subscription.',
+    description: 'Pay only for the document check you need, no subscription. CoS credits only — does not include sponsor monitoring.',
     packageType: 'cos_check_single',
     credits: 1,
     icon: FileCheck,
@@ -53,10 +53,10 @@ const plans: PricingPlan[] = [
     ],
   },
   {
-    name: 'Starter Package',
+    name: 'CoS Credits — Starter (50 checks)',
     price: '£24.99',
     priceValue: 2499,
-    description: '50 verification credits for occasional use. One-time purchase.',
+    description: '50 verification credits for occasional use. One-time purchase. CoS credits only — does not include sponsor monitoring.',
     packageType: 'starter',
     credits: 50,
     icon: CreditCard,
@@ -69,13 +69,14 @@ const plans: PricingPlan[] = [
     ],
     notIncluded: [
       'Expert human review',
+      'Sponsor licence monitoring',
     ],
   },
   {
-    name: 'Pro Package',
+    name: 'CoS Credits — Pro (100 checks)',
     price: '£39.99',
     priceValue: 3999,
-    description: '100 verification credits, best value. One-time purchase.',
+    description: '100 verification credits, best value. One-time purchase. CoS credits only — does not include sponsor monitoring.',
     packageType: 'pro',
     credits: 100,
     popular: true,
@@ -90,13 +91,15 @@ const plans: PricingPlan[] = [
     ],
     notIncluded: [
       'Expert human review',
+      'Sponsor licence monitoring',
     ],
   },
   {
     name: 'Unlimited Monthly',
     price: '£99.99',
     priceValue: 9999,
-    description: 'Unlimited verifications for businesses. One-time purchase, no recurring charge.',
+    period: '/month',
+    description: 'Unlimited verifications for businesses. Monthly subscription, auto-renews. Cancel anytime.',
     packageType: 'unlimited',
     icon: Infinity,
     features: [
@@ -106,9 +109,9 @@ const plans: PricingPlan[] = [
       'Instant results',
       'Priority support',
       'Perfect for high volume',
-      'One-time purchase, no recurring billing',
+      'Monthly subscription, auto-renews. Cancel anytime via Account → Manage Billing',
     ],
-    bundleBadge: 'Includes Notification Engine: 10 companies watchlist',
+    bundleBadge: 'Includes Notification Engine watchlist: twice-daily alerts (07:00 & 19:00 UTC)',
   },
   {
     name: 'Enterprise',
@@ -233,10 +236,14 @@ function PricingCard({ plan, index, isLoggedIn, loading, onSelect, available }: 
           {...tapScale}
           className="w-full py-3 px-4 font-semibold bg-primary text-primary-foreground hover:bg-primary/90 rounded-full transition-colors disabled:opacity-50"
           onClick={() => onSelect(plan)}
-          disabled={loading !== null || (!plan.contactSales && isLoggedIn && !available)}
+          disabled={loading === plan.packageType || (!plan.contactSales && isLoggedIn && !available)}
+          aria-disabled={loading !== null || (!plan.contactSales && !available)}
+          aria-label={!available && !plan.contactSales ? `${plan.name} — available soon` : `Get ${plan.name}`}
+          title={!available && !plan.contactSales ? "Available soon — join waitlist" : undefined}
         >
           {getPricingCardButtonContent(plan, loading, isLoggedIn, available)}
         </motion.button>
+        <div aria-live="polite" className="sr-only">{loading ? `Creating secure Stripe session for ${loading}…` : ''}</div>
       </div>
     </motion.div>
   );
@@ -362,7 +369,7 @@ export default function CosPricing() {
                 { "@type": "Offer", "name": "CoS Check (single)", "price": "4.99", "priceCurrency": "GBP", "description": "1 verification credit, pay-per-use" },
                 { "@type": "Offer", "name": "Starter", "price": "24.99", "priceCurrency": "GBP", "description": "50 verification credits, one-time purchase" },
                 { "@type": "Offer", "name": "Pro", "price": "39.99", "priceCurrency": "GBP", "description": "100 verification credits, one-time purchase" },
-                { "@type": "Offer", "name": "Unlimited", "price": "99.99", "priceCurrency": "GBP", "description": "Unlimited verifications, one-time purchase" }
+                { "@type": "Offer", "name": "Unlimited", "price": "99.99", "priceCurrency": "GBP", "description": "Unlimited verifications, monthly subscription, auto-renews" }
               ]
             },
             {
@@ -393,7 +400,7 @@ export default function CosPricing() {
               CoS Verification Plans
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto editorial-body">
-              One-time purchase, no subscription. Credits never expire and can be used anytime.
+              One-time purchase, no subscription (except Unlimited Monthly below, which auto-renews). Credits never expire and can be used anytime. Independent document checks — not affiliated with the Home Office/UKVI, not legal advice.
             </p>
             
             {!isLoadingUser && !isLoggedIn && (
@@ -507,9 +514,16 @@ export default function CosPricing() {
 
           <div className="mt-12 text-center text-muted-foreground">
             <p className="text-sm">
+              CoS credits only — does not include sponsor monitoring.{' '}
+              <button onClick={() => setLocation('/pricing')} className="underline font-semibold hover:no-underline text-primary">Compare Sponsor Alert plans</button>
+            </p>
+            <p className="text-sm mt-2">
+              Monthly Unlimited auto-renews. Cancel anytime in Account → Manage Billing (Stripe portal). Invoices by email. Prices include VAT where applicable.
+            </p>
+            <p className="text-sm mt-2">
               Questions? Contact us at{' '}
-              <a href="mailto:support@cosverify.uk" className="text-foreground underline hover:no-underline">
-                support@cosverify.uk
+              <a href="mailto:support@checkbyai.net" className="text-foreground underline hover:no-underline">
+                support@checkbyai.net
               </a>
             </p>
           </div>

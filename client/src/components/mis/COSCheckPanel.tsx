@@ -10,7 +10,11 @@ interface COSCheckPanelProps {
 }
 
 export default function COSCheckPanel({ result }: COSCheckPanelProps) {
-  const isGenuine = result.verdict === "GENUINE";
+  const verdict = result.verdict === "GENUINE" ? "genuine" : result.verdict === "EDITED" ? "needs-review" : "needs-review";
+  const isGenuine = verdict === "genuine";
+  const toneCard = isGenuine ? "border-success/30 bg-success/5" : "border-warning/30 bg-warning/5";
+  const toneBadge = isGenuine ? "bg-success/10 text-success border-success/20" : "bg-warning/10 text-warning border-warning/20";
+  const displayLabel = isGenuine ? "Genuine" : "Needs review";
 
   return (
     <motion.div
@@ -18,7 +22,7 @@ export default function COSCheckPanel({ result }: COSCheckPanelProps) {
       animate={{ opacity: 1, y: 0 }}
       transition={spring}
     >
-      <Card className={`border-2 ${isGenuine ? "border-success/30 bg-success/5" : "border-destructive/30 bg-destructive/5"}`}>
+      <Card className={`border-2 ${toneCard}`}>
         <CardContent className="pt-8 pb-8 flex flex-col items-center gap-4 text-center">
           {/* Icon */}
           <motion.div
@@ -28,13 +32,13 @@ export default function COSCheckPanel({ result }: COSCheckPanelProps) {
             className={`w-20 h-20 rounded-full flex items-center justify-center ${
               isGenuine
                 ? "bg-success/10"
-                : "bg-destructive/10"
+                : "bg-warning/10"
             }`}
           >
             {isGenuine ? (
-              <ShieldCheck className="w-10 h-10 text-success" />
+              <ShieldCheck className="w-10 h-10 text-success" aria-hidden="true" />
             ) : (
-              <ShieldX className="w-10 h-10 text-destructive" />
+              <ShieldX className="w-10 h-10 text-warning" aria-hidden="true" />
             )}
           </motion.div>
 
@@ -43,18 +47,16 @@ export default function COSCheckPanel({ result }: COSCheckPanelProps) {
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ ...spring, delay: 0.18 }}
-            className={`inline-flex items-center gap-2 px-5 py-2 rounded-full font-bold text-lg tracking-wide border ${
-              isGenuine
-                ? "bg-success/10 text-success border-success/20"
-                : "bg-destructive/10 text-destructive border-destructive/20"
-            }`}
+            role="status"
+            aria-label={isGenuine ? "Verdict: Genuine" : "Verdict: Needs review. Edited or altered — see details."}
+            className={`inline-flex items-center gap-2 px-5 py-2 rounded-full font-bold text-lg tracking-wide border ${toneBadge}`}
           >
             {isGenuine ? (
-              <CheckCircle2 className="w-5 h-5" />
+              <CheckCircle2 className="w-5 h-5" aria-hidden="true" />
             ) : (
-              <XCircle className="w-5 h-5" />
+              <XCircle className="w-5 h-5" aria-hidden="true" />
             )}
-            {result.verdict}
+            {displayLabel}
           </motion.div>
 
           {/* Reason line */}

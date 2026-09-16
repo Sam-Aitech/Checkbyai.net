@@ -23,10 +23,10 @@ import { ApiError } from "../lib/apiError";
  * page. Idempotent (no-op if a watch already exists or limit is reached) and
  * never throws — failures are logged but never break the checkout flow.
  */
-async function autoCreateWatchFromPayment(userId: string, companyName: string): Promise<void> {
+async function autoCreateWatchFromPayment(userId: string, companyName: string): Promise<{ created: boolean; reason: string }> {
   try {
     const trimmed = companyName.trim();
-    if (!trimmed) return;
+    if (!trimmed) return { created: false, reason: 'empty' };
 
     const normalized = normalizeName(trimmed);
 
@@ -45,10 +45,11 @@ async function autoCreateWatchFromPayment(userId: string, companyName: string): 
           .set({ isActive: true })
           .where(eq(companyWatches.id, existing[0].id));
         logger.info({ userId, companyName: trimmed }, '[AutoWatch] Reactivated existing watch after payment');
+        return { created: true, reason: 'reactivated' };
       } else {
         logger.info({ userId, companyName: trimmed }, '[AutoWatch] Watch already active, skipping');
+        return { created: true, reason: 'already-active' };
       }
-      return;
     }
 
     // Resolve the canonical sponsor — fingerprint first, then normalized scan
@@ -65,7 +66,7 @@ async function autoCreateWatchFromPayment(userId: string, companyName: string): 
 
     if (!match) {
       logger.warn({ userId, companyName: trimmed }, '[AutoWatch] Company not found in sponsor register; skipping auto-watch');
-      return;
+      return { created: false, reason: 'not-found' };
     }
 
     // Respect the user's tier watch limit (defensive — usually first watch)
@@ -76,7 +77,7 @@ async function autoCreateWatchFromPayment(userId: string, companyName: string): 
         .where(and(eq(companyWatches.userId, userId), eq(companyWatches.isActive, true)));
       if (active.length >= limit) {
         logger.warn({ userId, limit, current: active.length }, '[AutoWatch] Watch limit reached, skipping');
-        return;
+        return { created: false, reason: 'limit-reached' };
       }
     }
 
@@ -89,8 +90,10 @@ async function autoCreateWatchFromPayment(userId: string, companyName: string): 
       isActive: true,
     });
     logger.info({ userId, companyName: match.currentName, fingerprint: match.fingerprint }, '[AutoWatch] Created watch from checkout companyName');
+    return { created: true, reason: 'created' };
   } catch (err) {
     logger.error({ err, userId, companyName }, '[AutoWatch] Failed to auto-create watch from payment — non-fatal');
+    return { created: false, reason: 'error' };
   }
 }
 
@@ -283,7 +286,7 @@ async function sendSubscriptionNotifications(
   const planDetails: Record<string, { credits: string; watches: string; timing: string; portal: string }> = {
     starter:              { credits: "50 CoS checks",          watches: "—",             timing: "—",           portal: "/verify" },
     pro:                  { credits: "100 CoS checks",         watches: "—",             timing: "—",           portal: "/verify" },
-    unlimited:            { credits: "Unlimited CoS checks",   watches: "10 companies",  timing: "Twice-daily (07:00 & 19:00 UTC)",   portal: "/verify" },
+    unlimited:            { credits: "Unlimited CoS checks",   watches: "Unlimited companies",  timing: "Twice-daily (07:00 & 19:00 UTC)",   portal: "/verify" },
     notification_starter: { credits: "—",                      watches: "2 companies",   timing: "Same-day",    portal: "/sponsor-monitor" },
     notification_pro:     { credits: "5 CoS checks/month",     watches: "5 companies",   timing: "Twice-daily (07:00 & 19:00 UTC)",   portal: "/sponsor-monitor" },
     alert_annual:         { credits: "—",                      watches: "1 company/yr",  timing: "Same-day",    portal: "/sponsor-monitor" },
@@ -717,13 +720,17 @@ export function registerBillingRoutes(app: Express): void {
     const ANNUAL_PASS_TYPES = ['alert_annual', 'alert_annual_pro'];
     const isSubscription = packageType === 'unlimited' || ANNUAL_PASS_TYPES.includes(packageType);
     const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const COS_CREDIT_TYPES = ['cos_check_single', 'starter', 'pro', 'unlimited'];
+    const cancelUrl = COS_CREDIT_TYPES.includes(packageType)
+      ? `${baseUrl}/cos-pricing?cancelled=1${companyName ? `&company=${encodeURIComponent(String(companyName).slice(0, 200))}` : ''}`
+      : `${baseUrl}/pricing?cancelled=1${companyName ? `&company=${encodeURIComponent(String(companyName).slice(0, 200))}` : ''}`;
 
     const commonParams = {
       customer: customerId,
       payment_method_types: ['card'] as Stripe.Checkout.SessionCreateParams.PaymentMethodType[],
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${baseUrl}/pricing`,
+      cancel_url: cancelUrl,
       metadata: { userId, packageType, ...(companyName ? { companyName: String(companyName).slice(0, 300) } : {}) },
     };
 
@@ -765,6 +772,8 @@ export function registerBillingRoutes(app: Express): void {
       }
 
       if (sessionUserId && sessionUserId === req.user.id) {
+        let watchCreated: boolean | undefined;
+        let watchReason: string | undefined;
         if (packageType === 'master') {
           if (await tryClaimSession(sessionId)) {
             await storage.createPaidSubmission({
@@ -790,7 +799,9 @@ export function registerBillingRoutes(app: Express): void {
 
           const AUTO_WATCH_TYPES = ['notification_starter', 'notification_pro', 'alert_annual', 'alert_annual_pro'];
           if (granted && !!packageType && AUTO_WATCH_TYPES.includes(packageType) && companyName) {
-            await autoCreateWatchFromPayment(sessionUserId, companyName);
+            const watchResult = await autoCreateWatchFromPayment(sessionUserId, companyName);
+            watchCreated = watchResult.created;
+            watchReason = watchResult.reason;
           }
           if (granted && (packageType === 'alert_annual' || packageType === 'alert_annual_pro')) {
             scheduleAnnualPassExpiry(session.subscription as string, sessionUserId, packageType).catch((err) => logger.error({ err }, '[AnnualPass] verify expiry scheduling failed'));
@@ -805,7 +816,12 @@ export function registerBillingRoutes(app: Express): void {
           packageType,
           credits,
           subscriptionStatus: user?.subscriptionStatus,
+          amountTotal: (session as any).amount_total ?? null,
+          currency: (session as any).currency ?? 'gbp',
+          customerEmail: (session as any).customer_details?.email ?? (session as any).customer_email ?? user?.email ?? null,
+          sessionId: session.id,
           ...(companyName ? { companyName } : {}),
+          ...(watchCreated !== undefined ? { watchCreated, watchReason } : {}),
         });
       } else {
         throw new ApiError(403, 'Session does not belong to this user');

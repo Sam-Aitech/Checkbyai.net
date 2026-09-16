@@ -39,6 +39,7 @@ import {
   resolveTier,
   getWatchLimit,
   isChannelAllowed,
+  isPastDue,
   ALERT_TIMING_COPY,
   ALERT_TIMING_SHORT,
 } from "@shared/planTiers";
@@ -433,10 +434,10 @@ function HeroSection({ onScrollToSearch }: { onScrollToSearch: () => void }) {
           Automated UK Sponsor Licence Monitoring
         </p>
         <h1 className="editorial-heading text-3xl md:text-4xl mb-6">
-          Know the Moment Your Sponsor's Licence Status Changes
+          Know When Your Sponsor's Licence Status Changes
         </h1>
         <p className="text-base sm:text-lg text-slate-300 max-w-2xl mx-auto mb-10 leading-relaxed">
-          The Home Office updates the sponsor register every night. We check it for you and alert you the moment your employer's status changes, before any letter arrives.
+          The Home Office updates the sponsor register every night. We check it weeknights (~00:30 UTC) and send a digest — Starter same-day 18:00 UTC, Pro twice-daily 07:00 &amp; 19:00 UTC. No weekend checks; Monday covers Fri–Sun.
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
           <Button
@@ -449,7 +450,7 @@ function HeroSection({ onScrollToSearch }: { onScrollToSearch: () => void }) {
           </Button>
         </div>
         <p className="text-xs text-slate-400 mt-6">
-          Free plan monitors 1 company with email alerts, no card required. CheckByAI is not affiliated with the UK Home Office or UKVI.
+          Free: 1 watch with next-morning email digest only, no card required. Starter/Pro get same-day/twice-daily digests. CheckByAI is not affiliated with the UK Home Office or UKVI. Always verify on GOV.UK and seek immigration advice.
         </p>
       </div>
     </section>
@@ -716,14 +717,14 @@ function PricingSection({ isAuthenticated, tier }: { isAuthenticated: boolean; t
         <div className="grid md:grid-cols-3 gap-5">
           <Card className="border-amber-300/50 bg-amber-50/30 dark:bg-amber-950/10 dark:border-amber-800/30 grayscale-[40%]">
             <CardContent className="py-6">
-              <p className="text-xs font-bold uppercase tracking-wider text-amber-600 mb-2">Search Only</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-amber-600 mb-2">Free</p>
               <p className="text-3xl font-extrabold text-foreground mb-1">Free</p>
-              <p className="text-xs text-muted-foreground mb-6">No protection</p>
+              <p className="text-xs text-muted-foreground mb-6">1 watch · next-morning email digest</p>
               <ul className="space-y-2.5 text-sm mb-6">
                 <li className="flex items-center gap-2 text-muted-foreground"><CheckCircle className="w-4 h-4 text-amber-500" />Check today's status</li>
-                <li className="flex items-center gap-2 text-muted-foreground/60"><Lock className="w-4 h-4 text-slate-300 dark:text-slate-600" /><span className="line-through">No alerts</span></li>
+                <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />1 email alert (next-morning digest)</li>
+                <li className="flex items-center gap-2 text-muted-foreground/60"><Lock className="w-4 h-4 text-slate-300 dark:text-slate-600" /><span className="line-through">No WhatsApp/SMS</span></li>
                 <li className="flex items-center gap-2 text-muted-foreground/60"><Lock className="w-4 h-4 text-slate-300 dark:text-slate-600" /><span className="line-through">No history</span></li>
-                <li className="flex items-center gap-2 text-muted-foreground/60"><Lock className="w-4 h-4 text-slate-300 dark:text-slate-600" /><span className="line-through">No monitoring</span></li>
               </ul>
               {isAuthenticated && tier === "free" ? (
                 <Button variant="outline" disabled className="w-full opacity-60">Current Plan</Button>
@@ -982,6 +983,8 @@ export default function SponsorMonitor() {
   });
 
   const activeWatches = watches?.filter((w) => w.isActive) ?? [];
+  const pausedWatches = watches?.filter((w) => !w.isActive) ?? [];
+  const isPaymentPastDue = isPastDue(user?.subscriptionStatus);
 
   // Job alert preferences (Pro users only)
   const { data: jobAlertPrefs, isLoading: jobPrefsLoading } = useQuery<{fingerprint: string; enabled: boolean}[]>({
@@ -1008,7 +1011,9 @@ export default function SponsorMonitor() {
     onSuccess: (_data, company) => {
       setAddedCompanies((prev) => new Set(prev).add(company.organisationName));
       queryClient.invalidateQueries({ queryKey: ["/api/watches"] });
-      toast({ title: "Added to watchlist", description: `You'll be notified of any changes to ${company.organisationName}'s sponsor licence.` });
+      const timing = tier === 'pro' || tier === 'unlimited' || tier === 'enterprise' ? ALERT_TIMING_COPY.pro : tier === 'starter' ? ALERT_TIMING_COPY.starter : 'next-morning email digest';
+      const channel = tier === 'free' ? `Email to ${user?.email || 'your email'}` : 'your saved channels';
+      toast({ title: "Added to watchlist", description: `Watching ${company.organisationName} — alerts via ${channel}, ${timing}. Manage channels below.` });
     },
     onError: (error: Error, company) => {
       const msg = error.message || "";
@@ -1149,7 +1154,7 @@ export default function SponsorMonitor() {
                 <Lock className="w-8 h-8 text-amber-500 mx-auto mb-3" />
                 <h3 className="font-bold text-foreground mb-1">Free search limit reached</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  You've used your free search for today. Subscribe to get unlimited searches and real-time alerts.
+                  You've used your free search for today. Subscribe for more searches and twice-daily or same-day digest alerts (no instant alerts — weeknight checks ~00:30 UTC).
                 </p>
                 <div className="flex gap-3 justify-center flex-wrap">
                   <Link href="/pricing">
@@ -1307,17 +1312,28 @@ export default function SponsorMonitor() {
             <div className="flex items-center gap-3 mb-6">
               <Shield className="w-5 h-5 text-primary" />
               <h2 className="text-xl font-bold text-foreground">Your Watchlist</h2>
-              {activeWatches.length > 0 && <Badge variant="secondary" className="text-xs">{`${activeWatches.length} ${pluralize(activeWatches.length, "company", "companies")}`}</Badge>}
+              {activeWatches.length > 0 && <Badge variant="secondary" aria-label={`${activeWatches.length} active watches${pausedWatches.length > 0 ? `, ${pausedWatches.length} paused` : ''}`} className="text-xs">{`${activeWatches.length} ${pluralize(activeWatches.length, "company", "companies")}${pausedWatches.length > 0 ? ` · ${pausedWatches.length} paused` : ''}`}</Badge>}
             </div>
+
+            {isPaymentPastDue && (
+              <Card className="mb-4 border-destructive/40 bg-destructive/5" role="alert">
+                <CardContent className="py-3 flex items-center gap-3">
+                  <AlertTriangle className="w-4 h-4 text-destructive shrink-0" aria-hidden="true" />
+                  <p className="text-sm text-destructive">
+                    Payment failed — monitoring paused for your watches. <a href="/pro-dashboard/account" className="underline font-semibold">Update payment</a> to resume. Your watches are kept as paused below.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
 
             {isFreeUser && (
               <Card className="mb-4 border-amber-300 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-800">
                 <CardContent className="py-3 flex items-center gap-3">
-                  <Lock className="w-4 h-4 text-amber-600 shrink-0" />
+                  <Lock className="w-4 h-4 text-amber-600 shrink-0" aria-hidden="true" />
                   <p className="text-sm text-amber-800 dark:text-amber-200">
                     {activeWatches.length > 0
-                      ? <>Free plan: 1 company with email alerts. <a href="/pricing" className="underline font-semibold hover:no-underline text-primary">Upgrade</a> to monitor more with SMS/WhatsApp.</>
-                      : <>Free plan: monitor 1 company with email alerts, no card required. <a href="/pricing" className="underline font-semibold hover:no-underline text-primary">Upgrade</a> for more companies and faster channels.</>}
+                      ? <>Free: 1 watch with next-morning email digest to {user?.email || 'your email'}. <a href="/pricing" className="underline font-semibold hover:no-underline text-primary">Upgrade</a> for more companies and same-day/twice-daily channels.</>
+                      : <>Free: monitor 1 company with next-morning email digest, no card required. <a href="/pricing" className="underline font-semibold hover:no-underline text-primary">Upgrade</a> for more companies and faster channels.</>}
                   </p>
                 </CardContent>
               </Card>
@@ -1342,8 +1358,8 @@ export default function SponsorMonitor() {
                 <h3 className="text-2xl font-bold text-foreground mb-3">Your Watchlist is Empty</h3>
                 <p className="text-muted-foreground max-w-md mx-auto mb-8 leading-relaxed">
                   {isFreeUser
-                    ? "Your free plan includes monitoring 1 company at no cost. Search for your employer above and click 'Add to Watchlist' to get started."
-                    : "Search for your employer above and click 'Add to Watchlist'. We'll monitor their licence status every night and alert you if anything changes."}
+                    ? "Your free plan includes 1 company with a next-morning email digest at no cost. Search for your employer above and click 'Add to Watchlist' to get started."
+                    : "Search for your employer above and click 'Add to Watchlist'. We check weeknights ~00:30 UTC and send a digest (Starter 18:00 UTC, Pro 07:00 & 19:00 UTC). No weekend checks."}
                 </p>
                 <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/25 rounded-full font-bold px-8 h-12" onClick={scrollToSearch}>
                   <Search className="w-5 h-5 mr-2" />Start Searching
@@ -1370,20 +1386,20 @@ export default function SponsorMonitor() {
                               <span className="inline-flex items-center gap-1"><CalendarDays className="w-3.5 h-3.5" />Watching since {formatDate(watch.createdAt)}</span>
                             </div>
                             {(watch.currentStatus?.status === "REMOVED_REVOKED" || watch.currentStatus?.status === "NOT_LISTED") && (
-                              <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 mt-1">
-                                <Bell className="w-3 h-3 shrink-0" />
-                                Licence revoked, you&apos;ll be alerted if they reapply
+                              <p className="text-xs text-destructive font-semibold flex items-center gap-1 mt-1" role="alert">
+                                <Bell className="w-3 h-3 shrink-0" aria-hidden="true" />
+                                Licence revoked — removed from register. You&apos;ll be alerted if they reapply.
                               </p>
                             )}
                             <div className="flex items-center gap-3 mt-2 flex-wrap">
-                              {watch.fingerprint && <button onClick={() => openHistory(watch.fingerprint!, watch.organisationName)} className="inline-flex items-center gap-1 text-xs text-primary hover:underline"><History className="w-3 h-3" /> View History</button>}
+                              {watch.fingerprint && <button onClick={() => openHistory(watch.fingerprint!, watch.organisationName)} aria-label={`View history for ${watch.organisationName}`} className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"><History className="w-3 h-3" aria-hidden="true" /> View History</button>}
                               {isProUser && watch.fingerprint && (
                                 <button onClick={() => setIntelligenceTarget({ fingerprint: watch.fingerprint!, name: watch.organisationName })} className="inline-flex items-center gap-1 text-xs font-medium text-violet-600 dark:text-violet-400 hover:underline">
-                                  <BarChart3 className="w-3 h-3" /> Company Intel
+                                  <BarChart3 className="w-3 h-3" aria-hidden="true" /> Company Intel
                                 </button>
                               )}
-                              <a href="https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary hover:underline"><ExternalLink className="w-3 h-3" /> Gov.uk</a>
-                              <a href={`https://www.linkedin.com/search/results/companies/?keywords=${encodeURIComponent(watch.organisationName)}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary hover:underline"><Linkedin className="w-3 h-3" /> LinkedIn</a>
+                              <a href="https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers" target="_blank" rel="noopener noreferrer" aria-label={`Open GOV.UK register for ${watch.organisationName} (new tab)`} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary hover:underline"><ExternalLink className="w-3 h-3" aria-hidden="true" /> Gov.uk</a>
+                              <a href={`https://www.linkedin.com/search/results/companies/?keywords=${encodeURIComponent(watch.organisationName)}`} target="_blank" rel="noopener noreferrer" aria-label={`Search ${watch.organisationName} on LinkedIn (new tab)`} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary hover:underline"><Linkedin className="w-3 h-3" aria-hidden="true" /> LinkedIn</a>
                             </div>
 
                             {/* Job Alert Toggle — Pro users only */}
@@ -1423,8 +1439,8 @@ export default function SponsorMonitor() {
                               </div>
                             )}
                           </div>
-                          <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-destructive shrink-0" disabled={isRemoving} onClick={() => removeWatchMutation.mutate(watch.id)}>
-                            {isRemoving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}<span className="sr-only">Remove</span>
+                          <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-destructive shrink-0" disabled={isRemoving} onClick={() => removeWatchMutation.mutate(watch.id)} aria-label={`Remove ${watch.organisationName} from watchlist`}>
+                            {isRemoving ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Trash2 className="w-4 h-4" aria-hidden="true" />}<span className="sr-only">Remove {watch.organisationName}</span>
                           </Button>
                         </div>
                         {(watch.recentChanges?.length ?? 0) > 0 && (
@@ -1453,7 +1469,44 @@ export default function SponsorMonitor() {
               })}
             </AnimatePresence>
 
-            {!isFreeUser && <NotificationSettings user={user} />}
+            {pausedWatches.length > 0 && (
+              <div className="mt-6">
+                <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3">
+                  Paused / Inactive ({pausedWatches.length}) — not monitored
+                </h3>
+                <div className="space-y-3">
+                  {pausedWatches.map((watch) => (
+                    <Card key={watch.id} className="border-dashed opacity-80">
+                      <CardContent className="py-4 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-foreground truncate">{watch.organisationName}</p>
+                          <p className="text-xs text-muted-foreground">Paused — resume or upgrade to resume monitoring. Not currently checked.</p>
+                        </div>
+                        <Button size="sm" variant="outline" onClick={() => setLocation('/pricing')} aria-label={`Resume monitoring ${watch.organisationName} — upgrade`}>
+                          Resume / Upgrade
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {isFreeUser ? (
+              <Card className="mt-6 border-border">
+                <CardContent className="py-4">
+                  <h3 className="text-sm font-bold text-foreground mb-2">Email alerts (Free)</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Alerts will be sent to <span className="font-medium text-foreground">{user?.email || 'your account email'}</span> as a next-morning digest. Verify your email in Account settings to avoid silent failures.
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    WhatsApp/SMS, timing controls and history are on Starter/Pro. <a href="/pricing" className="underline font-semibold text-primary">Compare plans</a>
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <NotificationSettings user={user} />
+            )}
             {!isFreeUser && <NotificationHistory />}
           </div>
         </section>
