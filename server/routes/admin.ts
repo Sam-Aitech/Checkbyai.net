@@ -30,7 +30,7 @@ import { upload } from "./verification";
 import { sendEmailReliably } from "../utils/resilientEmail";
 import { getAppUrl } from "../utils/appUrl";
 import { checkBinaryHealth } from "../utils/binaryRunner";
-import { sanitizeUploadPath, assertSafeUploadFilename, assertPdfMagicBytes } from "../utils/uploadGuard";
+import { sanitizeUploadPath, assertSafeUploadFilename, assertPdfMagicBytes, toConfinedFsPath } from "../utils/uploadGuard";
 import { isJobRunning, getLastRunInfo, runSponsorMonitorJob } from "../utils/sponsorMonitorJob";
 import {
   buildDiagnosticsReport,
@@ -122,12 +122,13 @@ export function registerAdminRoutes(app: Express): void {
 
       safeFilePath = sanitizeUploadPath(req.file.path);
       assertSafeUploadFilename(req.file.originalname);
-      await assertPdfMagicBytes(safeFilePath); // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
+      await assertPdfMagicBytes(safeFilePath);
       const pdfAnalyzer = new PDFAnalyzer();
-      // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
       const metadata = await pdfAnalyzer.extractMetadata(safeFilePath);
       // SHA-256 over exact uploaded bytes — identity for exact-hash trust matching.
-      const fileBytes = await fs.promises.readFile(safeFilePath); // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
+      // toConfinedFsPath() re-derives the path via path.basename under
+      // UPLOADS_DIR so CodeQL sees a sanitized value at this fs sink.
+      const fileBytes = await fs.promises.readFile(toConfinedFsPath(safeFilePath));
       const documentHash = crypto.createHash('sha256').update(fileBytes).digest('hex');
       const pdfBinary = fileBytes.toString('binary');
       // Mandatory forensic gate: same six-check engine as customer verification.
@@ -176,7 +177,7 @@ export function registerAdminRoutes(app: Express): void {
     } finally {
       if (safeFilePath) {
         try {
-          fs.unlink(safeFilePath, () => {}); // codeql[js/path-injection] - safeFilePath validated by sanitizeUploadPath
+          fs.unlink(toConfinedFsPath(safeFilePath), () => {});
         } catch (e) {
           // Ignore cleanup errors
         }
@@ -231,9 +232,8 @@ export function registerAdminRoutes(app: Express): void {
       }
 
       safeFilePath = sanitizeUploadPath(req.file.path);
-      await assertPdfMagicBytes(safeFilePath); // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
+      await assertPdfMagicBytes(safeFilePath);
       const pdfAnalyzer = new PDFAnalyzer();
-      // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
       const metadata = await pdfAnalyzer.extractMetadata(safeFilePath);
 
       res.json({
@@ -260,7 +260,7 @@ export function registerAdminRoutes(app: Express): void {
     } finally {
       if (safeFilePath) {
         try {
-          await fs.promises.unlink(safeFilePath); // codeql[js/path-injection] - safeFilePath validated by sanitizeUploadPath
+          await fs.promises.unlink(toConfinedFsPath(safeFilePath));
         } catch (e) {
           // Ignore cleanup errors
         }

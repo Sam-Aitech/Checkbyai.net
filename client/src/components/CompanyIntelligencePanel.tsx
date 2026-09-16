@@ -50,12 +50,6 @@ const T = {
   red:     "var(--status-danger)",
 } as const;
 
-const card: CSSProperties = {
-  background:   "var(--card)",
-  border:       "1px solid var(--border)",
-  borderRadius: 12,
-};
-
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface EnrichmentRecord {
   fingerprint:           string;

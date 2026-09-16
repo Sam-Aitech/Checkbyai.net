@@ -123,9 +123,12 @@ async function scheduleAnnualPassExpiry(subscriptionId: string | null | undefine
 function buildCheckoutCancelUrl(baseUrl: string, packageType: string, companyName: unknown): string {
   const COS_CREDIT_TYPES = ['cos_check_single', 'starter', 'pro', 'unlimited'];
   const funnelPath = COS_CREDIT_TYPES.includes(packageType) ? '/cos-pricing' : '/pricing';
+  // Narrow unknown body input to a real string first: non-string values are
+  // dropped instead of degrading to "[object Object]" in the URL.
+  const companyText = typeof companyName === "string" ? companyName : "";
   let companyParam = '';
-  if (companyName) {
-    companyParam = '&company=' + encodeURIComponent(String(companyName).slice(0, 200));
+  if (companyText) {
+    companyParam = '&company=' + encodeURIComponent(companyText.slice(0, 200));
   }
   return baseUrl + funnelPath + '?cancelled=1' + companyParam;
 }
