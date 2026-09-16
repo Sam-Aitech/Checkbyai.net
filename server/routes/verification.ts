@@ -381,7 +381,7 @@ export function registerVerificationRoutes(app: Express): void {
       // isAdminOverride is always false here — the branch above returns whenever it's true.
       success(res, { receiptId, documentHash, result, confidence: analysis.confidence, details: analysis.details, checks: analysis.checks || [], forensicAnalysis: analysis.details?.forensicAnalysis || null, adminOverride: false, metadata, cosCheck: analysis.cosCheck ?? null, timestamp: new Date().toISOString(), queued: true });
     } finally {
-      await fs.promises.unlink(safeFilePath).catch(() => {}); // codeql[js/path-injection] - safeFilePath is validated by sanitizeUploadPath
+      await fs.promises.unlink(toConfinedFsPath(safeFilePath)).catch(() => {});
     }
   }));
 
