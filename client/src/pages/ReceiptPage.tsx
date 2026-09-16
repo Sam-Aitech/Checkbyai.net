@@ -51,7 +51,7 @@ function ResultBadge({ result }: { result: ReceiptData['result'] }) {
   );
 }
 
-function CopyButton({ value, label }: { value: string; label: string }) {
+function CopyButton({ value, label }: Readonly<{ value: string; label: string }>) {
   const [copied, setCopied] = useState(false);
   const copy = () => {
     navigator.clipboard.writeText(value);
@@ -70,7 +70,20 @@ function CopyButton({ value, label }: { value: string; label: string }) {
   );
 }
 
-function HashRow({ label, value }: { label: string; value: string }) {
+function receiptBarClass(result: ReceiptData['result']): string {
+  switch (result) {
+    case 'genuine':
+      return 'bg-green-500';
+    case 'suspicious':
+      return 'bg-amber-500';
+    case 'inconclusive':
+      return 'bg-blue-500';
+    default:
+      return 'bg-red-500';
+  }
+}
+
+function HashRow({ label, value }: Readonly<{ label: string; value: string }>) {
   return (
     <div className="flex items-start gap-3 py-3 border-b border-gray-100 dark:border-gray-800 last:border-0">
       <span className="w-36 flex-shrink-0 text-sm text-gray-500 dark:text-gray-400 pt-0.5">{label}</span>
@@ -180,9 +193,7 @@ export default function ReceiptPage() {
               <div className="flex items-center gap-2 flex-1">
                 <div className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full h-2" role="progressbar" aria-valuenow={normalizeConfidence(data.confidence)} aria-valuemin={0} aria-valuemax={100} aria-label={`Model certainty ${normalizeConfidence(data.confidence)} out of 100 in ${data.result} verdict`}>
                   <div
-                    className={`h-2 rounded-full ${
-                      data.result === 'genuine' ? 'bg-green-500' : data.result === 'suspicious' ? 'bg-amber-500' : data.result === 'inconclusive' ? 'bg-blue-500' : 'bg-red-500'
-                    }`}
+                    className={`h-2 rounded-full ${receiptBarClass(data.result)}`}
                     style={{ width: `${Math.min(normalizeConfidence(data.confidence), 100)}%` }}
                   />
                 </div>

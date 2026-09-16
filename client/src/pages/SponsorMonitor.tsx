@@ -48,6 +48,32 @@ function pluralize(count: number, singular: string, plural: string = `${singular
   return count === 1 ? singular : plural;
 }
 
+// Human-readable alert-timing + channel summary for the post-add toast,
+// derived from the canonical ALERT_TIMING_COPY so copy can never drift.
+function WatchCountBadge({ activeCount, pausedCount }: Readonly<{ activeCount: number; pausedCount: number }>) {
+  const pausedSuffix = pausedCount > 0 ? ` · ${pausedCount} paused` : '';
+  const pausedLabel = pausedCount > 0 ? `, ${pausedCount} paused` : '';
+  return (
+    <Badge variant="secondary" aria-label={`${activeCount} active watches${pausedLabel}`} className="text-xs">
+      {`${activeCount} ${pluralize(activeCount, "company", "companies")}${pausedSuffix}`}
+    </Badge>
+  );
+}
+
+function watchAddedToastCopy(tier: PlanTier, userEmail: string | null | undefined, companyName: string): { title: string; description: string } {
+  let timing: string = 'next-morning email digest';
+  if (tier === 'pro' || tier === 'unlimited' || tier === 'enterprise') {
+    timing = ALERT_TIMING_COPY.pro;
+  } else if (tier === 'starter') {
+    timing = ALERT_TIMING_COPY.starter;
+  }
+  const channel = tier === 'free' ? `Email to ${userEmail || 'your email'}` : 'your saved channels';
+  return {
+    title: 'Added to watchlist',
+    description: `Watching ${companyName} — alerts via ${channel}, ${timing}. Manage channels below.`,
+  };
+}
+
 // getWatchLimit returns -1 for unlimited tiers; that must never compare as "at limit".
 function isAtWatchLimit(activeCount: number, subscriptionStatus: string | null | undefined): boolean {
   const limit = getWatchLimit(subscriptionStatus);
@@ -1011,9 +1037,8 @@ export default function SponsorMonitor() {
     onSuccess: (_data, company) => {
       setAddedCompanies((prev) => new Set(prev).add(company.organisationName));
       queryClient.invalidateQueries({ queryKey: ["/api/watches"] });
-      const timing = tier === 'pro' || tier === 'unlimited' || tier === 'enterprise' ? ALERT_TIMING_COPY.pro : tier === 'starter' ? ALERT_TIMING_COPY.starter : 'next-morning email digest';
-      const channel = tier === 'free' ? `Email to ${user?.email || 'your email'}` : 'your saved channels';
-      toast({ title: "Added to watchlist", description: `Watching ${company.organisationName} — alerts via ${channel}, ${timing}. Manage channels below.` });
+      const added = watchAddedToastCopy(tier, user?.email, company.organisationName);
+      toast({ title: added.title, description: added.description });
     },
     onError: (error: Error, company) => {
       const msg = error.message || "";
@@ -1312,7 +1337,7 @@ export default function SponsorMonitor() {
             <div className="flex items-center gap-3 mb-6">
               <Shield className="w-5 h-5 text-primary" />
               <h2 className="text-xl font-bold text-foreground">Your Watchlist</h2>
-              {activeWatches.length > 0 && <Badge variant="secondary" aria-label={`${activeWatches.length} active watches${pausedWatches.length > 0 ? `, ${pausedWatches.length} paused` : ''}`} className="text-xs">{`${activeWatches.length} ${pluralize(activeWatches.length, "company", "companies")}${pausedWatches.length > 0 ? ` · ${pausedWatches.length} paused` : ''}`}</Badge>}
+              {activeWatches.length > 0 && <WatchCountBadge activeCount={activeWatches.length} pausedCount={pausedWatches.length} />}
             </div>
 
             {isPaymentPastDue && (

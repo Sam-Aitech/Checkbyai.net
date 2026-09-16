@@ -10,8 +10,7 @@ interface COSCheckPanelProps {
 }
 
 export default function COSCheckPanel({ result }: COSCheckPanelProps) {
-  const verdict = result.verdict === "GENUINE" ? "genuine" : result.verdict === "EDITED" ? "needs-review" : "needs-review";
-  const isGenuine = verdict === "genuine";
+  const isGenuine = result.verdict === "GENUINE";
   const toneCard = isGenuine ? "border-success/30 bg-success/5" : "border-warning/30 bg-warning/5";
   const toneBadge = isGenuine ? "bg-success/10 text-success border-success/20" : "bg-warning/10 text-warning border-warning/20";
   const displayLabel = isGenuine ? "Genuine" : "Needs review";

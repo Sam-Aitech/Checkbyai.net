@@ -126,6 +126,31 @@ function getIconWrapClass(planName: string): string {
   return "bg-primary/20 text-primary";
 }
 
+function getCardHighlightClass(highlighted: boolean | undefined, popular: boolean | undefined): string {
+  if (highlighted) {
+    return 'ring-2 ring-primary border-primary shadow-lg shadow-primary/20';
+  }
+  if (popular) {
+    return 'border-primary ring-1 ring-primary/30 shadow-lg shadow-primary/10 z-10';
+  }
+  return '';
+}
+
+function PlanCtaContent({ plan, loading, available }: Readonly<{ plan: PlanCardData; loading: string | null; available: boolean }>) {
+  if (loading === plan.packageType) {
+    return (
+      <span className="flex items-center justify-center gap-2" role="status" aria-live="polite">
+        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-background"></div>
+        Processing...
+      </span>
+    );
+  }
+  if (!available) {
+    return 'Coming soon';
+  }
+  return `Get ${plan.name}`;
+}
+
 function PlanCard<T extends PlanCardData>({ plan, index, isLoggedIn, loading, onSelect, highlighted, available = true }: Readonly<{
   plan: T;
   index: number;
@@ -144,10 +169,7 @@ function PlanCard<T extends PlanCardData>({ plan, index, isLoggedIn, loading, on
       initial={{ opacity: 0, y: 32 }}
       animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 32 }}
       transition={{ ...spring, delay: Math.min(index * 0.06, 0.18) }}
-      className={`relative overflow-hidden flex flex-col theme-card bg-card ${
-        highlighted ? 'ring-2 ring-primary border-primary shadow-lg shadow-primary/20' :
-        plan.popular ? 'border-primary ring-1 ring-primary/30 shadow-lg shadow-primary/10 z-10' : ''
-      }`}
+      className={`relative overflow-hidden flex flex-col theme-card bg-card ${getCardHighlightClass(highlighted, plan.popular)}`}
     >
       {plan.popular && (
         <div className="absolute top-3 right-3">
@@ -212,16 +234,7 @@ function PlanCard<T extends PlanCardData>({ plan, index, isLoggedIn, loading, on
             title={!available ? "Available soon — join waitlist" : undefined}
             data-testid="pricing-plan-cta"
           >
-            {loading === plan.packageType ? (
-              <span className="flex items-center justify-center gap-2" role="status" aria-live="polite">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-background"></div>
-                Processing...
-              </span>
-            ) : !available ? (
-              'Coming soon'
-            ) : (
-              `Get ${plan.name}`
-            )}
+            <PlanCtaContent plan={plan} loading={loading} available={available} />
           </motion.button>
         )}
         <div aria-live="polite" className="sr-only">{loading ? `Creating secure Stripe session for ${loading}…` : ''}</div>

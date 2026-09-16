@@ -28,6 +28,8 @@ const questionnaireSchema = z.object({
 
 type QuestionnaireFormData = z.infer<typeof questionnaireSchema>;
 
+const SUPPORTED_PDF = new Set(['application/pdf']);
+const SUPPORTED_SUPPORTING = new Set(['application/pdf', 'image/jpeg', 'image/png']);
 interface SubmissionData {
   id: number;
   email: string;
@@ -51,12 +53,10 @@ export default function Submit() {
 
   const MAX_FILE_MB = 10;
   const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024;
-  const SUPPORTED_PDF = ['application/pdf'];
-  const SUPPORTED_SUPPORTING = ['application/pdf', 'image/jpeg', 'image/png'];
 
-  const isPdfFile = (file: File) => SUPPORTED_PDF.includes(file.type) || /\.pdf$/i.test(file.name);
+  const isPdfFile = (file: File) => SUPPORTED_PDF.has(file.type) || /\.pdf$/i.test(file.name);
   const isSupportedSupporting = (file: File) =>
-    SUPPORTED_SUPPORTING.includes(file.type) || /\.(pdf|jpe?g|png)$/i.test(file.name);
+    SUPPORTED_SUPPORTING.has(file.type) || /\.(pdf|jpe?g|png)$/i.test(file.name);
   const formatMB = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 
   const form = useForm<QuestionnaireFormData>({

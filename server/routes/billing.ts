@@ -118,6 +118,18 @@ async function scheduleAnnualPassExpiry(subscriptionId: string | null | undefine
   }
 }
 
+/** Checkout cancel URL that preserves the buyer's funnel: COS credit SKUs
+ * return to /cos-pricing, Alert-Pass SKUs to /pricing, keeping ?company=. */
+function buildCheckoutCancelUrl(baseUrl: string, packageType: string, companyName: unknown): string {
+  const COS_CREDIT_TYPES = ['cos_check_single', 'starter', 'pro', 'unlimited'];
+  const funnelPath = COS_CREDIT_TYPES.includes(packageType) ? '/cos-pricing' : '/pricing';
+  let companyParam = '';
+  if (companyName) {
+    companyParam = '&company=' + encodeURIComponent(String(companyName).slice(0, 200));
+  }
+  return baseUrl + funnelPath + '?cancelled=1' + companyParam;
+}
+
 /** Maps a Stripe subscription's packageType metadata to the subscriptionStatus it grants. */
 function subStatusForSubscriptionPackage(subPkgType: string | undefined): 'starter' | 'pro' | 'unlimited' {
   if (subPkgType === 'starter' || subPkgType === 'alert_annual') return 'starter';
@@ -720,10 +732,7 @@ export function registerBillingRoutes(app: Express): void {
     const ANNUAL_PASS_TYPES = ['alert_annual', 'alert_annual_pro'];
     const isSubscription = packageType === 'unlimited' || ANNUAL_PASS_TYPES.includes(packageType);
     const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const COS_CREDIT_TYPES = ['cos_check_single', 'starter', 'pro', 'unlimited'];
-    const cancelUrl = COS_CREDIT_TYPES.includes(packageType)
-      ? `${baseUrl}/cos-pricing?cancelled=1${companyName ? `&company=${encodeURIComponent(String(companyName).slice(0, 200))}` : ''}`
-      : `${baseUrl}/pricing?cancelled=1${companyName ? `&company=${encodeURIComponent(String(companyName).slice(0, 200))}` : ''}`;
+    const cancelUrl = buildCheckoutCancelUrl(baseUrl, packageType, companyName);
 
     const commonParams = {
       customer: customerId,

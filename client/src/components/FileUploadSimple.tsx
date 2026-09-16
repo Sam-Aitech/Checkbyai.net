@@ -3,6 +3,7 @@ import { Link } from 'wouter';
 import { Lock, Crown, CheckCircle, ShieldAlert, LogIn } from 'lucide-react';
 import { unwrapApiEnvelope } from '@/lib/apiEnvelope';
 import { getVerificationResultTone, verificationToneBadgeClasses } from '@/lib/verificationResultTone';
+import { mapBackendVerdict, normalizeBackendConfidence } from '@/lib/verificationVerdict';
 
 interface AccessDeniedCardProps {
   title: string;
@@ -191,26 +192,9 @@ export default function FileUploadSimple({
       const envelope = await response.json();
       const data = unwrapApiEnvelope<Record<string, any>>(envelope);
 
-      // Transform backend response — fail closed to inconclusive, never fake.
-      const typeMapping: Record<string, 'genuine' | 'suspicious' | 'fake' | 'inconclusive'> = {
-        'genuine': 'genuine',
-        'suspicious': 'suspicious',
-        'fake': 'fake',
-        'inconclusive': 'inconclusive',
-      };
-
-      const rawType = typeof data.result === 'string' ? data.result.toLowerCase() : '';
-      const mappedType = typeMapping[rawType] || 'inconclusive';
-      if (!typeMapping[rawType]) {
-        console.error('[FileUploadSimple] Unknown verdict from backend, showing inconclusive:', data.result);
-      }
-      const rawConfidence = typeof data.confidence === 'number' ? data.confidence : 0;
-      // Backend sends 0-100; store as 0-1.
-      const normalizedConfidence = rawConfidence > 1 ? rawConfidence / 100 : rawConfidence;
-
       const transformedResult: VerificationResult = {
-        type: mappedType,
-        confidence: normalizedConfidence,
+        type: mapBackendVerdict(data.result, 'FileUploadSimple'),
+        confidence: normalizeBackendConfidence(data.confidence),
         mismatchedFields: data.mismatchedFields || [],
         checks: data.checks || [],
         receiptId: data.receiptId,

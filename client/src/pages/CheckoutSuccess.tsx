@@ -144,6 +144,17 @@ export default function CheckoutSuccess() {
     }
   };
 
+function watchFailureReasonCopy(reason?: string): string {
+  switch (reason) {
+    case 'not-found':
+      return 'Not found on the sponsor register under that exact name. ';
+    case 'limit-reached':
+      return 'Your plan watch limit is already reached. ';
+    default:
+      return 'Automatic setup was skipped. ';
+  }
+}
+
   const getNextStepCta = (): { label: string; href: string; secondary?: { label: string; href: string } } => {
     const t = verifyResult?.packageType;
     if (t === 'unlimited') return { label: 'Start Verifying Documents', href: '/dashboard?fresh=1', secondary: { label: 'Go to Sponsor Dashboard', href: sponsorDashboardUrl } };
@@ -310,11 +321,7 @@ export default function CheckoutSuccess() {
                       Payment ok — we couldn’t auto-watch “{verifyResult.companyName}”
                     </p>
                     <p className="text-xs text-amber-600/90 dark:text-amber-400/90 mt-1">
-                      {verifyResult.watchReason === 'not-found'
-                        ? 'Not found on the sponsor register under that exact name. '
-                        : verifyResult.watchReason === 'limit-reached'
-                        ? 'Your plan watch limit is already reached. '
-                        : 'Automatic setup was skipped. '}
+                      {watchFailureReasonCopy(verifyResult.watchReason)}
                       <button onClick={() => setLocation(`/sponsor-monitor?company=${encodeURIComponent(verifyResult.companyName || '')}`)} className="underline font-semibold">Add watch manually</button>
                     </p>
                   </div>

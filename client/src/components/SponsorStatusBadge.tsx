@@ -2,7 +2,6 @@ import { Badge } from "@/components/ui/badge";
 import {
   getSponsorStatusPresentation,
   isSponsorBRated,
-  SPONSOR_B_RATED_PRESENTATION,
   sponsorToneBadgeClasses,
 } from "@/lib/sponsorStatus";
 
