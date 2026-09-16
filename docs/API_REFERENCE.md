@@ -302,7 +302,7 @@ When authenticated via session cookie, `userId` is set automatically from the se
 ## 4. Sponsor Monitor — Search
 
 ### `GET /api/sponsors/free-search?q={query}`
-Free sponsor search. Unlimited for all users (30 req/min per IP). Returns only ACTIVE and NEWLY_GRANTED sponsors.
+Free sponsor search. Limited to 1 req/day per IP (sponsor data scraping prevention). Returns only ACTIVE and NEWLY_GRANTED sponsors.
 
 **Query params:**
 | Param | Required | Description |
@@ -328,14 +328,14 @@ Free sponsor search. Unlimited for all users (30 req/min per IP). Returns only A
 }
 ```
 
-**Response 429:** Rate limit exceeded
+**Response 429:** Daily free-search quota exhausted (1 req/day per IP; validation 400s do not count). `RateLimit-Reset` gives seconds until reset.
 
 **Response 503:** Search index not yet available (building post-startup)
 
 ---
 
 ### `GET /api/sponsors/historical-search?q={query}`
-Searches REMOVED_REVOKED sponsors using pg_trgm trigram similarity. Called client-side only when `free-search` returns 0 results — lets users find revoked companies and see conversion CTAs. Rate limited (same limiter as free-search, 30 req/min per IP).
+Searches REMOVED_REVOKED sponsors using pg_trgm trigram similarity. Called client-side only when `free-search` returns 0 results — lets users find revoked companies and see conversion CTAs. Shares free-search's daily bucket (1 req/day per IP across both endpoints combined).
 
 **Query params:**
 | Param | Required | Description |

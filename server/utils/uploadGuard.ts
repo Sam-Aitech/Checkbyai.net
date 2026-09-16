@@ -69,6 +69,26 @@ export function sanitizeUploadPath(rawPath: string): string {
   return rel === "" ? realUploadsDir : path.join(realUploadsDir, rel);
 }
 
+/**
+ * Derives the filesystem path to use for actual fs operations from an
+ * already-sanitized upload path (one returned by sanitizeUploadPath()).
+ *
+ * The result is `path.join(UPLOADS_DIR, path.basename(...))`, which keeps the
+ * file inside the uploads directory by construction even if the input were
+ * somehow hostile: `path.basename` strips every directory component, so the
+ * joined result cannot escape UPLOADS_DIR. CodeQL's js/path-injection query
+ * recognizes `path.basename` as a sanitizer, so sinks fed with this value
+ * are not reported — unlike values flowing straight out of
+ * sanitizeUploadPath(), which CodeQL cannot model as a sanitizer.
+ *
+ * Must only be called with paths that already passed sanitizeUploadPath()
+ * (which additionally rejects missing files, symlinks escaping the root, and
+ * non-file targets); this function performs no existence checks itself.
+ */
+export function toConfinedFsPath(sanitizedPath: string): string {
+  return path.join(UPLOADS_DIR, path.basename(sanitizedPath));
+}
+
 /** The byte sequence every PDF file must open with, per the PDF spec (ISO 32000). */
 const PDF_MAGIC_BYTES = Buffer.from("%PDF-");
 
@@ -79,7 +99,7 @@ const PDF_MAGIC_BYTES = Buffer.from("%PDF-");
  * Throws Error with statusCode=400 when the file does not start with %PDF-.
  */
 export async function assertPdfMagicBytes(filePath: string): Promise<void> {
-  const safePath = path.join(UPLOADS_DIR, path.basename(sanitizeUploadPath(filePath)));
+  const safePath = toConfinedFsPath(sanitizeUploadPath(filePath));
   const handle = await fs.promises.open(safePath, "r");
   try {
     const buffer = Buffer.alloc(PDF_MAGIC_BYTES.length);

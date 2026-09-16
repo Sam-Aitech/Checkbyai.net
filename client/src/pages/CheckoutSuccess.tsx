@@ -17,9 +17,26 @@ interface VerifyResult {
   subscriptionStatus?: string;
   status?: string;
   companyName?: string;
+  amountTotal?: number | null;
+  currency?: string | null;
+  customerEmail?: string | null;
+  sessionId?: string;
+  watchCreated?: boolean;
+  watchReason?: string;
 }
 
 const spring = { type: "spring" as const, stiffness: 100, damping: 15 };
+
+function watchFailureReasonCopy(reason?: string): string {
+  switch (reason) {
+    case 'not-found':
+      return 'Not found on the sponsor register under that exact name. ';
+    case 'limit-reached':
+      return 'Your plan watch limit is already reached. ';
+    default:
+      return 'Automatic setup was skipped. ';
+  }
+}
 
 export default function CheckoutSuccess() {
   const [, setLocation] = useLocation();
@@ -28,13 +45,25 @@ export default function CheckoutSuccess() {
   const [verifyResult, setVerifyResult] = useState<VerifyResult | null>(null);
   const [isVerifying, setIsVerifying] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   const sessionId = new URLSearchParams(search).get('session_id');
 
+  const formatAmount = (total?: number | null, currency?: string | null) => {
+    if (total == null) return null;
+    try {
+      return new Intl.NumberFormat('en-GB', { style: 'currency', currency: (currency || 'gbp').toUpperCase() }).format(total / 100);
+    } catch {
+      return `£${(total / 100).toFixed(2)}`;
+    }
+  };
+
   useEffect(() => {
-    async function verifySession() {
+    let cancelled = false;
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
+    async function verifySession(attempt = 0) {
       if (!sessionId) {
-        setError('No session ID found');
+        setError('No session ID found. If you came from Stripe, use the link in your email or return to Pricing.');
         setIsVerifying(false);
         return;
       }
@@ -43,21 +72,39 @@ export default function CheckoutSuccess() {
         const response = await apiRequest('GET', `/api/checkout/verify/${sessionId}`);
         const envelope = await response.json();
         const data = unwrapApiEnvelope<VerifyResult>(envelope);
+        if (cancelled) return;
+        // Stripe webhook lag: unpaid-yet → poll 3× @3s before showing error
+        if (!data.success && attempt < 3) {
+          pollTimer = setTimeout(() => verifySession(attempt + 1), 3000);
+          return;
+        }
         setVerifyResult(data);
         
         if (data.success) {
           queryClient.invalidateQueries({ queryKey: ['/api/credits'] });
           queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+        } else if (!data.success) {
+          setError(`Payment status: ${(data as VerifyResult).status || 'unpaid'}. If you were charged, wait a minute then Try again.`);
         }
       } catch (err: any) {
+        if (cancelled) return;
+        if (attempt < 3) {
+          pollTimer = setTimeout(() => verifySession(attempt + 1), 3000);
+          return;
+        }
         setError(err.message || 'Failed to verify checkout');
       } finally {
-        setIsVerifying(false);
+        if (cancelled) return;
+        if (!pollTimer) setIsVerifying(false);
+        else setIsVerifying(true);
       }
     }
 
-    verifySession();
-  }, [sessionId, queryClient]);
+    setIsVerifying(true);
+    setError(null);
+    verifySession(retryCount);
+    return () => { cancelled = true; if (pollTimer) clearTimeout(pollTimer); };
+  }, [sessionId, queryClient, retryCount]);
 
   // ALERT-PASS FAMILY: `alert_annual`/`alert_annual_pro` (annual) and the
   // legacy `notification_starter`/`notification_pro` (monthly) SKUs. This
@@ -100,12 +147,23 @@ export default function CheckoutSuccess() {
       case 'alert_annual_pro':
         return `5 companies monitored • Sponsored job alerts • ${ALERT_TIMING_SHORT.pro}`;
       case 'notification_starter':
-        return `1 company monitored • ${ALERT_TIMING_SHORT.starter}`;
+        return `2 companies monitored • ${ALERT_TIMING_SHORT.starter}`;
       case 'notification_pro':
         return `5 companies monitored • 5 CoS checks/month • ${ALERT_TIMING_SHORT.pro}`;
       default:
         return null;
     }
+  };
+
+  const getNextStepCta = (): { label: string; href: string; secondary?: { label: string; href: string } } => {
+    const t = verifyResult?.packageType;
+    if (t === 'unlimited') return { label: 'Start Verifying Documents', href: '/dashboard?fresh=1', secondary: { label: 'Go to Sponsor Dashboard', href: sponsorDashboardUrl } };
+    if (t === 'starter' || t === 'pro' || t === 'cos_check_single') return { label: 'Start Verifying Documents', href: '/dashboard?fresh=1' };
+    if (t === 'notification_starter' || t === 'notification_pro' || t === 'alert_annual' || t === 'alert_annual_pro') {
+      const company = verifyResult?.companyName ? `?company=${encodeURIComponent(verifyResult.companyName)}` : '';
+      return { label: 'Go to Dashboard', href: `${sponsorDashboardUrl}${company}` };
+    }
+    return { label: 'Start Verifying Documents', href: '/' };
   };
 
   return (
@@ -171,6 +229,31 @@ export default function CheckoutSuccess() {
                     {getPackageLabel(verifyResult.packageType)}
                   </span>
                 </div>
+
+                {formatAmount(verifyResult.amountTotal, verifyResult.currency) && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Paid:</span>
+                    <span className="text-foreground font-semibold">
+                      {formatAmount(verifyResult.amountTotal, verifyResult.currency)}
+                    </span>
+                  </div>
+                )}
+
+                {verifyResult.customerEmail && (
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-muted-foreground">Receipt sent to:</span>
+                    <span className="text-foreground font-medium text-sm break-all text-right">{verifyResult.customerEmail}</span>
+                  </div>
+                )}
+
+                {verifyResult.sessionId && (
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-muted-foreground">Order ref:</span>
+                    <span className="text-xs font-mono text-muted-foreground text-right break-all" title={verifyResult.sessionId}>
+                      {verifyResult.sessionId.slice(0, 24)}…
+                    </span>
+                  </div>
+                )}
                 
                 {verifyResult.credits !== undefined && verifyResult.packageType !== 'unlimited' && (
                   <div className="flex items-center justify-between">
@@ -199,9 +282,12 @@ export default function CheckoutSuccess() {
                     </p>
                   </div>
                 )}
+                <p className="text-xs text-muted-foreground">
+                  Stripe invoice by email. Manage billing or cancel in Account → Manage Billing (Stripe portal).
+                </p>
               </div>
 
-              {verifyResult.companyName && isAlertPassFamily && (
+              {verifyResult.companyName && isAlertPassFamily && verifyResult.watchCreated !== false && (
                 <div
                   className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4 flex items-start gap-3"
                   data-testid="checkout-success-company-watch"
@@ -216,23 +302,87 @@ export default function CheckoutSuccess() {
                         ? `We'll include any changes to their sponsor licence in your next scheduled alert: ${ALERT_TIMING_SHORT[verifyResult.subscriptionStatus as keyof typeof ALERT_TIMING_SHORT].toLowerCase()}.`
                         : "We'll include any changes to their sponsor licence in your next scheduled alert digest."}
                     </p>
+                    <p className="text-xs text-emerald-600/80 dark:text-emerald-400/80 mt-1">
+                      Next: confirm channels in Alerts (WhatsApp/SMS need verification) and manage your watch in Dashboard.
+                    </p>
                   </div>
                 </div>
               )}
 
-              <Button
-                className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full"
-                size="lg"
-                onClick={() => setLocation(isAlertPassFamily ? sponsorDashboardUrl : '/')}
-              >
-                {isAlertPassFamily ? 'Go to Dashboard' : 'Start Verifying Documents'}
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
+              {verifyResult.companyName && isAlertPassFamily && verifyResult.watchCreated === false && (
+                <div
+                  className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl p-4 flex items-start gap-3"
+                  role="alert"
+                  data-testid="checkout-success-watch-warning"
+                >
+                  <Bell className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                  <div className="text-left">
+                    <p className="font-semibold text-amber-700 dark:text-amber-300 text-sm">
+                      Payment ok — we couldn’t auto-watch “{verifyResult.companyName}”
+                    </p>
+                    <p className="text-xs text-amber-600/90 dark:text-amber-400/90 mt-1">
+                      {watchFailureReasonCopy(verifyResult.watchReason)}
+                      <button onClick={() => setLocation(`/sponsor-monitor?company=${encodeURIComponent(verifyResult.companyName || '')}`)} className="underline font-semibold">Add watch manually</button>
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {(() => {
+                const cta = getNextStepCta();
+                return (
+                  <div className="space-y-2">
+                    <Button
+                      className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full"
+                      size="lg"
+                      onClick={() => setLocation(cta.href)}
+                    >
+                      {cta.label}
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                    {cta.secondary && (
+                      <Button
+                        className="w-full rounded-full"
+                        size="lg"
+                        variant="outline"
+                        onClick={() => setLocation(cta.secondary!.href)}
+                      >
+                        {cta.secondary.label}
+                      </Button>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )}
 
           {!isVerifying && (error || !verifyResult?.success) && (
-            <div className="mt-6">
+            <div className="mt-6 space-y-2">
+              <div className="flex gap-2">
+                <Button
+                  className="flex-1 rounded-xl"
+                  variant="outline"
+                  onClick={() => { setError(null); setVerifyResult(null); setIsVerifying(true); setRetryCount(c => c + 1); }}
+                >
+                  Try again
+                </Button>
+                <Button
+                  className="flex-1 rounded-xl"
+                  variant="outline"
+                  onClick={() => {
+                    const subject = encodeURIComponent(`Checkout issue ${sessionId || ''}`);
+                    const body = encodeURIComponent(`Session: ${sessionId || '(missing)'}\nError: ${error || 'payment not confirmed'}\n`);
+                    window.location.href = `mailto:support@checkbyai.net?subject=${subject}&body=${body}`;
+                  }}
+                >
+                  Contact support
+                </Button>
+              </div>
+              {sessionId && (
+                <p className="text-xs text-muted-foreground text-center break-all">
+                  Order reference: <span className="font-mono">{sessionId.slice(0, 32)}…</span> — include it when contacting support.
+                </p>
+              )}
               <Button
                 className="w-full border border-border text-foreground hover:bg-muted rounded-xl"
                 variant="outline"

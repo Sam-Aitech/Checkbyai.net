@@ -5,7 +5,7 @@ import COSAdminPanel from "./mis/COSAdminPanel";
 import type { COSCheckResult } from "../../../shared/mis-types";
 
 interface TabbedResult {
-  type: 'genuine' | 'suspicious' | 'fake';
+  type: 'genuine' | 'suspicious' | 'fake' | 'inconclusive';
   confidence: number;
   mismatchedFields?: string[];
   checks?: Array<{

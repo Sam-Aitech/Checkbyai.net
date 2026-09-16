@@ -28,6 +28,8 @@ const questionnaireSchema = z.object({
 
 type QuestionnaireFormData = z.infer<typeof questionnaireSchema>;
 
+const SUPPORTED_PDF = new Set(['application/pdf']);
+const SUPPORTED_SUPPORTING = new Set(['application/pdf', 'image/jpeg', 'image/png']);
 interface SubmissionData {
   id: number;
   email: string;
@@ -45,6 +47,17 @@ export default function Submit() {
   const [cosFile, setCosFile] = useState<File | null>(null);
   const [supportingFiles, setSupportingFiles] = useState<File[]>([]);
   const [submitted, setSubmitted] = useState(false);
+  const [cosError, setCosError] = useState<string | null>(null);
+  const [supportingError, setSupportingError] = useState<string | null>(null);
+  const [isCosDragging, setIsCosDragging] = useState(false);
+
+  const MAX_FILE_MB = 10;
+  const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024;
+
+  const isPdfFile = (file: File) => SUPPORTED_PDF.has(file.type) || /\.pdf$/i.test(file.name);
+  const isSupportedSupporting = (file: File) =>
+    SUPPORTED_SUPPORTING.has(file.type) || /\.(pdf|jpe?g|png)$/i.test(file.name);
+  const formatMB = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 
   const form = useForm<QuestionnaireFormData>({
     resolver: zodResolver(questionnaireSchema),
@@ -120,14 +133,38 @@ export default function Submit() {
   const handleCosFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.type !== 'application/pdf') {
-        toast({
-          title: 'Invalid File',
-          description: 'Please upload a PDF file',
-          variant: 'destructive',
-        });
+      if (!isPdfFile(file)) {
+        const msg = `We got ${file.type || 'an unknown format'} — please export as PDF.`;
+        setCosError(msg);
+        toast({ title: 'Invalid File', description: msg, variant: 'destructive' });
         return;
       }
+      if (file.size > MAX_FILE_BYTES) {
+        const msg = `${file.name} is ${formatMB(file.size)} — limit is ${MAX_FILE_MB} MB. Try compressing or a photo of relevant pages.`;
+        setCosError(msg);
+        toast({ title: 'File too large', description: msg, variant: 'destructive' });
+        return;
+      }
+      setCosError(null);
+      setCosFile(file);
+    }
+  };
+
+  const handleCosDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsCosDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      if (!isPdfFile(file)) {
+        const msg = `We got ${file.type || 'an unknown format'} — please export as PDF.`;
+        setCosError(msg);
+        return;
+      }
+      if (file.size > MAX_FILE_BYTES) {
+        setCosError(`${file.name} is ${formatMB(file.size)} — limit is ${MAX_FILE_MB} MB.`);
+        return;
+      }
+      setCosError(null);
       setCosFile(file);
     }
   };
@@ -135,23 +172,33 @@ export default function Submit() {
   const handleSupportingFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length + supportingFiles.length > 5) {
-      toast({
-        title: 'Too Many Files',
-        description: 'Maximum 5 supporting documents allowed',
-        variant: 'destructive',
-      });
+      const msg = 'Maximum 5 supporting documents allowed';
+      setSupportingError(msg);
+      toast({ title: 'Too Many Files', description: msg, variant: 'destructive' });
       return;
     }
-    setSupportingFiles([...supportingFiles, ...files]);
+    const rejected: string[] = [];
+    const accepted: File[] = [];
+    for (const f of files) {
+      if (!isSupportedSupporting(f)) { rejected.push(`${f.name}: unsupported format — use PDF/JPG/PNG`); continue; }
+      if (f.size > MAX_FILE_BYTES) { rejected.push(`${f.name} is ${formatMB(f.size)} — limit ${MAX_FILE_MB} MB`); continue; }
+      accepted.push(f);
+    }
+    if (rejected.length > 0) {
+      setSupportingError(rejected.join('. '));
+      toast({ title: 'Some files skipped', description: rejected.join('. '), variant: 'destructive' });
+    } else {
+      setSupportingError(null);
+    }
+    if (accepted.length > 0) setSupportingFiles([...supportingFiles, ...accepted]);
   };
 
   const onSubmit = (data: QuestionnaireFormData) => {
     if (!cosFile) {
-      toast({
-        title: 'CoS Document Required',
-        description: 'Please upload your Certificate of Sponsorship document',
-        variant: 'destructive',
-      });
+      const msg = 'Please upload your Certificate of Sponsorship document';
+      setCosError(msg);
+      toast({ title: 'CoS Document Required', description: msg, variant: 'destructive' });
+      document.getElementById('cos-file-input')?.focus();
       return;
     }
     submitMutation.mutate(data);
@@ -186,8 +233,8 @@ export default function Submit() {
     return (
       <PageLayout>
         <div className="flex items-center justify-center bg-background">
-          <div className="text-center">
-            <Loader2 className="w-12 h-12 animate-spin text-muted-foreground mx-auto mb-4" />
+          <div className="text-center" role="status" aria-live="polite">
+            <Loader2 className="w-12 h-12 animate-spin text-muted-foreground mx-auto mb-4" aria-hidden="true" />
             <p className="text-muted-foreground">Loading your submission...</p>
           </div>
         </div>
@@ -202,14 +249,20 @@ export default function Submit() {
           <div className="max-w-md theme-card overflow-hidden">
             <div className="p-6 border-b border-border">
               <h3 className="editorial-subheading text-destructive flex items-center gap-2">
-                <AlertCircle className="w-6 h-6 text-destructive" />
+                <AlertCircle className="w-6 h-6 text-destructive" aria-hidden="true" />
                 Error Loading Submission
               </h3>
-              <p className="text-muted-foreground text-sm mt-1">
+              <p className="text-muted-foreground text-sm mt-1" role="alert">
                 We couldn't find your submission. Please try again or contact support.
               </p>
             </div>
-            <div className="p-6">
+            <div className="p-6 space-y-2">
+              <Button onClick={() => window.location.reload()} variant="outline" className="w-full rounded-full">
+                Retry
+              </Button>
+              <Button onClick={() => { window.location.href = 'mailto:support@checkbyai.net?subject=Submission%20not%20found'; }} variant="outline" className="w-full rounded-full">
+                Contact Support
+              </Button>
               <Button onClick={() => setLocation('/pricing')} className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full">
                 Go to Pricing
               </Button>
@@ -240,8 +293,9 @@ export default function Submit() {
             </div>
             <div className="p-6 space-y-4">
               <div className="bg-muted/50 border border-border rounded-xl p-4">
-                <p className="text-sm text-muted-foreground mb-2">Submission ID</p>
+                <p className="text-sm text-muted-foreground mb-2">Submission ID — save this for support</p>
                 <p className="font-mono text-lg font-semibold">{submission.id}</p>
+                <p className="text-xs text-muted-foreground mt-1">Sent to {submission.email} from noreply@checkbyai.net — check spam. If nothing arrives in 48h, contact support with this ID.</p>
               </div>
               <div className="bg-muted/50 border border-border rounded-xl p-4 text-left">
                 <h4 className="font-semibold mb-2">What happens next?</h4>
@@ -436,66 +490,89 @@ export default function Submit() {
                     <p className="text-muted-foreground text-sm mt-1">
                       Upload your Certificate of Sponsorship and any supporting documents
                     </p>
+                    <p className="text-sm mt-2 flex items-center gap-1.5 text-foreground">
+                      <span aria-hidden="true">🔒</span>
+                      <span>PDF only · Deleted per Data Security policy · Never stored — <a href="/data-security.html" className="underline font-medium">How we handle docs</a></span>
+                    </p>
                   </div>
                   <div className="p-6 space-y-6">
                     <div>
-                      <label className="block text-sm font-medium mb-2">
+                      <label htmlFor="cos-file-input" className="block text-sm font-medium mb-2">
                         Certificate of Sponsorship (PDF) <span className="text-destructive">*</span>
                       </label>
-                      <div className="border border-dashed border-border rounded-xl p-6 text-center hover:border-foreground/30 transition-colors">
+                      <p id="cos-hint" className="text-sm text-muted-foreground mb-2">PDF only, max 10MB. Deleted immediately after review.</p>
+                      <div
+                        onDragEnter={(e) => { e.preventDefault(); setIsCosDragging(true); }}
+                        onDragLeave={(e) => { e.preventDefault(); setIsCosDragging(false); }}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={handleCosDrop}
+                        aria-dropeffect="copy"
+                        className={`border rounded-xl p-6 text-center transition-colors ${isCosDragging ? 'border-primary bg-primary/5 border-solid' : 'border-dashed border-border hover:border-foreground/30'}`}
+                      >
                         {cosFile ? (
                           <div className="flex items-center justify-center gap-3">
-                            <FileText className="w-8 h-8 text-foreground" />
+                            <FileText className="w-8 h-8 text-foreground" aria-hidden="true" />
                             <div className="text-left">
                               <p className="font-medium">{cosFile.name}</p>
                               <p className="text-sm text-muted-foreground">
-                                {(cosFile.size / 1024 / 1024).toFixed(2)} MB
+                                {(cosFile.size / 1024 / 1024).toFixed(2)} MB · PDF
                               </p>
                             </div>
                             <Button
                               type="button"
                               variant="ghost"
                               size="sm"
-                              onClick={() => setCosFile(null)}
+                              aria-label={`Remove ${cosFile.name}`}
+                              onClick={() => { setCosFile(null); setCosError(null); }}
                             >
                               Remove
                             </Button>
                           </div>
                         ) : (
-                          <label className="cursor-pointer block rounded-xl has-[:focus-visible]:outline-none has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2">
-                            <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                          <label htmlFor="cos-file-input" className="cursor-pointer block rounded-xl has-[:focus-visible]:outline-none has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2">
+                            <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" aria-hidden="true" />
                             <p className="text-muted-foreground">
-                              Click to upload your CoS document
+                              Drag &amp; drop here or click to upload your CoS document
                             </p>
                             <p className="text-sm text-muted-foreground">PDF only, max 10MB</p>
                             <input
+                              id="cos-file-input"
                               type="file"
                               accept=".pdf"
                               onChange={handleCosFileChange}
+                              aria-describedby="cos-hint cos-error"
+                              aria-required="true"
                               className="sr-only"
                               data-testid="input-cos-file"
                             />
                           </label>
                         )}
+                        {cosError && (
+                          <div id="cos-error" role="alert" aria-live="polite" className="mt-3 p-3 bg-destructive/10 border-l-4 border-destructive text-destructive text-sm text-left">
+                            {cosError}
+                          </div>
+                        )}
                       </div>
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium mb-2">
+                      <label htmlFor="supporting-files-input" className="block text-sm font-medium mb-2">
                         Supporting Documents (Optional)
                       </label>
-                      <div className="border border-dashed border-border rounded-xl p-6 text-center hover:border-foreground/30 transition-colors">
+                      <p id="supporting-hint" className="text-sm text-muted-foreground mb-2">PDF, JPG, PNG — max 5 files, 10MB each. Emails and letters are deleted after review.</p>
+                      <div className="border border-solid border-border rounded-xl p-6 text-center">
                         {supportingFiles.length > 0 ? (
                           <div className="space-y-2">
-                            {supportingFiles.map((file, idx) => (
-                              <div key={idx} className="flex items-center justify-between bg-muted/50 rounded-xl p-2">
-                                <span className="text-sm truncate">{file.name}</span>
+                            {supportingFiles.map((file) => (
+                              <div key={`${file.name}-${file.size}-${file.lastModified}`} className="flex items-center justify-between bg-muted/50 rounded-xl p-2">
+                                <span className="text-sm truncate">{file.name} · {(file.size / 1024 / 1024).toFixed(1)} MB</span>
                                 <Button
                                   type="button"
                                   variant="ghost"
                                   size="sm"
+                                  aria-label={`Remove ${file.name}`}
                                   onClick={() => {
-                                    setSupportingFiles(supportingFiles.filter((_, i) => i !== idx));
+                                    setSupportingFiles(supportingFiles.filter((f) => f !== file));
                                   }}
                                 >
                                   Remove
@@ -503,34 +580,43 @@ export default function Submit() {
                               </div>
                             ))}
                             {supportingFiles.length < 5 && (
-                              <label className="cursor-pointer block mt-2 text-foreground underline hover:underline rounded has-[:focus-visible]:outline-none has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2">
+                              <label htmlFor="supporting-files-input" className="cursor-pointer block mt-2 text-foreground underline hover:underline rounded has-[:focus-visible]:outline-none has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2">
                                 + Add more files
                                 <input
+                                  id="supporting-files-input"
                                   type="file"
                                   accept=".pdf,.jpg,.jpeg,.png"
                                   multiple
                                   onChange={handleSupportingFilesChange}
+                                  aria-describedby="supporting-hint supporting-error"
                                   className="sr-only"
                                 />
                               </label>
                             )}
                           </div>
                         ) : (
-                          <label className="cursor-pointer block rounded-xl has-[:focus-visible]:outline-none has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2">
-                            <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                          <label htmlFor="supporting-files-input" className="cursor-pointer block rounded-xl has-[:focus-visible]:outline-none has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2">
+                            <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" aria-hidden="true" />
                             <p className="text-muted-foreground">
-                              Upload emails, letters, or other documents
+                              Select files to upload
                             </p>
-                            <p className="text-sm text-muted-foreground">PDF, JPG, PNG - max 5 files</p>
+                            <p className="text-sm text-muted-foreground">PDF, JPG, PNG - max 5 files, 10MB each</p>
                             <input
+                              id="supporting-files-input"
                               type="file"
                               accept=".pdf,.jpg,.jpeg,.png"
                               multiple
                               onChange={handleSupportingFilesChange}
+                              aria-describedby="supporting-hint supporting-error"
                               className="sr-only"
                               data-testid="input-supporting-files"
                             />
                           </label>
+                        )}
+                        {supportingError && (
+                          <div id="supporting-error" role="alert" aria-live="polite" className="mt-3 p-3 bg-destructive/10 border-l-4 border-destructive text-destructive text-sm text-left">
+                            {supportingError}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -563,6 +649,10 @@ export default function Submit() {
                   </div>
                 </div>
 
+                <div className="p-4 bg-info/10 border border-info/20 rounded-xl text-sm text-info">
+                  Independent expert review — not the Home Office/UKVI. Does not guarantee a visa outcome. For legal advice consult an OISC-registered adviser.
+                </div>
+
                 <Button
                   type="submit"
                   size="lg"
@@ -572,8 +662,8 @@ export default function Submit() {
                 >
                   {submitMutation.isPending ? (
                     <>
-                      <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                      Submitting...
+                      <Loader2 className="w-5 h-5 animate-spin mr-2" aria-hidden="true" />
+                      <span role="status" aria-live="polite">Uploading documents… do not close this page…</span>
                     </>
                   ) : (
                     <>

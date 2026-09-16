@@ -3,6 +3,7 @@ import { Link } from 'wouter';
 import { Lock, Crown, CheckCircle, ShieldAlert, LogIn } from 'lucide-react';
 import { unwrapApiEnvelope } from '@/lib/apiEnvelope';
 import { getVerificationResultTone, verificationToneBadgeClasses } from '@/lib/verificationResultTone';
+import { mapBackendVerdict, normalizeBackendConfidence } from '@/lib/verificationVerdict';
 
 interface AccessDeniedCardProps {
   title: string;
@@ -24,7 +25,7 @@ function AccessDeniedCard({ title, message, children }: Readonly<AccessDeniedCar
 }
 
 interface VerificationResult {
-  type: 'genuine' | 'suspicious' | 'fake';
+  type: 'genuine' | 'suspicious' | 'fake' | 'inconclusive';
   confidence: number;
   mismatchedFields?: string[];
   checks?: Array<{
@@ -125,7 +126,7 @@ export default function FileUploadSimple({
   const processFile = (selectedFile: File) => {
     // Check if user has already used their free verification (skip for admin)
     if (restrictToOneCheck && hasUsedFreeCheck && !isAdmin) {
-      setError('You have already used your free verification for today. Upgrade to Pro for unlimited checks.');
+      setError('You have already used your free verification for today. Need more checks? See CoS credit packs (1 / 50 / 100) or Unlimited Monthly.');
       return;
     }
 
@@ -191,16 +192,9 @@ export default function FileUploadSimple({
       const envelope = await response.json();
       const data = unwrapApiEnvelope<Record<string, any>>(envelope);
 
-      // Transform backend response
-      const typeMapping: Record<string, 'genuine' | 'suspicious' | 'fake'> = {
-        'genuine': 'genuine',
-        'suspicious': 'suspicious',
-        'fake': 'fake'
-      };
-
       const transformedResult: VerificationResult = {
-        type: typeMapping[data.result] || 'fake',
-        confidence: (data.confidence || 0) / 100,
+        type: mapBackendVerdict(data.result, 'FileUploadSimple'),
+        confidence: normalizeBackendConfidence(data.confidence),
         mismatchedFields: data.mismatchedFields || [],
         checks: data.checks || [],
         receiptId: data.receiptId,
@@ -299,11 +293,11 @@ export default function FileUploadSimple({
                 <div className="bg-primary text-primary-foreground p-4 rounded-lg">
                   <div className="flex items-center justify-center mb-2">
                     <Crown className="w-5 h-5 mr-2" />
-                    <span className="font-semibold">Upgrade to Pro</span>
+                    <span className="font-semibold">Need More Checks?</span>
                   </div>
-                  <p className="text-sm opacity-90 mb-3">Get unlimited document verifications, priority support, and advanced analytics</p>
+                  <p className="text-sm opacity-90 mb-3">CoS credit packs (1 / 50 / 100, one-time) or Unlimited Monthly (subscription)</p>
                   <Link href="/cos-pricing" className="inline-block bg-background text-primary px-4 py-2 rounded-md font-medium hover:bg-background/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-                    Upgrade Now
+                    View CoS Plans
                   </Link>
                 </div>
                 <p className="text-xs text-muted-foreground">

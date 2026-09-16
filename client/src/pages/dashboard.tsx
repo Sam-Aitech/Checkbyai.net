@@ -88,7 +88,7 @@ export default function DashboardPage() {
               "name": "What does the confidence score mean?",
               "acceptedAnswer": {
                 "@type": "Answer",
-                "text": "The confidence score (0-100%) indicates how certain our AI is about the verification result. Higher scores mean greater confidence in the authenticity assessment."
+                "text": "Confidence is the model's certainty (0-100) in the shown verdict — not a genuineness score. A Fake 90% means strongly confident it is fake; a Genuine 90% means strongly confident it is genuine. CheckByAI is independent and not the Home Office."
               }
             }
           ]

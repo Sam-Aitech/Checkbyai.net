@@ -9,7 +9,7 @@ import type { User } from '@shared/api-types';
 import { getVerificationResultTone, verificationToneBadgeClasses, verificationToneCardClasses } from '@/lib/verificationResultTone';
 
 interface VerificationResult {
-  type: 'genuine' | 'suspicious' | 'fake';
+  type: 'genuine' | 'suspicious' | 'fake' | 'inconclusive';
   confidence: number;
   mismatchedFields?: string[];
 }
