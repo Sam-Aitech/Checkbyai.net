@@ -13,10 +13,11 @@ process.env.UPLOADS_DIR = tmpUploadsDir;
 let assertPdfMagicBytes: typeof import("../uploadGuard").assertPdfMagicBytes;
 let assertSafeUploadFilename: typeof import("../uploadGuard").assertSafeUploadFilename;
 let sanitizeUploadPath: typeof import("../uploadGuard").sanitizeUploadPath;
+let toConfinedFsPath: typeof import("../uploadGuard").toConfinedFsPath;
 let UPLOADS_DIR: typeof import("../uploadGuard").UPLOADS_DIR;
 
 beforeAll(async () => {
-  ({ assertPdfMagicBytes, assertSafeUploadFilename, sanitizeUploadPath, UPLOADS_DIR } =
+  ({ assertPdfMagicBytes, assertSafeUploadFilename, sanitizeUploadPath, toConfinedFsPath, UPLOADS_DIR } =
     await import("../uploadGuard"));
 });
 
@@ -55,6 +56,24 @@ describe("sanitizeUploadPath", () => {
     const bypassPath = `${UPLOADS_DIR}_evil/document.pdf`;
 
     expect(() => sanitizeUploadPath(bypassPath)).toThrow(/PATH_TRAVERSAL_BLOCKED/);
+  });
+});
+
+describe("toConfinedFsPath", () => {
+  it("confines a sanitized nested path to its basename under UPLOADS_DIR", () => {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+    const filePath = path.join(UPLOADS_DIR, "nested", "document.pdf");
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, "ok");
+    const sanitized = sanitizeUploadPath(filePath);
+
+    expect(toConfinedFsPath(sanitized)).toBe(path.join(UPLOADS_DIR, "document.pdf"));
+  });
+
+  it("strips directory components so hostile input cannot escape UPLOADS_DIR", () => {
+    expect(toConfinedFsPath("/etc/passwd")).toBe(path.join(UPLOADS_DIR, "passwd"));
+    expect(toConfinedFsPath("../../etc/passwd")).toBe(path.join(UPLOADS_DIR, "passwd"));
+    expect(toConfinedFsPath("").startsWith(UPLOADS_DIR)).toBe(true);
   });
 });
 
