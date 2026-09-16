@@ -431,6 +431,9 @@ export function registerBillingRoutes(app: Express): void {
                   stripeSubscriptionId: subscription.id,
                   stripeCustomerId: customerId,
                 });
+                if (subPkgType === 'unlimited') {
+                  await storage.updateCosCheckSubscription(user.id, true);
+                }
                 storage.logSubscriptionChange({
                   userId: user.id,
                   changedBy: 'stripe',
@@ -449,6 +452,9 @@ export function registerBillingRoutes(app: Express): void {
                   subscriptionStatus: 'free',
                   stripeSubscriptionId: null,
                 });
+                if (subPkgType === 'unlimited') {
+                  await storage.updateCosCheckSubscription(user.id, false);
+                }
                 storage.logSubscriptionChange({
                   userId: user.id,
                   changedBy: 'stripe',
@@ -760,7 +766,13 @@ export function registerBillingRoutes(app: Express): void {
     };
 
     const session = isSubscription
-      ? await stripe.checkout.sessions.create({ ...commonParams, mode: 'subscription' })
+      ? await stripe.checkout.sessions.create({
+          ...commonParams,
+          mode: 'subscription',
+          subscription_data: {
+            metadata: { userId, packageType },
+          },
+        })
       : await stripe.checkout.sessions.create({ ...commonParams, mode: 'payment' });
 
     success(res, { url: session.url, sessionId: session.id });

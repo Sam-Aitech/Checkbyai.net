@@ -75,7 +75,10 @@ export default function CheckoutSuccess() {
         if (cancelled) return;
         // Stripe webhook lag: unpaid-yet → poll 3× @3s before showing error
         if (!data.success && attempt < 3) {
-          pollTimer = setTimeout(() => verifySession(attempt + 1), 3000);
+          pollTimer = setTimeout(() => {
+            pollTimer = null;
+            verifySession(attempt + 1);
+          }, 3000);
           return;
         }
         setVerifyResult(data);
@@ -89,7 +92,10 @@ export default function CheckoutSuccess() {
       } catch (err: any) {
         if (cancelled) return;
         if (attempt < 3) {
-          pollTimer = setTimeout(() => verifySession(attempt + 1), 3000);
+          pollTimer = setTimeout(() => {
+            pollTimer = null;
+            verifySession(attempt + 1);
+          }, 3000);
           return;
         }
         setError(err.message || 'Failed to verify checkout');
