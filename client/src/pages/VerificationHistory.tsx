@@ -39,7 +39,7 @@ interface Verification {
   receiptId: string | null;
   documentHash: string | null;
   filename: string;
-  result: "genuine" | "suspicious" | "fake";
+  result: "genuine" | "suspicious" | "fake" | "inconclusive";
   confidence: number;
   verifiedAt: string;
   adminStatus: string;
@@ -52,21 +52,28 @@ const resultConfig = {
     bg: "bg-success/10",
     text: "text-success",
     border: "border-success/20",
-    icon: <CheckCircle className="w-4 h-4" />,
+    icon: <CheckCircle className="w-4 h-4" aria-hidden="true" />,
   },
   suspicious: {
     label: "Suspicious",
     bg: "bg-warning/10",
     text: "text-warning",
     border: "border-warning/20",
-    icon: <AlertTriangle className="w-4 h-4" />,
+    icon: <AlertTriangle className="w-4 h-4" aria-hidden="true" />,
   },
   fake: {
     label: "Fake",
     bg: "bg-destructive/10",
     text: "text-destructive",
     border: "border-destructive/20",
-    icon: <XCircle className="w-4 h-4" />,
+    icon: <XCircle className="w-4 h-4" aria-hidden="true" />,
+  },
+  inconclusive: {
+    label: "Needs review",
+    bg: "bg-info/10",
+    text: "text-info",
+    border: "border-info/20",
+    icon: <Shield className="w-4 h-4" aria-hidden="true" />,
   },
 };
 
@@ -88,11 +95,14 @@ function SkeletonCard() {
 const VerificationCard = memo(function VerificationCard({ v, index }: { v: Verification; index: number }) {
   const [expanded, setExpanded] = useState(false);
   const { toast } = useToast();
-  const config = resultConfig[v.result] || resultConfig.fake;
-  const confidencePercent = Math.round(v.confidence * 100);
+  // Fail closed to inconclusive — never show unknown as Fake.
+  const config = (resultConfig as Record<string, (typeof resultConfig)['genuine']>)[v.result] || resultConfig.inconclusive;
+  const confidencePercent = Math.round((v.confidence <= 1 ? v.confidence * 100 : v.confidence));
   const date = new Date(v.verifiedAt);
   const passedChecks = v.checks.filter((c) => c.passed).length;
+  const failedCritical = v.checks.filter((c) => !c.passed && c.severity === 'critical').length;
   const [ref, inView] = useInView({ triggerOnce: true, threshold: 0.1 });
+  const panelId = `history-checks-${v.id}`;
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -128,17 +138,17 @@ const VerificationCard = memo(function VerificationCard({ v, index }: { v: Verif
 
             <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mt-2">
               <span className="flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5" />
+                <Clock className="w-3.5 h-3.5" aria-hidden="true" />
                 {date.toLocaleDateString()} {date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
               </span>
-              <span className="flex items-center gap-1">
-                <BarChart3 className="w-3.5 h-3.5" />
-                {confidencePercent}% confidence
+              <span className="flex items-center gap-1" aria-label={`Model certainty ${confidencePercent} of 100 in ${config.label} verdict`}>
+                <BarChart3 className="w-3.5 h-3.5" aria-hidden="true" />
+                {config.label} · certainty {confidencePercent}/100
               </span>
               {v.checks.length > 0 && (
                 <span className="flex items-center gap-1">
-                  <Shield className="w-3.5 h-3.5" />
-                  {passedChecks}/{v.checks.length} checks passed
+                  <Shield className="w-3.5 h-3.5" aria-hidden="true" />
+                  {failedCritical > 0 ? `${failedCritical} critical failed` : `${passedChecks}/${v.checks.length} checks passed`}
                 </span>
               )}
             </div>
@@ -150,29 +160,31 @@ const VerificationCard = memo(function VerificationCard({ v, index }: { v: Verif
                 <motion.button
                   whileTap={{ scale: 0.97 }}
                   onClick={() => copyToClipboard(v.receiptId!, "Receipt ID")}
-                  className="text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label={`Copy receipt ID ${v.receiptId}`}
+                  className="text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
                 >
-                  <Copy className="w-3.5 h-3.5" />
+                  <Copy className="w-3.5 h-3.5" aria-hidden="true" />
                 </motion.button>
               </div>
             )}
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">
-            {(v.adminStatus === "approved" || v.adminStatus === "fake") && (
-              <span className={`editorial-caption inline-flex items-center gap-1 px-2.5 py-1 rounded-full ${
+            {(v.adminStatus === "approved" || v.adminStatus === "fake") ? (
+              <span role="status" aria-label={v.adminStatus === "approved" ? `Final: human-reviewed, approved. AI said ${config.label}.` : `Final: human flagged. AI said ${config.label}. See note.`} className={`editorial-caption inline-flex items-center gap-1 px-2.5 py-1 rounded-full ${
                 v.adminStatus === "approved"
                   ? "bg-info/10 text-info"
                   : "bg-destructive/10 text-destructive"
               }`}>
-                <Shield className="w-3 h-3" />
-                {v.adminStatus === "approved" ? "Admin Approved" : "Admin Flagged"}
+                <Shield className="w-3 h-3" aria-hidden="true" />
+                {v.adminStatus === "approved" ? `Final: Approved (AI: ${config.label})` : `Final: Flagged (AI: ${config.label})`}
+              </span>
+            ) : (
+              <span role="status" aria-label={`Verdict: ${config.label}, certainty ${confidencePercent} of 100. Not human-reviewed.`} className={`editorial-caption inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full ${config.bg} ${config.text}`}>
+                {config.icon}
+                {config.label}
               </span>
             )}
-            <span className={`editorial-caption inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full ${config.bg} ${config.text}`}>
-              {config.icon}
-              {config.label}
-            </span>
           </div>
         </div>
 
@@ -181,15 +193,18 @@ const VerificationCard = memo(function VerificationCard({ v, index }: { v: Verif
             <motion.button
               whileTap={{ scale: 0.97 }}
               onClick={() => setExpanded(!expanded)}
-              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              aria-expanded={expanded}
+              aria-controls={panelId}
+              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
             >
-              {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              {expanded ? <ChevronUp className="w-4 h-4" aria-hidden="true" /> : <ChevronDown className="w-4 h-4" aria-hidden="true" />}
               {expanded ? "Hide" : "Show"} check details ({v.checks.length})
             </motion.button>
 
             <AnimatePresence>
               {expanded && (
                 <motion.div
+                  id={panelId}
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
                   exit={{ opacity: 0, height: 0 }}

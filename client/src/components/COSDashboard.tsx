@@ -16,10 +16,11 @@ const cardHeaderToneClasses: Record<VerificationTone, string> = {
   success: 'bg-success text-success-foreground',
   warning: 'bg-warning text-warning-foreground',
   destructive: 'bg-destructive text-destructive-foreground',
+  info: 'bg-info text-info-foreground',
 };
 
 interface VerificationResult {
-  type: 'genuine' | 'suspicious' | 'fake';
+  type: 'genuine' | 'suspicious' | 'fake' | 'inconclusive';
   confidence: number;
   mismatchedFields?: string[];
   checks?: Array<{
@@ -448,15 +449,15 @@ export default function COSDashboard() {
                         </svg>
                       </div>
                       <h3 className="text-xl font-bold text-foreground mb-2">Free Check Used</h3>
-                      <p className="text-muted-foreground mb-6">You've already used your free verification for today. Upgrade to Pro for unlimited checks.</p>
+                      <p className="text-muted-foreground mb-6">You've already used your free verification for today. Need more checks? See CoS credit packs (1 / 50 / 100) or Unlimited Monthly.</p>
 
                       <div className="bg-info/10 border border-info/20 rounded-lg p-6 mb-6">
-                        <h4 className="font-semibold text-info mb-3">Upgrade to Pro Service</h4>
+                        <h4 className="font-semibold text-info mb-3">Need More Checks?</h4>
                         <ul className="text-left text-info space-y-2 mb-4">
                           {[
-                            'Unlimited document verifications',
+                            'CoS credit packs: 1, 50 or 100 checks (one-time, never expire)',
+                            'Unlimited Monthly for high volume (subscription, auto-renews)',
                             'Advanced metadata analysis',
-                            'Batch document processing',
                             'Detailed verification reports',
                           ].map((text) => (
                             <li key={text} className="flex items-center gap-2">

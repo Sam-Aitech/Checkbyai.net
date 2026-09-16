@@ -47,7 +47,7 @@ const annualPlans: AnnualPlan[] = [
     name: 'Alert Pass (Annual)',
     price: '£9.99',
     period: '/year',
-    description: 'Low-commitment monitoring for a single employer.',
+    description: 'Low-commitment monitoring for a single employer. Billed today, ends 12 months later unless repurchased.',
     packageType: 'alert_annual',
     icon: Bell,
     features: [
@@ -55,13 +55,14 @@ const annualPlans: AnnualPlan[] = [
       'Email + WhatsApp alerts',
       'Same-day alerts (18:00 UTC)',
       '30-day change history',
+      'Ends after 12 months — repurchase to continue. Expiry reminders at 30/7 days.',
     ],
   },
   {
     name: 'Alert Pass Pro (Annual)',
     price: '£19.99',
     period: '/year',
-    description: 'Full protection with twice-daily alerts, billed once a year.',
+    description: 'Full protection with twice-daily alerts. Billed once, ends 12 months later unless repurchased.',
     packageType: 'alert_annual_pro',
     popular: true,
     icon: Zap,
@@ -69,8 +70,9 @@ const annualPlans: AnnualPlan[] = [
       'Monitor up to 5 companies for 12 months',
       'Email + WhatsApp + SMS',
       '90-day change history',
-      'Sponsored job alerts by email',
+      'Sponsored job alerts by email (opt-out in Alerts)',
       ALERT_TIMING_SHORT.pro,
+      'Ends after 12 months — repurchase to continue. Expiry reminders at 30/7 days.',
     ],
   },
 ];
@@ -124,6 +126,31 @@ function getIconWrapClass(planName: string): string {
   return "bg-primary/20 text-primary";
 }
 
+function getCardHighlightClass(highlighted: boolean | undefined, popular: boolean | undefined): string {
+  if (highlighted) {
+    return 'ring-2 ring-primary border-primary shadow-lg shadow-primary/20';
+  }
+  if (popular) {
+    return 'border-primary ring-1 ring-primary/30 shadow-lg shadow-primary/10 z-10';
+  }
+  return '';
+}
+
+function PlanCtaContent({ plan, loading, available }: Readonly<{ plan: PlanCardData; loading: string | null; available: boolean }>) {
+  if (loading === plan.packageType) {
+    return (
+      <span className="flex items-center justify-center gap-2" role="status" aria-live="polite">
+        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-background"></div>
+        Processing...
+      </span>
+    );
+  }
+  if (!available) {
+    return 'Coming soon';
+  }
+  return `Get ${plan.name}`;
+}
+
 function PlanCard<T extends PlanCardData>({ plan, index, isLoggedIn, loading, onSelect, highlighted, available = true }: Readonly<{
   plan: T;
   index: number;
@@ -142,10 +169,7 @@ function PlanCard<T extends PlanCardData>({ plan, index, isLoggedIn, loading, on
       initial={{ opacity: 0, y: 32 }}
       animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 32 }}
       transition={{ ...spring, delay: Math.min(index * 0.06, 0.18) }}
-      className={`relative overflow-hidden flex flex-col theme-card bg-card ${
-        highlighted ? 'ring-2 ring-primary border-primary shadow-lg shadow-primary/20' :
-        plan.popular ? 'border-primary ring-1 ring-primary/30 shadow-lg shadow-primary/10 z-10' : ''
-      }`}
+      className={`relative overflow-hidden flex flex-col theme-card bg-card ${getCardHighlightClass(highlighted, plan.popular)}`}
     >
       {plan.popular && (
         <div className="absolute top-3 right-3">
@@ -204,21 +228,16 @@ function PlanCard<T extends PlanCardData>({ plan, index, isLoggedIn, loading, on
             {...tapScale}
             className="w-full py-3 px-4 font-semibold bg-primary text-primary-foreground hover:bg-primary/90 rounded-full transition-colors disabled:opacity-50"
             onClick={() => (isLoggedIn ? onSelect(plan) : setCapturing(true))}
-            disabled={loading !== null}
+            disabled={loading === plan.packageType || !available}
+            aria-disabled={loading !== null || !available}
+            aria-label={!available ? `${plan.name} — available soon` : `Get ${plan.name}`}
+            title={!available ? "Available soon — join waitlist" : undefined}
             data-testid="pricing-plan-cta"
           >
-            {loading === plan.packageType ? (
-              <span className="flex items-center justify-center gap-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-background"></div>
-                Processing...
-              </span>
-            ) : !available ? (
-              'Coming soon'
-            ) : (
-              `Get ${plan.name}`
-            )}
+            <PlanCtaContent plan={plan} loading={loading} available={available} />
           </motion.button>
         )}
+        <div aria-live="polite" className="sr-only">{loading ? `Creating secure Stripe session for ${loading}…` : ''}</div>
       </div>
     </motion.div>
   );
@@ -429,7 +448,7 @@ export default function Pricing() {
                   Protect Your Visa
                 </h1>
                 <p className="text-xl text-muted-foreground max-w-2xl mx-auto editorial-body">
-                  Get alerted the moment your sponsor's licence status changes. Never be caught off guard by a revocation or suspension.
+                  Get a same-day or twice-daily digest when your sponsor's licence status changes. Independent monitoring of the public Home Office register — not affiliated with the Home Office/UKVI. Alerts are digests, not legal advice.
                 </p>
               </>
             )}
@@ -444,7 +463,7 @@ export default function Pricing() {
 
           <div className="max-w-3xl mx-auto mb-8">
             <div className="flex justify-center mb-8">
-              <div className="inline-flex items-center gap-1 bg-muted rounded-full p-1">
+              <div role="group" aria-label="Billing period" className="inline-flex items-center gap-1 bg-muted rounded-full p-1">
                 <button
                   type="button"
                   onClick={() => setCadence('annual')}
@@ -500,10 +519,21 @@ export default function Pricing() {
               </div>
             )}
 
-            <p className="text-center text-xs text-muted-foreground mt-4">
-              {cadence === 'annual'
-                ? 'Annual plans monitor fewer companies per tier in exchange for a lower yearly price. Switch to Monthly for higher company limits.'
-                : 'Monthly plans cost more per year but monitor more companies per tier. Switch to Annual for the lowest entry price.'}
+            <div role="note" aria-label="Plan comparison note" className="mt-4 p-4 bg-muted/60 border border-border rounded-xl">
+              <p className="text-center text-sm text-foreground font-medium">
+                {cadence === 'annual'
+                  ? 'Annual: billed today, monitoring ends 12 months later unless you repurchase. Alert Pass £9.99/yr = 1 company · Pro £19.99/yr = 5 companies.'
+                  : 'Monthly: auto-renews, cancel anytime in Account → Manage Billing (Stripe portal). Starter £24.99/mo = 2 companies · Pro £49.99/mo = 5 companies.'}
+              </p>
+              <p className="text-center text-xs text-muted-foreground mt-2">
+                {cadence === 'annual'
+                  ? 'We email 30 and 7 days before expiry. Switch to Monthly for higher company limits.'
+                  : 'Monitoring continues to end of billing period after cancel. Invoices by email. Prices include VAT where applicable. Switch to Annual for the lowest entry price.'}
+              </p>
+            </div>
+            <p className="text-center text-xs text-muted-foreground mt-3">
+              Sponsor Alerts only — this does NOT include CoS document verification credits. Need document checks?{' '}
+              <button onClick={() => setLocation('/cos-pricing')} className="underline font-semibold hover:no-underline text-primary">View CoS Verification Plans</button>
             </p>
           </div>
 
@@ -575,9 +605,12 @@ export default function Pricing() {
 
           <div className="mt-12 text-center text-muted-foreground">
             <p className="text-sm">
+              Monthly subscription, auto-renews. Cancel anytime in Account → Manage Billing (Stripe portal). Invoices by email.
+            </p>
+            <p className="text-sm mt-2">
               Questions? Contact us at{' '}
-              <a href="mailto:support@cosverify.uk" className="text-foreground underline hover:no-underline">
-                support@cosverify.uk
+              <a href="mailto:support@checkbyai.net" className="text-foreground underline hover:no-underline">
+                support@checkbyai.net
               </a>
             </p>
           </div>

@@ -27,9 +27,10 @@ export function getSponsorStatusPresentation(status: string | null | undefined):
     // Active or falls through to "Unknown".
     case "REMOVED_REVOKED":
     case "NOT_LISTED":
-      return { label: "Removed", icon: XCircle, tone: "danger" };
+      return { label: "Licence revoked — removed from register", icon: XCircle, tone: "danger" };
     default:
-      return { label: "Unknown", icon: HelpCircle, tone: "neutral" };
+      // Fail safe: unknown/missing status must look like a warning, never benign grey.
+      return { label: "Unknown — check GOV.UK, retrying", icon: HelpCircle, tone: "warning" };
   }
 }
 

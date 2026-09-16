@@ -293,13 +293,14 @@ export default function SponsorDetail() {
                 <span className="text-foreground">Licensed since {formatDate(data.grantedAt)}</span>
               </div>
             )}
-            <div className="flex items-center gap-2 text-sm">
-              <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
+            <div className="flex items-center gap-2 text-sm" role="status">
+              <Clock className="w-4 h-4 text-muted-foreground shrink-0" aria-hidden="true" />
               <span className="text-muted-foreground">
                 {isRevoked
                   ? `Revoked ${data.removedAt ? formatDate(data.removedAt) : "recently"}`
-                  : `Last confirmed ${data.lastSeen ? formatDate(data.lastSeen) : "unknown"}`}
+                  : `Register snapshot: ${data.lastSeen ? formatDate(data.lastSeen) : "unknown"} · Next weeknight check ~00:30 UTC (no weekend checks)`}
               </span>
+              <a href="https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers" target="_blank" rel="noopener noreferrer" className="text-xs underline text-primary ml-1">Verify on GOV.UK</a>
             </div>
           </div>
         </div>
@@ -320,8 +321,7 @@ export default function SponsorDetail() {
                     new licensed employer, switch visa category, or leave the UK.
                   </p>
                   <p>
-                    The Home Office does not email individual workers — your only protection
-                    is actively monitoring the register or subscribing to alerts.
+                    The Home Office does not email individual workers — actively monitor the register and consider alerts (weeknight checks, digest delays apply). CheckByAI is independent and not the Home Office; seek immigration advice for decisions.
                   </p>
                   <p>
                     If <strong>{data.currentName}</strong> reapplies and is re-granted a licence,

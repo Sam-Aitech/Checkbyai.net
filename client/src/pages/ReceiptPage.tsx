@@ -6,39 +6,52 @@ import { unwrapApiEnvelope } from '@/lib/apiEnvelope';
 interface ReceiptData {
   receiptId: string;
   documentHash: string;
-  result: 'genuine' | 'suspicious' | 'fake';
+  result: 'genuine' | 'suspicious' | 'fake' | 'inconclusive';
   confidence: number;
   verifiedAt: string;
   checksPerformed: number;
   integrityHash: string;
 }
 
+function normalizeConfidence(c: number): number {
+  // Backend may send 0-1 or 0-100 — normalize to 0-100 for display.
+  return Math.round(c <= 1 ? c * 100 : c);
+}
+
 function ResultBadge({ result }: { result: ReceiptData['result'] }) {
   if (result === 'genuine') {
     return (
-      <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-        <CheckCircle className="w-4 h-4" />
+      <span role="status" aria-label="Verdict: Genuine" className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+        <CheckCircle className="w-4 h-4" aria-hidden="true" />
         Genuine
       </span>
     );
   }
   if (result === 'suspicious') {
     return (
-      <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
-        <AlertTriangle className="w-4 h-4" />
+      <span role="status" aria-label="Verdict: Suspicious" className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+        <AlertTriangle className="w-4 h-4" aria-hidden="true" />
         Suspicious
       </span>
     );
   }
+  if (result === 'inconclusive') {
+    return (
+      <span role="status" aria-label="Verdict: Needs human review" className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+        <Shield className="w-4 h-4" aria-hidden="true" />
+        Needs review
+      </span>
+    );
+  }
   return (
-    <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
-      <XCircle className="w-4 h-4" />
+    <span role="status" aria-label="Verdict: Fake" className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
+      <XCircle className="w-4 h-4" aria-hidden="true" />
       Fake
     </span>
   );
 }
 
-function CopyButton({ value }: { value: string }) {
+function CopyButton({ value, label }: Readonly<{ value: string; label: string }>) {
   const [copied, setCopied] = useState(false);
   const copy = () => {
     navigator.clipboard.writeText(value);
@@ -49,20 +62,34 @@ function CopyButton({ value }: { value: string }) {
     <button
       onClick={copy}
       className="ml-2 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors flex-shrink-0"
-      title="Copy"
+      aria-label={copied ? `Copied ${label}` : `Copy ${label}`}
+      title={copied ? "Copied" : `Copy ${label}`}
     >
-      {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+      {copied ? <Check className="w-3.5 h-3.5 text-green-500" aria-hidden="true" /> : <Copy className="w-3.5 h-3.5" aria-hidden="true" />}
     </button>
   );
 }
 
-function HashRow({ label, value }: { label: string; value: string }) {
+function receiptBarClass(result: ReceiptData['result']): string {
+  switch (result) {
+    case 'genuine':
+      return 'bg-green-500';
+    case 'suspicious':
+      return 'bg-amber-500';
+    case 'inconclusive':
+      return 'bg-blue-500';
+    default:
+      return 'bg-red-500';
+  }
+}
+
+function HashRow({ label, value }: Readonly<{ label: string; value: string }>) {
   return (
     <div className="flex items-start gap-3 py-3 border-b border-gray-100 dark:border-gray-800 last:border-0">
       <span className="w-36 flex-shrink-0 text-sm text-gray-500 dark:text-gray-400 pt-0.5">{label}</span>
       <div className="flex items-center flex-1 min-w-0">
         <span className="text-sm font-mono text-gray-800 dark:text-gray-200 break-all">{value}</span>
-        <CopyButton value={value} />
+        <CopyButton value={value} label={label} />
       </div>
     </div>
   );
@@ -161,18 +188,16 @@ export default function ReceiptPage() {
 
             {/* Confidence */}
             <div className="flex items-center gap-3 py-3 border-b border-gray-100 dark:border-gray-800">
-              <Shield className="w-4 h-4 text-gray-400 flex-shrink-0" />
-              <span className="w-36 flex-shrink-0 text-sm text-gray-500 dark:text-gray-400">Confidence</span>
+              <Shield className="w-4 h-4 text-gray-400 flex-shrink-0" aria-hidden="true" />
+              <span className="w-36 flex-shrink-0 text-sm text-gray-500 dark:text-gray-400">Model certainty</span>
               <div className="flex items-center gap-2 flex-1">
-                <div className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full h-2">
+                <div className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full h-2" role="progressbar" aria-valuenow={normalizeConfidence(data.confidence)} aria-valuemin={0} aria-valuemax={100} aria-label={`Model certainty ${normalizeConfidence(data.confidence)} out of 100 in ${data.result} verdict`}>
                   <div
-                    className={`h-2 rounded-full ${
-                      data.result === 'genuine' ? 'bg-green-500' : data.result === 'suspicious' ? 'bg-amber-500' : 'bg-red-500'
-                    }`}
-                    style={{ width: `${Math.min(data.confidence, 100)}%` }}
+                    className={`h-2 rounded-full ${receiptBarClass(data.result)}`}
+                    style={{ width: `${Math.min(normalizeConfidence(data.confidence), 100)}%` }}
                   />
                 </div>
-                <span className="text-sm font-semibold text-gray-800 dark:text-gray-200 w-12 text-right">{data.confidence}%</span>
+                <span className="text-sm font-semibold text-gray-800 dark:text-gray-200 w-12 text-right">{normalizeConfidence(data.confidence)}%</span>
               </div>
             </div>
 
@@ -206,7 +231,17 @@ export default function ReceiptPage() {
         </div>
 
         {/* Footer note */}
-        <p className="text-center text-xs text-gray-400 dark:text-gray-600">
+        <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
+          <p className="text-center text-sm text-blue-800 dark:text-blue-300 font-medium">
+            Technical analysis only — not a Home Office decision, not legal advice, not proof for a visa application.
+          </p>
+          <p className="text-center text-xs text-blue-600 dark:text-blue-400 mt-1">
+            CheckByAI is independent and not affiliated with the Home Office/UKVI. Verify your sponsor on the{' '}
+            <a href="https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers" target="_blank" rel="noopener noreferrer" className="underline font-semibold">GOV.UK register</a>.
+            Result reflects the document as uploaded at the time shown.
+          </p>
+        </div>
+        <p className="text-center text-xs text-gray-400 dark:text-gray-600 mt-3">
           This receipt was generated by CheckByAI. The integrity hash proves the result has not been altered.{' '}
           <Link href="/" className="text-blue-500 hover:underline">Verify another document →</Link>
         </p>

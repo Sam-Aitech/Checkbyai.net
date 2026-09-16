@@ -1,6 +1,8 @@
 # UI/UX Brief
 # checkbyai.net
-**Version:** 1.0 | **Status:** Live | **Last Updated:** 2026-06-01
+**Version:** 1.1 | **Status:** Live | **Last Updated:** 2026-09-16
+
+> **2026-09-16 production UX audit remediation (P0/P1):** verdicts fail closed to `inconclusive` (never unknown→Fake); confidence shown as "model certainty N/100 in this verdict"; Home Office separation at every decision point; Free = 1 watch + next-morning digest stated identically on cards, banners, empty states and settings; weeknight ~00:30 UTC + digest timing replaces "moment/real-time"; paused watches listed; intake validates size/type inline with `role=alert`; checkout CTAs expose amount/order ref/retry. See `CHANGELOG.md [Unreleased]`.
 
 ---
 

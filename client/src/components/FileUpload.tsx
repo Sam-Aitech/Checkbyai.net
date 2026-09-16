@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, FileText, AlertCircle, Loader2, Lock } from 'lucide-react';
 import { unwrapApiEnvelope } from '@/lib/apiEnvelope';
 import { getVerificationResultTone, verificationToneBadgeClasses } from '@/lib/verificationResultTone';
+import { mapBackendVerdict, normalizeBackendConfidence } from '@/lib/verificationVerdict';
 
 interface FileUploadProps {
   onFileUpload: (file: File) => void;
@@ -99,15 +100,9 @@ export default function FileUpload({ onFileUpload, onVerificationResult, onLoadi
       const envelope = await response.json();
       const data = unwrapApiEnvelope<Record<string, any>>(envelope);
 
-      const typeMapping: Record<string, 'genuine' | 'suspicious' | 'fake'> = {
-        'genuine': 'genuine',
-        'suspicious': 'suspicious',
-        'fake': 'fake'
-      };
-
       const transformedResult = {
-        type: typeMapping[data.result] || 'fake',
-        confidence: (data.confidence || 0) / 100,
+        type: mapBackendVerdict(data.result, 'FileUpload'),
+        confidence: normalizeBackendConfidence(data.confidence),
         mismatchedFields: data.mismatchedFields || []
       };
 

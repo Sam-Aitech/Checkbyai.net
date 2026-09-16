@@ -225,34 +225,38 @@ export default function CheckFakeCoS() {
 
           <ScrollSection className="mb-10">
             <div className="bg-muted border border-border rounded-xl p-8 text-center">
-              <Shield className="w-12 h-12 text-primary mx-auto mb-4" />
+              <Shield className="w-12 h-12 text-primary mx-auto mb-4" aria-hidden="true" />
               <h2 className="editorial-subheading text-foreground text-2xl mb-2">
                 Don't guess — verify your CoS
               </h2>
-              <p className="text-muted-foreground editorial-body max-w-xl mx-auto mb-6">
-                Our AI-powered verification tool analyses your Certificate of Sponsorship in seconds, checking metadata, formatting, reference numbers, and more — so you can apply for your visa with confidence.
+              <p className="text-muted-foreground editorial-body max-w-xl mx-auto mb-2">
+                Our AI-powered verification gives technical risk signals on your Certificate of Sponsorship — metadata, formatting, reference patterns. CheckByAI is independent, not the Home Office; only the Home Office decides visas.
+              </p>
+              <p className="text-sm text-muted-foreground max-w-xl mx-auto mb-6">
+                🔒 PDF only · Deleted immediately · UK GDPR — <a href="/data-security.html" className="underline font-medium">Data Security</a>
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                 <Link href="/dashboard">
                   <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full">
-                    <CheckCircle className="w-5 h-5 mr-2" />
-                    Verify Your CoS Now
+                    <CheckCircle className="w-5 h-5 mr-2" aria-hidden="true" />
+                    Log in to Verify (Closed Beta)
                   </Button>
                 </Link>
                 <Link href="/sponsor-monitor">
                   <Button size="lg" variant="outline" className="border-primary/30 text-primary hover:bg-primary/10 rounded-full">
                     Check Sponsor Register
-                    <ArrowRight className="w-4 h-4 ml-2" />
+                    <ArrowRight className="w-4 h-4 ml-2" aria-hidden="true" />
                   </Button>
                 </Link>
               </div>
+              <p className="text-xs text-muted-foreground mt-3">Approval usually within 24h; or check the sponsor register instantly, no login.</p>
             </div>
           </ScrollSection>
 
           <ScrollSection>
             <div className="text-center">
-              <p className="text-xs text-muted-foreground editorial-body max-w-2xl mx-auto">
-                This guide is for educational purposes only and does not constitute legal or immigration advice. CheckByAI is not affiliated with the UK Home Office or UKVI.
+              <p className="text-sm text-foreground editorial-body max-w-2xl mx-auto bg-info/10 border border-info/20 rounded-xl p-4">
+                CheckByAI gives technical risk signals only. Only the Home Office decides. Always verify your sponsor on GOV.UK and seek OISC advice. This guide is for education, not legal advice. CheckByAI is not affiliated with the UK Home Office or UKVI.
               </p>
             </div>
           </ScrollSection>
