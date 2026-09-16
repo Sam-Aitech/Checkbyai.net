@@ -80,7 +80,7 @@ describe("makeRateLimitStore", () => {
 
     it("each limiter prefix is distinct (no counter collisions)", () => {
       const prefixes = [
-        "rl:search:free:",
+        "rl:search:free-daily:",
         "rl:search:auth:",
         "rl:search:personalized:",
         "rl:directory:",

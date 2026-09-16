@@ -233,7 +233,7 @@ The `processed_checkouts` table has a unique constraint on `stripeSessionId`. An
 | `POST /api/auth/*/send-otp` | 5 req/15min per IP | OTP flooding / SMS cost abuse |
 | `POST /api/auth/*/verify-otp` | 5 req/15min per IP | OTP brute force |
 | `POST /api/verify` | 10 req/1hr per IP | AI inference cost protection |
-| `GET /api/sponsors/free-search` | 1 req/day per IP | Sponsor data scraping prevention |
+| `GET /api/sponsors/free-search` (+ `historical-search`, one shared bucket) | 1 req/day per IP (IP-only key; validation 400s don't count) | Sponsor data scraping prevention |
 | Notification dispatch | 10 notifications/user/24h | Notification spam prevention |
 
 Anonymous `POST /api/verify` is additionally limited by the `ip_verifications` table (counted per IP per day, reset at midnight).
