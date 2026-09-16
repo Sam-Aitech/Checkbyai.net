@@ -102,8 +102,8 @@
   --text-caption-weight: 600;
   --text-caption-size: 0.6875rem;
 
-  /* Aliases + a tinted "soft badge" status palette for dashboard and soft-status
-     utilities (CompanyIntelligencePanel.tsx only) — distinct from the solid-fill
+  /* Aliases + a tinted "soft badge" status palette for .dash-* and .st-soft-*
+     (CompanyIntelligencePanel.tsx only) — distinct from the solid-fill
      --success/--warning/--info above, which are for safe white-text fills. */
   --surface-page: var(--background);
   --surface-card: var(--card);
