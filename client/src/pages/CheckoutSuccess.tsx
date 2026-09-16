@@ -27,6 +27,17 @@ interface VerifyResult {
 
 const spring = { type: "spring" as const, stiffness: 100, damping: 15 };
 
+function watchFailureReasonCopy(reason?: string): string {
+  switch (reason) {
+    case 'not-found':
+      return 'Not found on the sponsor register under that exact name. ';
+    case 'limit-reached':
+      return 'Your plan watch limit is already reached. ';
+    default:
+      return 'Automatic setup was skipped. ';
+  }
+}
+
 export default function CheckoutSuccess() {
   const [, setLocation] = useLocation();
   const search = useSearch();
@@ -143,17 +154,6 @@ export default function CheckoutSuccess() {
         return null;
     }
   };
-
-function watchFailureReasonCopy(reason?: string): string {
-  switch (reason) {
-    case 'not-found':
-      return 'Not found on the sponsor register under that exact name. ';
-    case 'limit-reached':
-      return 'Your plan watch limit is already reached. ';
-    default:
-      return 'Automatic setup was skipped. ';
-  }
-}
 
   const getNextStepCta = (): { label: string; href: string; secondary?: { label: string; href: string } } => {
     const t = verifyResult?.packageType;
