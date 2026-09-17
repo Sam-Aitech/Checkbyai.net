@@ -5,7 +5,7 @@ import { STALE_TIMES } from '@/lib/queryDefaults'
 import { unwrapApiEnvelope } from '@/lib/apiEnvelope'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useInView } from 'react-intersection-observer'
-import { Zap, Lock, ArrowRight, Briefcase, Bell, Activity, CheckCircle, XCircle, AlertTriangle, ShieldCheck, Search, Loader2, ChevronDown } from 'lucide-react'
+import { Zap, Lock, ArrowRight, Briefcase, Bell, Activity, CheckCircle, XCircle, AlertTriangle, ShieldCheck, Search, Loader2, ChevronDown, ChevronRight } from 'lucide-react'
 import { TimelineClockIcon, EarlyWarningIcon,
   HeroAlertIcon,
   HeroTrackedIcon,
@@ -131,7 +131,7 @@ function RecentlyRevokedSection() {
                 <Link
                   key={s.id}
                   href={`/sponsor/${s.id}/${toDetailSlug(s.currentName)}`}
-                  className="flex items-center gap-4 px-5 py-4 bg-red-50/40 dark:bg-red-950/10 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors group"
+                  className="flex items-center gap-4 px-5 py-4 bg-red-50/40 dark:bg-red-950/10 hover:bg-red-50 dark:hover:bg-red-950/20 hover:shadow-sm transition-[background-color,box-shadow] group"
                 >
                   <XCircle className="w-4 h-4 text-red-500 shrink-0" aria-hidden="true" />
                   <div className="flex-1 min-w-0">
@@ -147,6 +147,7 @@ function RecentlyRevokedSection() {
                   <span className="text-xs whitespace-nowrap shrink-0">
                     {formatRevokedItemDate(s.removedAt)}
                   </span>
+                  <ChevronRight className="w-4 h-4 text-red-400/70 shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:text-red-500" aria-hidden="true" />
                 </Link>
               ))}
             </div>
@@ -583,6 +584,7 @@ export default function HeroSection() {
   const [, setLocation] = useLocation()
   const [searchQuery, setSearchQuery] = useState("")
   const [alertMeOnSubmit, setAlertMeOnSubmit] = useState(false)
+  const [pricingCadence, setPricingCadence] = useState<"annual" | "monthly">("annual")
   const [searchResults, setSearchResults] = useState<FreeSearchResult[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
@@ -759,7 +761,7 @@ export default function HeroSection() {
                 </motion.h1>
 
                 <motion.p initial={{ opacity: 0, y: 20 }} animate={isLoaded ? { opacity: 1, y: 0 } : {}} transition={{ ...springGentle, delay: 0.35 }} className="text-base text-white/70 max-w-lg leading-relaxed">
-                  We check the sponsor register every weeknight at ~00:30 UTC and alert you when your employer's status changes: Pro subscribers twice daily at 07:00 and 19:00 UTC, Starter subscribers by 18:00 UTC the same day.
+                  We check the sponsor register every weeknight at ~00:30 UTC and alert you when your employer's status changes: Alert Pass Pro (Monthly) subscribers twice daily at 07:00 and 19:00 UTC, Alert Pass (Monthly) subscribers by 18:00 UTC the same day.
                 </motion.p>
 
                 {/* ── Hero search box ───────────────────────────────────── */}
@@ -993,7 +995,7 @@ export default function HeroSection() {
                   <TimelineClockIcon size={30} />
                 </div>
                 <h3 className="text-lg font-bold text-foreground mb-3">The 12-Hour Advantage</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">We check the register at ~00:30 UTC. Letters are posted at 9 AM. Pro subscribers receive a WhatsApp alert by 07:00 UTC, well before their employer's letter arrives. Starter subscribers are alerted by 18:00 UTC, still the same day.</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">We check the register at ~00:30 UTC. Letters are posted at 9 AM. Alert Pass Pro (Monthly) subscribers receive a WhatsApp alert by 07:00 UTC, well before their employer's letter arrives. Alert Pass (Monthly) subscribers are alerted by 18:00 UTC, still the same day.</p>
               </CardContent>
             </Card>
             <Card className="border-slate-200 dark:border-slate-800 glow-amber transition-all duration-300">
@@ -1042,7 +1044,32 @@ export default function HeroSection() {
       <section className="py-16 sm:py-20 bg-background">
         <div className="max-w-4xl mx-auto px-6">
           <h2 className="text-2xl sm:text-3xl font-bold text-center text-foreground mb-2">Choose Your Protection Level</h2>
-          <p className="text-center text-muted-foreground mb-12">Keep your visa safe. Cancel anytime.</p>
+          <p className="text-center text-muted-foreground mb-6">Keep your visa safe. Choose the billing cadence that fits you.</p>
+
+          <div className="flex justify-center mb-8">
+            <div role="group" aria-label="Homepage pricing billing period" className="inline-flex items-center gap-1 bg-muted rounded-full p-1">
+              <button
+                type="button"
+                onClick={() => setPricingCadence("annual")}
+                aria-pressed={pricingCadence === "annual"}
+                className={`px-5 py-2 text-sm font-semibold rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                  pricingCadence === "annual" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Annual
+              </button>
+              <button
+                type="button"
+                onClick={() => setPricingCadence("monthly")}
+                aria-pressed={pricingCadence === "monthly"}
+                className={`px-5 py-2 text-sm font-semibold rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                  pricingCadence === "monthly" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Monthly
+              </button>
+            </div>
+          </div>
 
           <div className="grid md:grid-cols-3 gap-5">
             <Card className="border-amber-300/50 bg-amber-50/30 dark:bg-amber-950/10 dark:border-amber-800/30 opacity-80">
@@ -1064,38 +1091,54 @@ export default function HeroSection() {
 
             <Card className="border-slate-300 dark:border-slate-700">
               <CardContent className="py-6">
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-2">Alert Pass</p>
-                <div className="mb-1"><span className="text-3xl font-extrabold text-foreground">£9.99</span><span className="text-sm text-muted-foreground">/year</span></div>
-                <p className="text-xs text-muted-foreground mb-6">Low-commitment monitoring for a single employer</p>
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-2">
+                  {pricingCadence === "annual" ? "Alert Pass (Annual)" : "Alert Pass (Monthly)"}
+                </p>
+                <div className="mb-1">
+                  <span className="text-3xl font-extrabold text-foreground">{pricingCadence === "annual" ? "£9.99" : "£24.99"}</span>
+                  <span className="text-sm text-muted-foreground">{pricingCadence === "annual" ? "/year" : "/month"}</span>
+                </div>
+                <p className="text-xs text-muted-foreground mb-6">
+                  {pricingCadence === "annual" ? "Billed once for 12 months; repurchase to continue" : "Auto-renews monthly; cancel anytime"}
+                </p>
                 <ul className="space-y-2.5 text-sm mb-6">
-                  <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />Monitor 1 company for 12 months</li>
+                  <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />Monitor {pricingCadence === "annual" ? "1 company for 12 months" : "2 companies"}</li>
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />Email + WhatsApp alerts</li>
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />Same-day alerts (18:00 UTC)</li>
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />30-day change history</li>
                 </ul>
-                <Link href="/pricing"><Button variant="outline" className="w-full font-bold py-5 text-base">Get Alert Pass</Button></Link>
+                <Link href="/pricing"><Button variant="outline" className="w-full font-bold py-5 text-base">Get {pricingCadence === "annual" ? "Alert Pass (Annual)" : "Alert Pass (Monthly)"}</Button></Link>
               </CardContent>
             </Card>
 
             <Card className="border-emerald-500 dark:border-emerald-400 ring-2 ring-emerald-500/30 relative shadow-lg shadow-emerald-500/10">
               <div className="absolute -top-3 left-1/2 -translate-x-1/2"><Badge className="bg-emerald-600 text-white font-bold text-[10px] uppercase tracking-wider px-3 py-1 shadow-sm">Best Value</Badge></div>
               <CardContent className="py-6">
-                <p className="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-2">Alert Pass Pro</p>
-                <div className="mb-1"><span className="text-3xl font-extrabold text-foreground">£19.99</span><span className="text-sm text-muted-foreground">/year</span></div>
-                <p className="text-xs text-muted-foreground mb-6">Full protection, billed once a year</p>
+                <p className="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-2">
+                  {pricingCadence === "annual" ? "Alert Pass Pro (Annual)" : "Alert Pass Pro (Monthly)"}
+                </p>
+                <div className="mb-1">
+                  <span className="text-3xl font-extrabold text-foreground">{pricingCadence === "annual" ? "£19.99" : "£49.99"}</span>
+                  <span className="text-sm text-muted-foreground">{pricingCadence === "annual" ? "/year" : "/month"}</span>
+                </div>
+                <p className="text-xs text-muted-foreground mb-6">
+                  {pricingCadence === "annual" ? "Billed once for 12 months; repurchase to continue" : "Auto-renews monthly; cancel anytime"}
+                </p>
                 <ul className="space-y-2.5 text-sm mb-6">
-                  <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />Monitor up to 5 companies for 12 months</li>
+                  <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />Monitor up to 5 companies{pricingCadence === "annual" ? " for 12 months" : ""}</li>
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />Email + WhatsApp + SMS</li>
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />Twice-daily alerts (07:00 & 19:00 UTC)</li>
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />90-day change history</li>
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />Sponsored job alerts by email</li>
                 </ul>
-                <Link href="/pricing"><Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-5 text-base shadow-md"><Zap className="w-4 h-4 mr-2" />Get Alert Pass Pro</Button></Link>
+                <Link href="/pricing"><Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-5 text-base shadow-md shadow-primary/20"><Zap className="w-4 h-4 mr-2" />Get {pricingCadence === "annual" ? "Alert Pass Pro (Annual)" : "Alert Pass Pro (Monthly)"}</Button></Link>
               </CardContent>
             </Card>
           </div>
 
-          <p className="text-center text-xs text-muted-foreground mt-6">Cancel anytime. 30-day money-back guarantee.</p>
+          <p className="text-center text-xs text-muted-foreground mt-6">
+            Alert Pass (Annual): £9.99/year or Alert Pass Pro (Annual): £19.99/year, billed once for 12 months. Alert Pass (Monthly): £24.99/month or Alert Pass Pro (Monthly): £49.99/month, auto-renews and can be cancelled anytime. Both options include the same-day or twice-daily alert schedules shown above.
+          </p>
         </div>
       </section>
 
@@ -1116,9 +1159,9 @@ export default function HeroSection() {
               <AccordionContent className="text-sm text-muted-foreground pb-4">Yes, but you must remember to check every single night. Most people check once, forget, and find out too late. Our service is insurance against forgetfulness.</AccordionContent>
             </AccordionItem>
             <AccordionItem value="q4" className="border rounded-xl px-4 bg-white dark:bg-slate-900">
-              <AccordionTrigger className="text-sm font-semibold text-foreground hover:no-underline py-4">What is the difference between Starter and Pro?</AccordionTrigger>
+              <AccordionTrigger className="text-sm font-semibold text-foreground hover:no-underline py-4">What is the difference between Alert Pass (Monthly) and Alert Pass Pro (Monthly)?</AccordionTrigger>
               <AccordionContent className="text-sm text-muted-foreground pb-4">
-                Starter (£24.99/mo) monitors 2 companies and sends Email + WhatsApp alerts by 18:00 UTC on the day a change is detected. Pro (£49.99/mo) monitors 5 companies, adds SMS, delivers alerts twice daily at 07:00 and 19:00 UTC, and includes 5 Certificate of Sponsorship checks per month. Both plans can be cancelled anytime.
+                Alert Pass (Monthly) (£24.99/mo) monitors 2 companies and sends Email + WhatsApp alerts by 18:00 UTC on the day a change is detected. Alert Pass Pro (Monthly) (£49.99/mo) monitors 5 companies, adds SMS, delivers alerts twice daily at 07:00 and 19:00 UTC, and includes 5 Certificate of Sponsorship checks per month. Both plans can be cancelled anytime.
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="q5" className="border rounded-xl px-4 bg-white dark:bg-slate-900">

@@ -79,7 +79,7 @@ const annualPlans: AnnualPlan[] = [
 
 const notificationPlans: NotificationPlan[] = [
   {
-    name: 'Starter',
+    name: 'Alert Pass (Monthly)',
     price: '£24.99',
     period: '/month',
     description: 'Stay informed when your sponsor licence status changes.',
@@ -99,7 +99,7 @@ const notificationPlans: NotificationPlan[] = [
     ],
   },
   {
-    name: 'Pro',
+    name: 'Alert Pass Pro (Monthly)',
     price: '£49.99',
     period: '/month',
     description: 'Full protection with twice-daily alerts and CoS checks.',
@@ -117,12 +117,11 @@ const notificationPlans: NotificationPlan[] = [
   },
 ];
 
-// Blue/amber here are intentional per-tier decorative differentiation (Starter
-// vs Pro), not status indicators — deliberately not mapped to --info/--warning,
-// which would misleadingly imply the Pro plan is a "warning" state.
+// Blue/amber here are intentional per-tier decorative differentiation, not
+// status indicators — deliberately not mapped to --info/--warning.
 function getIconWrapClass(planName: string): string {
-  if (planName.includes("Starter")) return "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400";
-  if (planName.includes("Pro")) return "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400";
+  if (planName.includes("Alert Pass Pro")) return "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400";
+  if (planName.includes("Alert Pass")) return "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400";
   return "bg-primary/20 text-primary";
 }
 
@@ -354,7 +353,7 @@ export default function Pricing() {
     <PageLayout>
       <SEOHead
         title="Protect Your Visa | Sponsor Licence Alerts from £24.99/mo | CheckByAI"
-        description="Never be blindsided by a sponsor licence revocation. Get WhatsApp and email alerts. Starter £24.99/mo (2 companies), Pro £49.99/mo (5 companies, SMS + twice-daily alerts)."
+        description="Never be blindsided by a sponsor licence revocation. Get WhatsApp and email alerts. Alert Pass (Monthly) £24.99/mo (2 companies), Alert Pass Pro (Monthly) £49.99/mo (5 companies, SMS + twice-daily alerts)."
         canonicalUrl="https://checkbyai.net/pricing"
         ogTitle="Protect Your Visa | Sponsor Alerts from £24.99/mo"
         ogDescription="Get alerted when your employer's sponsor licence changes. Don't risk your visa status."
@@ -368,7 +367,7 @@ export default function Pricing() {
           "@graph": [
             {
               "@type": "Product",
-              "name": "CheckByAI Notification Engine - Starter",
+              "name": "CheckByAI Notification Engine - Alert Pass (Monthly)",
               "description": "UK sponsor licence monitoring with email and WhatsApp alerts for up to 2 companies. Same-day alerts at 18:00 UTC.",
               "brand": { "@type": "Brand", "name": "CheckByAI" },
               "offers": {
@@ -382,7 +381,7 @@ export default function Pricing() {
             },
             {
               "@type": "Product",
-              "name": "CheckByAI Notification Engine - Pro",
+              "name": "CheckByAI Notification Engine - Alert Pass Pro (Monthly)",
               "description": "UK sponsor licence monitoring with twice-daily email, WhatsApp and SMS alerts for up to 5 companies. Includes 5 CoS verification checks per month.",
               "brand": { "@type": "Brand", "name": "CheckByAI" },
               "offers": {
@@ -399,8 +398,8 @@ export default function Pricing() {
               "mainEntity": [
                 {
                   "@type": "Question",
-                  "name": "What's the difference between Starter and Pro plans?",
-                  "acceptedAnswer": { "@type": "Answer", "text": "The Starter plan (£24.99/mo) monitors up to 2 companies with email and WhatsApp alerts delivered same-day at 18:00 UTC. The Pro plan (£49.99/mo) monitors up to 5 companies with alerts delivered twice daily at 07:00 and 19:00 UTC via email, WhatsApp, and SMS, plus 5 CoS verification checks per month." }
+                  "name": "What's the difference between Alert Pass (Monthly) and Alert Pass Pro (Monthly)?",
+                  "acceptedAnswer": { "@type": "Answer", "text": "Alert Pass (Monthly) (£24.99/mo) monitors up to 2 companies with email and WhatsApp alerts delivered same-day at 18:00 UTC. Alert Pass Pro (Monthly) (£49.99/mo) monitors up to 5 companies with alerts delivered twice daily at 07:00 and 19:00 UTC via email, WhatsApp, and SMS, plus 5 CoS verification checks per month." }
                 },
                 {
                   "@type": "Question",
@@ -410,7 +409,7 @@ export default function Pricing() {
                 {
                   "@type": "Question",
                   "name": "How are alerts delivered?",
-                  "acceptedAnswer": { "@type": "Answer", "text": "Starter plan subscribers receive alerts via email and WhatsApp at 18:00 UTC on the day a change is detected. Pro plan subscribers receive alerts via email, WhatsApp, and SMS twice daily at 07:00 and 19:00 UTC." }
+                  "acceptedAnswer": { "@type": "Answer", "text": "Alert Pass (Monthly) subscribers receive alerts via email and WhatsApp at 18:00 UTC on the day a change is detected. Alert Pass Pro (Monthly) subscribers receive alerts via email, WhatsApp, and SMS twice daily at 07:00 and 19:00 UTC." }
                 }
               ]
             }
@@ -522,8 +521,8 @@ export default function Pricing() {
             <div role="note" aria-label="Plan comparison note" className="mt-4 p-4 bg-muted/60 border border-border rounded-xl">
               <p className="text-center text-sm text-foreground font-medium">
                 {cadence === 'annual'
-                  ? 'Annual: billed today, monitoring ends 12 months later unless you repurchase. Alert Pass £9.99/yr = 1 company · Pro £19.99/yr = 5 companies.'
-                  : 'Monthly: auto-renews, cancel anytime in Account → Manage Billing (Stripe portal). Starter £24.99/mo = 2 companies · Pro £49.99/mo = 5 companies.'}
+                  ? 'Annual: billed today, monitoring ends 12 months later unless you repurchase. Alert Pass £9.99/yr = 1 company · Alert Pass Pro £19.99/yr = 5 companies.'
+                  : 'Monthly: auto-renews, cancel anytime in Account → Manage Billing (Stripe portal). Alert Pass (Monthly) £24.99/mo = 2 companies · Alert Pass Pro (Monthly) £49.99/mo = 5 companies.'}
               </p>
               <p className="text-center text-xs text-muted-foreground mt-2">
                 {cadence === 'annual'

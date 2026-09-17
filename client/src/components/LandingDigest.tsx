@@ -76,7 +76,7 @@ export default function LandingDigest() {
 
   if (!data?.available) return null;
 
-  const { headline = "", emotion = "neutral", date, type, activeSponsors } = data;
+  const { headline = "", emotion = "neutral", date, type } = data;
   const total = counts.added + counts.updated + counts.removed;
   const hasChanges = type === "daily";
   const formattedDate = new Date(date + "T00:00:00").toLocaleDateString("en-GB", {
@@ -116,16 +116,6 @@ export default function LandingDigest() {
             <p className="text-sm text-muted-foreground mb-4">
               {formattedDate}
             </p>
-
-            {activeSponsors > 0 && (
-              <AnimatedCounter
-                value={activeSponsors}
-                label="Active Licensed Sponsors on the UK Register"
-                icon={<ShieldMonitorIcon size={20} />}
-                color="bg-success/15"
-                large
-              />
-            )}
 
             <div className="w-16 h-px mx-auto my-5 bg-gradient-to-r from-transparent via-border to-transparent" />
 
