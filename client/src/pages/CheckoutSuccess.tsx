@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLocation, useSearch } from 'wouter';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, CreditCard, Loader2, PartyPopper, ArrowRight, Bell } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { apiRequest } from '@/lib/queryClient';
 import { unwrapApiEnvelope } from '@/lib/apiEnvelope';
@@ -46,6 +46,7 @@ export default function CheckoutSuccess() {
   const [isVerifying, setIsVerifying] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const prefersReducedMotion = useReducedMotion();
 
   const sessionId = new URLSearchParams(search).get('session_id');
 
@@ -176,23 +177,23 @@ export default function CheckoutSuccess() {
       <div className="bg-background flex items-center justify-center p-4 min-h-screen">
         <motion.div
           className="w-full max-w-md border border-border rounded-xl bg-card p-6"
-          initial={{ opacity: 0, y: 24 }}
+          initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 24 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={spring}
+          transition={prefersReducedMotion ? { duration: 0 } : spring}
         >
-          <div className="text-center">
+          <div className="text-center" role="status" aria-live="polite" aria-atomic="true">
             {isVerifying ? (
               <>
                 <div className="bg-primary/10 rounded-xl w-14 h-14 flex items-center justify-center mx-auto mb-4">
-                  <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
+                  <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" aria-hidden="true" />
                 </div>
-                <h1 className="editorial-subheading text-foreground text-2xl">Verifying Payment...</h1>
+                <h1 className="editorial-subheading text-foreground text-2xl">Verifying Payment…</h1>
                 <p className="text-muted-foreground text-sm mt-2">Please wait while we confirm your purchase</p>
               </>
             ) : error ? (
               <>
                 <div className="bg-primary/10 rounded-xl w-14 h-14 flex items-center justify-center mx-auto mb-4">
-                  <span className="text-3xl text-destructive">!</span>
+                  <span className="text-3xl text-destructive" aria-hidden="true">!</span>
                 </div>
                 <h1 className="editorial-subheading text-destructive text-2xl">Error</h1>
                 <p className="text-muted-foreground text-sm mt-2">{error}</p>
@@ -200,7 +201,7 @@ export default function CheckoutSuccess() {
             ) : verifyResult?.success ? (
               <>
                 <div className="bg-primary/10 rounded-xl w-14 h-14 flex items-center justify-center mx-auto mb-4">
-                  <PartyPopper className="w-8 h-8 text-emerald-500" />
+                  <PartyPopper className="w-8 h-8 text-emerald-500" aria-hidden="true" />
                 </div>
                 <h1 className="editorial-subheading text-emerald-600 dark:text-emerald-400 text-2xl">
                   Payment Successful!
@@ -212,7 +213,7 @@ export default function CheckoutSuccess() {
             ) : (
               <>
                 <div className="bg-primary/10 rounded-xl w-14 h-14 flex items-center justify-center mx-auto mb-4">
-                  <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
+                  <Loader2 className="w-8 h-8 text-amber-500 animate-spin" aria-hidden="true" />
                 </div>
                 <h1 className="editorial-subheading text-foreground text-2xl">Payment Processing</h1>
                 <p className="text-muted-foreground text-sm mt-2">Your payment is being processed</p>
@@ -259,7 +260,7 @@ export default function CheckoutSuccess() {
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Total Credits:</span>
                     <span className="text-primary font-semibold flex items-center gap-1">
-                      <CreditCard className="w-4 h-4" />
+                      <CreditCard className="w-4 h-4" aria-hidden="true" />
                       {verifyResult.credits}
                     </span>
                   </div>
@@ -269,7 +270,7 @@ export default function CheckoutSuccess() {
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Status:</span>
                     <span className="text-emerald-500 font-semibold flex items-center gap-1">
-                      <Check className="w-4 h-4" />
+                      <Check className="w-4 h-4" aria-hidden="true" />
                       {isUnlimitedWatchTier(verifyResult.subscriptionStatus) ? 'Unlimited Access Active' : `${verifyResult.subscriptionStatus.charAt(0).toUpperCase() + verifyResult.subscriptionStatus.slice(1)} Plan Active`}
                     </span>
                   </div>
@@ -292,7 +293,7 @@ export default function CheckoutSuccess() {
                   className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4 flex items-start gap-3"
                   data-testid="checkout-success-company-watch"
                 >
-                  <Bell className="w-5 h-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" />
+                  <Bell className="w-5 h-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
                   <div className="text-left">
                     <p className="font-semibold text-emerald-700 dark:text-emerald-300 text-sm">
                       Now monitoring <span className="font-bold">{verifyResult.companyName}</span>
@@ -315,7 +316,7 @@ export default function CheckoutSuccess() {
                   role="alert"
                   data-testid="checkout-success-watch-warning"
                 >
-                  <Bell className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                  <Bell className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
                   <div className="text-left">
                     <p className="font-semibold text-amber-700 dark:text-amber-300 text-sm">
                       Payment ok — we couldn’t auto-watch “{verifyResult.companyName}”
@@ -338,7 +339,7 @@ export default function CheckoutSuccess() {
                       onClick={() => setLocation(cta.href)}
                     >
                       {cta.label}
-                      <ArrowRight className="w-4 h-4 ml-2" />
+                      <ArrowRight className="w-4 h-4 ml-2" aria-hidden="true" />
                     </Button>
                     {cta.secondary && (
                       <Button

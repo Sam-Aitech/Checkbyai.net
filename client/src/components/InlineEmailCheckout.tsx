@@ -1,6 +1,6 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2, Mail, ArrowLeft, CheckCircle } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +23,16 @@ export default function InlineEmailCheckout({ onVerified, onCancel }: Readonly<I
   const [error, setError] = useState<string | null>(null);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const turnstileRef = useRef<any>(null);
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  const codeInputRef = useRef<HTMLInputElement>(null);
+  const prefersReducedMotion = useReducedMotion();
+
+  useEffect(() => {
+    const isDesktop = window.matchMedia("(pointer: fine)").matches;
+    if (isDesktop) {
+      (step === "email" ? emailInputRef : codeInputRef).current?.focus();
+    }
+  }, [step]);
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,22 +107,25 @@ export default function InlineEmailCheckout({ onVerified, onCancel }: Readonly<I
         {step === "email" ? (
           <motion.form
             key="email-step"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ type: "spring", stiffness: 100, damping: 15 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.2 }}
             onSubmit={handleSendOtp}
             className="space-y-2.5"
           >
             <div className="relative">
               <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" aria-hidden="true" />
               <Input
+                ref={emailInputRef}
                 type="email"
+                name="email"
+                autoComplete="email"
+                spellCheck={false}
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="pl-10 rounded-xl"
-                autoFocus
                 aria-label="Email address"
                 aria-invalid={!!error}
                 aria-describedby={error ? "inline-email-error" : undefined}
@@ -121,7 +134,7 @@ export default function InlineEmailCheckout({ onVerified, onCancel }: Readonly<I
             </div>
 
             {TURNSTILE_SITE_KEY && (
-              <div className="flex justify-center" role="group" aria-label="Spam protection challenge">
+              <div className="flex justify-center min-h-[65px]" role="group" aria-label="Spam protection challenge">
                 <Turnstile
                   ref={turnstileRef}
                   siteKey={TURNSTILE_SITE_KEY}
@@ -142,7 +155,14 @@ export default function InlineEmailCheckout({ onVerified, onCancel }: Readonly<I
                 disabled={isLoading || (!!TURNSTILE_SITE_KEY && !turnstileToken)}
                 data-testid="inline-checkout-send"
               >
-                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send code"}
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                    Sending…
+                  </>
+                ) : (
+                  "Send code"
+                )}
               </Button>
               <Button type="button" variant="outline" className="rounded-full" onClick={onCancel}>
                 Cancel
@@ -152,23 +172,25 @@ export default function InlineEmailCheckout({ onVerified, onCancel }: Readonly<I
         ) : (
           <motion.form
             key="otp-step"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ type: "spring", stiffness: 100, damping: 15 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.2 }}
             onSubmit={handleVerifyOtp}
             className="space-y-2.5"
           >
             <p className="text-xs text-muted-foreground">Code sent to <strong className="text-foreground">{email}</strong></p>
             <Input
+              ref={codeInputRef}
               type="text"
+              name="code"
               inputMode="numeric"
+              spellCheck={false}
               maxLength={6}
               placeholder="6-digit code"
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
               className="rounded-xl text-center tracking-[0.3em] font-mono"
-              autoFocus
               aria-label="Verification code"
               aria-invalid={!!error}
               aria-describedby={error ? "inline-otp-error" : undefined}
@@ -185,7 +207,17 @@ export default function InlineEmailCheckout({ onVerified, onCancel }: Readonly<I
                 disabled={isLoading || code.length !== 6}
                 data-testid="inline-checkout-verify"
               >
-                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><CheckCircle className="h-4 w-4 mr-1.5" />Verify</>}
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                    Verifying…
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-1.5" aria-hidden="true" />
+                    Verify
+                  </>
+                )}
               </Button>
               <Button
                 type="button"
@@ -194,7 +226,7 @@ export default function InlineEmailCheckout({ onVerified, onCancel }: Readonly<I
                 onClick={() => { setStep("email"); setCode(""); setError(null); }}
                 aria-label="Change email"
               >
-                <ArrowLeft className="h-4 w-4" />
+                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
               </Button>
             </div>
           </motion.form>
