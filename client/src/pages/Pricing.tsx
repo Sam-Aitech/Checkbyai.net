@@ -225,7 +225,7 @@ function PlanCard<T extends PlanCardData>({ plan, index, isLoggedIn, loading, on
         ) : (
           <motion.button
             {...tapScale}
-            className="w-full py-3 px-4 font-semibold bg-primary text-primary-foreground hover:bg-primary/90 rounded-full transition-colors disabled:opacity-50"
+            className="w-full min-h-12 py-3 px-4 font-semibold bg-primary text-primary-foreground hover:bg-primary/90 rounded-full transition-colors disabled:opacity-50 whitespace-normal text-center leading-tight"
             onClick={() => (isLoggedIn ? onSelect(plan) : setCapturing(true))}
             disabled={loading === plan.packageType || !available}
             aria-disabled={loading !== null || !available}

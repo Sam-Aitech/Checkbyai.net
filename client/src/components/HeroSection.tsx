@@ -1014,7 +1014,11 @@ export default function HeroSection() {
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />Same-day alerts (18:00 UTC)</li>
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />30-day change history</li>
                 </ul>
-                <Link href="/pricing"><Button variant="outline" className="w-full font-bold py-5 text-base">Get {pricingCadence === "annual" ? "Alert Pass (Annual)" : "Alert Pass (Monthly)"}</Button></Link>
+                <Link href="/pricing">
+                  <Button variant="outline" className="w-full min-h-14 whitespace-normal text-center leading-tight font-bold py-3 text-base">
+                    <span className="min-w-0">Get {pricingCadence === "annual" ? "Alert Pass (Annual)" : "Alert Pass (Monthly)"}</span>
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
 
@@ -1038,7 +1042,12 @@ export default function HeroSection() {
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />90-day change history</li>
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />Sponsored job alerts by email</li>
                 </ul>
-                <Link href="/pricing"><Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-5 text-base shadow-md shadow-primary/20"><Zap className="w-4 h-4 mr-2" />Get {pricingCadence === "annual" ? "Alert Pass Pro (Annual)" : "Alert Pass Pro (Monthly)"}</Button></Link>
+                <Link href="/pricing">
+                  <Button className="w-full min-h-14 whitespace-normal text-center leading-tight bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-3 text-base shadow-md shadow-primary/20">
+                    <Zap className="w-4 h-4 shrink-0" />
+                    <span className="min-w-0">Get {pricingCadence === "annual" ? "Alert Pass Pro (Annual)" : "Alert Pass Pro (Monthly)"}</span>
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
           </div>
@@ -1126,8 +1135,8 @@ export default function HeroSection() {
           <div className="text-center">
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <Link href="/pricing">
-                <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 px-8 py-3 rounded-full font-semibold shadow-lg transition-all duration-200">
-                  Get Alert Pass Pro
+                <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 px-8 py-3 rounded-full font-semibold shadow-lg transition-all duration-200 whitespace-normal text-center leading-tight">
+                  <span className="min-w-0">Get Alert Pass Pro</span>
                   <ArrowRight className="ml-2 w-4 h-4" />
                 </Button>
               </Link>
