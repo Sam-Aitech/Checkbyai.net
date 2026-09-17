@@ -764,52 +764,52 @@ export default function HeroSection() {
 
                 {/* ── Hero search box ───────────────────────────────────── */}
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={isLoaded ? { opacity: 1, y: 0 } : {}} transition={{ ...spring, delay: 0.45 }} className="space-y-3">
-                  <div className="relative">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40 pointer-events-none" />
-                    <label htmlFor="hero-sponsor-search" className="sr-only">Search any UK sponsor by employer name</label>
-                    <input
-                      id="hero-sponsor-search"
-                      type="text"
-                      ref={searchInputRef}
-                      placeholder="Search any employer, e.g. NHS, Tata, Deloitte…"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleSearchSubmit()}
-                      className="w-full pl-11 pr-28 h-14 bg-white/10 border border-white/20 rounded-xl text-white placeholder:text-white/40 text-sm focus:outline-none focus:border-primary focus:bg-white/15 transition-all"
-                    />
-                    <button
-                      onClick={handleSearchSubmit}
-                      disabled={searchQuery.trim().length < 3 || searchLoading}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground rounded-full px-4 h-10 text-sm font-semibold transition-colors flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
-                    >
-                      {heroSearchButtonLabel(searchLoading, alertMeOnSubmit)}
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between gap-3 flex-wrap">
-                    <p className="text-xs text-white/50">Free, unlimited searches. No login required. 124,000+ licensed sponsors.</p>
-                    <label className="flex items-center gap-2 text-xs text-white/70 cursor-pointer select-none">
-                      <Switch checked={alertMeOnSubmit} onCheckedChange={setAlertMeOnSubmit} className="scale-90" />
-                      Also alert me when this employer's licence changes
-                    </label>
-                  </div>
-                  <a href="#cos-verification" className="inline-block text-sm font-medium text-white/70 hover:text-white underline underline-offset-2">
-                    Need to verify a CoS document instead? →
-                  </a>
-
-                  {/* Hero search results */}
-                  {searchLoading && (
-                    <div className="flex items-center gap-2 text-white/60 text-sm py-2">
-                      <Loader2 className="w-4 h-4 animate-spin" />Searching…
+                  <div className="relative z-20">
+                    <div className="relative">
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40 pointer-events-none" />
+                      <label htmlFor="hero-sponsor-search" className="sr-only">Search any UK sponsor by employer name</label>
+                      <input
+                        id="hero-sponsor-search"
+                        type="text"
+                        ref={searchInputRef}
+                        placeholder="Search any employer, e.g. NHS, Tata, Deloitte…"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleSearchSubmit()}
+                        className="w-full pl-11 pr-28 h-14 bg-white/10 border border-white/20 rounded-xl text-white placeholder:text-white/40 text-sm focus:outline-none focus:border-primary focus:bg-white/15 transition-all"
+                      />
+                      <button
+                        onClick={handleSearchSubmit}
+                        disabled={searchQuery.trim().length < 3 || searchLoading}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground rounded-full px-4 h-10 text-sm font-semibold transition-colors flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
+                      >
+                        {heroSearchButtonLabel(searchLoading, alertMeOnSubmit)}
+                      </button>
                     </div>
-                  )}
-                  {searchUnavailable && (
-                    <p className="text-amber-300 text-xs py-1">Search temporarily unavailable. Please try again.</p>
-                  )}
-                  {!searchLoading && !searchUnavailable && hasSearched && searchResults.length === 0 && !historicalLoading && historicalResults.length === 0 && (
-                    <p className="text-white/60 text-xs py-1">No sponsors found. Try a different name.</p>
-                  )}
-                  {!searchLoading && searchResults.length > 0 && (
-                    <div className="space-y-1.5 max-h-64 overflow-y-auto pr-0.5">
+
+                    {/* Search results float over the hero content instead of
+                        changing the layout while the user is typing. */}
+                    {(searchLoading || searchUnavailable || searchResults.length > 0 || historicalLoading || historicalResults.length > 0 || (
+                      hasSearched && searchResults.length === 0 && !historicalLoading && historicalResults.length === 0
+                    )) && searchQuery.trim().length >= 3 && (
+                      <div
+                        role="region"
+                        aria-label="Sponsor search results"
+                        className="absolute left-0 right-0 top-[calc(100%+0.75rem)] max-h-80 overflow-y-auto rounded-2xl border border-white/15 bg-slate-950/95 p-2 shadow-2xl shadow-black/30 backdrop-blur-xl"
+                      >
+                        {searchLoading && (
+                          <div className="flex items-center gap-2 px-2 py-2 text-white/60 text-sm">
+                            <Loader2 className="w-4 h-4 animate-spin" />Searching…
+                          </div>
+                        )}
+                        {searchUnavailable && (
+                          <p className="px-2 py-2 text-amber-300 text-xs">Search temporarily unavailable. Please try again.</p>
+                        )}
+                        {!searchLoading && !searchUnavailable && hasSearched && searchResults.length === 0 && !historicalLoading && historicalResults.length === 0 && (
+                          <p className="px-2 py-2 text-white/60 text-xs">No sponsors found. Try a different name.</p>
+                        )}
+                        {!searchLoading && searchResults.length > 0 && (
+                          <div className="space-y-1.5">
                       {searchResults.map((r) => {
                         const isActive = r.status === "ACTIVE";
                         const isNew = r.status === "NEWLY_GRANTED";
@@ -844,57 +844,71 @@ export default function HeroSection() {
                           Get alerts when any sponsor changes →
                         </Link>
                       </div>
-                    </div>
-                  )}
+                          </div>
+                        )}
 
-                  {/* ── Historical / revoked results tier ───────────────── */}
-                  {historicalLoading && (
-                    <div className="flex items-center gap-2 text-white/50 text-xs py-1.5">
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />Checking historical register…
-                    </div>
-                  )}
-                  {!historicalLoading && historicalResults.length > 0 && (
-                    <div className="space-y-1.5">
-                      <div className="flex items-center gap-1.5 pt-0.5">
-                        <XCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
-                        <p className="text-xs text-red-300 font-semibold">Found in historical register: licence revoked</p>
-                      </div>
-                      <div className="space-y-1.5 max-h-48 overflow-y-auto pr-0.5">
-                        {historicalResults.map((r) => {
-                          const removedDate = r.removedAt
-                            ? new Date(r.removedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
-                            : null;
-                          const detailHref = r.id ? `/sponsor/${r.id}/${toHeroSlug(r.organisationName)}` : null;
-                          const inner = (
-                            <div className="bg-red-950/40 border border-red-500/25 rounded-xl px-3.5 py-2.5 hover:bg-red-950/60 transition-colors">
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="min-w-0 flex-1">
-                                  <p className="font-semibold text-white text-sm truncate">{r.organisationName}</p>
-                                  <p className="text-xs text-red-300/80 mt-0.5 truncate">
-                                    {removedDate ? `Licence revoked · ${removedDate}` : "Licence revoked"}{r.townCity ? ` · ${r.townCity}` : ""}
-                                  </p>
-                                </div>
-                                <span className="bg-red-500/15 text-red-300 border border-red-400/30 text-xs font-bold px-2 py-0.5 rounded-full shrink-0 mt-0.5">Revoked</span>
-                              </div>
-                              <div className="mt-2 flex items-center justify-between gap-2">
-                                <p className="text-xs text-white/50">Get notified if this licence is restored</p>
-                                <Link
-                                  href="/pricing?plan=starter"
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="text-xs font-bold text-indigo-300 hover:text-indigo-200 whitespace-nowrap"
-                                >
-                                  Subscribe for alerts →
-                                </Link>
-                              </div>
+                        {/* ── Historical / revoked results tier ───────────────── */}
+                        {historicalLoading && (
+                          <div className="flex items-center gap-2 px-2 py-1.5 text-white/50 text-xs">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />Checking historical register…
+                          </div>
+                        )}
+                        {!historicalLoading && historicalResults.length > 0 && (
+                          <div className="space-y-1.5">
+                            <div className="flex items-center gap-1.5 px-2 pt-0.5">
+                              <XCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                              <p className="text-xs text-red-300 font-semibold">Found in historical register: licence revoked</p>
                             </div>
-                          );
-                          return detailHref
-                            ? <Link key={r.fingerprint} href={detailHref}>{inner}</Link>
-                            : <div key={r.fingerprint}>{inner}</div>;
-                        })}
+                            <div className="space-y-1.5">
+                              {historicalResults.map((r) => {
+                                const removedDate = r.removedAt
+                                  ? new Date(r.removedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+                                  : null;
+                                const detailHref = r.id ? `/sponsor/${r.id}/${toHeroSlug(r.organisationName)}` : null;
+                                const inner = (
+                                  <div className="bg-red-950/40 border border-red-500/25 rounded-xl px-3.5 py-2.5 hover:bg-red-950/60 transition-colors">
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div className="min-w-0 flex-1">
+                                        <p className="font-semibold text-white text-sm truncate">{r.organisationName}</p>
+                                        <p className="text-xs text-red-300/80 mt-0.5 truncate">
+                                          {removedDate ? `Licence revoked · ${removedDate}` : "Licence revoked"}{r.townCity ? ` · ${r.townCity}` : ""}
+                                        </p>
+                                      </div>
+                                      <span className="bg-red-500/15 text-red-300 border border-red-400/30 text-xs font-bold px-2 py-0.5 rounded-full shrink-0 mt-0.5">Revoked</span>
+                                    </div>
+                                    <div className="mt-2 flex items-center justify-between gap-2">
+                                      <p className="text-xs text-white/50">Get notified if this licence is restored</p>
+                                      <Link
+                                        href="/pricing?plan=starter"
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="text-xs font-bold text-indigo-300 hover:text-indigo-200 whitespace-nowrap"
+                                      >
+                                        Subscribe for alerts →
+                                      </Link>
+                                    </div>
+                                  </div>
+                                );
+                                return detailHref
+                                  ? <Link key={r.fingerprint} href={detailHref}>{inner}</Link>
+                                  : <div key={r.fingerprint}>{inner}</div>;
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <p className="text-xs text-white/50">Free, unlimited searches. No login required. 124,000+ licensed sponsors.</p>
+                    <label className="flex items-center gap-2 text-xs text-white/70 cursor-pointer select-none">
+                      <Switch checked={alertMeOnSubmit} onCheckedChange={setAlertMeOnSubmit} className="scale-90" />
+                      Also alert me when this employer's licence changes
+                    </label>
+                  </div>
+                  <a href="#cos-verification" className="inline-block text-sm font-medium text-white/70 hover:text-white underline underline-offset-2">
+                    Need to verify a CoS document instead? →
+                  </a>
                 </motion.div>
 
                 <div className="flex flex-col sm:flex-row sm:items-center gap-x-4 gap-y-2">
@@ -944,12 +958,12 @@ export default function HeroSection() {
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link href="/sponsors">
-              <Button size="lg" className="bg-slate-900 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 text-white rounded-full px-8 font-bold shadow-md">
+              <Button size="lg" variant="outline" className="rounded-full px-8 font-bold border-primary text-primary hover:bg-primary/5 dark:hover:bg-primary/10">
                 <Search className="w-4 h-4 mr-2" />Browse Full Register
               </Button>
             </Link>
             <Link href="/sponsor-monitor">
-              <Button size="lg" variant="outline" className="rounded-full px-8 font-bold border-primary text-primary hover:bg-primary/5 dark:hover:bg-primary/10">
+              <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full px-8 font-bold shadow-md shadow-primary/20">
                 <Bell className="w-4 h-4 mr-2" />Set Up Monitoring
               </Button>
             </Link>
@@ -1042,7 +1056,9 @@ export default function HeroSection() {
                   <li className="flex items-center gap-2 text-muted-foreground/60"><Lock className="w-4 h-4 text-slate-300 dark:text-slate-600" /><span className="line-through">No history</span></li>
                   <li className="flex items-center gap-2 text-muted-foreground/60"><Lock className="w-4 h-4 text-slate-300 dark:text-slate-600" /><span className="line-through">No monitoring</span></li>
                 </ul>
-                <Button variant="outline" disabled className="w-full opacity-60">Free Plan</Button>
+                <p className="flex min-h-10 items-center justify-center text-center text-sm font-medium text-muted-foreground">
+                  Included — just search above, no signup needed
+                </p>
               </CardContent>
             </Card>
 

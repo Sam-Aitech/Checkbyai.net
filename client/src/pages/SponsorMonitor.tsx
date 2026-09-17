@@ -933,6 +933,9 @@ export default function SponsorMonitor() {
   const [alertAddOnOpen, setAlertAddOnOpen] = useState(false);
   const [alertAddOnCompany, setAlertAddOnCompany] = useState<string>("");
   const searchRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchHighlightTimeoutRef = useRef<number | null>(null);
+  const [searchHighlighted, setSearchHighlighted] = useState(false);
 
   const tier: PlanTier = resolveTier(user?.subscriptionStatus);
   // While the auth query is still in flight, don't default to "free" — that
@@ -947,11 +950,28 @@ export default function SponsorMonitor() {
   const [freeSearchDone, setFreeSearchDone] = useState(false);
 
   const scrollToSearch = useCallback(() => {
-    searchRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    setTimeout(() => {
-      const input = searchRef.current?.querySelector("input");
-      input?.focus();
-    }, 500);
+    const input = searchInputRef.current;
+    if (!input) return;
+
+    setSearchHighlighted(true);
+    input.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+    window.setTimeout(() => input.focus({ preventScroll: true }), 450);
+
+    if (searchHighlightTimeoutRef.current) {
+      clearTimeout(searchHighlightTimeoutRef.current);
+    }
+    searchHighlightTimeoutRef.current = window.setTimeout(() => {
+      setSearchHighlighted(false);
+      searchHighlightTimeoutRef.current = null;
+    }, 1800);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (searchHighlightTimeoutRef.current) {
+        clearTimeout(searchHighlightTimeoutRef.current);
+      }
+    };
   }, []);
 
   const {
@@ -1152,7 +1172,7 @@ export default function SponsorMonitor() {
       <LandingDigest />
       <ProofBar />
 
-      <section className="py-12 sm:py-16" ref={searchRef}>
+      <section className="py-12 sm:py-16 scroll-mt-24" ref={searchRef}>
         <div className="max-w-3xl mx-auto px-4">
           <div className="text-center mb-8">
             <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">Check Any Company Right Now (Free)</h2>
@@ -1165,10 +1185,13 @@ export default function SponsorMonitor() {
             <Input
               id="sponsor-search-input"
               type="text"
+              ref={searchInputRef}
               placeholder="e.g., 'Deloitte' or your employer name..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 h-14 text-base border-2 border-input focus-visible:ring-primary focus-visible:border-primary"
+              className={`pl-10 h-14 text-base border-2 border-input focus-visible:ring-primary focus-visible:border-primary transition-shadow ${
+                searchHighlighted ? "ring-4 ring-primary/50 ring-offset-2 shadow-lg shadow-primary/25" : ""
+              }`}
             />
             {effectiveFetching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground animate-spin" />}
           </div>

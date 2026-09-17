@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useInView } from "react-intersection-observer";
 import { ArrowRight, Bell } from "lucide-react";
@@ -9,24 +8,6 @@ import { useDailyDigest } from "@/hooks/useDailyDigest";
 
 function AnimatedCounter({ value, label, icon, color, large }: { value: number; label: string; icon: React.ReactNode; color: string; large?: boolean }) {
   const [ref, inView] = useInView({ triggerOnce: true, threshold: 0.3 });
-  const [displayValue, setDisplayValue] = useState(0);
-
-  useEffect(() => {
-    if (!inView || value === 0) return;
-    let start = 0;
-    const duration = large ? 1800 : 1200;
-    const step = Math.max(1, Math.floor(value / 60));
-    const interval = setInterval(() => {
-      start += step;
-      if (start >= value) {
-        setDisplayValue(value);
-        clearInterval(interval);
-      } else {
-        setDisplayValue(start);
-      }
-    }, duration / 60);
-    return () => clearInterval(interval);
-  }, [inView, value, large]);
 
   if (large) {
     return (
@@ -42,7 +23,7 @@ function AnimatedCounter({ value, label, icon, color, large }: { value: number; 
             {icon}
           </div>
           <span className="text-4xl sm:text-5xl md:text-6xl font-extrabold bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent tabular-nums tracking-tight">
-            {displayValue.toLocaleString()}
+            {value.toLocaleString()}
           </span>
         </div>
         <p className="text-sm sm:text-base text-muted-foreground font-medium">{label}</p>
@@ -62,7 +43,7 @@ function AnimatedCounter({ value, label, icon, color, large }: { value: number; 
         {icon}
       </div>
       <div className="text-3xl sm:text-4xl font-bold text-foreground tabular-nums">
-        {displayValue.toLocaleString()}
+        {value.toLocaleString()}
       </div>
       <div className="text-sm text-muted-foreground mt-1">{label}</div>
     </motion.div>
