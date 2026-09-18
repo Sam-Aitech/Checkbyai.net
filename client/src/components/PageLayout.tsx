@@ -72,10 +72,14 @@ function NavDropdown({ item, dark = false }: NavDropdownProps) {
         onClick={() => setOpen(v => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className={`flex items-center gap-1 px-4 py-2 text-sm font-medium rounded-full transition-[color,background-color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+        className={`flex items-center gap-1 px-4 py-2 text-sm font-medium rounded-full border transition-[color,background-color,border-color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
           dark
-            ? isChildActive ? "text-white bg-white/10 font-semibold" : "text-slate-300 hover:text-white hover:bg-white/5"
-            : isChildActive ? "text-primary bg-primary/10 font-semibold" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+            ? isChildActive
+              ? "text-white bg-white/10 border-white/20 font-semibold"
+              : "text-slate-300 border-white/10 bg-white/[0.03] hover:text-white hover:bg-white/10 hover:border-white/20"
+            : isChildActive
+              ? "text-primary bg-primary/10 border-primary/20 font-semibold"
+              : "text-muted-foreground border-border/70 bg-muted/30 hover:text-foreground hover:bg-muted hover:border-border"
         }`}
       >
         {item.label}
@@ -168,6 +172,17 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
     }
   }, [mobileOpen]);
 
+  useEffect(() => {
+    if (!mobileOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [mobileOpen]);
+
   const closeMobileMenu = () => {
     setMobileOpen(false);
     menuButtonRef.current?.focus();
@@ -258,9 +273,10 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
 
                 <button
                   ref={menuButtonRef}
-                  className={`lg:hidden p-2 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${darkNav ? "text-slate-300 hover:text-white hover:bg-white/5" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
-                  onClick={() => setMobileOpen(!mobileOpen)}
-                  aria-label="Toggle navigation menu"
+                  type="button"
+                  className={`lg:hidden flex min-h-11 min-w-11 items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${darkNav ? "text-slate-300 hover:text-white hover:bg-white/5" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+                  onClick={() => mobileOpen ? closeMobileMenu() : setMobileOpen(true)}
+                  aria-label={mobileOpen ? "Close navigation menu" : "Open navigation menu"}
                   aria-expanded={mobileOpen}
                   aria-controls="mobile-nav"
                 >
@@ -273,17 +289,26 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
           {/* Mobile menu */}
           <AnimatePresence>
             {mobileOpen && (
-              <motion.div
-                id="mobile-nav"
-                ref={mobileMenuRef}
-                aria-label="Navigation menu"
-                initial={menuVariants.initial}
-                animate={menuVariants.animate}
-                exit={menuVariants.exit}
-                transition={shouldReduceMotion ? { duration: 0.15 } : { type: "spring", stiffness: 100, damping: 15 }}
-                className={`lg:hidden border-t backdrop-blur-xl overflow-hidden ${darkNav ? "border-slate-800 bg-slate-900/95" : "border-border/50 bg-white/95 dark:bg-background/95"}`}
-              >
-                <div className="px-5 py-4 space-y-4">
+              <>
+                <button
+                  type="button"
+                  aria-label="Close navigation menu"
+                  className="fixed inset-0 z-40 cursor-default bg-slate-950/50 lg:hidden"
+                  onClick={closeMobileMenu}
+                />
+                <motion.div
+                  id="mobile-nav"
+                  ref={mobileMenuRef}
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label="Navigation menu"
+                  initial={menuVariants.initial}
+                  animate={menuVariants.animate}
+                  exit={menuVariants.exit}
+                  transition={shouldReduceMotion ? { duration: 0.15 } : { type: "spring", stiffness: 100, damping: 15 }}
+                  className={`relative z-50 max-h-[calc(100svh-4rem)] overflow-y-auto border-t backdrop-blur-xl shadow-2xl lg:hidden ${darkNav ? "border-slate-800 bg-slate-900/95" : "border-border/50 bg-white/95 dark:bg-background/95"}`}
+                >
+                  <div className="px-5 py-4 space-y-4">
 
                   {/* Monitor group */}
                   <div>
@@ -346,44 +371,45 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
                     ))}
                   </div>
 
-                  {/* CTA */}
-                  <div className={`border-t pt-3 ${darkNav ? "border-slate-800" : "border-border/50"}`}>
-                    {isAuthenticated ? (
-                      (isPro || isAdmin) && (
-                        <Link
-                          href="/pro-dashboard"
-                          onClick={closeMobileMenu}
-                          className="flex items-center justify-center gap-2 w-full px-4 py-3 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-xl transition-all"
-                        >
-                          <LayoutDashboard className="w-4 h-4" />
-                          My Dashboard
-                        </Link>
-                      )
-                    ) : (
-                      <>
-                        <Link
-                          href="/login"
-                          onClick={closeMobileMenu}
-                          className={`block w-full px-4 py-2.5 text-sm font-medium text-center rounded-xl transition-colors mb-2 ${darkNav ? "text-slate-300 hover:text-white hover:bg-white/5" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
-                        >
-                          Sign In
-                        </Link>
-                        {location !== "/pricing" && (
+                    {/* CTA */}
+                    <div className={`border-t pt-3 ${darkNav ? "border-slate-800" : "border-border/50"}`}>
+                      {isAuthenticated ? (
+                        (isPro || isAdmin) && (
                           <Link
-                            href="/pricing"
+                            href="/pro-dashboard"
                             onClick={closeMobileMenu}
                             className="flex items-center justify-center gap-2 w-full px-4 py-3 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-xl transition-all"
                           >
-                            <Bell className="w-4 h-4" />
-                            Get Licence Alerts
+                            <LayoutDashboard className="w-4 h-4" />
+                            My Dashboard
                           </Link>
-                        )}
-                      </>
-                    )}
-                  </div>
+                        )
+                      ) : (
+                        <>
+                          <Link
+                            href="/login"
+                            onClick={closeMobileMenu}
+                            className={`block w-full px-4 py-2.5 text-sm font-medium text-center rounded-xl transition-colors mb-2 ${darkNav ? "text-slate-300 hover:text-white hover:bg-white/5" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+                          >
+                            Sign In
+                          </Link>
+                          {location !== "/pricing" && (
+                            <Link
+                              href="/pricing"
+                              onClick={closeMobileMenu}
+                              className="flex items-center justify-center gap-2 w-full px-4 py-3 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-xl transition-all"
+                            >
+                              <Bell className="w-4 h-4" />
+                              Get Alerts
+                            </Link>
+                          )}
+                        </>
+                      )}
+                    </div>
 
-                </div>
-              </motion.div>
+                  </div>
+                </motion.div>
+              </>
             )}
           </AnimatePresence>
         </nav>

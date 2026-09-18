@@ -2532,12 +2532,16 @@ export default function SimpleAdmin() {
                                     const val = e.target.value;
                                     const limit = val === 'default' ? null : val === 'unlimited' ? -1 : parseInt(val);
                                     try {
-                                      await fetch(`/api/admin/users/${u.id}/limit`, {
+                                      const response = await fetch(`/api/admin/users/${u.id}/limit`, {
                                         method: 'PATCH',
                                         headers: { 'Content-Type': 'application/json' },
                                         body: JSON.stringify({ limit }),
                                         credentials: 'include'
                                       });
+                                      if (!response.ok) {
+                                        const body = await response.json().catch(() => ({}));
+                                        throw new Error(body.message || 'Failed to update limit');
+                                      }
                                       toast({ title: 'Limit updated', description: val === 'unlimited' ? 'User has unlimited verifications' : val === 'default' ? 'User has default limit (1/day)' : `User has ${val} verifications` });
                                       loadUsers();
                                     } catch {
@@ -2564,12 +2568,16 @@ export default function SimpleAdmin() {
                                       variant="outline"
                                       onClick={async () => {
                                         try {
-                                          await fetch(`/api/admin/users/${u.id}/cos-approval`, {
+                                        const response = await fetch(`/api/admin/users/${u.id}/cos-approval`, {
                                             method: 'PATCH',
                                             headers: { 'Content-Type': 'application/json' },
                                             body: JSON.stringify({ approved: !u.cosCheckApproved }),
                                             credentials: 'include',
                                           });
+                                        if (!response.ok) {
+                                          const body = await response.json().catch(() => ({}));
+                                          throw new Error(body.message || 'Failed to update beta access');
+                                        }
                                           toast({
                                             title: u.cosCheckApproved ? 'Beta access revoked' : 'Beta access approved',
                                             description: u.cosCheckApproved ? 'User can no longer verify documents' : 'User will receive an email confirmation',

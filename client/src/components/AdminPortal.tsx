@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { unwrapApiEnvelope } from "@/lib/apiEnvelope";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -247,8 +248,10 @@ export default function AdminPortal() {
   });
 
   const creditsMutation = useMutation({
-    mutationFn: ({ userId, operation, amount, reason }: { userId: string; operation: 'add' | 'deduct' | 'set'; amount: number; reason?: string }) =>
-      apiRequest('PATCH', `/api/admin/users/${userId}/credits`, { operation, amount, reason }),
+    mutationFn: async ({ userId, operation, amount, reason }: { userId: string; operation: 'add' | 'deduct' | 'set'; amount: number; reason?: string }) => {
+      const response = await apiRequest('PATCH', `/api/admin/users/${userId}/credits`, { operation, amount, reason });
+      return unwrapApiEnvelope<{ creditsBefore: number; creditsAfter: number }>(await response.json());
+    },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
       toast({ title: 'Credits updated', description: `${data.creditsBefore} → ${data.creditsAfter} credits.` });

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSpring, animated } from '@react-spring/web'
+import { Link } from 'wouter'
 
 interface FloatingShapeProps {
   delay: number
@@ -106,17 +107,22 @@ function DocumentAnimation() {
 
   return (
     <div className="relative flex items-center justify-center h-full">
-      <animated.div
-        style={floatingAnimation}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        className="relative cursor-pointer"
+      <Link
+        href="/dashboard"
+        aria-label="Verify a Certificate of Sponsorship"
+        className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-4"
       >
         <animated.div
-          style={{ ...documentAnimation, width: '264px', height: '340px' }}
-          aria-hidden="true"
-          className="relative bg-white dark:bg-slate-900 rounded-xl p-6 border border-indigo-100 dark:border-slate-700 overflow-hidden"
+          style={floatingAnimation}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          className="relative cursor-pointer"
         >
+          <animated.div
+            style={{ ...documentAnimation, width: '264px', height: '340px' }}
+            aria-hidden="true"
+            className="relative bg-white dark:bg-slate-900 rounded-xl p-6 border border-indigo-100 dark:border-slate-700 overflow-hidden"
+          >
           {/* Document Header with UK cues */}
           <div className="flex items-start justify-between mb-4">
             <div>
@@ -187,8 +193,9 @@ function DocumentAnimation() {
 
           {/* AI Scan line overlay */}
           <div className="scan-line" />
+          </animated.div>
         </animated.div>
-      </animated.div>
+      </Link>
     </div>
   )
 }

@@ -41,6 +41,10 @@ import { rebuildSponsorIndex } from "../utils/sponsorSearch";
 import { isQueueAvailable, getSponsorRefreshQueue } from "../services/jobQueue";
 import { cacheFlushPattern } from "../utils/redisClient";
 import { getWatchLimit } from "../utils/tierConfig";
+import {
+  formatForensicSseEvent,
+  loadAdminForensicContext,
+} from "../services/adminForensicAnalysis";
 
 const TRUSTED_COS_FORENSIC_VERSION = 1;
 
@@ -321,9 +325,16 @@ export function registerAdminRoutes(app: Express): void {
         return res.status(404).json({ message: "Verification not found" });
       }
 
-      const globalRules = await storage.getActiveGlobalAiRules();
-      const trustedPatterns = await storage.getTrustedPatterns();
-      const hitlKnowledge = await storage.getAdminFakeKnowledge(15);
+      const {
+        globalRules,
+        trustedPatterns,
+        hitlKnowledge,
+        warnings: contextWarnings,
+      } = await loadAdminForensicContext(id, {
+        globalRules: () => storage.getActiveGlobalAiRules(),
+        trustedPatterns: () => storage.getTrustedPatterns(),
+        hitlKnowledge: () => storage.getAdminFakeKnowledge(15),
+      });
 
       let knowledgeContext = '';
 
@@ -436,7 +447,11 @@ Format your response in clear, professional markdown.`;
         provider = created.provider;
       } catch (err) {
         logger.error({ err }, "AI provider failed before streaming:");
-        return res.status(502).json({ message: 'AI analysis unavailable. All configured AI providers failed. The verification itself completed successfully — please retry.' });
+        return res.status(502).json({
+          message: 'AI analysis unavailable. All configured AI providers failed. The verification itself completed successfully — please retry.',
+          code: "AI_PROVIDER_FAILED",
+          retryable: true,
+        });
       }
 
       res.setHeader('Content-Type', 'text/event-stream');
@@ -444,31 +459,49 @@ Format your response in clear, professional markdown.`;
       res.setHeader('Connection', 'keep-alive');
       res.setHeader('X-Accel-Buffering', 'no');
 
-      res.write(`data: ${JSON.stringify({ provider, availableProviders: getAvailableProviders() })}\n\n`);
+      res.write(formatForensicSseEvent({
+        provider,
+        availableProviders: getAvailableProviders(),
+        contextWarnings,
+      }));
 
       try {
         for await (const chunk of stream) {
           const content = chunk.choices[0]?.delta?.content || '';
           if (content) {
-            res.write(`data: ${JSON.stringify({ content })}\n\n`);
+            res.write(formatForensicSseEvent({ content }));
           }
         }
       } catch (err) {
         logger.error({ err }, "AI stream failed mid-response:");
-        res.write(`data: ${JSON.stringify({ error: "AI analysis unavailable. The stream failed during generation. The verification itself completed successfully — please retry." })}\n\n`);
+        res.write(formatForensicSseEvent({
+          error: "AI analysis unavailable. The stream failed during generation. The verification itself completed successfully — please retry.",
+          code: "AI_STREAM_FAILED",
+          retryable: true,
+          done: true,
+        }));
         res.end();
         return;
       }
 
-      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      res.write(formatForensicSseEvent({ done: true }));
       res.end();
     } catch (error) {
       logger.error({ err: error }, "Error in AI analysis:");
       if (!res.headersSent) {
-        res.status(500).json({ message: "AI analysis unavailable. The verification itself completed successfully — please retry." });
+        res.status(500).json({
+          message: "AI analysis unavailable. The verification itself completed successfully — please retry.",
+          code: "AI_ANALYSIS_FAILED",
+          retryable: true,
+        });
       } else {
         try {
-          res.write(`data: ${JSON.stringify({ error: "AI analysis unavailable. The verification itself completed successfully — please retry." })}\n\n`);
+          res.write(formatForensicSseEvent({
+            error: "AI analysis unavailable. The verification itself completed successfully — please retry.",
+            code: "AI_ANALYSIS_FAILED",
+            retryable: true,
+            done: true,
+          }));
         } catch {}
         res.end();
       }
@@ -1154,7 +1187,8 @@ Format your response in clear, professional markdown.`;
       res.json({
         message: `Verification limit set to: ${limitDescription}`,
         userId,
-        verificationLimit: limit
+        verificationLimit: limit,
+        cosEntitlement: await storage.getCosEntitlement(userId),
       });
     } catch (error) {
       logger.error({ err: error }, "Error updating user verification limit:");
@@ -1220,6 +1254,7 @@ Format your response in clear, professional markdown.`;
         message: approved ? 'Beta access granted' : 'Beta access revoked',
         userId,
         cosCheckApproved: approved,
+        cosEntitlement: await storage.getCosEntitlement(userId),
       });
     } catch (error) {
       logger.error({ err: error }, "Error updating CoS Check approval:");
@@ -1317,7 +1352,12 @@ Format your response in clear, professional markdown.`;
         );
       }
 
-      res.json({ message: active ? 'COS check subscription activated' : 'COS check subscription deactivated', userId, cosCheckSubscription: active });
+      res.json({
+        message: active ? 'COS check subscription activated' : 'COS check subscription deactivated',
+        userId,
+        cosCheckSubscription: active,
+        cosEntitlement: await storage.getCosEntitlement(userId),
+      });
     } catch (error) {
       logger.error({ err: error }, "Error updating COS check subscription:");
       res.status(500).json({ message: "Failed to update COS check subscription" });
@@ -2313,6 +2353,7 @@ Format your response in clear, professional markdown.`;
         userId,
         creditsBefore: prevCredits,
         creditsAfter: newCredits,
+        cosEntitlement: await storage.getCosEntitlement(userId),
       });
     } catch (error) {
       logger.error({ err: error }, 'Error updating credits:');

@@ -6,7 +6,7 @@ import type { Response } from "express";
  * that isn't in the client union (or vice versa) is a compile error on
  * whichever side is stale, instead of a silently-dead client branch.
  */
-export type ApiErrorCode = "beta_login_required" | "cos_access_denied";
+export type ApiErrorCode = "beta_login_required" | "cos_access_denied" | "account_restricted";
 
 export interface ApiSuccess<T> {
   success: true;

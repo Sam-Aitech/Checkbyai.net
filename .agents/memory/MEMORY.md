@@ -1,2 +1,3 @@
 - [Development preview framing](development-preview-framing.md) — keep production anti-framing headers strict, but do not emit them in Replit development Preview.
 - [Stripe customer migration](stripe-customer-migration.md) — changing Stripe account or mode invalidates stored customer IDs; checkout must recover missing/deleted customers.
+- [CoS entitlement boundaries](cos-entitlement-boundaries.md) — Sponsor Monitor plans and CoS verification access are separate; resolve CoS allowance through one shared contract.

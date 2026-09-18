@@ -131,29 +131,11 @@ export function registerVerificationRoutes(app: Express): void {
     }
 
     const isAdminUser = betaUser.role === 'admin';
-    const hasCosSubscription = betaUser.cosCheckSubscription === true;
-    const hasAdminApproval = betaUser.cosCheckApproved === true;
-    // `credits` is currently minted ONLY by COS-domain grants (cos_check_single,
-    // COS starter/pro packages, and the notification_pro monthly +5 bundle) —
-    // alert_annual/alert_annual_pro/notification_starter never touch it. That
-    // makes credits>0 a safe COS-only signal HERE, in the COS verification gate
-    // only. It is a fact about current grant behavior in billing.ts, not a
-    // schema-enforced guarantee — if a future Alert-Pass package ever grants
-    // `credits`, this check must be revisited.
-    //
-    // INVARIANT: this signal must never be read anywhere that decides Alert-Pass
-    // tier/watch-limits/channels/jobAlerts (those derive solely from
-    // subscriptionStatus via shared/planTiers.ts). A notification_pro subscriber
-    // keeps full Alert-Pass-Pro features regardless of whether these COS credits
-    // are unspent, partially spent, or exhausted — exhausting them must never
-    // downgrade or gate any Alert-Pass feature.
-    const hasCosCredits = (betaUser.credits || 0) > 0;
-    // 'enterprise' is never auto-assigned by any checkout/webhook path (it's a
-    // manual/admin-provisioned value for negotiated deals covering both
-    // products), so treating it as an unconditional COS pass is zero-risk.
-    const hasEnterpriseGrant = betaUser.subscriptionStatus === 'enterprise';
-
-    if (!isAdminUser && !hasCosSubscription && !hasAdminApproval && !hasCosCredits && !hasEnterpriseGrant) {
+    const entitlement = await storage.getCosEntitlement(betaUserId);
+    if (!entitlement?.hasAccess) {
+      if (entitlement?.accessSource === "restricted") {
+        throw new ApiError(403, 'Your account is restricted. Please contact support.', 'account_restricted');
+      }
       throw new ApiError(403, 'Your account is pending COS Check access. Please contact support or upgrade your subscription.', 'cos_access_denied');
     }
 
@@ -188,7 +170,7 @@ export function registerVerificationRoutes(app: Express): void {
       // accepting an unchecked possibly-undefined value.
       const userId: string = betaUserId;
 
-      if (!betaUser.ipExempt && !isAdminUser) {
+      if (entitlement.consumptionSource === "daily" && !betaUser.ipExempt && !isAdminUser) {
         const clientIp = getClientIp(req);
         const hashedIp = hashIpAddress(clientIp);
         const ipRecord = await storage.getIpVerification(hashedIp);
@@ -207,20 +189,14 @@ export function registerVerificationRoutes(app: Express): void {
       let useDailyLimit = false;
 
       if (userId) {
-        const user = betaUser;
-        const hasUnlimited = isAdminUser || hasCosSubscription || user.subscriptionStatus === 'enterprise' || user.verificationLimit === -1;
-
-        if (!hasUnlimited) {
-          const credits = user.credits || 0;
-          if (credits > 0) {
-            useCredits = true;
-          } else {
-            const canVerify = await storage.checkDailyLimit(userId);
-            if (!canVerify) {
-              throw new ApiError(429, 'Daily verification limit reached. Purchase credits or upgrade for unlimited verifications.');
-            }
-            useDailyLimit = true;
-          }
+        if (!entitlement.canVerify) {
+          throw new ApiError(429, 'CoS verification limit reached. Purchase credits or ask an administrator to increase your limit.');
+        }
+        if (!entitlement.isUnlimited) {
+          useCredits = entitlement.consumptionSource === "credits";
+          useDailyLimit =
+            entitlement.consumptionSource === "custom_limit" ||
+            entitlement.consumptionSource === "daily";
         }
       }
 
@@ -356,7 +332,12 @@ export function registerVerificationRoutes(app: Express): void {
             const today = new Date().toISOString().split('T')[0];
             const [currentUser] = await tx.select({ dailyVerificationsUsed: users.dailyVerificationsUsed, lastVerificationDate: users.lastVerificationDate }).from(users).where(eq(users.id, userId));
             const usageToday = currentUser?.lastVerificationDate === today ? (currentUser.dailyVerificationsUsed || 0) + 1 : 1;
-            await tx.update(users).set({ dailyVerificationsUsed: usageToday, lastVerificationDate: today, updatedAt: new Date() }).where(eq(users.id, userId));
+            await tx.update(users).set({
+              dailyVerificationsUsed: usageToday,
+              totalVerificationsUsed: sql`COALESCE(${users.totalVerificationsUsed}, 0) + 1`,
+              lastVerificationDate: today,
+              updatedAt: new Date(),
+            }).where(eq(users.id, userId));
           }
           const insertValues: any = {
             userId, filename: path.basename(req.file!.originalname), result, confidence: Math.floor(analysis.confidence),
