@@ -61,6 +61,19 @@ describe("Customer-facing copy safety (static)", () => {
     expect(src).not.toContain("99.99%");
     expect(src).not.toContain("10,000+");
     expect(src).not.toContain("industry-leading accuracy");
+    expect(src).not.toContain("escalated to qualified immigration professionals");
+    expect(src).not.toContain("never interrupted");
+    expect(src).not.toContain("no single point of failure");
+    expect(src).not.toContain("Automatic Failover");
+  });
+
+  it("uses current GOV.UK civil-penalty figures in the employer guide", () => {
+    const guide = fs.readFileSync(
+      path.resolve(import.meta.dirname, "../../../client/public/guides/employers-guide-fake-cos.html"),
+      "utf-8",
+    );
+    expect(guide).toContain("£60,000");
+    expect(guide).not.toContain("up to £20,000 per illegal worker");
   });
 
   it("frames CoS SEO metadata as technical risk analysis, not genuineness verdicts", () => {
