@@ -83,6 +83,28 @@ function rewriteRouteMeta(
   return html;
 }
 
+/** Accept-header gate shared by every HTML-only SEO handler. */
+function wantsHtml(req: any): boolean {
+  const accept = req.headers["accept"] || "";
+  return accept.includes("text/html");
+}
+
+/** First available shell template (built output, then dev source). */
+function readShellTemplate(): string | null {
+  for (const p of HTML_PATHS) {
+    const html = readHtmlTemplate(p);
+    if (html) return html;
+  }
+  return null;
+}
+
+/** Send an HTML page with a CDN-friendly cache header. */
+function sendHtmlPage(res: any, html: string): void {
+  res.set("Content-Type", "text/html");
+  res.set("Cache-Control", "public, max-age=3600");
+  res.send(html);
+}
+
 export function registerSeoRoutes(app: Express): void {
 
   // Sitemap INDEX — points to core pages + 124k sponsor detail pages
@@ -386,6 +408,12 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
     }
   });
 
+  // Shared by /dashboard and its /verify-cos alias — one copy, not two.
+  const dashboardMeta = {
+    title: 'Certificate of Sponsorship Risk Check | Technical Analysis | CheckByAI',
+    description: 'Upload your Certificate of Sponsorship PDF for technical risk analysis — hidden metadata, formatting and reference-pattern signals. Not a genuineness verdict; only the Home Office decides.',
+  };
+
   const seoMetaMap: Record<string, { title: string; description: string }> = {
     '/': {
       title: 'Is Your UK Sponsor Licence Safe? | Twice-Daily Revocation Alerts | CheckByAI',
@@ -411,14 +439,8 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
       title: 'UK Sponsor Licence Revocations Today | Live Register Updates | CheckByAI',
       description: 'Which UK sponsor licences were revoked today? See live changes from the Home Office register — additions, removals, downgrades — updated daily.',
     },
-    '/dashboard': {
-      title: 'Certificate of Sponsorship Risk Check | Technical Analysis | CheckByAI',
-      description: 'Upload your Certificate of Sponsorship PDF for technical risk analysis — hidden metadata, formatting and reference-pattern signals. Not a genuineness verdict; only the Home Office decides.',
-    },
-    '/verify-cos': {
-      title: 'Certificate of Sponsorship Risk Check | Technical Analysis | CheckByAI',
-      description: 'Upload your Certificate of Sponsorship PDF for technical risk analysis — hidden metadata, formatting and reference-pattern signals. Not a genuineness verdict; only the Home Office decides.',
-    },
+    '/dashboard': dashboardMeta,
+    '/verify-cos': dashboardMeta,
     '/technology': {
       title: 'How We Detect Fake Documents | Forensic AI Technology | CheckByAI',
       description: 'Learn how our forensic AI catches fake Certificates of Sponsorship that humans miss. Metadata extraction, pattern analysis, and machine learning — explained.',
@@ -458,13 +480,8 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
   for (const routePath of Object.keys(ROUTE_SSR_BODIES)) {
     app.get(routePath, (req: any, res, next) => {
       try {
-        const accept = req.headers["accept"] || "";
-        if (!accept.includes("text/html")) return next();
-        let html: string | null = null;
-        for (const p of HTML_PATHS) {
-          html = readHtmlTemplate(p);
-          if (html) break;
-        }
+        if (!wantsHtml(req)) return next();
+        let html = readShellTemplate();
         if (!html) return next();
         const routeMeta = seoMetaMap[routePath];
         if (routeMeta) {
@@ -475,9 +492,7 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
           ROOT_INJECTION_REGEX,
           (_match: string, p1: string, p2: string) => `${p1}${seoBody}${p2}`,
         );
-        res.set("Content-Type", "text/html");
-        res.set("Cache-Control", "public, max-age=3600");
-        res.send(html);
+        sendHtmlPage(res, html);
       } catch (err) {
         logger.error({ err, routePath }, "Route SSR injection error:");
         next();
@@ -502,17 +517,14 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
   for (const [routePath, guideFile] of Object.entries(GUIDE_FILES)) {
     app.get(routePath, (req: any, res, next) => {
       try {
-        const accept = req.headers["accept"] || "";
-        if (!accept.includes("text/html")) return next();
+        if (!wantsHtml(req)) return next();
         let html: string | null = null;
         for (const dir of GUIDE_DIRS) {
           html = readHtmlTemplate(path.join(dir, guideFile));
           if (html) break;
         }
         if (!html) return next();
-        res.set("Content-Type", "text/html");
-        res.set("Cache-Control", "public, max-age=3600");
-        res.send(html);
+        sendHtmlPage(res, html);
       } catch (err) {
         logger.error({ err, routePath }, "Guide static serve error:");
         next();
