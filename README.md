@@ -41,7 +41,7 @@
 |---|---|
 | 🔍 **Sponsor Licence Monitor** | Daily scans of the UK Home Office Register of Licensed Sponsors. Alerts on removals, downgrades, new routes, and status changes. |
 | 🔎 **CoS Check — PDF Forensics** | Forensic analysis of Certificate of Sponsorship PDFs to detect tampering, fabricated metadata, suspicious modification dates, and invalid certificate generation. |
-| ⚡ **Real-Time Alerts** | Email, WhatsApp, and SMS notifications when licences are revoked or suspended. |
+| ⚡ **Scheduled Digest Alerts** | Email, WhatsApp, and SMS digests on licence changes (Starter same-day 18:00 UTC; Pro twice-daily 07:00 & 19:00 UTC). |
 | 📊 **124,000+ Sponsors Tracked** | Full coverage of the UK Home Office Register of Licensed Sponsors. |
 
 ---
@@ -52,7 +52,7 @@
 1. Upload a CoS PDF  →  2. AI scans 6 data points  →  3. Get a risk score in seconds
 
 
-1. Enter a sponsor name  →  2. CheckByAI scans the register  →  3. Get instant status + alerts
+1. Enter a sponsor name  →  2. CheckByAI checks the register  →  3. Get instant listing status + scheduled digest alerts
 ```
 
 ---
@@ -62,7 +62,7 @@
 | Feature | Free | Starter | Pro | Unlimited | Enterprise |
 |---|:---:|:---:|:---:|:---:|:---:|
 | **Sponsor Watches** | 1 | 2 | 5 | Unlimited | Unlimited |
-| **Notifications** | Daily digest | Email + WhatsApp | All + Immediate | All + Immediate | All + Webhooks |
+| **Notifications** | Daily digest | Email + WhatsApp, same-day 18:00 UTC | All channels, twice-daily 07:00 & 19:00 UTC | All channels, twice-daily 07:00 & 19:00 UTC | All + Webhooks |
 | **CoS Check MIS** | — | — | ✅ | ✅ | ✅ |
 | **API Access** ¹ | — | — | — | Planned | Planned |
 

@@ -83,8 +83,8 @@ Feature access gated by `users.subscriptionStatus`:
 free      → 1 watch, no notifications
 starter   → 2 watches, email + WhatsApp, same-day
 pro       → 5 watches, all channels, immediate, job alerts
-unlimited → unlimited watches, all channels, API access
-enterprise → unlimited + webhooks + CSV upload
+unlimited → unlimited watches, all channels, API access (limited pilot — approval required)
+enterprise → unlimited + webhooks + CSV upload + API access (limited pilot)
 ```
 Tier config is the single source of truth in `server/utils/tierConfig.ts`.
 

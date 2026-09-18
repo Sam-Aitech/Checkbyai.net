@@ -47,14 +47,14 @@ const annualPlans: AnnualPlan[] = [
     name: 'Alert Pass (Annual)',
     price: '£9.99',
     period: '/year',
-    description: 'Low-commitment monitoring for a single employer. Billed today, ends 12 months later unless repurchased.',
+    description: 'Annual pass: 1 company · 12 months · same-day 18:00 UTC digest · one-off payment, no auto-renew.',
     packageType: 'alert_annual',
     icon: Bell,
     features: [
-      'Monitor 1 company for 12 months',
+      'Monitor 1 company for 12 months — never miss a revocation affecting your visa',
       'Email + WhatsApp alerts',
-      'Same-day alerts (18:00 UTC)',
-      '30-day change history',
+      'Same-day alerts (18:00 UTC) — act before work problems escalate',
+      '30-day change history — keep evidence of when your employer changed',
       'Ends after 12 months — repurchase to continue. Expiry reminders at 30/7 days.',
     ],
   },
@@ -62,15 +62,15 @@ const annualPlans: AnnualPlan[] = [
     name: 'Alert Pass Pro (Annual)',
     price: '£19.99',
     period: '/year',
-    description: 'Full protection with twice-daily alerts. Billed once, ends 12 months later unless repurchased.',
+    description: 'Annual pass: up to 5 companies · 12 months · twice-daily 07:00 & 19:00 UTC digest · one-off payment, no auto-renew.',
     packageType: 'alert_annual_pro',
     popular: true,
     icon: Zap,
     features: [
-      'Monitor up to 5 companies for 12 months',
+      'Monitor up to 5 companies for 12 months — cover current + backup employers',
       'Email + WhatsApp + SMS',
-      '90-day change history',
-      'Sponsored job alerts by email (opt-out in Alerts)',
+      '90-day change history — prove timing for visa records',
+      'Sponsored job alerts by email (opt-out in Alerts) — don’t miss backup sponsorship',
       ALERT_TIMING_SHORT.pro,
       'Ends after 12 months — repurchase to continue. Expiry reminders at 30/7 days.',
     ],
@@ -82,14 +82,14 @@ const notificationPlans: NotificationPlan[] = [
     name: 'Starter',
     price: '£24.99',
     period: '/month',
-    description: 'Stay informed when your sponsor licence status changes.',
+    description: 'Monthly subscription: up to 2 companies · auto-renews · same-day 18:00 UTC digest. Stay informed when a sponsor licence status changes.',
     packageType: 'notification_starter',
     icon: Bell,
     features: [
-      'Monitor up to 2 companies',
+      'Monitor up to 2 companies — cover your employer + previous sponsor',
       'Email + WhatsApp alerts',
-      'Same-day alerts (18:00 UTC)',
-      '30-day change history',
+      'Same-day alerts (18:00 UTC) — avoid being blindsided at work',
+      '30-day change history — keep evidence of when status changed',
       'Monitoring dashboard',
     ],
     notIncluded: [
@@ -102,16 +102,16 @@ const notificationPlans: NotificationPlan[] = [
     name: 'Pro',
     price: '£49.99',
     period: '/month',
-    description: 'Full protection with twice-daily alerts and CoS checks.',
+    description: 'Monthly subscription: up to 5 companies · auto-renews · twice-daily 07:00 & 19:00 UTC digest, plus 5 CoS checks/month.',
     packageType: 'notification_pro',
     popular: true,
     icon: Zap,
     features: [
-      'Monitor up to 5 companies',
+      'Monitor up to 5 companies — protect main + backup employers',
       'Email + WhatsApp + SMS',
-      'Twice-daily alerts (07:00 & 19:00 UTC)',
-      '90-day change history',
-      '5 CoS verification checks per month',
+      'Twice-daily alerts (07:00 & 19:00 UTC) — fastest warning before visa impact',
+      '90-day change history — prove timing for visa records',
+      '5 CoS verification checks per month — catch fake documents early',
       'Priority support',
     ],
   },
@@ -543,7 +543,7 @@ export default function Pricing() {
               </p>
             </div>
             <p className="text-center text-xs text-muted-foreground mt-3">
-              Sponsor Alerts only — this does NOT include CoS document verification credits. Need document checks?{' '}
+              Sponsor Alerts only — except Pro Monthly includes 5 CoS verification checks/month. Annual passes include no document credits. Need more document checks?{' '}
               <button onClick={() => setLocation('/cos-pricing')} className="underline font-semibold hover:no-underline text-primary">View CoS Verification Plans</button>
             </p>
           </div>

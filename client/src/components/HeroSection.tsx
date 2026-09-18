@@ -160,7 +160,7 @@ function RecentlyRevokedSection() {
           <div className="mt-5 bg-slate-50 dark:bg-slate-900/50 border border-border rounded-xl px-5 py-3 flex items-center justify-between gap-3 flex-wrap">
             <p className="text-sm text-muted-foreground">
               <Bell className="w-3.5 h-3.5 inline mr-1 text-emerald-500" />
-              Get instant WhatsApp or email alerts when any sponsor revokes.
+              Get same-day or twice-daily digest alerts when any sponsor licence changes.
             </p>
             <Link href="/pricing">
               <Button variant="brand" size="sm" className="text-xs">
@@ -714,20 +714,22 @@ export default function HeroSection() {
                 <HeroNavDropdown
                   label="Monitor"
                   items={[
-                    { href: "/sponsors",        label: "Sponsor Register",  desc: "Search 124,000+ licensed sponsors" },
+                    { href: "/sponsors",        label: "Sponsor Register",  desc: "Search 124,000+ licensed sponsors (listing only)" },
                     { href: "/sponsor-monitor", label: "Sponsor Monitor",   desc: "Get alerted when a licence changes" },
                     { href: "/sponsor-changes", label: "Licence Changes",   desc: "Recent additions and revocations" },
                   ]}
                 />
-                <Link href="/pricing"   className="px-4 py-2 text-sm text-white/70 hover:text-white font-medium rounded-full hover:bg-white/10 transition-all duration-200">Pricing</Link>
+                <Link href="/pricing"   className="px-4 py-2 text-sm text-white/70 hover:text-white font-medium rounded-full hover:bg-white/10 transition-all duration-200">Alert Plans</Link>
+                <Link href="/cos-pricing"   className="px-4 py-2 text-sm text-white/70 hover:text-white font-medium rounded-full hover:bg-white/10 transition-all duration-200">CoS Credits</Link>
                 <HeroNavDropdown
-                  label="Resources"
+                  label="Verify"
                   items={[
+                    { href: "/dashboard",  label: "Verify CoS Document",  desc: "Forensic document check (login, closed beta)" },
                     { href: "/cos-guide",  label: "CoS Guide",  desc: "Certificate of Sponsorship explained" },
+                    { href: "/check-fake-cos",  label: "Spot a Fake CoS",  desc: "5 warning signs before you risk your visa" },
                     { href: "/ai-guide",   label: "AI Guide",   desc: "How our AI verification works" },
                     { href: "/technology", label: "Technology", desc: "The tech behind CheckByAI" },
-                    { href: "/api-docs",   label: "API Docs",   desc: "Integrate via our REST API" },
-                    { href: "/dashboard",  label: "Verify CoS", desc: "Check a Certificate of Sponsorship" },
+                    { href: "/api-docs",   label: "API Docs (Pilot)",   desc: "REST API in limited pilot — approval required" },
                   ]}
                 />
               </div>
@@ -755,10 +757,13 @@ export default function HeroSection() {
 
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={isLoaded ? { opacity: 1, y: 0 } : {}} transition={{ ...springGentle, delay: 0.35 }} className="space-y-1.5 max-w-lg">
                   <p className="text-base text-white/70 leading-relaxed">
-                    For UK visa holders. Search your employer free, then get WhatsApp or email alerts when their sponsor licence is revoked, downgraded, or changed.
+                    For visa holders, HR teams, immigration advisers and recruiters. Search any employer free, then get WhatsApp or email alerts when a sponsor licence is revoked, downgraded, or changed — so you can act before work rights are at risk.
                   </p>
                   <p className="text-xs text-white/50">
-                    We check the official Home Office register every weeknight. Starter alerts by 18:00 UTC the same day · Pro twice daily at 07:00 &amp; 19:00 UTC.
+                    Independent checks of the public Home Office register every weeknight (~00:30 UTC). Starter digest by 18:00 UTC same day · Pro twice daily at 07:00 &amp; 19:00 UTC. Always verify on GOV.UK.
+                  </p>
+                  <p className="text-xs text-white/40">
+                    Independent monitoring — not affiliated with the Home Office/UKVI. Alerts are digests, not legal advice. HR, advisers &amp; recruiters: see <Link href="/cos-pricing" className="underline underline-offset-2 hover:text-white">CoS verification &amp; Enterprise</Link>.
                   </p>
                 </motion.div>
 
@@ -786,9 +791,9 @@ export default function HeroSection() {
                     </button>
                   </div>
                   <p className="text-xs text-white/50">Free, unlimited searches. No login required. 124,000+ licensed sponsors on the official register.</p>
-                  <a href="#cos-verification" className="inline-block text-sm font-medium text-white/70 hover:text-white underline underline-offset-2">
-                    Need to verify a CoS document instead? →
-                  </a>
+                  <Link href="/cos-pricing" className="inline-block text-sm font-medium text-white/70 hover:text-white underline underline-offset-2">
+                    Need to verify a CoS document instead? View CoS verification plans →
+                  </Link>
 
                   {/* Hero search results */}
                   {searchLoading && (
@@ -1036,9 +1041,9 @@ export default function HeroSection() {
 
             <Card className="border-slate-300 dark:border-slate-700">
               <CardContent className="py-6">
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-2">Alert Pass</p>
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-2">Alert Pass — Annual</p>
                 <div className="mb-1"><span className="text-3xl font-extrabold text-foreground">£9.99</span><span className="text-sm text-muted-foreground">/year</span></div>
-                <p className="text-xs text-muted-foreground mb-6">Low-commitment monitoring for a single employer</p>
+                <p className="text-xs text-muted-foreground mb-6">1 company · 12 months · same-day 18:00 UTC digest · one-off payment, no auto-renew</p>
                 <ul className="space-y-2.5 text-sm mb-6">
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />Monitor 1 company for 12 months</li>
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />Email + WhatsApp alerts</li>
@@ -1052,15 +1057,15 @@ export default function HeroSection() {
             <Card className="border-emerald-500 dark:border-emerald-400 ring-2 ring-emerald-500/30 relative shadow-lg shadow-emerald-500/10">
               <div className="absolute -top-3 left-1/2 -translate-x-1/2"><Badge className="bg-emerald-600 text-white font-bold text-[10px] uppercase tracking-wider px-3 py-1 shadow-sm">Best Value</Badge></div>
               <CardContent className="py-6">
-                <p className="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-2">Alert Pass Pro</p>
+                <p className="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-2">Alert Pass Pro — Annual</p>
                 <div className="mb-1"><span className="text-3xl font-extrabold text-foreground">£19.99</span><span className="text-sm text-muted-foreground">/year</span></div>
-                <p className="text-xs text-muted-foreground mb-6">Full protection, billed once a year</p>
+                <p className="text-xs text-muted-foreground mb-6">Up to 5 companies · 12 months · twice-daily 07:00 & 19:00 UTC digest · one-off payment, no auto-renew</p>
                 <ul className="space-y-2.5 text-sm mb-6">
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />Monitor up to 5 companies for 12 months</li>
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />Email + WhatsApp + SMS</li>
                   <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />Twice-daily alerts (07:00 & 19:00 UTC)</li>
-                  <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />90-day change history</li>
-                  <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />Sponsored job alerts by email</li>
+                  <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />90-day change history, see when a sponsor's status changed</li>
+                  <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />Sponsored job alerts, spot new roles from watched sponsors</li>
                 </ul>
                 <Link href="/pricing"><Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-5 text-base shadow-md"><Zap className="w-4 h-4 mr-2" />Get Alert Pass Pro</Button></Link>
               </CardContent>

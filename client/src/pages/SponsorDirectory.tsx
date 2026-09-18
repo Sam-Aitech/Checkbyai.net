@@ -211,8 +211,8 @@ export default function SponsorDirectory() {
   return (
     <PageLayout>
       <SEOHead
-        title="UK Licensed Sponsor Register — Browse 80,000+ Employers | CheckByAI"
-        description="Search and browse the full UK Home Office Register of Licensed Sponsors. Filter by status: Active, Newly Granted, Removed. Updated daily from official gov.uk data."
+        title="UK Licensed Sponsor Register — Browse 124,000+ Employers | CheckByAI"
+        description="Search and browse the full UK Home Office Register of Licensed Sponsors (licence listings only — not CoS document verification). Filter by status: Active, Newly Granted, Removed. Updated daily from official gov.uk data."
         canonicalUrl="https://checkbyai.net/sponsors"
       />
 

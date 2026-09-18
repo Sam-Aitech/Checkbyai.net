@@ -754,11 +754,11 @@ function PricingSection({ isAuthenticated, tier }: { isAuthenticated: boolean; t
                 <span className="text-3xl font-extrabold text-foreground">£24.99</span>
                 <span className="text-sm text-muted-foreground">/month</span>
               </div>
-              <p className="text-xs text-muted-foreground mb-6">£239.99/year (save 20%)</p>
+              <p className="text-xs text-muted-foreground mb-6">Or Alert Pass £9.99/yr for 1 company — <button onClick={goToPricing} className="underline font-semibold">see annual</button></p>
               <ul className="space-y-2.5 text-sm mb-6">
                 <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />Monitor 2 companies</li>
                 <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />Email + WhatsApp alerts</li>
-                <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />30-day history</li>
+                <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />30-day history — keep evidence of when your employer changed</li>
                 <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-emerald-500" />{ALERT_TIMING_SHORT.starter}</li>
               </ul>
               <PlanCardAction
@@ -779,12 +779,13 @@ function PricingSection({ isAuthenticated, tier }: { isAuthenticated: boolean; t
                 <span className="text-3xl font-extrabold text-foreground">£49.99</span>
                 <span className="text-sm text-muted-foreground">/month</span>
               </div>
-              <p className="text-xs text-muted-foreground mb-6">£479.99/year (save 20%)</p>
+              <p className="text-xs text-muted-foreground mb-6">Or Alert Pass Pro £19.99/yr for 5 companies — <button onClick={goToPricing} className="underline font-semibold">see annual</button></p>
               <ul className="space-y-2.5 text-sm mb-6">
                 <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />Monitor 5 companies</li>
                 <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />Email + WhatsApp + SMS</li>
-                <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />90-day history</li>
+                <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />90-day history — prove timing for visa records</li>
                 <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />{ALERT_TIMING_SHORT.pro}</li>
+                <li className="flex items-center gap-2 text-foreground"><CheckCircle className="w-4 h-4 text-slate-600 dark:text-slate-400" />5 CoS document checks/month included</li>
               </ul>
               <PlanCardAction
                 cardTier="pro"
@@ -1117,7 +1118,7 @@ export default function SponsorMonitor() {
                 {
                   "@type": "Question",
                   "name": "What does it mean if a sponsor licence is revoked?",
-                  "acceptedAnswer": { "@type": "Answer", "text": "If your employer's sponsor licence is revoked by the Home Office, your visa may be curtailed. You typically have 60 days to find a new sponsor or make alternative arrangements. CheckByAI sends alerts so you can act quickly." }
+                  "acceptedAnswer": { "@type": "Answer", "text": "If a sponsor licence is revoked, a sponsor licence change can affect sponsored workers. Check current GOV.UK guidance for the steps that apply to your situation. CheckByAI sends digest alerts so you can act quickly." }
                 },
                 {
                   "@type": "Question",

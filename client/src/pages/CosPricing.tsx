@@ -48,7 +48,7 @@ const plans: PricingPlan[] = [
     features: [
       '1 verification credit',
       'AI-powered document analysis',
-      'Forensic metadata extraction',
+      'Forensic metadata extraction (hidden PDF data — spots edits)',
       'Instant results',
     ],
   },
@@ -63,7 +63,7 @@ const plans: PricingPlan[] = [
     features: [
       '50 verification credits',
       'AI-powered document analysis',
-      'Forensic metadata extraction',
+      'Forensic metadata extraction (hidden PDF data — spots edits)',
       'Instant results',
       'Credits never expire',
     ],
@@ -84,7 +84,7 @@ const plans: PricingPlan[] = [
     features: [
       '100 verification credits',
       'AI-powered document analysis',
-      'Forensic metadata extraction',
+      'Forensic metadata extraction (hidden PDF data — spots edits)',
       'Instant results',
       'Credits never expire',
       'Priority support',
@@ -105,7 +105,7 @@ const plans: PricingPlan[] = [
     features: [
       'Unlimited verifications',
       'AI-powered document analysis',
-      'Forensic metadata extraction',
+      'Forensic metadata extraction (hidden PDF data — spots edits)',
       'Instant results',
       'Priority support',
       'Perfect for high volume',
@@ -117,14 +117,14 @@ const plans: PricingPlan[] = [
     name: 'Enterprise',
     price: 'Contact Sales',
     priceValue: 0,
-    description: 'For HR teams, recruitment agencies and immigration law firms managing multiple sponsored employees.',
+    description: 'For HR teams, recruitment agencies and immigration law firms managing multiple sponsored employees. API access is in limited pilot — request access via sales; approval required.',
     packageType: 'enterprise',
     icon: Building2,
     contactSales: true,
     features: [
       'Unlimited CoS checks and company watches',
       'Expert human review included',
-      'CSV upload and API access',
+      'CSV upload + API access (limited pilot — approval required)',
       'Weekly reports and webhooks',
       'Dedicated support',
     ],
@@ -514,7 +514,7 @@ export default function CosPricing() {
 
           <div className="mt-12 text-center text-muted-foreground">
             <p className="text-sm">
-              CoS credits only — does not include sponsor monitoring.{' '}
+              CoS credits only — except Unlimited Monthly adds a Notification Engine watchlist and Enterprise adds company watches. Standalone Starter/Pro/Single include no sponsor monitoring.{' '}
               <button onClick={() => setLocation('/pricing')} className="underline font-semibold hover:no-underline text-primary">Compare Sponsor Alert plans</button>
             </p>
             <p className="text-sm mt-2">

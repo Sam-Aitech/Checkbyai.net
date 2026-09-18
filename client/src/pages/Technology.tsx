@@ -395,7 +395,7 @@ export default function Technology() {
                     ))}
                   </div>
                   <p className="text-xs text-muted-foreground mt-6 text-center italic leading-relaxed">
-                    Accuracy based on forensic metadata analysis of document structure and software signatures. Results should not be relied upon as the sole basis for any immigration decision.
+                    Accuracy based on forensic metadata analysis (hidden PDF creation data — document structure and software signatures). Technical signals only — not legal advice. Results should not be relied upon as the sole basis for any immigration decision. Always verify on GOV.UK.
                   </p>
                 </div>
               </div>
@@ -403,12 +403,13 @@ export default function Technology() {
           </div>
 
           <div className="text-center">
-            <Link href="/dashboard">
+            <Link href="/cos-pricing">
               <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full">
                 <Shield className="w-5 h-5 mr-2" />
-                Verify Your Document Now
+                View CoS Verification Plans
               </Button>
             </Link>
+            <p className="text-xs text-muted-foreground mt-3">Credit packs from £4.99. Direct verification needs login and closed-beta approval.</p>
           </div>
         </div>
       </div>
