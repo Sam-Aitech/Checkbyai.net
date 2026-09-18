@@ -134,3 +134,72 @@ describe("GET /sponsor/:id/:slug (bot-visible SSR)", () => {
     expect(cacheGet).not.toHaveBeenCalled();
   });
 });
+
+describe("Route-specific SSR bodies (/sponsors, /dashboard, /what-to-do-fake-cos)", () => {
+  let app: express.Express;
+
+  beforeEach(() => {
+    app = express();
+    registerSeoRoutes(app);
+  });
+
+  function htmlRequest(url: string) {
+    return request(app).get(url).set("Accept", "text/html");
+  }
+
+  it("serves Sponsor Directory intent on /sponsors, not homepage/CoS copy", async () => {
+    const res = await htmlRequest("/sponsors");
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toContain("text/html");
+    expect(res.text).toContain("UK Licensed Sponsor Register");
+    expect(res.text).toContain("Search and browse the UK Home Office Register of Licensed Sponsors");
+  });
+
+  it("serves CoS verification intent on /dashboard without Sponsor Monitor copy", async () => {
+    const res = await htmlRequest("/dashboard");
+    expect(res.status).toBe(200);
+    expect(res.text).toContain("Is your Certificate of Sponsorship genuine?");
+    expect(res.text).toContain("Verify Your Certificate of Sponsorship");
+  });
+
+  it("serves the recovery guide intent on /what-to-do-fake-cos", async () => {
+    const res = await htmlRequest("/what-to-do-fake-cos");
+    expect(res.status).toBe(200);
+    expect(res.text).toContain("What To Do If You've Bought a Fake Certificate");
+  });
+
+  it("skips SSR for non-HTML Accept headers", async () => {
+    const res = await request(app).get("/sponsors").set("Accept", "application/json");
+    expect(res.status).toBe(404);
+  });
+});
+
+describe("Sitemap + llms.txt safety", () => {
+  let app: express.Express;
+
+  beforeEach(() => {
+    app = express();
+    registerSeoRoutes(app);
+  });
+
+  it("does not advertise dead /guides/*, /single-check, /privacy or /data-security routes", async () => {
+    const res = await request(app).get("/sitemap-core.xml");
+    expect(res.status).toBe(200);
+    expect(res.text).not.toContain("/guides/");
+    expect(res.text).not.toContain("/single-check");
+    expect(res.text).not.toContain("<loc>https://checkbyai.net/privacy</loc>");
+    expect(res.text).not.toContain("<loc>https://checkbyai.net/data-security</loc>");
+    expect(res.text).toContain("/sponsors");
+    expect(res.text).toContain("/dashboard");
+  });
+
+  it("uses neutral revocation wording and digest timing in llms.txt", async () => {
+    const res = await request(app).get("/llms-full.txt");
+    expect(res.status).toBe(200);
+    expect(res.text).toContain("A sponsor licence change can affect sponsored workers");
+    expect(res.text).toContain("GOV.UK");
+    expect(res.text).not.toContain("60 days to find");
+    expect(res.text).not.toContain("within minutes of detection");
+    expect(res.text).not.toContain("Real-time");
+  });
+});

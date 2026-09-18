@@ -127,17 +127,15 @@ export default function COSDashboard() {
           <p className="text-muted-foreground mb-8">
             CoS Check is a paid product. Log in or create an account, then choose a CoS plan to unlock document verification.
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Button asChild>
-              <Link href="/login?redirect=/dashboard">Log In</Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href="/login">Create Account</Link>
-            </Button>
-          </div>
+          <p className="text-sm text-muted-foreground mb-8">
+            Approval usually within 24 hours. We’ll email you as soon as your access is ready.
+          </p>
+          <Button asChild className="w-full">
+            <Link href="/login?redirect=/dashboard">Log In / Sign Up</Link>
+          </Button>
           <p className="text-xs text-muted-foreground mt-6">
-            Already have an account?{' '}
-            <a href="mailto:support@checkbyai.net" className="text-primary hover:underline">Contact us</a> if you need help.
+            Need help?{' '}
+            <a href="mailto:support@checkbyai.net" className="text-primary hover:underline">Contact us</a>.
           </p>
         </div>
       </div>
@@ -175,7 +173,7 @@ export default function COSDashboard() {
             Contact Support to Expedite
           </a>
           <div className="mt-5 pt-5 border-t border-border">
-            <p className="text-sm text-muted-foreground mb-3">Want instant access? Upgrade your plan:</p>
+            <p className="text-sm text-muted-foreground mb-3">Skip the waitlist — a CoS credit pack unlocks instant access:</p>
             <Button asChild className="w-full">
               <Link href="/cos-pricing">View COS Check Plans →</Link>
             </Button>
@@ -187,8 +185,9 @@ export default function COSDashboard() {
 
   return (
     <div className="bg-background min-h-screen">
-      {/* Dashboard Header */}
-      <header className="relative bg-primary shadow-md overflow-hidden">
+      {/* Single header block: one H1, one primary action. The old layout stacked
+          a "UK CoS Authenticator" bar and a second hero with the same CTA twice. */}
+      <section className="relative bg-primary text-primary-foreground overflow-hidden">
         <div className="relative max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16 sm:h-20">
             <div className="flex items-center space-x-2 sm:space-x-4">
@@ -219,14 +218,11 @@ export default function COSDashboard() {
             </Button>
           </div>
         </div>
-      </header>
 
-      {/* Hero Section */}
-      <section className="relative bg-primary text-primary-foreground text-center py-20 sm:py-24 overflow-hidden">
         {/* Product-specific 3D illustration lives in Enhanced3DDemo, invoked below */}
-        <div className="container mx-auto px-5 relative z-10">
+        <div className="container mx-auto px-5 relative z-10 text-center pb-16 sm:pb-20 pt-4 sm:pt-6">
           <h1 className="text-4xl md:text-6xl font-bold mb-6 font-sans drop-shadow-sm">
-            UK Certificate of Sponsorship Verification
+            Is your Certificate of Sponsorship genuine?
           </h1>
           <p className="text-lg md:text-xl max-w-3xl mx-auto mb-10 text-primary-foreground/85 leading-relaxed">
             Verify your UK CoS document before applying for your Skilled Worker visa with paid AI analysis and detailed human-review findings when available.
@@ -244,17 +240,12 @@ export default function COSDashboard() {
               Verify UK CoS Now
             </Button>
 
-            <Button
+            <button
               onClick={startDemo}
-              size="lg"
-              variant="outline"
-              className="rounded-full px-10 py-6 text-lg font-bold bg-transparent border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
+              className="text-primary-foreground/80 hover:text-primary-foreground text-sm font-semibold underline underline-offset-4 px-4 py-2 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Watch Demo
-            </Button>
+              See how it works (60s demo) →
+            </button>
           </div>
         </div>
       </section>

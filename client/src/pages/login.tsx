@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useLocation, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -98,13 +98,28 @@ export default function LoginPage() {
   const [step, setStep] = useState<"email" | "otp">("email");
   const [isLoading, setIsLoading] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [captchaNeeded, setCaptchaNeeded] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const turnstileRef = useRef<any>(null);
+  const captchaRef = useRef<HTMLDivElement>(null);
   const oauthError = new URLSearchParams(search).get("error");
   const oauthErrorMessage = oauthError === "google_access_denied"
     ? "Google did not allow this account to sign in. If this is a managed or testing Google app, the account must be approved by the app owner."
     : oauthError === "google_auth_failed" || oauthError === "auth_failed"
       ? "Google sign-in could not be completed. Please try again or use email verification."
       : null;
+
+  // Resend-code cooldown: prevents silent rate-limit rejections after rapid taps.
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const t = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendCooldown]);
+
+  // Start the cooldown each time the OTP step is shown.
+  useEffect(() => {
+    if (step === "otp") setResendCooldown(30);
+  }, [step]);
 
   const { data: authProviders } = useQuery<{ google: boolean }>({
     queryKey: ["/api/auth/providers"],
@@ -125,13 +140,13 @@ export default function LoginPage() {
     }
 
     if (TURNSTILE_SITE_KEY && !turnstileToken) {
-      toast({
-        title: "Please complete the CAPTCHA",
-        description: "Verify you're human before continuing",
-        variant: "destructive",
-      });
+      // Inline + focus, not a disabled button: the user can see exactly why
+      // sending is blocked and where to act.
+      setCaptchaNeeded(true);
+      captchaRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
+    setCaptchaNeeded(false);
 
     setIsLoading(true);
 
@@ -255,6 +270,7 @@ export default function LoginPage() {
         throw new Error("Failed to resend code");
       }
 
+      setResendCooldown(30);
       toast({
         title: "Code resent!",
         description: "Check your email for a new verification code",
@@ -342,22 +358,28 @@ export default function LoginPage() {
                     </div>
 
                     {TURNSTILE_SITE_KEY && (
-                      <div className="flex justify-center">
+                      <div className="flex flex-col items-center gap-1" ref={captchaRef}>
                         <Turnstile
                           ref={turnstileRef}
                           siteKey={TURNSTILE_SITE_KEY}
-                          onSuccess={setTurnstileToken}
+                          onSuccess={(token) => { setTurnstileToken(token); setCaptchaNeeded(false); }}
                           onExpire={() => setTurnstileToken(null)}
                           onError={() => setTurnstileToken(null)}
                           options={{ theme: "auto" }}
                         />
+                        {captchaNeeded && !turnstileToken && (
+                          <p id="captcha-hint" role="alert" className="text-xs text-destructive font-medium">
+                            Complete the check above, then send the code.
+                          </p>
+                        )}
                       </div>
                     )}
 
                     <Button 
                       type="submit" 
                       className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full font-semibold" 
-                      disabled={isLoading || (!!TURNSTILE_SITE_KEY && !turnstileToken)}
+                      disabled={isLoading}
+                      aria-describedby={captchaNeeded && !turnstileToken ? "captcha-hint" : undefined}
                       data-testid="button-send-otp"
                     >
                       {isLoading ? (
@@ -398,7 +420,6 @@ export default function LoginPage() {
                 >
                   <form onSubmit={handleVerifyOTP} className="space-y-4">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-                    <img src={logoImg} alt="CheckByAi" width={160} height={40} className="h-12 w-auto mb-6 object-contain" />
                       <span>Code sent to <strong className="text-foreground">{email}</strong></span>
                     </div>
 
@@ -442,11 +463,11 @@ export default function LoginPage() {
                       <button 
                         type="button"
                         onClick={handleResendCode}
-                        disabled={isLoading}
-                        className="text-muted-foreground hover:text-foreground"
+                        disabled={isLoading || resendCooldown > 0}
+                        className="text-muted-foreground hover:text-foreground disabled:opacity-50"
                         data-testid="button-resend-code"
                       >
-                        Resend code
+                        {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : "Resend code"}
                       </button>
                     </div>
                   </form>

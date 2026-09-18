@@ -1,3 +1,5 @@
 - [Development preview framing](development-preview-framing.md) — keep production anti-framing headers strict, but do not emit them in Replit development Preview.
 - [CoS entitlement boundaries](cos-entitlement-boundaries.md) — Sponsor Monitor plans stay separate; customer CoS checks and human-review details require paid access.
 - [Lazy route HMR recovery](lazy-route-hmr-recovery.md) — transient Vite module-fetch failures can crash a lazy route during rapid HMR updates; recover with one guarded reload.
+- [Stripe customer migration](stripe-customer-migration.md) — changing Stripe account or mode invalidates stored customer IDs; checkout must recover missing/deleted customers.
+- [Preview asset cache](preview-asset-cache.md) — a route can show stale hashed build assets after a workflow restart; verify fresh dev HTML before changing app routing.

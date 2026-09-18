@@ -39,7 +39,7 @@ Fraudulent Certificates of Sponsorship are a known vector for immigration fraud.
 - Manages 10–100+ client cases
 - Watches multiple companies simultaneously
 - Needs immediate alerts, not same-day
-- Needs API access and webhooks for CRM integration
+- Needs API access (limited pilot — approval required) and webhooks for CRM integration
 - Likely to take an Unlimited or Enterprise plan
 
 ### P3 — The HR Compliance Manager

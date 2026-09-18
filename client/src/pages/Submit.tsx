@@ -198,7 +198,10 @@ export default function Submit() {
       const msg = 'Please upload your Certificate of Sponsorship document';
       setCosError(msg);
       toast({ title: 'CoS Document Required', description: msg, variant: 'destructive' });
-      document.getElementById('cos-file-input')?.focus();
+      // Focus the visible dropzone (step 1), not the sr-only file input.
+      const dropzone = document.getElementById('cos-dropzone');
+      dropzone?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      dropzone?.focus({ preventScroll: true });
       return;
     }
     submitMutation.mutate(data);
@@ -332,7 +335,7 @@ export default function Submit() {
                 <div>
                   <h3 className="editorial-subheading text-foreground text-2xl">Complete Your Submission</h3>
                   <p className="text-muted-foreground text-sm mt-1">
-                    Please provide details about your CoS and upload your documents
+                    Upload your CoS document first (required), then answer a few questions about your application
                   </p>
                 </div>
                 <span className="editorial-caption px-2.5 py-1 rounded-full bg-primary/10 text-foreground">
@@ -351,144 +354,12 @@ export default function Submit() {
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <div className="theme-card overflow-hidden">
                   <div className="p-6 border-b border-border">
-                    <h3 className="editorial-subheading text-foreground text-lg">1. About Your Application</h3>
-                    <p className="text-muted-foreground text-sm mt-1">
-                      Tell us about how you applied and any communications you received
-                    </p>
-                  </div>
-                  <div className="p-6 space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="howApplied"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>How did you apply for this job?</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              placeholder="Describe how you found and applied for this position (e.g., job board, recruitment agency, direct application...)"
-                              className="min-h-[100px]"
-                              {...field}
-                              data-testid="input-how-applied"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="emailsReceived"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>What emails have you received from the employer?</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              placeholder="Describe the emails you've received (interview invitations, job offers, CoS notification...)"
-                              className="min-h-[100px]"
-                              {...field}
-                              data-testid="input-emails-received"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="confirmationDetails"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Any phone calls or confirmation letters?</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              placeholder="Describe any phone conversations or official letters you've received (optional)"
-                              className="min-h-[80px]"
-                              {...field}
-                              data-testid="input-confirmation-details"
-                            />
-                          </FormControl>
-                          <FormDescription>Optional but helpful for our review</FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </div>
-
-                <div className="theme-card overflow-hidden">
-                  <div className="p-6 border-b border-border">
-                    <h3 className="editorial-subheading text-foreground text-lg">2. Job Details</h3>
-                    <p className="text-muted-foreground text-sm mt-1">
-                      Information about the position and employer
-                    </p>
-                  </div>
-                  <div className="p-6 space-y-4">
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="employerName"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Employer Name</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="Company name"
-                                {...field}
-                                data-testid="input-employer-name"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="jobTitle"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Job Title</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="Your job title"
-                                {...field}
-                                data-testid="input-job-title"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="editorial-subheading text-foreground text-lg">1. Upload your CoS document</h3>
+                      <span className="editorial-caption px-2.5 py-1 rounded-full bg-destructive/10 text-destructive">Required</span>
                     </div>
-
-                    <FormField
-                      control={form.control}
-                      name="cosReferenceNumber"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>CoS Reference Number (if known)</FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder="e.g., AB1234567"
-                              {...field}
-                              data-testid="input-cos-reference"
-                            />
-                          </FormControl>
-                          <FormDescription>Optional - found on your CoS document</FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </div>
-
-                <div className="theme-card overflow-hidden">
-                  <div className="p-6 border-b border-border">
-                    <h3 className="editorial-subheading text-foreground text-lg">3. Upload Documents</h3>
                     <p className="text-muted-foreground text-sm mt-1">
-                      Upload your Certificate of Sponsorship and any supporting documents
+                      Start here — we can’t review anything without the document. Then tell us about your application below.
                     </p>
                     <p className="text-sm mt-2 flex items-center gap-1.5 text-foreground">
                       <span aria-hidden="true">🔒</span>
@@ -502,12 +373,14 @@ export default function Submit() {
                       </label>
                       <p id="cos-hint" className="text-sm text-muted-foreground mb-2">PDF only, max 10MB. Deleted immediately after review.</p>
                       <div
+                        id="cos-dropzone"
+                        tabIndex={-1}
                         onDragEnter={(e) => { e.preventDefault(); setIsCosDragging(true); }}
                         onDragLeave={(e) => { e.preventDefault(); setIsCosDragging(false); }}
                         onDragOver={(e) => e.preventDefault()}
                         onDrop={handleCosDrop}
                         aria-dropeffect="copy"
-                        className={`border rounded-xl p-6 text-center transition-colors ${isCosDragging ? 'border-primary bg-primary/5 border-solid' : 'border-dashed border-border hover:border-foreground/30'}`}
+                        className={`border rounded-xl p-6 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${isCosDragging ? 'border-primary bg-primary/5 border-solid' : 'border-dashed border-border hover:border-foreground/30'}`}
                       >
                         {cosFile ? (
                           <div className="flex items-center justify-center gap-3">
@@ -620,6 +493,141 @@ export default function Submit() {
                         )}
                       </div>
                     </div>
+                  </div>
+                </div>
+
+                <div className="theme-card overflow-hidden">
+                  <div className="p-6 border-b border-border">
+                    <h3 className="editorial-subheading text-foreground text-lg">2. About Your Application</h3>
+                    <p className="text-muted-foreground text-sm mt-1">
+                      Tell us about how you applied and any communications you received
+                    </p>
+                  </div>
+                  <div className="p-6 space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="howApplied"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>How did you apply for this job?</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Describe how you found and applied for this position (e.g., job board, recruitment agency, direct application...)"
+                              className="min-h-[100px]"
+                              {...field}
+                              data-testid="input-how-applied"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="emailsReceived"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>What emails have you received from the employer?</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Describe the emails you've received (interview invitations, job offers, CoS notification...)"
+                              className="min-h-[100px]"
+                              {...field}
+                              data-testid="input-emails-received"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="confirmationDetails"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Any phone calls or confirmation letters?</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Describe any phone conversations or official letters you've received (optional)"
+                              className="min-h-[80px]"
+                              {...field}
+                              data-testid="input-confirmation-details"
+                            />
+                          </FormControl>
+                          <FormDescription>Optional but helpful for our review</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
+                <div className="theme-card overflow-hidden">
+                  <div className="p-6 border-b border-border">
+                    <h3 className="editorial-subheading text-foreground text-lg">3. Job Details</h3>
+                    <p className="text-muted-foreground text-sm mt-1">
+                      Information about the position and employer
+                    </p>
+                  </div>
+                  <div className="p-6 space-y-4">
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="employerName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Employer Name</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="Company name"
+                                {...field}
+                                data-testid="input-employer-name"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="jobTitle"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Job Title</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="Your job title"
+                                {...field}
+                                data-testid="input-job-title"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <FormField
+                      control={form.control}
+                      name="cosReferenceNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>CoS Reference Number (if known)</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="e.g., AB1234567"
+                              {...field}
+                              data-testid="input-cos-reference"
+                            />
+                          </FormControl>
+                          <FormDescription>Optional - found on your CoS document</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
                 </div>
 

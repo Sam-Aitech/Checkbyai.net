@@ -588,7 +588,7 @@ export default function SponsorDashboard() {
                   {companyParam ? `Monitor ${companyParam}` : "Start Monitoring"}
                 </h2>
                 <p className="text-sm text-muted-foreground mb-6">
-                  Get real-time alerts when a sponsor's licence status changes on the GOV.UK register.
+                  Get scheduled digest alerts (Starter same-day 18:00 UTC, Pro twice-daily 07:00 & 19:00 UTC) when a sponsor's licence status changes on the GOV.UK register.
                 </p>
                 <Button
                   className="w-full rounded-full bg-primary text-primary-foreground hover:bg-primary/90"

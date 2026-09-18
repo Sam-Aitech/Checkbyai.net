@@ -34,20 +34,22 @@ const navItems: NavItem[] = [
   {
     label: "Monitor",
     children: [
-      { href: "/sponsors",        label: "Sponsor Register",  desc: "Search 124,000+ licensed UK sponsors",          icon: <Search className="w-4 h-4" /> },
+      { href: "/sponsors",        label: "Sponsor Register",  desc: "Search 124,000+ licensed UK sponsors (licence listing only)",          icon: <Search className="w-4 h-4" /> },
       { href: "/sponsor-monitor", label: "Sponsor Monitor",   desc: "Get alerted when a licence changes",      icon: <Bell className="w-4 h-4" /> },
       { href: "/sponsor-changes", label: "Licence Changes",   desc: "Recent additions, revocations and downgrades",   icon: <TrendingUp className="w-4 h-4" /> },
     ],
   },
-  { href: "/pricing",   label: "Pricing" },
+  { href: "/pricing",   label: "Alert Plans" },
+  { href: "/cos-pricing",   label: "CoS Credits" },
   {
-    label: "Resources",
+    label: "Verify",
     children: [
+      { href: "/dashboard",   label: "Verify CoS Document",  desc: "Forensic document check (login, closed beta)",      icon: <FileCheck className="w-4 h-4" /> },
       { href: "/cos-guide",   label: "CoS Guide",   desc: "Certificate of Sponsorship explained",   icon: <BookOpen className="w-4 h-4" /> },
+      { href: "/check-fake-cos",   label: "Spot a Fake CoS",   desc: "5 warning signs before you risk your visa",   icon: <FileCheck className="w-4 h-4" /> },
       { href: "/ai-guide",    label: "AI Guide",    desc: "How our AI verification works",           icon: <Cpu className="w-4 h-4" /> },
       { href: "/technology",  label: "Technology",  desc: "The tech behind CheckByAI",               icon: <FileCheck className="w-4 h-4" /> },
-      { href: "/api-docs",    label: "API Docs",    desc: "Integrate via our REST API",              icon: <Code2 className="w-4 h-4" /> },
-      { href: "/dashboard",   label: "Verify CoS",  desc: "Check a Certificate of Sponsorship",      icon: <FileCheck className="w-4 h-4" /> },
+      { href: "/api-docs",    label: "API Docs (Pilot)",    desc: "REST API in limited pilot — approval required",              icon: <Code2 className="w-4 h-4" /> },
     ],
   },
 ];
@@ -195,7 +197,8 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
     : { initial: { opacity: 0, y: 15 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -15 } };
 
   const monitorGroup = navItems[0];
-  const resourcesGroup = navItems[2];
+  const verifyGroup = navItems[3];
+  const standaloneLinks = navItems.filter((n) => !n.children);
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -330,7 +333,7 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
 
                   {/* Standalone links */}
                   <div className={`border-t pt-3 ${darkNav ? "border-slate-800" : "border-border/50"}`}>
-                    {[navItems[1]].map(item => (
+                    {standaloneLinks.map(item => (
                       <Link
                         key={item.href}
                         href={item.href!}
@@ -347,10 +350,10 @@ export default function PageLayout({ children, hideNav = false, hideFooter = fal
                     ))}
                   </div>
 
-                  {/* Resources group */}
+                  {/* Verify group */}
                   <div className={`border-t pt-3 ${darkNav ? "border-slate-800" : "border-border/50"}`}>
-                    <p className={`text-xs font-bold tracking-widest uppercase px-3 mb-1 ${darkNav ? "text-slate-500" : "text-muted-foreground/50"}`}>Resources</p>
-                    {resourcesGroup.children?.map(child => (
+                    <p className={`text-xs font-bold tracking-widest uppercase px-3 mb-1 ${darkNav ? "text-slate-500" : "text-muted-foreground/50"}`}>Verify</p>
+                    {verifyGroup.children?.map(child => (
                       <Link
                         key={child.href}
                         href={child.href}

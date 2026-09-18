@@ -1,9 +1,33 @@
-import { useState, useEffect, type ReactNode } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { Link } from 'wouter';
 import { Lock, Crown, CheckCircle, ShieldAlert, LogIn } from 'lucide-react';
 import { unwrapApiEnvelope } from '@/lib/apiEnvelope';
 import { getVerificationResultTone, verificationToneBadgeClasses } from '@/lib/verificationResultTone';
 import { mapBackendVerdict, normalizeBackendConfidence } from '@/lib/verificationVerdict';
+
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+
+// Raw verdict enums ("fake", "suspicious") are misread as genuineness scores
+// ("90% fake"). Every result gets a headline plus a confidence-as-certainty
+// explainer, and risky verdicts get a concrete next step.
+const verdictCopy: Record<'genuine' | 'suspicious' | 'fake' | 'inconclusive', { title: string; explain: (confidence: number) => string }> = {
+  genuine: {
+    title: 'Looks genuine',
+    explain: (c) => `We’re ${c}% confident this document is genuine. Confidence is our certainty in this verdict — not a score. Only the Home Office decides visas.`,
+  },
+  suspicious: {
+    title: 'Needs a closer look',
+    explain: (c) => `We’re ${c}% confident parts of this document were altered after creation. Do not use it for a visa application yet.`,
+  },
+  fake: {
+    title: 'Looks fake — do not use',
+    explain: (c) => `We’re ${c}% confident this document was fabricated. Submitting it risks automatic refusal and a ban of up to 10 years.`,
+  },
+  inconclusive: {
+    title: 'Inconclusive',
+    explain: (c) => `We couldn’t reach a verdict (certainty ${c}%). Try a clearer scan, or send it for expert human review.`,
+  },
+};
 
 interface AccessDeniedCardProps {
   title: string;
@@ -66,6 +90,7 @@ export default function FileUploadSimple({
   const [hasUsedFreeCheck, setHasUsedFreeCheck] = useState(false);
   const [verificationCount, setVerificationCount] = useState(0);
   const [accessDenied, setAccessDenied] = useState<'login' | 'upgrade' | false>(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Check usage on component mount
   useEffect(() => {
@@ -132,6 +157,13 @@ export default function FileUploadSimple({
 
     if (selectedFile.type !== 'application/pdf') {
       const errorMsg = 'Please upload a valid PDF file.';
+      setError(errorMsg);
+      onError?.(errorMsg);
+      return;
+    }
+
+    if (selectedFile.size > MAX_UPLOAD_BYTES) {
+      const errorMsg = `“${selectedFile.name}” is ${(selectedFile.size / 1024 / 1024).toFixed(1)} MB — the limit is 10 MB. Try compressing it or scanning at a lower resolution.`;
       setError(errorMsg);
       onError?.(errorMsg);
       return;
@@ -351,7 +383,12 @@ export default function FileUploadSimple({
       )}
 
       <div
-        className={`border-2 border-dashed rounded-lg p-6 sm:p-8 text-center transition-all duration-200 min-h-[160px] sm:min-h-[200px] flex flex-col justify-center ${
+        onClick={(e) => {
+          // Whole-zone click for mouse users; the label/input keep working natively.
+          if ((e.target as HTMLElement).closest('input,label,button,a')) return;
+          fileInputRef.current?.click();
+        }}
+        className={`border-2 border-dashed rounded-lg p-6 sm:p-8 text-center transition-all duration-200 min-h-[160px] sm:min-h-[200px] flex flex-col justify-center cursor-pointer focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 ${
           isDragging
             ? 'border-primary/60 bg-primary/5 scale-[1.02]'
             : 'border-border hover:border-border-strong active:scale-[0.98]'
@@ -367,11 +404,13 @@ export default function FileUploadSimple({
 
         <h3 className="mt-2 text-base sm:text-lg font-medium text-foreground">Upload Document</h3>
         <p className="mt-1 text-sm text-muted-foreground px-2">
-          <span className="hidden sm:inline">Drag and drop your PDF file here, or click to select</span>
-          <span className="sm:hidden">Tap to select your PDF file</span>
+          <span className="hidden sm:inline">Drag and drop your PDF here, or click anywhere to select</span>
+          <span className="sm:hidden">Tap anywhere to select your PDF file</span>
         </p>
+        <p className="mt-1 text-xs text-muted-foreground">PDF only · up to 10 MB</p>
 
         <input
+          ref={fileInputRef}
           type="file"
           accept=".pdf"
           onChange={handleFileChange}
@@ -427,11 +466,22 @@ export default function FileUploadSimple({
         <div className="mt-6 p-6 bg-card rounded-lg border border-border">
           <h3 className="text-lg font-semibold mb-4 text-foreground">Verification Result</h3>
 
-          <div className="flex items-center gap-3 mb-4">
+          <div className="flex items-center gap-3 mb-2">
             <div role="status" className={`px-4 py-2 rounded-full text-base font-semibold border animate-in fade-in zoom-in-95 duration-200 ${verificationToneBadgeClasses[getVerificationResultTone(result.type)]}`}>
-              {result.type}
+              {verdictCopy[result.type].title}
             </div>
           </div>
+          <p className="text-sm text-muted-foreground mb-4">{verdictCopy[result.type].explain(result.confidence)}</p>
+
+          {(result.type === 'fake' || result.type === 'suspicious') && (
+            <div className="mb-4 p-3 bg-muted/60 border border-border rounded-lg text-sm">
+              <p className="font-medium text-foreground mb-1">What to do next</p>
+              <ul className="list-disc list-inside text-muted-foreground space-y-1">
+                <li>Check the employer on the <a className="text-primary underline underline-offset-2" href="https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers" target="_blank" rel="noopener noreferrer">official sponsor register</a></li>
+                <li>Speak to an OISC-registered immigration adviser before applying</li>
+              </ul>
+            </div>
+          )}
 
           {result.mismatchedFields && result.mismatchedFields.length > 0 && (
             <div className="mb-4">

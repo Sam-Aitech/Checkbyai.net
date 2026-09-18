@@ -28,7 +28,7 @@ const signs = [
     icon: <Shield className="w-6 h-6 text-foreground" />,
     title: "The sponsor isn't on the official register",
     description:
-      "Every legitimate UK employer who can issue a Certificate of Sponsorship must hold an active sponsor licence listed on the official Home Office register. If the company name on your CoS does not appear on the government's published list of licensed sponsors, this is the single strongest indicator that your document is fraudulent. You can search the register directly on gov.uk, or use our free Sponsor Monitor tool to check instantly.",
+      "Every legitimate UK employer who can issue a Certificate of Sponsorship must hold an active sponsor licence listed on the official Home Office register. If the company name on your CoS does not appear on the government's published list of licensed sponsors, this is the single strongest indicator that your document is fraudulent. You can search the register directly on gov.uk, or check the licence listing instantly (no login) via our Sponsor Register — note this checks the licence listing only, not the CoS document itself, which needs separate forensic verification below.",
   },
   {
     number: 2,
@@ -40,9 +40,9 @@ const signs = [
   {
     number: 3,
     icon: <Eye className="w-6 h-6 text-foreground" />,
-    title: "Suspicious metadata",
+    title: "Suspicious metadata (hidden PDF creation data)",
     description:
-      "Every PDF carries hidden metadata that reveals how and where it was created. Genuine CoS documents are generated through UKVI's Sponsor Management System — not consumer software. If the metadata shows the PDF was created or edited using Microsoft Word, Adobe Photoshop, GIMP, or similar desktop applications, this strongly suggests the document was fabricated rather than generated through official channels.",
+      "Every PDF carries hidden data (metadata) that reveals how and where it was created — plain English: the invisible stamp showing which software made it. Genuine CoS documents are generated through UKVI's Sponsor Management System (SMS, the official Home Office system) — not consumer software. If the metadata shows the PDF was created or edited using Microsoft Word, Adobe Photoshop, GIMP, or similar desktop applications, this strongly suggests the document was fabricated rather than generated through official channels.",
   },
   {
     number: 4,
@@ -236,20 +236,20 @@ export default function CheckFakeCoS() {
                 🔒 PDF only · Deleted immediately · UK GDPR — <a href="/data-security.html" className="underline font-medium">Data Security</a>
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-                <Link href="/dashboard">
+                <Link href="/cos-pricing">
                   <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full">
                     <CheckCircle className="w-5 h-5 mr-2" aria-hidden="true" />
-                    Log in to Verify (Closed Beta)
+                    Verify a CoS Document — View Plans
                   </Button>
                 </Link>
-                <Link href="/sponsor-monitor">
+                <Link href="/sponsors">
                   <Button size="lg" variant="outline" className="border-primary/30 text-primary hover:bg-primary/10 rounded-full">
-                    Check Sponsor Register
+                    Check Licence Listing (Free, No Login)
                     <ArrowRight className="w-4 h-4 ml-2" aria-hidden="true" />
                   </Button>
                 </Link>
               </div>
-              <p className="text-xs text-muted-foreground mt-3">Approval usually within 24h; or check the sponsor register instantly, no login.</p>
+              <p className="text-xs text-muted-foreground mt-3">Document verification needs credits/login and is currently in closed beta (approval usually within 24h). Licence-listing checks are instant with no login — they do not verify the document itself.</p>
             </div>
           </ScrollSection>
 

@@ -139,7 +139,7 @@ export function buildSponsorJsonLd(
   faqs.push({
     q: "What happens if a sponsor licence is revoked?",
     a:
-      "Workers sponsored by that company typically have 60 days to find a new licensed sponsor or leave the UK. " +
+      "A sponsor licence change can affect sponsored workers. Check current GOV.UK guidance for the steps that apply to your situation. " +
       "Check the register before accepting any job offer, and never pay for a Certificate of Sponsorship — selling a CoS is illegal.",
   });
 
@@ -248,16 +248,16 @@ export function buildSponsorSeoBody(
       <h2 style="font-size:1.25rem;margin:1.5rem 0 0.5rem;color:#1f2937;">Have a Certificate of Sponsorship from ${name}?</h2>
       <p style="color:#374151;line-height:1.6;">
         A real company name on a CoS does not mean the document is genuine — scammers reuse the
-        names of licensed sponsors. <a href="/single-check" style="color:#3434b2;text-decoration:underline;">Run a
-        one-off &pound;9.99 scam check on your CoS document</a> (no account needed), or
+        names of licensed sponsors. <a href="/cos-pricing" style="color:#3434b2;text-decoration:underline;">Verify
+        your CoS document</a> (credit packs from &pound;4.99), or
         <a href="/pricing" style="color:#3434b2;text-decoration:underline;">get alerted if this sponsor's
-        licence status changes</a>.
+        licence status changes</a>. Check current GOV.UK guidance for the steps that apply to your situation.
       </p>
       <nav style="margin-top:2rem;font-size:0.9rem;">
         <a href="/sponsors" style="color:#3434b2;margin-right:1rem;">Search the sponsor register</a>
         <a href="/sponsor-changes" style="color:#3434b2;margin-right:1rem;">Today's register changes</a>
-        <a href="/guides/cos-scams-red-flags" style="color:#3434b2;margin-right:1rem;">CoS scam red flags</a>
-        <a href="/guides/how-to-check-cos-genuine" style="color:#3434b2;">How to check a CoS is genuine</a>
+        <a href="/check-fake-cos" style="color:#3434b2;margin-right:1rem;">CoS scam red flags</a>
+        <a href="/cos-guide" style="color:#3434b2;">How to check a CoS is genuine</a>
       </nav>
       <p style="font-size:0.75rem;color:#9ca3af;margin-top:2rem;">
         Register data: Home Office Register of Licensed Sponsors (Workers), used under the

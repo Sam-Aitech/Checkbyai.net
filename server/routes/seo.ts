@@ -15,6 +15,7 @@ import {
   toSafeJsonLd,
   ROOT_INJECTION_REGEX,
 } from "../utils/sponsorSeoHtml";
+import { ROUTE_SSR_BODIES } from "../ssr/renderRoutePage";
 import { cacheGet, cacheSet } from "../utils/redisClient";
 
 // In-memory HTML template cache — eliminates repeated disk reads per bot request.
@@ -46,7 +47,6 @@ const CORE_URLS: Array<{ path: string; priority: string; changefreq: string }> =
   { path: '/sponsor-monitor', priority: '0.9', changefreq: 'daily' },
   { path: '/sponsors', priority: '0.9', changefreq: 'daily' },
   { path: '/pricing', priority: '0.9', changefreq: 'weekly' },
-  { path: '/single-check', priority: '0.9', changefreq: 'weekly' },
   { path: '/cos-pricing', priority: '0.8', changefreq: 'weekly' },
   { path: '/dashboard', priority: '0.8', changefreq: 'weekly' },
   { path: '/sponsor-changes', priority: '0.8', changefreq: 'daily' },
@@ -55,14 +55,8 @@ const CORE_URLS: Array<{ path: string; priority: string; changefreq: string }> =
   { path: '/technology', priority: '0.7', changefreq: 'monthly' },
   { path: '/login', priority: '0.5', changefreq: 'monthly' },
   { path: '/about', priority: '0.6', changefreq: 'monthly' },
-  { path: '/privacy', priority: '0.4', changefreq: 'yearly' },
-  { path: '/data-security', priority: '0.4', changefreq: 'yearly' },
   { path: '/check-fake-cos', priority: '0.8', changefreq: 'monthly' },
   { path: '/what-to-do-fake-cos', priority: '0.8', changefreq: 'monthly' },
-  { path: '/guides/how-to-check-cos-genuine', priority: '0.6', changefreq: 'monthly' },
-  { path: '/guides/cos-scams-red-flags', priority: '0.6', changefreq: 'monthly' },
-  { path: '/guides/employers-guide-fake-cos', priority: '0.5', changefreq: 'monthly' },
-  { path: '/guides/what-to-do-fake-cos', priority: '0.5', changefreq: 'monthly' },
 ];
 
 export function registerSeoRoutes(app: Express): void {
@@ -141,12 +135,12 @@ Disallow: /uploads/`;
 
   const llmsBaseContent = `# CheckByAI - UK Sponsor Licence Monitor & CoS Verification
 
-> Real-time monitoring of the UK Home Office Register of Licensed Sponsors with same-day and twice-daily WhatsApp, email and SMS alerts when licences are revoked. Plus AI-powered Certificate of Sponsorship verification.
+> Weeknight monitoring of the UK Home Office Register of Licensed Sponsors with same-day (Starter, 18:00 UTC) and twice-daily (Pro, 07:00 & 19:00 UTC) digest alerts when licences change. Plus AI-powered Certificate of Sponsorship verification.
 
 ## Products
 
-- [Single Scam Check](${getAppUrl()}/single-check): One-off £9.99 Certificate of Sponsorship scam check — forensic document analysis, sponsor licence verification, and salary threshold check. No account needed.
-- [Notification Engine](${getAppUrl()}/pricing): Real-time UK sponsor licence monitoring. Get alerted via WhatsApp, email, and SMS when your employer's licence is revoked, suspended, or downgraded. Plans from £24.99/month.
+- [CoS Verification](${getAppUrl()}/cos-pricing): AI-powered Certificate of Sponsorship document verification from £4.99. Detect fake or edited CoS documents using forensic metadata analysis.
+- [Notification Engine](${getAppUrl()}/pricing): UK sponsor licence monitoring via scheduled digests. Get alerted via WhatsApp, email, and SMS when your employer's licence status changes. Alert Pass from £9.99/year; monthly plans from £24.99/month.
 - [CoS Verification](${getAppUrl()}/cos-pricing): AI-powered Certificate of Sponsorship document verification. Detect fake or edited CoS documents using forensic metadata analysis.
 - [Free Sponsor Search](${getAppUrl()}/sponsor-monitor): Search the UK Home Office Register of Licensed Sponsors for free. Check if any company holds a valid sponsor licence.
 
@@ -172,15 +166,15 @@ Website: ${getAppUrl()}`;
 ## Detailed Product Information
 
 ### Notification Engine (Primary Product)
-The Notification Engine monitors the UK Home Office Register of Licensed Sponsors, which lists all companies authorised to sponsor migrant workers. The register is updated regularly, and when a sponsor licence is revoked, all workers sponsored by that company may lose their right to work in the UK.
+The Notification Engine monitors the UK Home Office Register of Licensed Sponsors, which lists all companies authorised to sponsor migrant workers. A sponsor licence change can affect sponsored workers. Check current GOV.UK guidance for the steps that apply.
 
-**Starter Plan - £24.99/month (£239.99/year)**
+**Starter Plan - £24.99/month (or Alert Pass £9.99/year for 1 company)**
 - Monitor up to 2 companies
 - Email and WhatsApp alerts
 - Same-day alerts delivered at 6 PM UTC
 - 30-day change history
 
-**Pro Plan - £49.99/month (£479.99/year)**
+**Pro Plan - £49.99/month (or Alert Pass Pro £19.99/year for up to 5 companies)**
 - Monitor up to 5 companies
 - Email, WhatsApp, and SMS alerts
 - Twice-daily alerts (07:00 and 19:00 UTC)
@@ -206,13 +200,13 @@ Results are classified as Genuine, Suspicious, or Fake with confidence scores.
 ## Common Questions
 
 Q: What happens when a sponsor licence is revoked?
-A: Workers sponsored by that company typically have 60 days to find a new sponsor or leave the UK. Our alerts help you act fast.
+A: A sponsor licence change can affect sponsored workers. Check current GOV.UK guidance for the steps that apply to your situation. Our alerts help you act fast.
 
 Q: Is the free search really free?
 A: Yes. Anyone can search the sponsor register once per day without creating an account.
 
 Q: How quickly do you detect changes?
-A: We check the Home Office register daily. Pro subscribers receive alerts within minutes of detection.
+A: We check the Home Office register every weeknight (~00:30 UTC). Starter subscribers receive a same-day digest at 18:00 UTC; Pro subscribers receive twice-daily digests at 07:00 and 19:00 UTC.
 
 Q: Do you store uploaded documents?
 A: No. Documents are analysed in memory and permanently deleted immediately after verification. We only retain the verification result metadata.`;
@@ -283,8 +277,8 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
         `${sponsor.currentName} — ${label} UK Sponsor Licence | CheckByAI`;
 
       const description = sponsor.status === 'REMOVED_REVOKED'
-        ? `${sponsor.currentName}${location} had their UK sponsor licence revoked. ` +
-          `Workers must find a new employer. See full licence history on CheckByAI.`
+        ? `${sponsor.currentName}${location} no longer appears on the UK sponsor register. ` +
+          `A sponsor licence change can affect sponsored workers — check GOV.UK guidance. See full licence history on CheckByAI.`
         : `${sponsor.currentName}${location} holds a ${label} UK sponsor licence${routePart}` +
           `${grantedYr ? `, active since ${grantedYr}` : ''}. ` +
           `Get alerted if their status changes — free on CheckByAI.`;
@@ -381,9 +375,9 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
       title: 'Protect Your Visa | Sponsor Licence Alerts from £24.99/mo | CheckByAI',
       description: 'Never be blindsided by a sponsor licence revocation. Get WhatsApp and email alerts. Starter £24.99/mo (2 companies, same-day alerts), Pro £49.99/mo (5 companies, SMS + twice-daily alerts).',
     },
-    '/single-check': {
-      title: 'Is Your UK Job Offer a Scam? One-Off £9.99 CoS Check | CheckByAI',
-      description: 'Check a Certificate of Sponsorship in minutes: forensic document analysis, sponsor licence verification, and salary threshold check. One payment, no account, no subscription.',
+    '/sponsors': {
+      title: 'UK Licensed Sponsor Register — Browse 124,000+ Employers | CheckByAI',
+      description: 'Search and browse the UK Home Office Register of Licensed Sponsors (licence listings only — not CoS document verification). Updated daily from official gov.uk data.',
     },
     '/cos-pricing': {
       title: 'Verify Your CoS is Genuine | Fake Document Detection from £24.99 | CheckByAI',
@@ -394,6 +388,10 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
       description: 'Which UK sponsor licences were revoked today? See live changes from the Home Office register — additions, removals, downgrades — updated daily.',
     },
     '/dashboard': {
+      title: 'Verify Your Certificate of Sponsorship | Detect Fake CoS Documents | CheckByAI',
+      description: 'Upload your Certificate of Sponsorship and find out if it\'s genuine in under 60 seconds. Our forensic AI detects fakes, edits, and suspicious formatting. Your document is deleted immediately after checking.',
+    },
+    '/verify-cos': {
       title: 'Verify Your Certificate of Sponsorship | Detect Fake CoS Documents | CheckByAI',
       description: 'Upload your Certificate of Sponsorship and find out if it\'s genuine in under 60 seconds. Our forensic AI detects fakes, edits, and suspicious formatting. Your document is deleted immediately after checking.',
     },
@@ -428,6 +426,52 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
   };
 
   const botPatterns = /bot|crawl|spider|slurp|Googlebot|Bingbot|GPTBot|PerplexityBot|facebookexternalhit|Twitterbot|LinkedInBot/i;
+
+  // ── Full SSR bodies for key funnels (all HTML clients, not bots-only) ──
+  // /sponsors, /dashboard (/verify-cos) and /what-to-do-fake-cos previously
+  // served the generic homepage fallback inside #root. Inject route-matched
+  // hidden bodies so initial HTML carries the correct funnel H1/intent.
+  for (const routePath of Object.keys(ROUTE_SSR_BODIES)) {
+    app.get(routePath, (req: any, res, next) => {
+      try {
+        const accept = req.headers["accept"] || "";
+        if (!accept.includes("text/html")) return next();
+        let html: string | null = null;
+        for (const p of HTML_PATHS) {
+          html = readHtmlTemplate(p);
+          if (html) break;
+        }
+        if (!html) return next();
+        const routeMeta = seoMetaMap[routePath];
+        if (routeMeta) {
+          const t = escapeAttr(routeMeta.title);
+          const d = escapeAttr(routeMeta.description);
+          const canonical = escapeAttr(`${getAppUrl()}${routePath}`);
+          html = html.replace(/<title>[^<]*<\/title>/, `<title>${t}</title>`);
+          html = html.replace(/<meta name="title" content="[^"]*"/, `<meta name="title" content="${t}"`);
+          html = html.replace(/<meta name="description" content="[^"]*"/, `<meta name="description" content="${d}"`);
+          html = html.replace(/<meta property="og:title" content="[^"]*"/, `<meta property="og:title" content="${t}"`);
+          html = html.replace(/<meta property="og:description" content="[^"]*"/, `<meta property="og:description" content="${d}"`);
+          html = html.replace(/<meta property="og:url" content="[^"]*"/, `<meta property="og:url" content="${canonical}"`);
+          html = html.replace(/<meta property="twitter:title" content="[^"]*"/, `<meta property="twitter:title" content="${t}"`);
+          html = html.replace(/<meta property="twitter:description" content="[^"]*"/, `<meta property="twitter:description" content="${d}"`);
+          html = html.replace(/<meta property="twitter:url" content="[^"]*"/, `<meta property="twitter:url" content="${canonical}"`);
+          html = html.replace(/<link rel="canonical" href="[^"]*"/, `<link rel="canonical" href="${canonical}"`);
+        }
+        const seoBody = ROUTE_SSR_BODIES[routePath]();
+        html = html.replace(
+          ROOT_INJECTION_REGEX,
+          (_match: string, p1: string, p2: string) => `${p1}${seoBody}${p2}`,
+        );
+        res.set("Content-Type", "text/html");
+        res.set("Cache-Control", "public, max-age=3600");
+        res.send(html);
+      } catch (err) {
+        logger.error({ err, routePath }, "Route SSR injection error:");
+        next();
+      }
+    });
+  }
 
   app.use((req, res, next) => {
     const ua = req.headers['user-agent'] || '';

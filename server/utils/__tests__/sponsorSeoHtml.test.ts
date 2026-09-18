@@ -55,9 +55,11 @@ describe("buildSponsorSeoBody", () => {
     expect(html).toContain("Skilled Worker");
     expect(html).toContain("Licence history");
     expect(html).toContain("Rating upgraded");
-    expect(html).toContain('href="/single-check"');
+    expect(html).toContain('href="/cos-pricing"');
     expect(html).toContain('href="/pricing"');
     expect(html).toContain("Open Government Licence");
+    expect(html).not.toContain('href="/single-check"');
+    expect(html).not.toContain("/guides/");
   });
 
   it("shows revoked warning with what-to-do link for removed sponsors", () => {
@@ -172,6 +174,18 @@ describe("buildSponsorJsonLd", () => {
       "https://checkbyai.net",
     );
     expect(out).toContain("no longer appears on the Home Office Register");
+  });
+
+  it("uses neutral GOV.UK revocation wording, not 60-day immigration advice", () => {
+    const out = buildSponsorJsonLd(
+      makeSponsor(),
+      "https://checkbyai.net/sponsor/42/acme-care-ltd",
+      "https://checkbyai.net",
+    );
+    expect(out).toContain("A sponsor licence change can affect sponsored workers");
+    expect(out).toContain("GOV.UK");
+    expect(out).not.toContain("60 days to find");
+    expect(out).not.toContain("leave the UK");
   });
 
   it("escapes </script> in sponsor data so it can't break out of the JSON-LD script tag", () => {

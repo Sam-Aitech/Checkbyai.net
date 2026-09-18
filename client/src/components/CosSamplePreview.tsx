@@ -9,7 +9,7 @@ const STEPS = [
   {
     icon: FileSearch,
     title: '2. Structure check',
-    description: 'We check for incremental updates, XMP metadata field presence and ordering, and Info/XMP consistency against genuine Home Office-issued documents.',
+    description: 'We check for incremental updates (hidden appended edits), XMP metadata (hidden PDF edit history) field presence and ordering, and Info/XMP consistency against genuine Home Office-issued documents.',
   },
   {
     icon: Fingerprint,

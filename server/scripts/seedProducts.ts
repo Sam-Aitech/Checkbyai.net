@@ -2,30 +2,9 @@ import Stripe from 'stripe';
 import { logger } from '../utils/logger';
 
 /**
- * Idempotent (search-by-name before create, safe to re-run). Uses
- * process.env.STRIPE_SECRET_KEY directly — the same credential every other
- * Stripe call in this app uses (server/routes/billing.ts) — rather than the
- * Replit-connector client this script used previously. If this Replit
- * deployment's connector points at a different Stripe account/mode than
- * STRIPE_SECRET_KEY, re-verify that before relying on this script.
- *
- * Covers every packageType that GET /api/checkout/credits + GET /api/packages
- * need live in Stripe for the dynamic-Checkout-Session flow (Alert Pass
- * annual plans + the single CoS check) to work — confirmed 2026-09-13 that
- * production's GET /api/packages was returning an empty packages array,
- * meaning these had never actually been created (or existed in the wrong
- * Stripe mode), which is why the Alert Pass cards showed "Coming soon" on
- * live pricing pages.
- *
- * Deliberately does NOT include notification_starter/notification_pro or the
- * legacy starter/pro/unlimited/master CoS packages that also sell through
- * hardcoded Stripe Payment Links (Pricing.tsx/CosPricing.tsx/
- * AlertAddOnModal.tsx's paymentLinks maps) — those Payment Links can't
- * function without their underlying product/price already existing, so if
- * their buttons already work live, the products already exist; re-running
- * this for them would risk a second, disconnected product next to the one
- * the live Payment Link actually points at. Also excludes `cos_check`
- * (admin-granted only, never created via checkout).
+ * Seeds the three Stripe products whose UI checkout buttons depend on
+ * GET /api/packages. Product and price metadata are the stable identifiers;
+ * rerunning this script does not create duplicates.
  */
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
@@ -34,44 +13,39 @@ const stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: '2025-11-17.clover' as any,
 });
 
-interface Product {
+interface ProductSeed {
   name: string;
   description: string;
   priceAmount: number;
-  currency: string;
-  metadata: {
-    packageType: string;
-    credits?: string;
-  };
+  metadata: Record<string, string>;
   recurring?: { interval: 'month' | 'year' };
 }
 
-const products: Product[] = [
+const products: ProductSeed[] = [
   {
     name: 'Alert Pass (Annual)',
-    description: 'Low-commitment sponsor-licence monitoring for a single employer. Monitor 1 company for 12 months, email + WhatsApp alerts, same-day (18:00 UTC), 30-day change history.',
-    priceAmount: 999, // £9.99 in pence
-    currency: 'gbp',
+    description: 'Monitor one company for 12 months with email and WhatsApp alerts.',
+    priceAmount: 999,
     metadata: {
       packageType: 'alert_annual',
+      companies: '1',
     },
     recurring: { interval: 'year' },
   },
   {
     name: 'Alert Pass Pro (Annual)',
-    description: 'Full sponsor-licence protection, billed once a year. Monitor up to 5 companies for 12 months, email + WhatsApp + SMS, twice-daily alerts, 90-day change history, sponsored job alerts.',
-    priceAmount: 1999, // £19.99 in pence
-    currency: 'gbp',
+    description: 'Monitor up to five companies for 12 months with twice-daily alerts.',
+    priceAmount: 1999,
     metadata: {
       packageType: 'alert_annual_pro',
+      companies: '5',
     },
     recurring: { interval: 'year' },
   },
   {
-    name: 'CoS Check (Single)',
-    description: 'One Certificate of Sponsorship authenticity check. One-time purchase, no subscription.',
-    priceAmount: 499, // £4.99 in pence
-    currency: 'gbp',
+    name: 'CoS Check (single)',
+    description: 'One AI-powered Certificate of Sponsorship document verification.',
+    priceAmount: 499,
     metadata: {
       packageType: 'cos_check_single',
       credits: '1',
@@ -79,49 +53,65 @@ const products: Product[] = [
   },
 ];
 
+function priceMatches(price: Stripe.Price, seed: ProductSeed): boolean {
+  return (
+    price.active &&
+    price.unit_amount === seed.priceAmount &&
+    price.currency === 'gbp' &&
+    (price.recurring?.interval ?? null) === (seed.recurring?.interval ?? null)
+  );
+}
+
 async function seedProducts() {
   logger.info('Starting Stripe product seeding...');
-  
-  try {
-    for (const productData of products) {
-      const existingProducts = await stripeClient.products.search({
-        query: `name:"${productData.name}"`,
-      });
 
-      if (existingProducts.data.length > 0) {
-        logger.info(`Product "${productData.name}" already exists, skipping...`);
-        continue;
-      }
+  const existingProducts = await stripeClient.products.list({
+    active: true,
+    limit: 100,
+  });
 
-      const product = await stripeClient.products.create({
+  for (const productData of products) {
+    let product = existingProducts.data.find(
+      (candidate) =>
+        candidate.metadata?.packageType === productData.metadata.packageType,
+    );
+
+    if (!product) {
+      product = await stripeClient.products.create({
         name: productData.name,
         description: productData.description,
         metadata: productData.metadata,
       });
-
       logger.info(`Created product: ${product.id} - ${product.name}`);
-
-      const priceData: any = {
-        product: product.id,
-        unit_amount: productData.priceAmount,
-        currency: productData.currency,
-        metadata: productData.metadata,
-      };
-
-      if (productData.recurring) {
-        priceData.recurring = productData.recurring;
-      }
-
-      const price = await stripeClient.prices.create(priceData);
-      logger.info(`Created price: ${price.id} - £${(productData.priceAmount / 100).toFixed(2)}`);
+    } else {
+      logger.info(`Product "${product.name}" already exists, checking price...`);
     }
 
-    logger.info('Product seeding completed!');
-    logger.info('To use these in your app, query the stripe.products and stripe.prices tables.');
-  } catch (error) {
-    logger.error({ err: error }, 'Error seeding products:');
-    throw error;
+    const existingPrices = await stripeClient.prices.list({
+      product: product.id,
+      active: true,
+      limit: 100,
+    });
+
+    if (existingPrices.data.some((price) => priceMatches(price, productData))) {
+      logger.info(`Matching price for "${product.name}" already exists, skipping...`);
+      continue;
+    }
+
+    const price = await stripeClient.prices.create({
+      product: product.id,
+      unit_amount: productData.priceAmount,
+      currency: 'gbp',
+      metadata: productData.metadata,
+      ...(productData.recurring ? { recurring: productData.recurring } : {}),
+    });
+    logger.info(`Created price: ${price.id} - £${(productData.priceAmount / 100).toFixed(2)}`);
   }
+
+  logger.info('Stripe product seeding completed.');
 }
 
-seedProducts().catch((err) => logger.error({ err }, 'seedProducts failed'));
+seedProducts().catch((err) => {
+  logger.error({ err }, 'seedProducts failed');
+  process.exitCode = 1;
+});

@@ -171,17 +171,18 @@ export default function AIGuide() {
               </h3>
               <p className="text-muted-foreground mb-4 max-w-xl mx-auto">
                 If any of the above applies to your situation, do NOT proceed with your visa application.
-                Upload your document for verification, or seek advice from a registered immigration adviser before taking any action.
+                View verification plans, or seek advice from a registered immigration adviser before taking any action.
               </p>
-              <Link href="/dashboard">
+              <Link href="/cos-pricing">
                 <motion.button
                   whileTap={{ scale: 0.97 }}
                   className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full px-6 py-3 font-medium inline-flex items-center gap-2"
                 >
                   <Shield className="w-4 h-4" />
-                  Verify Your Document Now
+                  View CoS Verification Plans
                 </motion.button>
               </Link>
+              <p className="text-xs text-muted-foreground mt-3">Credit packs from £4.99. Direct verification needs login and closed-beta approval.</p>
             </motion.div>
           </div>
 
@@ -335,7 +336,7 @@ export default function AIGuide() {
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground mt-5 text-center italic leading-relaxed">
-                    Accuracy based on forensic metadata analysis. Results should not be relied upon as the sole basis for any immigration decision.
+                    Accuracy based on forensic metadata analysis (hidden PDF creation data). Technical signals only — not legal advice. Results should not be relied upon as the sole basis for any immigration decision. Always verify on GOV.UK.
                   </p>
                 </div>
               </div>
@@ -349,15 +350,16 @@ export default function AIGuide() {
             transition={spring}
             className="text-center"
           >
-            <Link href="/dashboard">
+            <Link href="/cos-pricing">
               <motion.button
                 whileTap={{ scale: 0.97 }}
                 className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full px-8 py-4 text-lg font-medium inline-flex items-center gap-2"
               >
                 <Shield className="w-5 h-5" />
-                Verify Your Document Now
+                View CoS Verification Plans
               </motion.button>
             </Link>
+            <p className="text-xs text-muted-foreground mt-3">Credit packs from £4.99. Direct verification needs login and closed-beta approval.</p>
           </motion.div>
         </div>
       </div>
