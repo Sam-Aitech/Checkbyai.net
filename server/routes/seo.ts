@@ -185,9 +185,8 @@ Disallow: /uploads/`;
 
 ## Products
 
-- [CoS Verification](${getAppUrl()}/cos-pricing): AI-powered Certificate of Sponsorship document verification from £4.99. Detect fake or edited CoS documents using forensic metadata analysis.
-- [Notification Engine](${getAppUrl()}/pricing): UK sponsor licence monitoring via scheduled digests. Get alerted via WhatsApp, email, and SMS when your employer's licence status changes. Alert Pass from £9.99/year; monthly plans from £24.99/month.
 - [CoS Verification](${getAppUrl()}/cos-pricing): AI-powered Certificate of Sponsorship document verification. Detect fake or edited CoS documents using forensic metadata analysis.
+- [Notification Engine](${getAppUrl()}/pricing): UK sponsor licence monitoring via scheduled digests. Get alerted via WhatsApp, email, and SMS when your employer's licence status changes. Alert Pass from £9.99/year; monthly plans from £24.99/month.
 - [Free Sponsor Search](${getAppUrl()}/sponsor-monitor): Search the UK Home Office Register of Licensed Sponsors for free. Check if any company holds a valid sponsor licence.
 
 ## Key Pages
@@ -439,17 +438,11 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
       title: 'UK Sponsor Licence Revocations Today | Live Register Updates | CheckByAI',
       description: 'Which UK sponsor licences were revoked today? See live changes from the Home Office register — additions, removals, downgrades — updated daily.',
     },
-    '/dashboard': {
-      title: 'Verify Your Certificate of Sponsorship | Detect Fake CoS Documents | CheckByAI',
-      description: 'Upload your Certificate of Sponsorship and find out if it\'s genuine in under 60 seconds. Our forensic AI detects fakes, edits, and suspicious formatting. Your document is deleted immediately after checking.',
-    },
-    '/verify-cos': {
-      title: 'Verify Your Certificate of Sponsorship | Detect Fake CoS Documents | CheckByAI',
-      description: 'Upload your Certificate of Sponsorship and find out if it\'s genuine in under 60 seconds. Our forensic AI detects fakes, edits, and suspicious formatting. Your document is deleted immediately after checking.',
-    },
+    '/dashboard': dashboardMeta,
+    '/verify-cos': dashboardMeta,
     '/technology': {
       title: 'How We Detect Fake Documents | Forensic AI Technology | CheckByAI',
-      description: 'Learn how our forensic AI catches fake Certificates of Sponsorship that humans miss. Metadata extraction, pattern analysis, and machine learning — explained.',
+      description: 'Learn how our forensic AI analyzes Certificates of Sponsorship through metadata forensics, pattern analysis, and machine learning.',
     },
     '/ai-guide': {
       title: 'How AI Catches Fake Visa Documents | Detection Guide | CheckByAI',
@@ -486,40 +479,53 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
   for (const routePath of Object.keys(ROUTE_SSR_BODIES)) {
     app.get(routePath, (req: any, res, next) => {
       try {
-        const accept = req.headers["accept"] || "";
-        if (!accept.includes("text/html")) return next();
-        let html: string | null = null;
-        for (const p of HTML_PATHS) {
-          html = readHtmlTemplate(p);
-          if (html) break;
-        }
+        if (!wantsHtml(req)) return next();
+        let html = readShellTemplate();
         if (!html) return next();
         const routeMeta = seoMetaMap[routePath];
         if (routeMeta) {
-          const t = escapeAttr(routeMeta.title);
-          const d = escapeAttr(routeMeta.description);
-          const canonical = escapeAttr(`${getAppUrl()}${routePath}`);
-          html = html.replace(/<title>[^<]*<\/title>/, `<title>${t}</title>`);
-          html = html.replace(/<meta name="title" content="[^"]*"/, `<meta name="title" content="${t}"`);
-          html = html.replace(/<meta name="description" content="[^"]*"/, `<meta name="description" content="${d}"`);
-          html = html.replace(/<meta property="og:title" content="[^"]*"/, `<meta property="og:title" content="${t}"`);
-          html = html.replace(/<meta property="og:description" content="[^"]*"/, `<meta property="og:description" content="${d}"`);
-          html = html.replace(/<meta property="og:url" content="[^"]*"/, `<meta property="og:url" content="${canonical}"`);
-          html = html.replace(/<meta property="twitter:title" content="[^"]*"/, `<meta property="twitter:title" content="${t}"`);
-          html = html.replace(/<meta property="twitter:description" content="[^"]*"/, `<meta property="twitter:description" content="${d}"`);
-          html = html.replace(/<meta property="twitter:url" content="[^"]*"/, `<meta property="twitter:url" content="${canonical}"`);
-          html = html.replace(/<link rel="canonical" href="[^"]*"/, `<link rel="canonical" href="${canonical}"`);
+          html = rewriteRouteMeta(html, routePath, routeMeta);
         }
         const seoBody = ROUTE_SSR_BODIES[routePath]();
         html = html.replace(
           ROOT_INJECTION_REGEX,
           (_match: string, p1: string, p2: string) => `${p1}${seoBody}${p2}`,
         );
-        res.set("Content-Type", "text/html");
-        res.set("Cache-Control", "public, max-age=3600");
-        res.send(html);
+        sendHtmlPage(res, html);
       } catch (err) {
         logger.error({ err, routePath }, "Route SSR injection error:");
+        next();
+      }
+    });
+  }
+
+  // ── Static guide pages for extensionless /guides/* URLs ────────────────
+  // The guide articles ship as static HTML (client/public/guides/*.html) but
+  // have no React route, so extensionless URLs fell through to the SPA
+  // NotFound page. Serve the matching static file directly instead.
+  const GUIDE_FILES: Record<string, string> = {
+    "/guides/how-to-check-cos-genuine": "guides/how-to-check-cos-genuine.html",
+    "/guides/cos-scams-red-flags": "guides/cos-scams-red-flags.html",
+    "/guides/employers-guide-fake-cos": "guides/employers-guide-fake-cos.html",
+    "/guides/what-to-do-fake-cos": "guides/what-to-do-fake-cos.html",
+  };
+  const GUIDE_DIRS = [
+    path.resolve("dist/public"),
+    path.resolve("client/public"),
+  ];
+  for (const [routePath, guideFile] of Object.entries(GUIDE_FILES)) {
+    app.get(routePath, (req: any, res, next) => {
+      try {
+        if (!wantsHtml(req)) return next();
+        let html: string | null = null;
+        for (const dir of GUIDE_DIRS) {
+          html = readHtmlTemplate(path.join(dir, guideFile));
+          if (html) break;
+        }
+        if (!html) return next();
+        sendHtmlPage(res, html);
+      } catch (err) {
+        logger.error({ err, routePath }, "Guide static serve error:");
         next();
       }
     });

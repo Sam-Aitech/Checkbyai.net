@@ -48,10 +48,10 @@ const pipelineStages = [
   },
   {
     step: 4,
-    title: "Expert Validation",
+    title: "Confidence Flagging",
     icon: <Users className="w-6 h-6" />,
     description:
-      "Edge cases are escalated to qualified immigration professionals who review AI findings and provide technical risk assessments for human review — not visa decisions.",
+      "Low-confidence outputs are flagged in the report so you can seek independent professional advice — not a visa decision. Automated checks only; no in-house immigration advice is included.",
   },
 ];
 
@@ -77,7 +77,7 @@ export default function Technology() {
     <PageLayout>
       <SEOHead
         title="Verification Technology | AI Document Forensics | Check By AI"
-        description="Discover how Check By AI uses advanced forensic analysis, machine learning, and multi-layer verification to detect fake Certificate of Sponsorship documents."
+        description="Discover how Check By AI uses forensic analysis, machine learning, and multi-layer checks to surface technical risk signals in Certificate of Sponsorship documents. Not a genuineness verdict; only the Home Office decides."
         keywords="document forensics technology, AI verification, PDF metadata analysis, document authenticity detection, forensic document analysis"
         canonicalUrl="https://checkbyai.net/technology"
         structuredData={{
@@ -103,7 +103,7 @@ export default function Technology() {
             {
               "@type": "TechArticle",
               "name": "Verification Technology | AI Document Forensics",
-              "description": "Discover how Check By AI uses advanced forensic analysis, machine learning, and multi-layer verification to detect fake Certificate of Sponsorship documents.",
+              "description": "Discover how Check By AI uses forensic analysis, machine learning, and multi-layer checks to surface technical risk signals in Certificate of Sponsorship documents.",
               "author": {
                 "@type": "Organization",
                 "name": "Check By AI",
@@ -143,7 +143,7 @@ export default function Technology() {
                 </div>
                 <div className="p-6">
                   <p className="text-muted-foreground editorial-body mb-6">
-                    Every document passes through a rigorous four-stage verification pipeline, combining automated forensic analysis with human expertise to deliver results you can trust.
+                    Every document passes through a four-stage verification pipeline of automated forensic checks that produce risk signals to review with an independent adviser.
                   </p>
                   <div className="space-y-4">
                     {pipelineStages.map((stage, index) => (
@@ -220,11 +220,11 @@ export default function Technology() {
               <div className="theme-card bg-card">
                 <div className="p-6 border-b border-border flex items-center gap-3">
                   <Brain className="w-6 h-6 text-foreground" />
-                  <h2 className="editorial-subheading text-foreground">Human-in-the-Loop (HITL) Learning</h2>
+                  <h2 className="editorial-subheading text-foreground">Model Improvement Approach</h2>
                 </div>
                 <div className="p-6 space-y-4">
                   <p className="text-muted-foreground editorial-body">
-                    What sets our platform apart is the continuous feedback loop between AI and human expertise. This is not a static model: it learns and improves with every verification.
+                    Our detection rules are updated over time using anonymised failure patterns. Current verifications are automated technical checks — reports should be reviewed with an independent adviser, not treated as visa decisions.
                   </p>
                   <div className="bg-muted/50 border border-border rounded-xl p-6">
                     <div className="grid md:grid-cols-3 gap-6 text-center">
@@ -239,20 +239,20 @@ export default function Technology() {
                         <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-3">
                           <Users className="w-6 h-6 text-foreground" />
                         </div>
-                        <p className="font-semibold text-foreground">Experts Review</p>
-                        <p className="text-sm text-muted-foreground mt-1">Immigration professionals review edge cases and provide corrections</p>
+                        <p className="font-semibold text-foreground">Your Review</p>
+                        <p className="text-sm text-muted-foreground mt-1">Flagged low-confidence outputs can be reviewed with an independent adviser</p>
                       </div>
                       <div>
                         <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-3">
                           <Zap className="w-6 h-6 text-foreground" />
                         </div>
-                        <p className="font-semibold text-foreground">AI Improves</p>
-                        <p className="text-sm text-muted-foreground mt-1">Expert corrections are fed back to train and refine the model continuously</p>
+                        <p className="font-semibold text-foreground">Rules Improve</p>
+                        <p className="text-sm text-muted-foreground mt-1">Anonymised failure patterns inform future detection-rule updates; current checks are automated</p>
                       </div>
                     </div>
                   </div>
                   <p className="text-sm text-muted-foreground italic editorial-body">
-                    This feedback loop helps our system adapt to emerging fraud techniques over time.
+                    This approach is designed to adapt to emerging fraud techniques over time; it is not a guarantee of future accuracy.
                   </p>
                 </div>
               </div>
@@ -266,7 +266,7 @@ export default function Technology() {
                 </div>
                 <div className="p-6 space-y-4">
                   <p className="text-muted-foreground editorial-body">
-                    Our platform is architected for maximum reliability with automatic failover across multiple independent AI providers, ensuring your verifications are never interrupted.
+                    Our platform retries across configured AI providers where available. Interruptions can still occur — there is no uptime or uninterrupted-service guarantee.
                   </p>
                   <div className="flex flex-col md:flex-row items-center gap-3 justify-center">
                     <div className="flex-1 max-w-[200px] p-4 bg-primary/10 rounded-xl text-center">
@@ -276,7 +276,7 @@ export default function Technology() {
                     <ArrowRight className="w-5 h-5 text-muted-foreground rotate-90 md:rotate-0 flex-shrink-0" />
                     <div className="flex-1 max-w-[200px] p-4 bg-primary/10 rounded-xl text-center">
                       <p className="editorial-caption text-foreground">Secondary</p>
-                      <p className="text-xs text-muted-foreground mt-1">Automatic Failover</p>
+                      <p className="text-xs text-muted-foreground mt-1">Best-effort retry</p>
                     </div>
                     <ArrowRight className="w-5 h-5 text-muted-foreground rotate-90 md:rotate-0 flex-shrink-0" />
                     <div className="flex-1 max-w-[200px] p-4 bg-primary/10 rounded-xl text-center">
@@ -285,8 +285,8 @@ export default function Technology() {
                     </div>
                   </div>
                   <div className="text-center p-4 bg-muted/50 border border-border rounded-xl">
-                    <p className="editorial-heading text-2xl text-foreground">Automatic failover</p>
-                    <p className="text-sm text-muted-foreground">Across independent AI providers, with no single point of failure by design</p>
+                    <p className="editorial-heading text-2xl text-foreground">Best-effort provider retry</p>
+                    <p className="text-sm text-muted-foreground">Retry across configured providers when available; no uptime guarantee</p>
                   </div>
                 </div>
               </div>
