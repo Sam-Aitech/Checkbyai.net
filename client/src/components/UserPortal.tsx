@@ -19,7 +19,7 @@ export default function UserPortal() {
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [verificationSteps, setVerificationSteps] = useState([
-    { id: 1, title: "Metadata Extraction", description: "Extract XMP metadata including creation date, producer, and creator tool information", status: "pending" },
+    { id: 1, title: "Metadata Extraction", description: "Extract hidden PDF file data (XMP edit history) including creation date, producer (software that created the PDF), and creator tool information", status: "pending" },
     { id: 2, title: "Pattern Analysis", description: "Compare against trusted patterns using rule-based matching and vector similarity", status: "pending" },
     { id: 3, title: "AI Verification", description: "ML model inference using ONNX Runtime for advanced pattern recognition", status: "pending" },
     { id: 4, title: "Result Generation", description: "Generate verification result and detailed analysis", status: "pending" }

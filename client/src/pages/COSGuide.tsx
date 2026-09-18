@@ -254,15 +254,26 @@ export default function COSGuide() {
           </div>
 
           <div className="text-center">
-            <Link href="/dashboard">
-              <motion.button
-                whileTap={{ scale: 0.97 }}
-                className="inline-flex items-center justify-center px-8 py-3 text-base font-medium bg-primary text-primary-foreground hover:bg-primary/90 rounded-full transition-colors"
-              >
-                <Shield className="w-5 h-5 mr-2" />
-                Verify Your CoS Now
-              </motion.button>
-            </Link>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <Link href="/cos-pricing">
+                <motion.button
+                  whileTap={{ scale: 0.97 }}
+                  className="inline-flex items-center justify-center px-8 py-3 text-base font-medium bg-primary text-primary-foreground hover:bg-primary/90 rounded-full transition-colors"
+                >
+                  <Shield className="w-5 h-5 mr-2" />
+                  View CoS Verification Plans
+                </motion.button>
+              </Link>
+              <Link href="/dashboard">
+                <motion.button
+                  whileTap={{ scale: 0.97 }}
+                  className="inline-flex items-center justify-center px-8 py-3 text-base font-medium border border-primary/30 text-primary hover:bg-primary/10 rounded-full transition-colors"
+                >
+                  Log in to Verify (Closed Beta)
+                </motion.button>
+              </Link>
+            </div>
+            <p className="text-xs text-muted-foreground mt-3">Purchase unlocks instant checks; direct verify needs login + beta approval.</p>
           </div>
         </div>
       </div>

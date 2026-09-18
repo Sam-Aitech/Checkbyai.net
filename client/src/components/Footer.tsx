@@ -14,7 +14,7 @@ export default function Footer() {
     <footer className="theme-gradient text-white relative overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/10" />
       <div className="relative z-10 max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
-        <div className="py-16 grid grid-cols-1 md:grid-cols-4 gap-12">
+        <div className="py-16 grid grid-cols-1 md:grid-cols-5 gap-12">
           <div className="md:col-span-2">
             <div className="flex items-center gap-2.5 mb-6">
               <img src={logoImg} alt="CheckByAi.net" width={160} height={40} className="h-10 sm:h-12 w-auto object-contain" loading="lazy" />
@@ -35,15 +35,33 @@ export default function Footer() {
             </a>
           </div>
 
-          <nav aria-label="Products">
-            <h2 className="editorial-caption mb-6 text-white/65 tracking-widest">Products</h2>
+          <nav aria-label="Monitor">
+            <h2 className="editorial-caption mb-6 text-white/65 tracking-widest">Monitor</h2>
             <ul className="space-y-3">
               {[
+                { href: "/sponsors", label: "Sponsor Register" },
                 { href: "/sponsor-monitor", label: "Sponsor Monitor" },
                 { href: "/pricing", label: "Alert Plans" },
-                { href: "/dashboard", label: "Verify CoS" },
-                { href: "/cos-pricing", label: "CoS Credits" },
                 { href: "/sponsor-changes", label: "Today's Changes" },
+              ].map(link => (
+                <li key={link.href}>
+                  <Link href={link.href} className="text-sm text-white/70 hover:text-white transition-colors font-medium">
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
+          <nav aria-label="Verify">
+            <h2 className="editorial-caption mb-6 text-white/65 tracking-widest">Verify</h2>
+            <ul className="space-y-3">
+              {[
+                { href: "/dashboard", label: "Verify CoS Document" },
+                { href: "/cos-pricing", label: "CoS Credits" },
+                { href: "/check-fake-cos", label: "Spot a Fake CoS" },
+                { href: "/cos-guide", label: "CoS Guide" },
+                { href: "/api-docs", label: "API Docs (Pilot)" },
               ].map(link => (
                 <li key={link.href}>
                   <Link href={link.href} className="text-sm text-white/70 hover:text-white transition-colors font-medium">

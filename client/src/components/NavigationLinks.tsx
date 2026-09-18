@@ -7,7 +7,7 @@ interface NavigationLinksProps {
 
 export default function NavigationLinks({ className = "" }: NavigationLinksProps) {
   const links = [
-    { href: "/sponsor-monitor", label: "Sponsor Monitor", description: "Get instant alerts when a UK sponsor licence is revoked" },
+    { href: "/sponsor-monitor", label: "Sponsor Monitor", description: "Get same-day or twice-daily digest alerts when a UK sponsor licence changes" },
     { href: "/dashboard", label: "Verify CoS", description: "Upload and verify your Certificate of Sponsorship" },
     { href: "/sponsor-changes", label: "Recent Changes", description: "See the latest sponsor licence changes detected" },
     { href: "/ai-guide", label: "AI Guide", description: "Learn about our AI verification technology" },

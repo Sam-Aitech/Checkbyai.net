@@ -51,7 +51,7 @@ const pipelineStages = [
     title: "Expert Validation",
     icon: <Users className="w-6 h-6" />,
     description:
-      "Edge cases are escalated to qualified immigration professionals who review AI findings and provide definitive assessments.",
+      "Edge cases are escalated to qualified immigration professionals who review AI findings and provide technical risk assessments for human review — not visa decisions.",
   },
 ];
 
@@ -130,7 +130,7 @@ export default function Technology() {
               Our Verification Technology
             </h1>
             <p className="text-xl text-muted-foreground editorial-body max-w-2xl mx-auto">
-              Built by immigration and security experts, our multi-layer verification platform delivers institutional-grade document authentication trusted by professionals across the UK.
+              Built by immigration and security experts, our multi-layer verification platform provides technical risk analysis designed for professionals across the UK. Results are risk signals for human review — not visa decisions.
             </p>
           </div>
 
@@ -252,7 +252,7 @@ export default function Technology() {
                     </div>
                   </div>
                   <p className="text-sm text-muted-foreground italic editorial-body">
-                    This feedback loop ensures our system adapts to emerging fraud techniques and maintains industry-leading accuracy rates.
+                    This feedback loop helps our system adapt to emerging fraud techniques over time.
                   </p>
                 </div>
               </div>
@@ -285,8 +285,8 @@ export default function Technology() {
                     </div>
                   </div>
                   <div className="text-center p-4 bg-muted/50 border border-border rounded-xl">
-                    <p className="editorial-heading text-2xl text-foreground">99.99%</p>
-                    <p className="text-sm text-muted-foreground">Uptime Guarantee, no single point of failure</p>
+                    <p className="editorial-heading text-2xl text-foreground">Automatic failover</p>
+                    <p className="text-sm text-muted-foreground">Across independent AI providers, with no single point of failure by design</p>
                   </div>
                 </div>
               </div>
@@ -337,7 +337,7 @@ export default function Technology() {
                 </div>
                 <div className="p-6 space-y-4">
                   <p className="text-muted-foreground editorial-body">
-                    Our verification technology is available via a RESTful API, enabling seamless integration into your existing workflows and platforms.
+                    API access is in limited pilot — request access via sales; approval required. The docs below show the intended contract for pilot customers.
                   </p>
                   <div className="grid md:grid-cols-3 gap-4">
                     <div className="bg-muted/50 border border-border rounded-xl p-5 text-center">
@@ -359,7 +359,7 @@ export default function Technology() {
                   <div className="text-center">
                     <Link href="/api-docs">
                       <Button variant="outline" className="border-primary/30 text-primary hover:bg-primary/10 rounded-full">
-                        View API Documentation
+                        View API Documentation (Pilot)
                         <ArrowRight className="w-4 h-4 ml-2" />
                       </Button>
                     </Link>
@@ -377,10 +377,10 @@ export default function Technology() {
                 <div className="p-6">
                   <div ref={statsRef} className="grid grid-cols-2 md:grid-cols-4 gap-6">
                     {[
-                      { value: "High", label: "Forensic Detection" },
-                      { value: "<3s", label: "Processing Time" },
-                      { value: "24/7", label: "Availability" },
-                      { value: "10,000+", label: "Documents Verified" },
+                      { value: "Multi-layer", label: "Forensic checks" },
+                      { value: "10–30s", label: "Typical processing time" },
+                      { value: "Zero-storage", label: "Deleted after checking" },
+                      { value: "Human review", label: "Edge cases escalated" },
                     ].map((stat, i) => (
                       <motion.div
                         key={stat.label}
@@ -395,7 +395,7 @@ export default function Technology() {
                     ))}
                   </div>
                   <p className="text-xs text-muted-foreground mt-6 text-center italic leading-relaxed">
-                    Accuracy based on forensic metadata analysis of document structure and software signatures. Results should not be relied upon as the sole basis for any immigration decision.
+                    Accuracy based on forensic metadata analysis (hidden PDF creation data — document structure and software signatures). Technical signals only — not legal advice. Results should not be relied upon as the sole basis for any immigration decision. Always verify on GOV.UK.
                   </p>
                 </div>
               </div>
@@ -403,12 +403,13 @@ export default function Technology() {
           </div>
 
           <div className="text-center">
-            <Link href="/dashboard">
+            <Link href="/cos-pricing">
               <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full">
                 <Shield className="w-5 h-5 mr-2" />
-                Verify Your Document Now
+                View CoS Verification Plans
               </Button>
             </Link>
+            <p className="text-xs text-muted-foreground mt-3">Credit packs from £4.99. Direct verification needs login and closed-beta approval.</p>
           </div>
         </div>
       </div>

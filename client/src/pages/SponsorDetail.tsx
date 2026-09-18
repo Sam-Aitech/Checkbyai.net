@@ -316,9 +316,8 @@ export default function SponsorDetail() {
                 </h2>
                 <div className="space-y-2 text-sm text-destructive">
                   <p>
-                    When the Home Office revokes a sponsor licence, any workers currently
-                    sponsored by that company are given a <strong>60-day window</strong> to find a
-                    new licensed employer, switch visa category, or leave the UK.
+                    When the Home Office revokes a sponsor licence, a sponsor licence change can affect sponsored workers.
+                    Check current GOV.UK guidance for the steps that apply to your situation.
                   </p>
                   <p>
                     The Home Office does not email individual workers — actively monitor the register and consider alerts (weeknight checks, digest delays apply). CheckByAI is independent and not the Home Office; seek immigration advice for decisions.
@@ -333,7 +332,7 @@ export default function SponsorDetail() {
             </div>
             <div className="grid sm:grid-cols-3 gap-3 pt-2 border-t border-destructive/20">
               {[
-                { label: "60 days",        sub: "Grace period to find a new sponsor" },
+                { label: "Check GOV.UK",        sub: "Steps depend on your situation" },
                 { label: "Midnight check", sub: "Home Office updates the register nightly" },
                 { label: "Same-day alert", sub: "Pro subscribers notified same-day or twice-daily" },
               ].map((item) => (

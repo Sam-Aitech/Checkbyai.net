@@ -1075,13 +1075,13 @@ async function seedInitialDigest(): Promise<void> {
       },
       {
         headline: `${active.toLocaleString()} Active Sponsor Licences`,
-        subheadline: `Checked nightly for revocations and changes`,
+        subheadline: `Checked every weeknight for revocations and changes`,
         emotion: "neutral",
         focus: "overview",
       },
       {
         headline: `Tracking ${active.toLocaleString()} UK Sponsors`,
-        subheadline: `Real-time monitoring of the official register`,
+        subheadline: `Checked every weeknight, alerts via scheduled digests`,
         emotion: "informative",
         focus: "overview",
       },

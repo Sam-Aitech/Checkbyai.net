@@ -9,6 +9,10 @@ export interface TierConfig {
   watchLimit: number; // -1 = unlimited
   channels: readonly NotificationChannel[];
   alertTiming: "next-morning" | "same-day" | "immediate";
+  // NOTE: apiAccess is a *pilot* entitlement (2026-09). No self-serve public
+  // v1 API exists yet — keys are issued manually via api@checkbyai.net.
+  // UI must label this "API access (limited pilot — approval required)",
+  // never as generally-available self-serve access.
   apiAccess: boolean;
   weeklyReports: boolean;
   csvUpload: boolean;
@@ -84,6 +88,12 @@ export const TIER_CONFIGS: Readonly<Record<PlanTier, TierConfig>> = Object.freez
     jobAlerts: true,
   }),
 });
+
+/** Maturity of the public API entitlement. Keep UI copy gated on this. */
+export const API_ACCESS_MATURITY = "limited-pilot" as const;
+
+/** User-facing label for API entitlement — always pilot-qualified until GA. */
+export const API_ACCESS_LABEL = "API access (limited pilot — approval required)";
 
 const STATUS_TO_TIER: Record<string, PlanTier> = {
   free: "free",

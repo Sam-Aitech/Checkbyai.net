@@ -36,8 +36,26 @@ const rateLimiterFactory = (maxPerMinute: number, prefix: string) => rateLimit({
   },
 });
 
-// Anonymous search - 30 requests/minute (prevents abuse)
-const freeSearchRateLimit = rateLimiterFactory(30, "rl:search:free:");
+// Anonymous free search — 1 request/day per IP (sponsor data scraping prevention).
+// SECURITY.md is the source of truth. Keyed on IP only (not user id) so the
+// quota cannot be sidestepped by logging in/out or rotating accounts behind
+// one egress IP. free-search and historical-search share this instance (and
+// its Redis prefix) so the two endpoints draw from ONE daily bucket.
+// NOTE: distinct "free-daily" prefix (not the old "rl:search:free:") so stale
+// 30/min counters in Redis can never grant extra hits after deploy.
+// skipFailedRequests: validation 400s must not burn the caller's whole day.
+const freeSearchRateLimit = rateLimit({
+  windowMs: 24 * 60 * 60 * 1_000,
+  max: 1,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: makeRateLimitStore("rl:search:free-daily:"),
+  // req.ip is correctly resolved after app.set('trust proxy', 1) in server/index.ts.
+  // Intentionally IP-only (no user.id branch) — spec is per-IP.
+  keyGenerator: (req) => ipKeyGenerator(req.ip ?? "127.0.0.1"),
+  skipFailedRequests: true,
+  message: { message: "Daily free search limit reached. Please try again tomorrow or sign in for unlimited search." },
+});
 
 // Authenticated search - 120 requests/minute (for power users)
 const authenticatedSearchRateLimit = rateLimiterFactory(120, "rl:search:auth:");

@@ -4,12 +4,12 @@ import PageLayout from "@/components/PageLayout";
 
 export default function DashboardPage() {
   const dashboardSEO = {
-    title: "Verify Your Certificate of Sponsorship | Detect Fake CoS Documents | CheckByAI",
-    description: "Upload your Certificate of Sponsorship and find out if it's genuine in under 60 seconds. Our forensic AI detects fakes, edits, and suspicious formatting. Your document is deleted immediately after checking.",
+    title: "Certificate of Sponsorship Risk Check | Technical Analysis | CheckByAI",
+    description: "Upload your Certificate of Sponsorship PDF for technical risk analysis — hidden metadata, formatting and reference-pattern signals. Not a genuineness verdict; only the Home Office decides. Deleted immediately after checking.",
     keywords: "verify Certificate of Sponsorship, UK CoS checker, upload CoS document, fake CoS detection, AI CoS verification, UK visa document check, sponsor verification",
     canonicalUrl: "https://checkbyai.net/dashboard",
-    ogTitle: "Is Your CoS Genuine? | Upload & Verify Instantly",
-    ogDescription: "Upload your Certificate of Sponsorship for instant verification. Detect fakes before it's too late.",
+    ogTitle: "Check Your CoS for Fraud-Risk Signals | Technical Analysis",
+    ogDescription: "Upload your CoS for a technical risk check — metadata, formatting and reference-pattern signals for human review, not a visa decision.",
     structuredData: {
       "@context": "https://schema.org",
       "@graph": [
@@ -49,8 +49,8 @@ export default function DashboardPage() {
             },
             {
               "@type": "HowToStep",
-              "name": "Review Results",
-              "text": "Get instant verification results with confidence score showing if your CoS is genuine, suspicious, or fake",
+              "name": "Review Risk Signals",
+              "text": "Review technical risk signals with model certainty across genuine, suspicious, fake or needs-review outcomes, for human review — not a visa decision",
               "position": 3
             }
           ],
@@ -61,10 +61,10 @@ export default function DashboardPage() {
           "mainEntity": [
             {
               "@type": "Question",
-              "name": "How long does CoS verification take?",
+              "name": "How long does CoS risk analysis take?",
               "acceptedAnswer": {
                 "@type": "Answer",
-                "text": "Verification is instant - typically completed within 10-30 seconds. Our AI analyzes your document immediately upon upload."
+                "text": "Analysis typically completes within 10-30 seconds of upload. The engine examines the document's metadata, format, and patterns and returns technical risk signals for human review."
               }
             },
             {

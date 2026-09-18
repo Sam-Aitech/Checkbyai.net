@@ -40,7 +40,7 @@ export default function VerificationResultsTabbed({
     <Tabs defaultValue="verification" className="w-full">
       <TabsList className="mb-4">
         <TabsTrigger value="verification">Verification</TabsTrigger>
-        <TabsTrigger value="inspector">Metadata Inspector</TabsTrigger>
+        <TabsTrigger value="inspector" title="Metadata Inspector (MIS): checks hidden PDF creation data to spot editing tools">Metadata Inspector (MIS)</TabsTrigger>
       </TabsList>
 
       <TabsContent value="verification">
@@ -48,6 +48,7 @@ export default function VerificationResultsTabbed({
       </TabsContent>
 
       <TabsContent value="inspector">
+        <p className="text-xs text-muted-foreground mb-3">Metadata Inspector (MIS) — plain English: checks hidden PDF creation data (software used, edit history) to spot Word/Photoshop forgeries. Technical signals only, not a visa decision.</p>
         <COSCheckPanel result={result.cosCheck!} />
         {isAdmin && <COSAdminPanel result={result.cosCheck!} />}
       </TabsContent>

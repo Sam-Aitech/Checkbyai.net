@@ -259,16 +259,16 @@ export default function WhatToDoFakeCoS() {
               Verify your next Certificate of Sponsorship
             </h3>
             <p className="text-muted-foreground mb-6 max-w-xl mx-auto editorial-body">
-              Don't let it happen again. Upload any CoS document for instant AI-powered verification.
+              Don't let it happen again. View CoS verification plans — credit packs from £4.99. Direct verification needs login and closed-beta approval.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Link href="/dashboard">
+              <Link href="/cos-pricing">
                 <motion.button
                   whileTap={{ scale: 0.97 }}
                   className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full px-8 py-3 font-medium inline-flex items-center gap-2"
                 >
                   <Shield className="w-5 h-5" />
-                  Verify a CoS Now
+                  View CoS Verification Plans
                   <ArrowRight className="w-4 h-4" />
                 </motion.button>
               </Link>

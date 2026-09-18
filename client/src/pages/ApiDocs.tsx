@@ -237,9 +237,9 @@ export default function ApiDocs() {
   return (
     <PageLayout>
       <SEOHead
-        title="API Documentation | B2B Integration | Check By AI"
-        description="Integrate CoS verification into your immigration consultancy or HR platform. RESTful API with real-time document analysis, webhooks, and enterprise features."
-        keywords="CoS verification API, document verification integration, immigration API, HR document check API, B2B verification service"
+        title="API Documentation (Limited Pilot) | B2B Integration | Check By AI"
+        description="Public API in limited pilot: request access to integrate CoS verification into your immigration consultancy or HR platform. Intended REST contract with document analysis, webhooks, and enterprise features — approval required."
+        keywords="CoS verification API pilot, document verification integration, immigration API, HR document check API, B2B verification service"
         canonicalUrl="https://checkbyai.net/api-docs"
       />
       <div className="bg-background">
@@ -247,7 +247,7 @@ export default function ApiDocs() {
           <div className="text-center mb-12">
           <div className="editorial-caption bg-primary/10 rounded-full px-3 py-1.5 inline-flex items-center gap-2">
             <Code className="w-4 h-4" />
-            Developer API
+            Developer API — Limited Pilot
           </div>
           <h1 className="editorial-heading text-5xl md:text-6xl text-foreground mt-4 mb-4">
             API Documentation
@@ -255,6 +255,14 @@ export default function ApiDocs() {
           <p className="text-xl text-muted-foreground editorial-body max-w-2xl mx-auto">
             Integrate CoS verification into your workflows. Built for immigration consultancies, law firms, and HR platforms.
           </p>
+          <div role="note" aria-label="API pilot status" className="mt-6 mx-auto max-w-2xl p-4 bg-muted/60 border border-border rounded-xl text-left">
+            <p className="text-sm text-foreground font-semibold">
+              Public API in limited pilot — approval required.
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Endpoints, SDKs, and rate limits below show the intended v1 contract for pilot customers. Keys are issued manually via <a className="underline font-semibold text-primary" href="mailto:api@checkbyai.net?subject=API%20Access%20Request">api@checkbyai.net</a>. Do not build production integrations until your pilot access is confirmed.
+            </p>
+          </div>
         </div>
 
         <div className="grid gap-8 mb-12">
@@ -268,17 +276,17 @@ export default function ApiDocs() {
               </div>
               <div className="p-6 space-y-6">
                 <div>
-                  <h3 className="font-semibold text-foreground mb-2">Base URL</h3>
+                  <h3 className="font-semibold text-foreground mb-2">Base URL (pilot — intended v1 contract)</h3>
                   <CodeBlock language="text">{`https://api.checkbyai.net/api/v1`}</CodeBlock>
                 </div>
 
                 <div>
                   <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2">
                     <Key className="w-4 h-4 text-foreground" />
-                    Authentication
+                    Authentication (pilot keys only)
                   </h3>
                   <p className="text-muted-foreground mb-3">
-                    All API requests require an API key passed via the <code className="px-1.5 py-0.5 bg-muted rounded-lg text-sm font-mono">Authorization</code> header.
+                    Pilot customers receive an API key manually. Pass it via the <code className="px-1.5 py-0.5 bg-muted rounded-lg text-sm font-mono">Authorization</code> header. Keys are not self-serve yet.
                   </p>
                   <CodeBlock language="http">{`Authorization: Bearer YOUR_API_KEY`}</CodeBlock>
                 </div>
@@ -312,7 +320,7 @@ export default function ApiDocs() {
               <div className="p-6 border-b border-border">
                 <div className="flex items-center gap-3">
                   <Server className="w-6 h-6 text-foreground" />
-                  <h2 className="editorial-subheading text-foreground">Endpoints</h2>
+                  <h2 className="editorial-subheading text-foreground">Endpoints (intended v1 — pilot)</h2>
                 </div>
               </div>
               <div className="p-6 space-y-8">
@@ -410,7 +418,7 @@ export default function ApiDocs() {
               </div>
               <div className="p-6 space-y-4">
                 <p className="text-muted-foreground">
-                  Get started quickly with our official SDKs or use cURL for direct API access.
+                  Get started quickly with our pilot SDKs or use cURL for direct API access (pilot customers only).
                 </p>
 
                 <div className="flex gap-2 border-b border-border">
@@ -489,7 +497,7 @@ export default function ApiDocs() {
               </div>
               <div className="p-6">
                 <p className="text-muted-foreground mb-6">
-                  Flexible pricing designed for teams and organisations of all sizes.
+                  Flexible pricing designed for teams and organisations of all sizes. API plans are in limited pilot — request access before purchasing.
                 </p>
                 <div className="grid md:grid-cols-3 gap-4">
                   <div className="p-6 bg-muted/50 border border-border rounded-xl text-center">
@@ -502,7 +510,7 @@ export default function ApiDocs() {
                     <ul className="text-sm text-left space-y-2">
                       <li className="flex items-center gap-2">
                         <CheckCircle className="w-4 h-4 text-foreground flex-shrink-0" />
-                        <span className="text-muted-foreground">Full API access</span>
+                        <span className="text-muted-foreground">Full API access (limited pilot)</span>
                       </li>
                       <li className="flex items-center gap-2">
                         <CheckCircle className="w-4 h-4 text-foreground flex-shrink-0" />
@@ -611,12 +619,12 @@ export default function ApiDocs() {
               <div className="p-6 border-b border-border">
                 <div className="flex items-center gap-3">
                   <Send className="w-6 h-6 text-foreground" />
-                  <h2 className="editorial-subheading text-foreground">Get API Access</h2>
+                  <h2 className="editorial-subheading text-foreground">Get API Access (Limited Pilot)</h2>
                 </div>
               </div>
               <div className="p-6 space-y-4">
                 <p className="text-muted-foreground">
-                  Ready to integrate CoS verification into your platform? Contact our team to get your API key and start building.
+                  Ready to integrate CoS verification into your platform? Contact our team to request a pilot API key. Approval required — keys are issued manually.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-3">
                   <a href="mailto:api@checkbyai.net?subject=API%20Access%20Request" className="flex-1">

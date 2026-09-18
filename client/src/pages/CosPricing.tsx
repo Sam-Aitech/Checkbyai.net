@@ -48,7 +48,7 @@ const plans: PricingPlan[] = [
     features: [
       '1 verification credit',
       'AI-powered document analysis',
-      'Forensic metadata extraction',
+      'Forensic metadata extraction (hidden PDF data — spots edits)',
       'Instant results',
     ],
   },
@@ -63,7 +63,7 @@ const plans: PricingPlan[] = [
     features: [
       '50 verification credits',
       'AI-powered document analysis',
-      'Forensic metadata extraction',
+      'Forensic metadata extraction (hidden PDF data — spots edits)',
       'Instant results',
       'Credits never expire',
     ],
@@ -84,7 +84,7 @@ const plans: PricingPlan[] = [
     features: [
       '100 verification credits',
       'AI-powered document analysis',
-      'Forensic metadata extraction',
+      'Forensic metadata extraction (hidden PDF data — spots edits)',
       'Instant results',
       'Credits never expire',
       'Priority support',
@@ -105,7 +105,7 @@ const plans: PricingPlan[] = [
     features: [
       'Unlimited verifications',
       'AI-powered document analysis',
-      'Forensic metadata extraction',
+      'Forensic metadata extraction (hidden PDF data — spots edits)',
       'Instant results',
       'Priority support',
       'Perfect for high volume',
@@ -117,14 +117,14 @@ const plans: PricingPlan[] = [
     name: 'Enterprise',
     price: 'Contact Sales',
     priceValue: 0,
-    description: 'For HR teams, recruitment agencies and immigration law firms managing multiple sponsored employees.',
+    description: 'For HR teams, recruitment agencies and immigration law firms managing multiple sponsored employees. API access is in limited pilot — request access via sales; approval required.',
     packageType: 'enterprise',
     icon: Building2,
     contactSales: true,
     features: [
       'Unlimited CoS checks and company watches',
       'Expert human review included',
-      'CSV upload and API access',
+      'CSV upload + API access (limited pilot — approval required)',
       'Weekly reports and webhooks',
       'Dedicated support',
     ],
@@ -238,8 +238,8 @@ function PricingCard({ plan, index, isLoggedIn, loading, onSelect, available }: 
           onClick={() => onSelect(plan)}
           disabled={loading === plan.packageType || (!plan.contactSales && isLoggedIn && !available)}
           aria-disabled={loading !== null || (!plan.contactSales && !available)}
-          aria-label={!available && !plan.contactSales ? `${plan.name} — available soon` : `Get ${plan.name}`}
-          title={!available && !plan.contactSales ? "Available soon — join waitlist" : undefined}
+          aria-label={!available && !plan.contactSales ? `${plan.name} — not open for checkout yet` : `Get ${plan.name}`}
+          title={!available && !plan.contactSales ? "Not open for checkout yet — please check back shortly" : undefined}
         >
           {getPricingCardButtonContent(plan, loading, isLoggedIn, available)}
         </motion.button>
@@ -321,11 +321,11 @@ export default function CosPricing() {
   return (
     <PageLayout>
       <SEOHead
-        title="Verify Your CoS is Genuine | Fake Document Detection from £24.99 | CheckByAI"
-        description="Worried your Certificate of Sponsorship might be fake? Verify it instantly with forensic AI analysis. Detect edited documents, forged metadata, and suspicious formatting."
+        title="CoS Fraud-Risk Check | Technical Document Analysis | CheckByAI"
+        description="Worried your Certificate of Sponsorship might be fake? Get technical risk analysis of your document — hidden metadata, formatting and reference-pattern signals. Not a genuineness verdict; only the Home Office decides."
         canonicalUrl="https://checkbyai.net/cos-pricing"
-        ogTitle="Don't Trust a Fake CoS | Verify from £24.99"
-        ogDescription="Worried your Certificate of Sponsorship is fake? Upload it for instant forensic verification."
+        ogTitle="Check Your CoS for Fraud-Risk Signals | Technical Analysis"
+        ogDescription="Upload your CoS for a technical risk check — metadata, formatting and reference-pattern signals for human review, not a visa decision."
         keywords="CoS verification pricing, certificate of sponsorship check cost, fake CoS detection, UK visa document verification"
         breadcrumbs={[
           { name: "Home", url: "https://checkbyai.net/" },
@@ -337,7 +337,7 @@ export default function CosPricing() {
             {
               "@type": "Product",
               "name": "CheckByAI CoS Verification",
-              "description": "AI-powered Certificate of Sponsorship verification for UK visa applicants. Forensic metadata analysis to detect fake or edited documents.",
+              "description": "Technical risk analysis of UK Certificate of Sponsorship documents for visa applicants. Hidden metadata, formatting and reference-pattern signals for human review — not a genuineness verdict.",
               "brand": { "@type": "Brand", "name": "CheckByAI" },
               "offers": [
                 { "@type": "Offer", "name": "CoS Check (single)", "price": "4.99", "priceCurrency": "GBP", "description": "1 verification credit, pay-per-use" },
@@ -488,7 +488,7 @@ export default function CosPricing() {
 
           <div className="mt-12 text-center text-muted-foreground">
             <p className="text-sm">
-              CoS credits only — does not include sponsor monitoring.{' '}
+              CoS credits only — except Unlimited Monthly adds a Notification Engine watchlist and Enterprise adds company watches. Standalone Starter/Pro/Single include no sponsor monitoring.{' '}
               <button onClick={() => setLocation('/pricing')} className="underline font-semibold hover:no-underline text-primary">Compare Sponsor Alert plans</button>
             </p>
             <p className="text-sm mt-2">
