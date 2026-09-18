@@ -385,6 +385,17 @@ export default function FileUploadSimple({
           if ((e.target as HTMLElement).closest('input,label,button,a')) return;
           fileInputRef.current?.click();
         }}
+        onKeyDown={(e) => {
+          // Keyboard equivalent of the whole-zone click (Enter/Space),
+          // ignoring keystrokes that originate from nested controls.
+          if (e.key !== 'Enter' && e.key !== ' ') return;
+          if ((e.target as HTMLElement).closest('input,label,button,a')) return;
+          e.preventDefault();
+          fileInputRef.current?.click();
+        }}
+        role="button"
+        tabIndex={0}
+        aria-label="Upload a Certificate of Sponsorship PDF for verification"
         className={`border-2 border-dashed rounded-lg p-6 sm:p-8 text-center transition-all duration-200 min-h-[160px] sm:min-h-[200px] flex flex-col justify-center cursor-pointer focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 ${
           isDragging
             ? 'border-primary/60 bg-primary/5 scale-[1.02]'

@@ -59,6 +59,30 @@ const CORE_URLS: Array<{ path: string; priority: string; changefreq: string }> =
   { path: '/what-to-do-fake-cos', priority: '0.8', changefreq: 'monthly' },
 ];
 
+// Shared <title>/meta/og/twitter/canonical rewrite for route-level SSR and
+// bot meta injection — single copy so the two call sites can't drift.
+function rewriteRouteMeta(
+  html: string,
+  routePath: string,
+  meta: { title: string; description: string },
+): string {
+  const t = escapeAttr(meta.title);
+  const d = escapeAttr(meta.description);
+  const canonical = escapeAttr(`${getAppUrl()}${routePath === "/" ? "/" : routePath}`);
+
+  html = html.replace(/<title>[^<]*<\/title>/, `<title>${t}</title>`);
+  html = html.replace(/<meta name="title" content="[^"]*"/, `<meta name="title" content="${t}"`);
+  html = html.replace(/<meta name="description" content="[^"]*"/, `<meta name="description" content="${d}"`);
+  html = html.replace(/<meta property="og:title" content="[^"]*"/, `<meta property="og:title" content="${t}"`);
+  html = html.replace(/<meta property="og:description" content="[^"]*"/, `<meta property="og:description" content="${d}"`);
+  html = html.replace(/<meta property="og:url" content="[^"]*"/, `<meta property="og:url" content="${canonical}"`);
+  html = html.replace(/<meta property="twitter:title" content="[^"]*"/, `<meta property="twitter:title" content="${t}"`);
+  html = html.replace(/<meta property="twitter:description" content="[^"]*"/, `<meta property="twitter:description" content="${d}"`);
+  html = html.replace(/<meta property="twitter:url" content="[^"]*"/, `<meta property="twitter:url" content="${canonical}"`);
+  html = html.replace(/<link rel="canonical" href="[^"]*"/, `<link rel="canonical" href="${canonical}"`);
+  return html;
+}
+
 export function registerSeoRoutes(app: Express): void {
 
   // Sitemap INDEX — points to core pages + 124k sponsor detail pages
@@ -444,19 +468,7 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
         if (!html) return next();
         const routeMeta = seoMetaMap[routePath];
         if (routeMeta) {
-          const t = escapeAttr(routeMeta.title);
-          const d = escapeAttr(routeMeta.description);
-          const canonical = escapeAttr(`${getAppUrl()}${routePath}`);
-          html = html.replace(/<title>[^<]*<\/title>/, `<title>${t}</title>`);
-          html = html.replace(/<meta name="title" content="[^"]*"/, `<meta name="title" content="${t}"`);
-          html = html.replace(/<meta name="description" content="[^"]*"/, `<meta name="description" content="${d}"`);
-          html = html.replace(/<meta property="og:title" content="[^"]*"/, `<meta property="og:title" content="${t}"`);
-          html = html.replace(/<meta property="og:description" content="[^"]*"/, `<meta property="og:description" content="${d}"`);
-          html = html.replace(/<meta property="og:url" content="[^"]*"/, `<meta property="og:url" content="${canonical}"`);
-          html = html.replace(/<meta property="twitter:title" content="[^"]*"/, `<meta property="twitter:title" content="${t}"`);
-          html = html.replace(/<meta property="twitter:description" content="[^"]*"/, `<meta property="twitter:description" content="${d}"`);
-          html = html.replace(/<meta property="twitter:url" content="[^"]*"/, `<meta property="twitter:url" content="${canonical}"`);
-          html = html.replace(/<link rel="canonical" href="[^"]*"/, `<link rel="canonical" href="${canonical}"`);
+          html = rewriteRouteMeta(html, routePath, routeMeta);
         }
         const seoBody = ROUTE_SSR_BODIES[routePath]();
         html = html.replace(
@@ -528,18 +540,7 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
       }
       if (!html) return next();
       const { title, description } = routeMeta;
-      const canonical = escapeAttr(`${getAppUrl()}${req.path === '/' ? '/' : req.path}`);
-
-      html = html.replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`);
-      html = html.replace(/<meta name="title" content="[^"]*"/, `<meta name="title" content="${title}"`);
-      html = html.replace(/<meta name="description" content="[^"]*"/, `<meta name="description" content="${description}"`);
-      html = html.replace(/<meta property="og:title" content="[^"]*"/, `<meta property="og:title" content="${title}"`);
-      html = html.replace(/<meta property="og:description" content="[^"]*"/, `<meta property="og:description" content="${description}"`);
-      html = html.replace(/<meta property="og:url" content="[^"]*"/, `<meta property="og:url" content="${canonical}"`);
-      html = html.replace(/<meta property="twitter:title" content="[^"]*"/, `<meta property="twitter:title" content="${title}"`);
-      html = html.replace(/<meta property="twitter:description" content="[^"]*"/, `<meta property="twitter:description" content="${description}"`);
-      html = html.replace(/<meta property="twitter:url" content="[^"]*"/, `<meta property="twitter:url" content="${canonical}"`);
-      html = html.replace(/<link rel="canonical" href="[^"]*"/, `<link rel="canonical" href="${canonical}"`);
+      html = rewriteRouteMeta(html, req.path, { title, description });
 
       res.set('Content-Type', 'text/html');
       res.send(html);
