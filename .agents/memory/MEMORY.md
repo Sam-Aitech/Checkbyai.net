@@ -1,2 +1,3 @@
 - [Development preview framing](development-preview-framing.md) — keep production anti-framing headers strict, but do not emit them in Replit development Preview.
 - [CoS entitlement boundaries](cos-entitlement-boundaries.md) — Sponsor Monitor plans and CoS verification access are separate; resolve CoS allowance through one shared contract.
+- [Lazy route HMR recovery](lazy-route-hmr-recovery.md) — transient Vite module-fetch failures can crash a lazy route during rapid HMR updates; recover with one guarded reload.
