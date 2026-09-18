@@ -69,7 +69,9 @@ describe("buildSponsorSeoBody", () => {
     );
     expect(html).toContain("Warning:");
     expect(html).toContain('href="/what-to-do-fake-cos"');
-    expect(html).toContain("no longer a licensed sponsor");
+    expect(html).toContain("no longer appears on the Home Office register of licensed sponsors");
+    expect(html).toContain("Check current GOV.UK guidance");
+    expect(html).not.toContain("cannot support a UK visa application");
   });
 
   it("escapes HTML special characters from register data", () => {

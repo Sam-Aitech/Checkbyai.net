@@ -166,6 +166,11 @@ export default function COSDashboard() {
           <Button asChild className="w-full mb-3">
             <Link href="/cos-pricing">View CoS plans</Link>
           </Button>
+          {hasCheckedStatus && !checkingStatus && (
+            <p role="status" className="text-sm text-muted-foreground mb-3">
+              Still pending — we’ll email <strong>{user?.email || 'you'}</strong> as soon as you’re approved. No need to keep checking.
+            </p>
+          )}
           <a
             href="mailto:support@checkbyai.net?subject=CoS%20Check%20Beta%20Access%20Request"
             className="inline-flex items-center justify-center px-6 py-3 border border-primary/30 text-primary rounded-lg font-semibold hover:bg-primary/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"

@@ -465,7 +465,7 @@ function HeroSection({ onScrollToSearch }: { onScrollToSearch: () => void }) {
           Know When Your Sponsor's Licence Status Changes
         </h1>
         <p className="text-base sm:text-lg text-slate-300 max-w-2xl mx-auto mb-10 leading-relaxed">
-          The Home Office updates the sponsor register every night. We check it weeknights (~00:30 UTC) and send a digest — Alert Pass (Monthly) same-day 18:00 UTC, Alert Pass Pro (Monthly) twice-daily 07:00 &amp; 19:00 UTC. No weekend checks; Monday covers Fri–Sun.
+          The Home Office updates the sponsor register every night. We check it weeknights (~00:30 UTC) and send a digest — Starter same-day 18:00 UTC, Pro twice-daily 07:00 &amp; 19:00 UTC. No weekend checks; Monday covers Fri–Sun.
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
           <Button
@@ -478,7 +478,7 @@ function HeroSection({ onScrollToSearch }: { onScrollToSearch: () => void }) {
           </Button>
         </div>
         <p className="text-xs text-slate-400 mt-6">
-          Free: 1 watch with next-morning email digest only, no card required. Alert Pass (Monthly) and Alert Pass Pro (Monthly) get same-day/twice-daily digests. CheckByAI is not affiliated with the UK Home Office or UKVI. Always verify on GOV.UK and seek immigration advice.
+          Free: 1 watch with next-morning email digest only, no card required. Starter/Pro get same-day/twice-daily digests. CheckByAI is not affiliated with the UK Home Office or UKVI. Always verify on GOV.UK and seek immigration advice.
         </p>
       </div>
     </section>
@@ -560,7 +560,7 @@ function ManualVsAutomated() {
     <section className="py-16 sm:py-20 bg-slate-50 dark:bg-slate-950/50">
       <div className="max-w-4xl mx-auto px-4">
         <h2 className="text-2xl sm:text-3xl font-bold text-center text-foreground mb-4">Stop Checking Manually</h2>
-        <p className="text-center text-muted-foreground mb-12 max-w-xl mx-auto">Manual checking takes 4 minutes per day. That is 24 hours per year. Alert Pass (Monthly) costs less than 82p per day.</p>
+        <p className="text-center text-muted-foreground mb-12 max-w-xl mx-auto">Manual checking takes 4 minutes per day. That is 24 hours per year. The Starter plan costs less than 82p per day.</p>
 
         <div className="grid md:grid-cols-2 gap-6">
           <Card className="border-red-200 dark:border-red-900 bg-red-50/50 dark:bg-red-950/20">
@@ -590,7 +590,7 @@ function ManualVsAutomated() {
               <ul className="space-y-3 text-sm text-muted-foreground">
                 <li className="flex items-start gap-2"><CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />Add company to watchlist</li>
                 <li className="flex items-start gap-2"><CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />We check the register every weeknight (~00:30 UTC)</li>
-                <li className="flex items-start gap-2"><CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />{ALERT_TIMING_SHORT.pro} on Alert Pass Pro (Monthly), or {ALERT_TIMING_SHORT.starter.toLowerCase()} on Alert Pass (Monthly)</li>
+                <li className="flex items-start gap-2"><CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />{ALERT_TIMING_SHORT.pro} on Pro, or {ALERT_TIMING_SHORT.starter.toLowerCase()} on Starter</li>
                 <li className="flex items-start gap-2"><CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />Take action before letter arrives</li>
               </ul>
               <div className="mt-5 p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg border border-emerald-200 dark:border-emerald-800">
@@ -620,7 +620,7 @@ function FeatureBlocks() {
               <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-4"><Timer className="w-5 h-5 text-red-600" /></div>
               <h3 className="text-lg font-bold text-foreground mb-2">The 12-Hour Advantage</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                When a licence is revoked, we check the register at ~00:30 UTC. Letters are posted the next morning. Alert Pass Pro (Monthly) subscribers get a WhatsApp alert by 07:00 UTC. You have hours to pivot before your employer even knows.
+                When a licence is revoked, we check the register at ~00:30 UTC. Letters are posted the next morning. Pro subscribers get a WhatsApp alert by 07:00 UTC. You have hours to pivot before your employer even knows.
               </p>
             </CardContent>
           </Card>
@@ -767,7 +767,7 @@ function PricingSection({ isAuthenticated, tier }: { isAuthenticated: boolean; t
               <Badge className="bg-primary text-primary-foreground font-bold text-xs uppercase tracking-wider px-3 py-1 shadow-sm">Best Value</Badge>
             </div>
             <CardContent className="py-6">
-              <p className="text-xs font-bold uppercase tracking-wider text-primary mb-2">Alert Pass (Monthly)</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-primary mb-2">Starter</p>
               <div className="mb-1">
                 <span className="text-3xl font-extrabold text-foreground">£24.99</span>
                 <span className="text-sm text-muted-foreground">/month</span>
@@ -792,7 +792,7 @@ function PricingSection({ isAuthenticated, tier }: { isAuthenticated: boolean; t
 
           <Card className="border-slate-300 dark:border-slate-700">
             <CardContent className="py-6">
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-2">Alert Pass Pro (Monthly)</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-2">Pro</p>
               <div className="mb-1">
                 <span className="text-3xl font-extrabold text-foreground">£49.99</span>
                 <span className="text-sm text-muted-foreground">/month</span>
@@ -810,7 +810,7 @@ function PricingSection({ isAuthenticated, tier }: { isAuthenticated: boolean; t
                 userTier={tier}
                 isAuthenticated={isAuthenticated}
                 onUpgrade={goToPricing}
-                upgradeLabel="Get Alert Pass Pro (Monthly)"
+                upgradeLabel="Get Pro Protection"
               />
             </CardContent>
           </Card>
@@ -936,9 +936,6 @@ export default function SponsorMonitor() {
   const [alertAddOnOpen, setAlertAddOnOpen] = useState(false);
   const [alertAddOnCompany, setAlertAddOnCompany] = useState<string>("");
   const searchRef = useRef<HTMLDivElement>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-  const searchHighlightTimeoutRef = useRef<number | null>(null);
-  const [searchHighlighted, setSearchHighlighted] = useState(false);
 
   const tier: PlanTier = resolveTier(user?.subscriptionStatus);
   // While the auth query is still in flight, don't default to "free" — that
@@ -953,28 +950,11 @@ export default function SponsorMonitor() {
   const [freeSearchDone, setFreeSearchDone] = useState(false);
 
   const scrollToSearch = useCallback(() => {
-    const input = searchInputRef.current;
-    if (!input) return;
-
-    setSearchHighlighted(true);
-    input.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
-    window.setTimeout(() => input.focus({ preventScroll: true }), 450);
-
-    if (searchHighlightTimeoutRef.current) {
-      clearTimeout(searchHighlightTimeoutRef.current);
-    }
-    searchHighlightTimeoutRef.current = window.setTimeout(() => {
-      setSearchHighlighted(false);
-      searchHighlightTimeoutRef.current = null;
-    }, 1800);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (searchHighlightTimeoutRef.current) {
-        clearTimeout(searchHighlightTimeoutRef.current);
-      }
-    };
+    searchRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setTimeout(() => {
+      const input = searchRef.current?.querySelector("input");
+      input?.focus();
+    }, 500);
   }, []);
 
   const {
@@ -1175,7 +1155,7 @@ export default function SponsorMonitor() {
       <LandingDigest />
       <ProofBar />
 
-      <section className="py-12 sm:py-16 scroll-mt-24" ref={searchRef}>
+      <section className="py-12 sm:py-16" ref={searchRef}>
         <div className="max-w-3xl mx-auto px-4">
           <div className="text-center mb-8">
             <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">Check Any Company Right Now (Free)</h2>
@@ -1188,13 +1168,10 @@ export default function SponsorMonitor() {
             <Input
               id="sponsor-search-input"
               type="text"
-              ref={searchInputRef}
               placeholder="e.g., 'Deloitte' or your employer name..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className={`pl-10 h-14 text-base border-2 border-input focus-visible:ring-primary focus-visible:border-primary transition-shadow ${
-                searchHighlighted ? "ring-4 ring-primary/50 ring-offset-2 shadow-lg shadow-primary/25" : ""
-              }`}
+              className="pl-10 h-14 text-base border-2 border-input focus-visible:ring-primary focus-visible:border-primary"
             />
             {effectiveFetching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground animate-spin" />}
           </div>
@@ -1410,7 +1387,7 @@ export default function SponsorMonitor() {
                 <p className="text-muted-foreground max-w-md mx-auto mb-8 leading-relaxed">
                   {isFreeUser
                     ? "Your free plan includes 1 company with a next-morning email digest at no cost. Search for your employer above and click 'Add to Watchlist' to get started."
-                    : "Search for your employer above and click 'Add to Watchlist'. We check weeknights ~00:30 UTC and send a digest (Alert Pass (Monthly) 18:00 UTC, Alert Pass Pro (Monthly) 07:00 & 19:00 UTC). No weekend checks."}
+                    : "Search for your employer above and click 'Add to Watchlist'. We check weeknights ~00:30 UTC and send a digest (Starter 18:00 UTC, Pro 07:00 & 19:00 UTC). No weekend checks."}
                 </p>
                 <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/25 rounded-full font-bold px-8 h-12" onClick={scrollToSearch}>
                   <Search className="w-5 h-5 mr-2" />Start Searching
@@ -1460,7 +1437,7 @@ export default function SponsorMonitor() {
                                   <div className="flex items-center gap-2">
                                     <Briefcase className="w-3.5 h-3.5 text-violet-500" />
                                     <span className="text-xs font-medium text-foreground">Job Opening Alerts</span>
-                                    <Badge className="text-xs px-1.5 py-0 bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-950 dark:text-violet-300 dark:border-violet-800">Alert Pass Pro (Monthly)</Badge>
+                                    <Badge className="text-xs px-1.5 py-0 bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-950 dark:text-violet-300 dark:border-violet-800">Pro</Badge>
                                   </div>
                                   <div className="flex items-center gap-2">
                                     {toggleJobAlertMutation.isPending && toggleJobAlertMutation.variables?.fingerprint === watch.fingerprint
@@ -1486,7 +1463,7 @@ export default function SponsorMonitor() {
                             {!isProUser && isAuthenticated && !isFreeUser && watch.fingerprint && (
                               <div className="mt-3 pt-3 border-t border-border/40 flex items-center gap-2 text-xs text-muted-foreground">
                                 <Lock className="w-3.5 h-3.5 text-slate-400" />
-                                <span>Job alerts: <a href="/pricing" className="text-primary underline hover:no-underline font-medium">Upgrade to Alert Pass Pro (Monthly)</a> to enable</span>
+                                <span>Job alerts: <a href="/pricing" className="text-primary underline hover:no-underline font-medium">Upgrade to Pro</a> to enable</span>
                               </div>
                             )}
                           </div>
@@ -1551,7 +1528,7 @@ export default function SponsorMonitor() {
                     Alerts will be sent to <span className="font-medium text-foreground">{user?.email || 'your account email'}</span> as a next-morning digest. Verify your email in Account settings to avoid silent failures.
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    WhatsApp/SMS, timing controls and history are on Alert Pass (Monthly) and Alert Pass Pro (Monthly). <a href="/pricing" className="underline font-semibold text-primary">Compare plans</a>
+                    WhatsApp/SMS, timing controls and history are on Starter/Pro. <a href="/pricing" className="underline font-semibold text-primary">Compare plans</a>
                   </p>
                 </CardContent>
               </Card>
@@ -1715,7 +1692,7 @@ function NotificationSettings({ user }: { user: any }) {
         <p className="text-xs text-muted-foreground">
           <span className="font-medium text-foreground">Alert timing:</span> {alertTiming}
           {resolvedTier === "free" && <span>, <a href="/pricing" className="underline hover:no-underline text-primary">upgrade for faster alerts</a></span>}
-          {resolvedTier === "starter" && <span>, <a href="/pricing" className="underline hover:no-underline text-primary">upgrade to Alert Pass Pro (Monthly) for twice-daily alerts</a></span>}
+          {resolvedTier === "starter" && <span>, <a href="/pricing" className="underline hover:no-underline text-primary">upgrade to Pro for twice-daily alerts</a></span>}
         </p>
       </div>
       <Card>
@@ -1728,9 +1705,9 @@ function NotificationSettings({ user }: { user: any }) {
             {user?.email && <p className="text-xs text-muted-foreground ml-7">Alerts will be sent to {user.email}</p>}
           </div>
           <div className="border-t border-border/50" />
-          <PhoneVerificationField channel="whatsapp" label="WhatsApp Notifications" icon={MessageSquare} enabled={whatsappEnabled} onToggle={(v) => { setWhatsappEnabled(v); markDirty(); }} phoneNumber={whatsappNumber} onPhoneChange={(v) => { setWhatsappNumber(v); markDirty(); }} verified={prefs?.whatsappVerified ?? false} channelAllowed={isChannelAllowed(user?.subscriptionStatus, "whatsapp")} requiredPlan="Alert Pass (Monthly)" />
+          <PhoneVerificationField channel="whatsapp" label="WhatsApp Notifications" icon={MessageSquare} enabled={whatsappEnabled} onToggle={(v) => { setWhatsappEnabled(v); markDirty(); }} phoneNumber={whatsappNumber} onPhoneChange={(v) => { setWhatsappNumber(v); markDirty(); }} verified={prefs?.whatsappVerified ?? false} channelAllowed={isChannelAllowed(user?.subscriptionStatus, "whatsapp")} requiredPlan="Starter" />
           <div className="border-t border-border/50" />
-          <PhoneVerificationField channel="sms" label="SMS Notifications" icon={Phone} enabled={smsEnabled} onToggle={(v) => { setSmsEnabled(v); markDirty(); }} phoneNumber={smsNumber} onPhoneChange={(v) => { setSmsNumber(v); markDirty(); }} verified={prefs?.smsVerified ?? false} channelAllowed={isChannelAllowed(user?.subscriptionStatus, "sms")} requiredPlan="Alert Pass Pro (Monthly)" />
+          <PhoneVerificationField channel="sms" label="SMS Notifications" icon={Phone} enabled={smsEnabled} onToggle={(v) => { setSmsEnabled(v); markDirty(); }} phoneNumber={smsNumber} onPhoneChange={(v) => { setSmsNumber(v); markDirty(); }} verified={prefs?.smsVerified ?? false} channelAllowed={isChannelAllowed(user?.subscriptionStatus, "sms")} requiredPlan="Pro" />
           {pushSupported.current && (
             <>
               <div className="border-t border-border/50" />

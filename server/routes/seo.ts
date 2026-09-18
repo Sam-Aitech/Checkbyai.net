@@ -59,6 +59,52 @@ const CORE_URLS: Array<{ path: string; priority: string; changefreq: string }> =
   { path: '/what-to-do-fake-cos', priority: '0.8', changefreq: 'monthly' },
 ];
 
+// Shared <title>/meta/og/twitter/canonical rewrite for route-level SSR and
+// bot meta injection — single copy so the two call sites can't drift.
+function rewriteRouteMeta(
+  html: string,
+  routePath: string,
+  meta: { title: string; description: string },
+): string {
+  const t = escapeAttr(meta.title);
+  const d = escapeAttr(meta.description);
+  const canonical = escapeAttr(`${getAppUrl()}${routePath === "/" ? "/" : routePath}`);
+
+  html = html.replace(/<title>[^<]*<\/title>/, `<title>${t}</title>`);
+  html = html.replace(/<meta name="title" content="[^"]*"/, `<meta name="title" content="${t}"`);
+  html = html.replace(/<meta name="description" content="[^"]*"/, `<meta name="description" content="${d}"`);
+  html = html.replace(/<meta property="og:title" content="[^"]*"/, `<meta property="og:title" content="${t}"`);
+  html = html.replace(/<meta property="og:description" content="[^"]*"/, `<meta property="og:description" content="${d}"`);
+  html = html.replace(/<meta property="og:url" content="[^"]*"/, `<meta property="og:url" content="${canonical}"`);
+  html = html.replace(/<meta property="twitter:title" content="[^"]*"/, `<meta property="twitter:title" content="${t}"`);
+  html = html.replace(/<meta property="twitter:description" content="[^"]*"/, `<meta property="twitter:description" content="${d}"`);
+  html = html.replace(/<meta property="twitter:url" content="[^"]*"/, `<meta property="twitter:url" content="${canonical}"`);
+  html = html.replace(/<link rel="canonical" href="[^"]*"/, `<link rel="canonical" href="${canonical}"`);
+  return html;
+}
+
+/** Accept-header gate shared by every HTML-only SEO handler. */
+function wantsHtml(req: any): boolean {
+  const accept = req.headers["accept"] || "";
+  return accept.includes("text/html");
+}
+
+/** First available shell template (built output, then dev source). */
+function readShellTemplate(): string | null {
+  for (const p of HTML_PATHS) {
+    const html = readHtmlTemplate(p);
+    if (html) return html;
+  }
+  return null;
+}
+
+/** Send an HTML page with a CDN-friendly cache header. */
+function sendHtmlPage(res: any, html: string): void {
+  res.set("Content-Type", "text/html");
+  res.set("Cache-Control", "public, max-age=3600");
+  res.send(html);
+}
+
 export function registerSeoRoutes(app: Express): void {
 
   // Sitemap INDEX — points to core pages + 124k sponsor detail pages
@@ -362,6 +408,12 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
     }
   });
 
+  // Shared by /dashboard and its /verify-cos alias — one copy, not two.
+  const dashboardMeta = {
+    title: 'Certificate of Sponsorship Risk Check | Technical Analysis | CheckByAI',
+    description: 'Upload your Certificate of Sponsorship PDF for technical risk analysis — hidden metadata, formatting and reference-pattern signals. Not a genuineness verdict; only the Home Office decides.',
+  };
+
   const seoMetaMap: Record<string, { title: string; description: string }> = {
     '/': {
       title: 'Is Your UK Sponsor Licence Safe? | Twice-Daily Revocation Alerts | CheckByAI',
@@ -380,8 +432,8 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
       description: 'Search and browse the UK Home Office Register of Licensed Sponsors (licence listings only — not CoS document verification). Updated daily from official gov.uk data.',
     },
     '/cos-pricing': {
-      title: 'Verify Your CoS is Genuine | Fake Document Detection from £24.99 | CheckByAI',
-      description: 'Worried your Certificate of Sponsorship might be fake? Verify it instantly with forensic AI analysis. Detect edited documents, forged metadata, and suspicious formatting.',
+      title: 'CoS Fraud-Risk Check | Technical Document Analysis | CheckByAI',
+      description: 'Worried your Certificate of Sponsorship might be fake? Get technical risk analysis — hidden metadata, formatting and reference-pattern signals. Not a genuineness verdict; only the Home Office decides.',
     },
     '/sponsor-changes': {
       title: 'UK Sponsor Licence Revocations Today | Live Register Updates | CheckByAI',
@@ -493,18 +545,7 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
       }
       if (!html) return next();
       const { title, description } = routeMeta;
-      const canonical = escapeAttr(`${getAppUrl()}${req.path === '/' ? '/' : req.path}`);
-
-      html = html.replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`);
-      html = html.replace(/<meta name="title" content="[^"]*"/, `<meta name="title" content="${title}"`);
-      html = html.replace(/<meta name="description" content="[^"]*"/, `<meta name="description" content="${description}"`);
-      html = html.replace(/<meta property="og:title" content="[^"]*"/, `<meta property="og:title" content="${title}"`);
-      html = html.replace(/<meta property="og:description" content="[^"]*"/, `<meta property="og:description" content="${description}"`);
-      html = html.replace(/<meta property="og:url" content="[^"]*"/, `<meta property="og:url" content="${canonical}"`);
-      html = html.replace(/<meta property="twitter:title" content="[^"]*"/, `<meta property="twitter:title" content="${title}"`);
-      html = html.replace(/<meta property="twitter:description" content="[^"]*"/, `<meta property="twitter:description" content="${description}"`);
-      html = html.replace(/<meta property="twitter:url" content="[^"]*"/, `<meta property="twitter:url" content="${canonical}"`);
-      html = html.replace(/<link rel="canonical" href="[^"]*"/, `<link rel="canonical" href="${canonical}"`);
+      html = rewriteRouteMeta(html, req.path, { title, description });
 
       res.set('Content-Type', 'text/html');
       res.send(html);
