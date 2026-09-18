@@ -51,7 +51,7 @@ const pipelineStages = [
     title: "Expert Validation",
     icon: <Users className="w-6 h-6" />,
     description:
-      "Edge cases are escalated to qualified immigration professionals who review AI findings and provide technical risk assessments for human review — not visa decisions.",
+      "Edge cases are escalated to qualified immigration professionals who review AI findings and provide technical risk assessments — not visa decisions.",
   },
 ];
 
@@ -240,7 +240,7 @@ export default function Technology() {
                           <Users className="w-6 h-6 text-foreground" />
                         </div>
                         <p className="font-semibold text-foreground">Experts Review</p>
-                        <p className="text-sm text-muted-foreground mt-1">Immigration professionals review edge cases and provide corrections</p>
+                        <p className="text-sm text-muted-foreground mt-1">Immigration professionals review edge cases and provide risk assessments.</p>
                       </div>
                       <div>
                         <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-3">

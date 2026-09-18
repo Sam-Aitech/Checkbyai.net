@@ -33,7 +33,7 @@ export function sponsorsHTML(): string {
 export function dashboardHTML(): string {
   return `
 <div class="ssr-dashboard" style="${SSR_HIDDEN_STYLE}">
-  <h1>Is your Certificate of Sponsorship genuine?</h1>
+  <h1>Technical risk analysis of your Certificate of Sponsorship</h1>
   <p>
     Upload your UK CoS document for technical risk analysis — hidden metadata,
     formatting, and reference-pattern signals for human review. Not a genuineness

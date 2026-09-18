@@ -158,7 +158,7 @@ describe("Route-specific SSR bodies (/sponsors, /dashboard, /what-to-do-fake-cos
   it("serves CoS verification intent on /dashboard without Sponsor Monitor copy", async () => {
     const res = await htmlRequest("/dashboard");
     expect(res.status).toBe(200);
-    expect(res.text).toContain("Is your Certificate of Sponsorship genuine?");
+    expect(res.text).toContain("Technical risk analysis of your Certificate of Sponsorship");
     expect(res.text).toContain("Certificate of Sponsorship Risk Check");
     expect(res.text).toContain("Not a genuineness verdict");
   });

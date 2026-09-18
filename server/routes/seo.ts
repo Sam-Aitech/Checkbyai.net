@@ -185,9 +185,8 @@ Disallow: /uploads/`;
 
 ## Products
 
-- [CoS Verification](${getAppUrl()}/cos-pricing): AI-powered Certificate of Sponsorship document verification from £4.99. Detect fake or edited CoS documents using forensic metadata analysis.
-- [Notification Engine](${getAppUrl()}/pricing): UK sponsor licence monitoring via scheduled digests. Get alerted via WhatsApp, email, and SMS when your employer's licence status changes. Alert Pass from £9.99/year; monthly plans from £24.99/month.
 - [CoS Verification](${getAppUrl()}/cos-pricing): AI-powered Certificate of Sponsorship document verification. Detect fake or edited CoS documents using forensic metadata analysis.
+- [Notification Engine](${getAppUrl()}/pricing): UK sponsor licence monitoring via scheduled digests. Get alerted via WhatsApp, email, and SMS when your employer's licence status changes. Alert Pass from £9.99/year; monthly plans from £24.99/month.
 - [Free Sponsor Search](${getAppUrl()}/sponsor-monitor): Search the UK Home Office Register of Licensed Sponsors for free. Check if any company holds a valid sponsor licence.
 
 ## Key Pages
@@ -443,7 +442,7 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
     '/verify-cos': dashboardMeta,
     '/technology': {
       title: 'How We Detect Fake Documents | Forensic AI Technology | CheckByAI',
-      description: 'Learn how our forensic AI catches fake Certificates of Sponsorship that humans miss. Metadata extraction, pattern analysis, and machine learning — explained.',
+      description: 'Learn how our forensic AI analyzes Certificates of Sponsorship through metadata forensics, pattern analysis, and machine learning.',
     },
     '/ai-guide': {
       title: 'How AI Catches Fake Visa Documents | Detection Guide | CheckByAI',
