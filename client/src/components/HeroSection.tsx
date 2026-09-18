@@ -5,7 +5,7 @@ import { STALE_TIMES } from '@/lib/queryDefaults'
 import { unwrapApiEnvelope } from '@/lib/apiEnvelope'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useInView } from 'react-intersection-observer'
-import { Zap, Lock, ArrowRight, Briefcase, Bell, Activity, CheckCircle, XCircle, AlertTriangle, ShieldCheck, Search, Loader2, ChevronRight, ChevronDown } from 'lucide-react'
+import { Zap, Lock, ArrowRight, Briefcase, Bell, Activity, CheckCircle, XCircle, AlertTriangle, ShieldCheck, Search, Loader2, ChevronRight } from 'lucide-react'
 import { TimelineClockIcon, EarlyWarningIcon,
   HeroAlertIcon,
   HeroTrackedIcon,
@@ -17,10 +17,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Link, useLocation } from 'wouter'
-import logoImg from "@assets/logo_material.png";
 import Footer from '@/components/Footer'
 import LandingDigest from '@/components/LandingDigest'
-import { useHoverDropdown } from '@/hooks/useHoverDropdown'
 
 const AnimatedBackground = lazy(() => import('./AnimatedBackground'))
 
@@ -452,59 +450,6 @@ function UrgencyBanner() {
   );
 }
 
-// ── Dark-themed dropdown for the home page hero nav ──────────────────────────
-
-interface HeroNavItem { href: string; label: string; desc: string }
-
-function HeroNavDropdown({ label, items }: { label: string; items: HeroNavItem[] }) {
-  const { open, setOpen, wrapperRef, triggerRef, wrapperHandlers } = useHoverDropdown<HTMLButtonElement>();
-
-  return (
-    <div ref={wrapperRef} className="relative" {...wrapperHandlers}>
-      <button
-        ref={triggerRef}
-        onClick={() => setOpen(v => !v)}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        className="flex items-center gap-1 px-4 py-2 text-sm text-white/70 hover:text-white font-medium rounded-full hover:bg-white/10 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-      >
-        {label}
-        <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
-      </button>
-
-      <AnimatePresence>
-        {open && (
-          <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 w-60 z-50">
-            <motion.div
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 6 }}
-              transition={{ duration: 0.15 }}
-              role="menu"
-              className="bg-surface-inverse/95 backdrop-blur-xl rounded-xl border border-white/10 shadow-2xl shadow-black/40 overflow-hidden"
-            >
-              <div className="p-1.5">
-                {items.map(item => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setOpen(false)}
-                    role="menuitem"
-                    className="flex flex-col gap-0.5 px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-                  >
-                    <span className="text-sm font-semibold text-white group-hover:text-success transition-colors">{item.label}</span>
-                    <span className="text-xs text-white/50">{item.desc}</span>
-                  </Link>
-                ))}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
 interface FreeSearchResult {
   id?:             number;
   fingerprint:     string;
@@ -701,45 +646,7 @@ export default function HeroSection() {
             <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-white/5 rounded-full blur-3xl" />
           </div>
 
-          <div className="relative z-10 max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
-            <nav className="flex justify-between items-center py-4 mb-6">
-              <Link href="/" className="flex items-center shrink-0">
-                <img src={logoImg} alt="CheckByAi.net" width={160} height={40} className="h-10 sm:h-12 w-auto object-contain" />
-              </Link>
-
-              {/* Desktop grouped nav */}
-              <div className="hidden md:flex items-center gap-1">
-                <HeroNavDropdown
-                  label="Monitor"
-                  items={[
-                    { href: "/sponsors",        label: "Sponsor Register",  desc: "Search 124,000+ licensed sponsors (listing only)" },
-                    { href: "/sponsor-monitor", label: "Sponsor Monitor",   desc: "Get alerted when a licence changes" },
-                    { href: "/sponsor-changes", label: "Licence Changes",   desc: "Recent additions and revocations" },
-                  ]}
-                />
-                <Link href="/pricing"   className="px-4 py-2 text-sm text-white/70 hover:text-white font-medium rounded-full hover:bg-white/10 transition-all duration-200">Alert Plans</Link>
-                <Link href="/cos-pricing"   className="px-4 py-2 text-sm text-white/70 hover:text-white font-medium rounded-full hover:bg-white/10 transition-all duration-200">CoS Credits</Link>
-                <HeroNavDropdown
-                  label="Verify"
-                  items={[
-                    { href: "/dashboard",  label: "Verify CoS Document",  desc: "Forensic document check (login, closed beta)" },
-                    { href: "/cos-guide",  label: "CoS Guide",  desc: "Certificate of Sponsorship explained" },
-                    { href: "/check-fake-cos",  label: "Spot a Fake CoS",  desc: "5 warning signs before you risk your visa" },
-                    { href: "/ai-guide",   label: "AI Guide",   desc: "How our AI verification works" },
-                    { href: "/technology", label: "Technology", desc: "The tech behind CheckByAI" },
-                    { href: "/api-docs",   label: "API Docs (Pilot)",   desc: "REST API in limited pilot — approval required" },
-                  ]}
-                />
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Link href="/pricing" className="hidden sm:flex items-center gap-1.5 px-4 py-2 text-sm text-white/70 hover:text-white font-medium rounded-full hover:bg-white/10 transition-all duration-200">
-                  <Bell className="w-3.5 h-3.5" />Get Alerts
-                </Link>
-                <Link href="/login" className="px-4 py-2 text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-all">Sign In</Link>
-              </div>
-            </nav>
-
+           <div className="relative z-10 max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
             <div className="grid lg:grid-cols-2 gap-16 items-center min-h-[70vh] py-8">
               <div className="space-y-7">
                 <motion.div initial={{ opacity: 0, x: -20 }} animate={isLoaded ? { opacity: 1, x: 0 } : {}} transition={{ ...springGentle, delay: 0.1 }}>
