@@ -380,20 +380,20 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
       description: 'Search and browse the UK Home Office Register of Licensed Sponsors (licence listings only — not CoS document verification). Updated daily from official gov.uk data.',
     },
     '/cos-pricing': {
-      title: 'Verify Your CoS is Genuine | Fake Document Detection from £24.99 | CheckByAI',
-      description: 'Worried your Certificate of Sponsorship might be fake? Verify it instantly with forensic AI analysis. Detect edited documents, forged metadata, and suspicious formatting.',
+      title: 'CoS Fraud-Risk Check | Technical Document Analysis | CheckByAI',
+      description: 'Worried your Certificate of Sponsorship might be fake? Get technical risk analysis — hidden metadata, formatting and reference-pattern signals. Not a genuineness verdict; only the Home Office decides.',
     },
     '/sponsor-changes': {
       title: 'UK Sponsor Licence Revocations Today | Live Register Updates | CheckByAI',
       description: 'Which UK sponsor licences were revoked today? See live changes from the Home Office register — additions, removals, downgrades — updated daily.',
     },
     '/dashboard': {
-      title: 'Verify Your Certificate of Sponsorship | Detect Fake CoS Documents | CheckByAI',
-      description: 'Upload your Certificate of Sponsorship and find out if it\'s genuine in under 60 seconds. Our forensic AI detects fakes, edits, and suspicious formatting. Your document is deleted immediately after checking.',
+      title: 'Certificate of Sponsorship Risk Check | Technical Analysis | CheckByAI',
+      description: 'Upload your Certificate of Sponsorship PDF for technical risk analysis — hidden metadata, formatting and reference-pattern signals. Not a genuineness verdict; only the Home Office decides.',
     },
     '/verify-cos': {
-      title: 'Verify Your Certificate of Sponsorship | Detect Fake CoS Documents | CheckByAI',
-      description: 'Upload your Certificate of Sponsorship and find out if it\'s genuine in under 60 seconds. Our forensic AI detects fakes, edits, and suspicious formatting. Your document is deleted immediately after checking.',
+      title: 'Certificate of Sponsorship Risk Check | Technical Analysis | CheckByAI',
+      description: 'Upload your Certificate of Sponsorship PDF for technical risk analysis — hidden metadata, formatting and reference-pattern signals. Not a genuineness verdict; only the Home Office decides.',
     },
     '/technology': {
       title: 'How We Detect Fake Documents | Forensic AI Technology | CheckByAI',
@@ -468,6 +468,41 @@ A: No. Documents are analysed in memory and permanently deleted immediately afte
         res.send(html);
       } catch (err) {
         logger.error({ err, routePath }, "Route SSR injection error:");
+        next();
+      }
+    });
+  }
+
+  // ── Static guide pages for extensionless /guides/* URLs ────────────────
+  // The guide articles ship as static HTML (client/public/guides/*.html) but
+  // have no React route, so extensionless URLs fell through to the SPA
+  // NotFound page. Serve the matching static file directly instead.
+  const GUIDE_FILES: Record<string, string> = {
+    "/guides/how-to-check-cos-genuine": "guides/how-to-check-cos-genuine.html",
+    "/guides/cos-scams-red-flags": "guides/cos-scams-red-flags.html",
+    "/guides/employers-guide-fake-cos": "guides/employers-guide-fake-cos.html",
+    "/guides/what-to-do-fake-cos": "guides/what-to-do-fake-cos.html",
+  };
+  const GUIDE_DIRS = [
+    path.resolve("dist/public"),
+    path.resolve("client/public"),
+  ];
+  for (const [routePath, guideFile] of Object.entries(GUIDE_FILES)) {
+    app.get(routePath, (req: any, res, next) => {
+      try {
+        const accept = req.headers["accept"] || "";
+        if (!accept.includes("text/html")) return next();
+        let html: string | null = null;
+        for (const dir of GUIDE_DIRS) {
+          html = readHtmlTemplate(path.join(dir, guideFile));
+          if (html) break;
+        }
+        if (!html) return next();
+        res.set("Content-Type", "text/html");
+        res.set("Cache-Control", "public, max-age=3600");
+        res.send(html);
+      } catch (err) {
+        logger.error({ err, routePath }, "Guide static serve error:");
         next();
       }
     });

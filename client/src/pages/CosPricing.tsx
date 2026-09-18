@@ -347,11 +347,11 @@ export default function CosPricing() {
   return (
     <PageLayout>
       <SEOHead
-        title="Verify Your CoS is Genuine | Fake Document Detection from £24.99 | CheckByAI"
-        description="Worried your Certificate of Sponsorship might be fake? Verify it instantly with forensic AI analysis. Detect edited documents, forged metadata, and suspicious formatting."
+        title="CoS Fraud-Risk Check | Technical Document Analysis | CheckByAI"
+        description="Worried your Certificate of Sponsorship might be fake? Get technical risk analysis of your document — hidden metadata, formatting and reference-pattern signals. Not a genuineness verdict; only the Home Office decides."
         canonicalUrl="https://checkbyai.net/cos-pricing"
-        ogTitle="Don't Trust a Fake CoS | Verify from £24.99"
-        ogDescription="Worried your Certificate of Sponsorship is fake? Upload it for instant forensic verification."
+        ogTitle="Check Your CoS for Fraud-Risk Signals | Technical Analysis"
+        ogDescription="Upload your CoS for a technical risk check — metadata, formatting and reference-pattern signals for human review, not a visa decision."
         keywords="CoS verification pricing, certificate of sponsorship check cost, fake CoS detection, UK visa document verification"
         breadcrumbs={[
           { name: "Home", url: "https://checkbyai.net/" },
@@ -363,7 +363,7 @@ export default function CosPricing() {
             {
               "@type": "Product",
               "name": "CheckByAI CoS Verification",
-              "description": "AI-powered Certificate of Sponsorship verification for UK visa applicants. Forensic metadata analysis to detect fake or edited documents.",
+              "description": "Technical risk analysis of UK Certificate of Sponsorship documents for visa applicants. Hidden metadata, formatting and reference-pattern signals for human review — not a genuineness verdict.",
               "brand": { "@type": "Brand", "name": "CheckByAI" },
               "offers": [
                 { "@type": "Offer", "name": "CoS Check (single)", "price": "4.99", "priceCurrency": "GBP", "description": "1 verification credit, pay-per-use" },

@@ -52,4 +52,30 @@ describe("Customer-facing copy safety (static)", () => {
     expect(readClient("pages/SponsorDetail.tsx")).not.toContain("/single-check");
     expect(readClient("pages/SponsorDetail.tsx")).not.toContain("/guides/");
   });
+
+  it("keeps Technology claims pilot-qualified without definitive/SLA overclaims", () => {
+    const src = readClient("pages/Technology.tsx");
+    expect(src).toContain("limited pilot");
+    expect(src).not.toContain("available via a RESTful API");
+    expect(src).not.toContain("definitive assessments");
+    expect(src).not.toContain("99.99%");
+    expect(src).not.toContain("10,000+");
+    expect(src).not.toContain("industry-leading accuracy");
+  });
+
+  it("frames CoS SEO metadata as technical risk analysis, not genuineness verdicts", () => {
+    const dashboard = readClient("pages/dashboard.tsx");
+    expect(dashboard).toContain("technical risk analysis");
+    expect(dashboard).toContain("Not a genuineness verdict");
+    expect(dashboard).not.toContain("find out if it's genuine in under 60 seconds");
+    const cosPricing = readClient("pages/CosPricing.tsx");
+    expect(cosPricing).toContain("Not a genuineness verdict");
+    expect(cosPricing).not.toContain("Verify Your CoS is Genuine");
+  });
+
+  it("uses neutral notification language in the hero H1", () => {
+    const hero = readClient("components/HeroSection.tsx");
+    expect(hero).toContain("Get notified when your sponsor's licence changes");
+    expect(hero).not.toContain("the night your sponsor's licence changes");
+  });
 });

@@ -103,7 +103,7 @@ function statusSentence(sponsor: Sponsor): string {
       return (
         `No. ${name}${town} no longer appears on the Home Office Register of Licensed Sponsors` +
         `${removedClause}. ` +
-        `A Certificate of Sponsorship issued by this company cannot support a UK visa application.`
+        `A sponsor licence change can affect sponsored workers — check current GOV.UK guidance for what this means for Certificates of Sponsorship from this company.`
       );
     }
   }
@@ -218,8 +218,8 @@ export function buildSponsorSeoBody(
   let warningBlock = "";
   if (isRevoked) {
     warningBlock = `<p style="background:#fef2f2;border:1px solid #fecaca;color:#991b1b;padding:12px 16px;border-radius:8px;margin:1rem 0;">
-         <strong>Warning:</strong> this company is no longer a licensed sponsor. A Certificate of
-         Sponsorship from this employer cannot support a UK visa application. If you have paid for
+         <strong>Warning:</strong> this company no longer appears on the Home Office register of licensed sponsors.
+         Check current GOV.UK guidance before relying on any Certificate of Sponsorship from them. If you have paid for
          one, <a href="/what-to-do-fake-cos" style="color:#991b1b;text-decoration:underline;">read what to do next</a>.
        </p>`;
   } else if (isGracePeriod) {

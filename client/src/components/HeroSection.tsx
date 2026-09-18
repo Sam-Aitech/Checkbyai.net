@@ -752,7 +752,7 @@ export default function HeroSection() {
                 </motion.div>
 
                 <motion.h1 initial={{ opacity: 0, y: 30 }} animate={isLoaded ? { opacity: 1, y: 0 } : {}} transition={{ ...spring, delay: 0.2 }} className="text-4xl sm:text-5xl editorial-heading text-white leading-[1.1]">
-                  Get alerted the night your sponsor's licence changes
+                  Get notified when your sponsor's licence changes
                 </motion.h1>
 
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={isLoaded ? { opacity: 1, y: 0 } : {}} transition={{ ...springGentle, delay: 0.35 }} className="space-y-1.5 max-w-lg">

@@ -35,8 +35,9 @@ export function dashboardHTML(): string {
 <div class="ssr-dashboard" style="${SSR_HIDDEN_STYLE}">
   <h1>Is your Certificate of Sponsorship genuine?</h1>
   <p>
-    Upload your UK CoS document for a forensic check — metadata, formatting,
-    and reference patterns. Login required; closed beta with approval.
+    Upload your UK CoS document for technical risk analysis — hidden metadata,
+    formatting, and reference-pattern signals for human review. Not a genuineness
+    verdict; only the Home Office decides. Login required; closed beta with approval.
     Documents are deleted immediately after checking.
   </p>
   <nav aria-label="Primary">

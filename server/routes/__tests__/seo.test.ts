@@ -159,7 +159,8 @@ describe("Route-specific SSR bodies (/sponsors, /dashboard, /what-to-do-fake-cos
     const res = await htmlRequest("/dashboard");
     expect(res.status).toBe(200);
     expect(res.text).toContain("Is your Certificate of Sponsorship genuine?");
-    expect(res.text).toContain("Verify Your Certificate of Sponsorship");
+    expect(res.text).toContain("Certificate of Sponsorship Risk Check");
+    expect(res.text).toContain("Not a genuineness verdict");
   });
 
   it("serves the recovery guide intent on /what-to-do-fake-cos", async () => {
@@ -170,6 +171,25 @@ describe("Route-specific SSR bodies (/sponsors, /dashboard, /what-to-do-fake-cos
 
   it("skips SSR for non-HTML Accept headers", async () => {
     const res = await request(app).get("/sponsors").set("Accept", "application/json");
+    expect(res.status).toBe(404);
+  });
+
+  it("serves static guide content for extensionless /guides/* URLs", async () => {
+    for (const slug of [
+      "/guides/how-to-check-cos-genuine",
+      "/guides/cos-scams-red-flags",
+      "/guides/employers-guide-fake-cos",
+      "/guides/what-to-do-fake-cos",
+    ]) {
+      const res = await request(app).get(slug).set("Accept", "text/html");
+      expect(res.status).toBe(200);
+      expect(res.headers["content-type"]).toContain("text/html");
+      expect(res.text).not.toContain("Not Found");
+    }
+  });
+
+  it("skips guide serving for non-HTML Accept headers", async () => {
+    const res = await request(app).get("/guides/cos-scams-red-flags").set("Accept", "application/json");
     expect(res.status).toBe(404);
   });
 });
