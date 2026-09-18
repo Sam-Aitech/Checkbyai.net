@@ -230,8 +230,8 @@ function PlanCard<T extends PlanCardData>({ plan, index, isLoggedIn, loading, on
             onClick={() => (isLoggedIn ? onSelect(plan) : setCapturing(true))}
             disabled={loading === plan.packageType || !available}
             aria-disabled={loading !== null || !available}
-            aria-label={!available ? `${plan.name} — available soon` : `Get ${plan.name}`}
-            title={!available ? "Available soon — join waitlist" : undefined}
+            aria-label={!available ? `${plan.name} — not open for checkout yet` : `Get ${plan.name}`}
+            title={!available ? "Not open for checkout yet — please check back shortly" : undefined}
             data-testid="pricing-plan-cta"
           >
             <PlanCtaContent plan={plan} loading={loading} available={available} />
@@ -253,7 +253,18 @@ export default function Pricing() {
   const [loading, setLoading] = useState<string | null>(null);
   const planCardsRef = useRef<HTMLDivElement>(null);
   const { getPriceId } = usePackagePrices();
-  const [cadence, setCadence] = useState<'annual' | 'monthly'>(planParam ? 'monthly' : 'annual');
+  const billingParam = params.get('billing');
+  const [cadence, setCadence] = useState<'annual' | 'monthly'>(planParam ? 'monthly' : (billingParam === 'monthly' || billingParam === 'annual' ? billingParam : 'annual'));
+
+  // Mirror cadence in ?billing= so the view is shareable and survives
+  // back-navigation. replaceState (not router nav) avoids replaying the page
+  // transition, which is keyed on location.
+  const handleCadenceChange = (next: 'annual' | 'monthly') => {
+    setCadence(next);
+    const url = new URL(window.location.href);
+    url.searchParams.set('billing', next);
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+  };
 
   // Scroll to the plan cards when arriving from the landing page with ?plan=
   useEffect(() => {
@@ -466,7 +477,7 @@ export default function Pricing() {
               <div role="group" aria-label="Billing period" className="inline-flex items-center gap-1 bg-muted rounded-full p-1">
                 <button
                   type="button"
-                  onClick={() => setCadence('annual')}
+                  onClick={() => handleCadenceChange('annual')}
                   aria-pressed={cadence === 'annual'}
                   data-testid="cadence-toggle-annual"
                   className={`px-5 py-2 text-sm font-semibold rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
@@ -477,7 +488,7 @@ export default function Pricing() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setCadence('monthly')}
+                  onClick={() => handleCadenceChange('monthly')}
                   aria-pressed={cadence === 'monthly'}
                   data-testid="cadence-toggle-monthly"
                   className={`px-5 py-2 text-sm font-semibold rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${

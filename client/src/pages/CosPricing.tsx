@@ -238,8 +238,8 @@ function PricingCard({ plan, index, isLoggedIn, loading, onSelect, available }: 
           onClick={() => onSelect(plan)}
           disabled={loading === plan.packageType || (!plan.contactSales && isLoggedIn && !available)}
           aria-disabled={loading !== null || (!plan.contactSales && !available)}
-          aria-label={!available && !plan.contactSales ? `${plan.name} — available soon` : `Get ${plan.name}`}
-          title={!available && !plan.contactSales ? "Available soon — join waitlist" : undefined}
+          aria-label={!available && !plan.contactSales ? `${plan.name} — not open for checkout yet` : `Get ${plan.name}`}
+          title={!available && !plan.contactSales ? "Not open for checkout yet — please check back shortly" : undefined}
         >
           {getPricingCardButtonContent(plan, loading, isLoggedIn, available)}
         </motion.button>

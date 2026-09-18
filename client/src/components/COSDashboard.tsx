@@ -56,11 +56,20 @@ export default function COSDashboard() {
   const [hasUsedFreeCheck, setHasUsedFreeCheck] = useState(false);
 
   const [checkingStatus, setCheckingStatus] = useState(false);
+  const [hasCheckedStatus, setHasCheckedStatus] = useState(false);
 
   const handleCheckApprovalStatus = async () => {
     setCheckingStatus(true);
-    await queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
-    setTimeout(() => setCheckingStatus(false), 1500);
+    setHasCheckedStatus(false);
+    try {
+      await queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+      await queryClient.refetchQueries({ queryKey: ['/api/auth/user'] });
+    } finally {
+      setCheckingStatus(false);
+      // hasElevatedAccess is derived from the user query above; if the refetch
+      // granted access this gate unmounts. Reaching here means still pending.
+      setHasCheckedStatus(true);
+    }
   };
 
   // Check if user has used their free verification today (skipped for elevated access)
@@ -155,20 +164,18 @@ export default function COSDashboard() {
             Closed Beta
           </div>
           <h1 className="text-2xl font-bold text-foreground mb-3">CoS Check — Login Required</h1>
-          <p className="text-muted-foreground mb-8">
-            CoS Check is currently in closed beta. Please log in or create an account to request access.
+          <p className="text-muted-foreground mb-2">
+            CoS Check is currently in closed beta. Log in or create an account with email verification — no password needed.
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Button asChild>
-              <Link href="/login?redirect=/dashboard">Log In</Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href="/login">Create Account</Link>
-            </Button>
-          </div>
+          <p className="text-sm text-muted-foreground mb-8">
+            Approval usually within 24 hours. We’ll email you as soon as your access is ready.
+          </p>
+          <Button asChild className="w-full">
+            <Link href="/login?redirect=/dashboard">Log In / Sign Up</Link>
+          </Button>
           <p className="text-xs text-muted-foreground mt-6">
-            Already have an account?{' '}
-            <a href="mailto:support@checkbyai.net" className="text-primary hover:underline">Contact us</a> if you need help.
+            Need help?{' '}
+            <a href="mailto:support@checkbyai.net" className="text-primary hover:underline">Contact us</a>.
           </p>
         </div>
       </div>
@@ -190,8 +197,8 @@ export default function COSDashboard() {
             Awaiting Approval
           </div>
           <h1 className="text-2xl font-bold text-foreground mb-3">CoS Check — Closed Beta</h1>
-          <p className="text-muted-foreground mb-4">
-            Your account is on the beta waitlist. An admin will review and approve your access.
+          <p className="text-muted-foreground mb-2">
+            Your account is on the beta waitlist. Approval usually within 24 hours.
           </p>
           <p className="text-muted-foreground text-sm mb-8">
             You'll receive an email at <strong>{user?.email || 'your registered address'}</strong> when you're approved.
@@ -218,6 +225,11 @@ export default function COSDashboard() {
               </>
             )}
           </Button>
+          {hasCheckedStatus && !checkingStatus && (
+            <p role="status" className="text-sm text-muted-foreground mb-3">
+              Still pending — we’ll email <strong>{user?.email || 'you'}</strong> as soon as you’re approved. No need to keep checking.
+            </p>
+          )}
           <a
             href="mailto:support@checkbyai.net?subject=CoS%20Check%20Beta%20Access%20Request"
             className="inline-flex items-center justify-center px-6 py-3 border border-primary/30 text-primary rounded-lg font-semibold hover:bg-primary/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -225,7 +237,7 @@ export default function COSDashboard() {
             Contact Support to Expedite
           </a>
           <div className="mt-5 pt-5 border-t border-border">
-            <p className="text-sm text-muted-foreground mb-3">Want instant access? Upgrade your plan:</p>
+            <p className="text-sm text-muted-foreground mb-3">Skip the waitlist — a CoS credit pack unlocks instant access:</p>
             <Button asChild className="w-full">
               <Link href="/cos-pricing">View COS Check Plans →</Link>
             </Button>
@@ -237,49 +249,30 @@ export default function COSDashboard() {
 
   return (
     <div className="bg-background min-h-screen">
-      {/* Dashboard Header */}
-      <header className="relative bg-primary shadow-md overflow-hidden">
+      {/* Single header block: one H1, one primary action. The old layout stacked
+          a "UK CoS Authenticator" bar and a second hero with the same CTA twice. */}
+      <section className="relative bg-primary text-primary-foreground overflow-hidden">
         <div className="relative max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16 sm:h-20">
-            <div className="flex items-center space-x-2 sm:space-x-4">
-              <div className="w-12 h-12 bg-primary-foreground/15 rounded-full flex items-center justify-center">
-                <svg className="w-6 h-6 text-primary-foreground" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-lg sm:text-2xl font-bold text-primary-foreground">UK CoS Authenticator</h1>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-warning text-warning-foreground">Beta</span>
-                </div>
-                <p className="text-xs sm:text-sm text-primary-foreground/80 hidden sm:block">UK Visa Document Verification</p>
-              </div>
-            </div>
-
-            <Button
-              onClick={() => setShowFreeCheck(true)}
-              variant="secondary"
-              className="px-3 sm:px-6 py-2 sm:py-3 touch-manipulation"
-            >
-              <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <div className="flex items-center gap-2 sm:gap-4 h-16 sm:h-20">
+            <div className="w-12 h-12 bg-primary-foreground/15 rounded-full flex items-center justify-center shrink-0">
+              <svg className="w-6 h-6 text-primary-foreground" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
               </svg>
-              <span className="hidden sm:inline">Try Free Check</span>
-              <span className="sm:hidden">Try Free</span>
-            </Button>
+            </div>
+            <div className="flex items-center gap-2 min-w-0">
+              <p className="text-lg sm:text-2xl font-bold text-primary-foreground truncate">UK CoS Authenticator</p>
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-warning text-warning-foreground shrink-0">Beta</span>
+            </div>
           </div>
         </div>
-      </header>
 
-      {/* Hero Section */}
-      <section className="relative bg-primary text-primary-foreground text-center py-20 sm:py-24 overflow-hidden">
         {/* Product-specific 3D illustration lives in Enhanced3DDemo, invoked below */}
-        <div className="container mx-auto px-5 relative z-10">
+        <div className="container mx-auto px-5 relative z-10 text-center pb-16 sm:pb-20 pt-4 sm:pt-6">
           <h1 className="text-4xl md:text-6xl font-bold mb-6 font-sans drop-shadow-sm">
-            UK Certificate of Sponsorship Verification
+            Is your Certificate of Sponsorship genuine?
           </h1>
           <p className="text-lg md:text-xl max-w-3xl mx-auto mb-10 text-primary-foreground/85 leading-relaxed">
-            Verify your UK CoS document is genuine before applying for your Skilled Worker visa. Free AI-powered verification for British immigration documents.
+            Upload your UK CoS document for an instant AI-powered check — metadata, formatting, and reference patterns — before you apply for your Skilled Worker visa.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
             <Button
@@ -294,17 +287,12 @@ export default function COSDashboard() {
               Verify UK CoS Now
             </Button>
 
-            <Button
+            <button
               onClick={startDemo}
-              size="lg"
-              variant="outline"
-              className="rounded-full px-10 py-6 text-lg font-bold bg-transparent border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
+              className="text-primary-foreground/80 hover:text-primary-foreground text-sm font-semibold underline underline-offset-4 px-4 py-2 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Watch Demo
-            </Button>
+              See how it works (60s demo) →
+            </button>
           </div>
         </div>
       </section>
