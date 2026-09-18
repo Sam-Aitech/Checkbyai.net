@@ -38,6 +38,17 @@ function safeCount(value: number | null | undefined): number {
   return Number.isFinite(value) ? Math.max(0, Math.floor(value as number)) : 0;
 }
 
+export function hasPaidCosAccess(user: CosEntitlementUser): boolean {
+  if (user.isRestricted === true) return false;
+
+  return (
+    user.cosCheckSubscription === true ||
+    safeCount(user.credits) > 0 ||
+    user.subscriptionStatus === "unlimited" ||
+    user.subscriptionStatus === "enterprise"
+  );
+}
+
 export function normalizeDailyVerificationLimit(value: string | number | null | undefined): number {
   const parsed = typeof value === "number" ? value : Number.parseInt(value ?? "", 10);
   return parsed === -1 || (Number.isInteger(parsed) && parsed > 0) ? parsed : 1;
@@ -69,7 +80,6 @@ export function resolveCosEntitlement(
   const hasUnlimitedPlan = subscriptionStatus === "unlimited" || subscriptionStatus === "enterprise";
   const hasUnlimitedOverride = user.verificationLimit === -1;
   const hasCustomLimit = typeof user.verificationLimit === "number" && user.verificationLimit > 0;
-  const hasAdminApproval = user.cosCheckApproved === true;
 
   const accessSource: CosAccessSource = isAdmin
     ? "admin"
@@ -77,13 +87,11 @@ export function resolveCosEntitlement(
       ? "cos_subscription"
       : hasUnlimitedOverride || hasCustomLimit
         ? "admin_limit"
-        : hasAdminApproval
-          ? "admin_approval"
-          : hasUnlimitedPlan
-            ? "plan"
-            : credits > 0
-              ? "credits"
-              : "none";
+        : hasUnlimitedPlan
+          ? "plan"
+          : credits > 0
+            ? "credits"
+            : "none";
 
   const hasAccess = accessSource !== "none";
   if (!hasAccess) {

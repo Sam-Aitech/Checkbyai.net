@@ -22,6 +22,33 @@ import { ApiError } from "../lib/apiError";
 import { logger } from "../utils/logger";
 import { isQueueAvailable, getPdfVerifyQueue } from "../services/jobQueue";
 import { storePdfUpload } from "../utils/pdfUploadStore";
+import { hasPaidCosAccess } from "@shared/cosEntitlement";
+
+const HUMAN_REVIEW_CHECK_NAME = "Admin Human Review Override";
+const LOCKED_HUMAN_REVIEW_MESSAGE = "Paid CoS access is required to view the human review finding and supporting reason.";
+
+function canViewHumanReviewDetails(user: any): boolean {
+  return user?.role === "admin" || hasPaidCosAccess(user ?? {});
+}
+
+function redactHumanReviewChecks(checks: any, canView: boolean): any {
+  if (canView || !Array.isArray(checks)) return checks;
+
+  return checks.map((check) =>
+    check?.name === HUMAN_REVIEW_CHECK_NAME
+      ? { ...check, message: LOCKED_HUMAN_REVIEW_MESSAGE }
+      : check,
+  );
+}
+
+function redactVerificationPayload(payload: any, canView: boolean): any {
+  if (canView || !payload || typeof payload !== "object") return payload;
+
+  return {
+    ...payload,
+    checks: redactHumanReviewChecks(payload.checks, canView),
+  };
+}
 
 function buildAdminOverrideAnalysis(status: 'fake' | 'approved', reason: string) {
   const isFake = status === 'fake';
@@ -82,6 +109,8 @@ export function registerVerificationRoutes(app: Express): void {
   app.get('/api/verify/status/:jobId', isAuthenticated, asyncHandler(async (req: any, res) => {
     const { jobId } = req.params;
     if (!jobId) throw new ApiError(400, "jobId required");
+    const requestingUser = await storage.getUser(req.user.id);
+    const canViewHumanReview = canViewHumanReviewDetails(requestingUser);
     // jobId is `verify-${documentHash.slice(0,16)}-${userId}-${nonce}`, not a
     // receiptId (`CBA-XXXXXXXX-XXXXXXXX`) — the fallback lookups below (used
     // once BullMQ evicts the job record via removeOnComplete/removeOnFail)
@@ -100,20 +129,45 @@ export function registerVerificationRoutes(app: Express): void {
     const queue = getPdfVerifyQueue();
     if (!queue) {
       const v = await lookupFallback();
-      if (v) success(res, { status: "completed", progress: 100, verificationId: v.id, receiptId: v.receiptId, result: v.result });
+      if (v) {
+        success(res, {
+          status: "completed",
+          progress: 100,
+          verificationId: v.id,
+          receiptId: v.receiptId,
+          result: v.result,
+          checks: redactHumanReviewChecks((v.analysisDetails as any)?.checks || [], canViewHumanReview),
+        });
+      }
       else success(res, { status: "not_found" });
       return;
     }
     const job = await queue.getJob(jobId);
     if (!job) {
       const byHash = await lookupFallback();
-      if (byHash) success(res, { status: "completed", progress: 100, verificationId: byHash.id, receiptId: byHash.receiptId, result: byHash.result });
+      if (byHash) {
+        success(res, {
+          status: "completed",
+          progress: 100,
+          verificationId: byHash.id,
+          receiptId: byHash.receiptId,
+          result: byHash.result,
+          checks: redactHumanReviewChecks((byHash.analysisDetails as any)?.checks || [], canViewHumanReview),
+        });
+      }
       else success(res, { status: "not_found" });
       return;
     }
     const state = await job.getState();
     const progress = (job.progress as number) || 0;
-    if (state === "completed") success(res, { status: "completed", progress: 100, jobId, returnvalue: job.returnvalue });
+    if (state === "completed") {
+      success(res, {
+        status: "completed",
+        progress: 100,
+        jobId,
+        returnvalue: redactVerificationPayload(job.returnvalue, canViewHumanReview),
+      });
+    }
     else if (state === "failed") success(res, { status: "failed", progress, failedReason: job.failedReason });
     else if (state === "active") success(res, { status: "active", progress });
     else success(res, { status: state, progress });
@@ -391,6 +445,8 @@ export function registerVerificationRoutes(app: Express): void {
 
   app.get('/api/my-verifications', isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.id;
+    const requestingUser = await storage.getUser(userId);
+    const canViewHumanReview = canViewHumanReviewDetails(requestingUser);
     const verifications = await storage.getVerificationsByUserId(userId);
 
     const history = verifications.map(v => ({
@@ -402,7 +458,7 @@ export function registerVerificationRoutes(app: Express): void {
       confidence: v.confidence,
       verifiedAt: v.verifiedAt,
       adminStatus: v.adminStatus,
-      checks: (v.analysisDetails as any)?.checks || [],
+      checks: redactHumanReviewChecks((v.analysisDetails as any)?.checks || [], canViewHumanReview),
     }));
 
     success(res, history);

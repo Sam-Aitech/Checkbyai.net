@@ -1,9 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { resolveCosEntitlement } from "@shared/cosEntitlement";
+import { hasPaidCosAccess, resolveCosEntitlement } from "@shared/cosEntitlement";
 
 const TODAY = "2026-09-15";
 
 describe("resolveCosEntitlement", () => {
+  it("recognizes paid CoS subscriptions and credits without treating approval as paid", () => {
+    expect(hasPaidCosAccess({ cosCheckApproved: true })).toBe(false);
+    expect(hasPaidCosAccess({ cosCheckSubscription: true })).toBe(true);
+    expect(hasPaidCosAccess({ credits: 1 })).toBe(true);
+  });
+
   it("treats an explicit admin unlimited limit as unlimited without changing the Pro plan", () => {
     expect(
       resolveCosEntitlement(
@@ -59,7 +65,7 @@ describe("resolveCosEntitlement", () => {
     });
   });
 
-  it("resets the displayed daily allowance on a new day", () => {
+  it("does not grant a free daily check to an approved non-paying user", () => {
     expect(
       resolveCosEntitlement(
         {
@@ -71,13 +77,14 @@ describe("resolveCosEntitlement", () => {
         TODAY,
       ),
     ).toMatchObject({
-      canVerify: true,
-      remaining: 2,
-      consumptionSource: "daily",
+      hasAccess: false,
+      canVerify: false,
+      remaining: 0,
+      consumptionSource: "none",
     });
   });
 
-  it("keeps an approved user at zero when today's daily allowance is exhausted", () => {
+  it("does not let an approved non-paying user verify after the daily allowance date changes", () => {
     expect(
       resolveCosEntitlement(
         {
@@ -89,9 +96,10 @@ describe("resolveCosEntitlement", () => {
         TODAY,
       ),
     ).toMatchObject({
-      hasAccess: true,
+      hasAccess: false,
       canVerify: false,
       remaining: 0,
+      consumptionSource: "none",
     });
   });
 

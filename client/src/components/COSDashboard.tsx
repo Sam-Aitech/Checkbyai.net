@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'wouter';
 import FileUploadSimple from './FileUploadSimple';
 import Enhanced3DDemo from './Enhanced3DDemo';
@@ -6,9 +6,9 @@ import VerificationResultsTabbed from './VerificationResultsTabbed';
 import MetadataGroupsPanel from './MetadataGroupsPanel';
 import { useAuth } from '@/hooks/useAuth';
 import { Skeleton } from '@/components/ui/skeleton';
-import { queryClient } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
 import type { VerificationTone } from '@/lib/verificationResultTone';
+import { hasPaidCosAccess as userHasPaidCosAccess } from '@shared/cosEntitlement';
 
 // Literal (not template-built) class strings — Tailwind's static scanner needs
 // the full class name to appear verbatim in source to include it in the build.
@@ -39,53 +39,22 @@ interface VerificationResult {
 export default function COSDashboard() {
   const { user, isLoading: authLoading, isAuthenticated, isAdmin } = useAuth();
 
-  // Users with any form of elevated access bypass the localStorage daily gate
-  const hasElevatedAccess =
+  // CoS checks are a paid product. Admins and explicit admin limits remain
+  // available for operations, but approval alone must not unlock a free check.
+  const hasPaidCosAccess = user ? userHasPaidCosAccess(user) : false;
+  const hasAdminOverride =
     isAdmin ||
-    user?.cosCheckApproved === true ||
-    user?.cosCheckSubscription === true ||
-    (user?.verificationLimit !== null && user?.verificationLimit !== undefined);
+    user?.verificationLimit === -1 ||
+    (typeof user?.verificationLimit === "number" && user.verificationLimit > 0);
+  const hasElevatedAccess = hasPaidCosAccess || hasAdminOverride;
 
-  const [showFreeCheck, setShowFreeCheck] = useState(false);
+  const [showCheck, setShowCheck] = useState(false);
   const [showDemo, setShowDemo] = useState(false);
   const [demoStep, setDemoStep] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  // Track free usage
-  const [hasUsedFreeCheck, setHasUsedFreeCheck] = useState(false);
-
-  const [checkingStatus, setCheckingStatus] = useState(false);
-
-  const handleCheckApprovalStatus = async () => {
-    setCheckingStatus(true);
-    await queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
-    setTimeout(() => setCheckingStatus(false), 1500);
-  };
-
-  // Check if user has used their free verification today (skipped for elevated access)
-  useEffect(() => {
-    if (hasElevatedAccess) {
-      setHasUsedFreeCheck(false);
-      return;
-    }
-    const today = new Date().toDateString();
-    const lastCheck = localStorage.getItem('lastFreeCheck');
-
-    if (lastCheck === today) {
-      setHasUsedFreeCheck(true);
-    } else {
-      setHasUsedFreeCheck(false);
-    }
-  }, [hasElevatedAccess]);
-
-  const handleFileUpload = async (file: File) => {
-    if (hasElevatedAccess) return;
-    // Mark free check as used for standard free users only
-    const today = new Date().toDateString();
-    localStorage.setItem('lastFreeCheck', today);
-    setHasUsedFreeCheck(true);
-  };
+  const handleFileUpload = async (_file: File) => {};
 
   const handleVerificationResult = (result: VerificationResult) => {
     setVerificationResult(result);
@@ -140,7 +109,7 @@ export default function COSDashboard() {
     );
   }
 
-  // Beta gate — not logged in
+  // Authentication gate — the paid CoS checker requires an account.
   if (!isAuthenticated) {
     return (
       <div className="bg-background min-h-screen flex items-center justify-center px-4">
@@ -152,11 +121,11 @@ export default function COSDashboard() {
           </div>
           <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-3 py-1 rounded-full text-sm font-semibold mb-4">
             <span className="w-2 h-2 bg-primary rounded-full" />
-            Closed Beta
+            Paid CoS Check
           </div>
           <h1 className="text-2xl font-bold text-foreground mb-3">CoS Check — Login Required</h1>
           <p className="text-muted-foreground mb-8">
-            CoS Check is currently in closed beta. Please log in or create an account to request access.
+            CoS Check is a paid product. Log in or create an account, then choose a CoS plan to unlock document verification.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Button asChild>
@@ -175,7 +144,7 @@ export default function COSDashboard() {
     );
   }
 
-  // Beta gate — logged in but not yet approved for COS Check
+  // Paid-access gate — free accounts cannot run COS Check.
   if (!hasElevatedAccess) {
     return (
       <div className="bg-background min-h-screen flex items-center justify-center px-4">
@@ -187,36 +156,17 @@ export default function COSDashboard() {
           </div>
           <div className="inline-flex items-center gap-2 bg-warning/10 text-warning px-3 py-1 rounded-full text-sm font-semibold mb-4">
             <span className="w-2 h-2 bg-warning rounded-full" />
-            Awaiting Approval
+            Paid access required
           </div>
-          <h1 className="text-2xl font-bold text-foreground mb-3">CoS Check — Closed Beta</h1>
+          <h1 className="text-2xl font-bold text-foreground mb-3">CoS Check — Paid access required</h1>
           <p className="text-muted-foreground mb-4">
-            Your account is on the beta waitlist. An admin will review and approve your access.
+            CoS Check is a paid product. Choose a plan to unlock document verification and detailed human-review findings when available.
           </p>
           <p className="text-muted-foreground text-sm mb-8">
-            You'll receive an email at <strong>{user?.email || 'your registered address'}</strong> when you're approved.
+            Your selected plan will include the verification access needed to run a CoS check.
           </p>
-          <Button
-            onClick={handleCheckApprovalStatus}
-            disabled={checkingStatus}
-            className="w-full mb-3"
-          >
-            {checkingStatus ? (
-              <>
-                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                Checking…
-              </>
-            ) : (
-              <>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                Check approval status
-              </>
-            )}
+          <Button asChild className="w-full mb-3">
+            <Link href="/cos-pricing">View CoS plans</Link>
           </Button>
           <a
             href="mailto:support@checkbyai.net?subject=CoS%20Check%20Beta%20Access%20Request"
@@ -257,15 +207,15 @@ export default function COSDashboard() {
             </div>
 
             <Button
-              onClick={() => setShowFreeCheck(true)}
+              onClick={() => setShowCheck(true)}
               variant="secondary"
               className="px-3 sm:px-6 py-2 sm:py-3 touch-manipulation"
             >
               <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span className="hidden sm:inline">Try Free Check</span>
-              <span className="sm:hidden">Try Free</span>
+              <span className="hidden sm:inline">Start CoS Check</span>
+              <span className="sm:hidden">Start Check</span>
             </Button>
           </div>
         </div>
@@ -279,11 +229,11 @@ export default function COSDashboard() {
             UK Certificate of Sponsorship Verification
           </h1>
           <p className="text-lg md:text-xl max-w-3xl mx-auto mb-10 text-primary-foreground/85 leading-relaxed">
-            Verify your UK CoS document is genuine before applying for your Skilled Worker visa. Free AI-powered verification for British immigration documents.
+            Verify your UK CoS document before applying for your Skilled Worker visa with paid AI analysis and detailed human-review findings when available.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
             <Button
-              onClick={() => setShowFreeCheck(true)}
+              onClick={() => setShowCheck(true)}
               size="lg"
               variant="secondary"
               className="rounded-full px-10 py-6 text-lg font-bold"
@@ -381,16 +331,16 @@ export default function COSDashboard() {
         </div>
       </section>
 
-      {/* Free Check Modal */}
-      {showFreeCheck && (
+      {/* Paid CoS Check Modal */}
+      {showCheck && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-card rounded-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-card p-6 border-b border-border flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-foreground">Free COS Verification</h2>
+              <h2 className="text-2xl font-bold text-foreground">CoS Verification</h2>
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => {
-                    setShowFreeCheck(false);
+                    setShowCheck(false);
                     setVerificationResult(null);
                   }}
                   className="text-muted-foreground hover:text-foreground text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -404,78 +354,34 @@ export default function COSDashboard() {
             <div className="p-6">
               {!verificationResult ? (
                 <div>
-                  {(!hasUsedFreeCheck || hasElevatedAccess) ? (
-                    <>
-                      <div className={`mb-6 p-4 rounded-lg border ${isAdmin ? 'bg-info/10 border-info/20' : 'bg-success/10 border-success/20'}`}>
-                        <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isAdmin ? 'bg-info' : 'bg-success'}`}>
-                            <svg className="w-5 h-5 text-primary-foreground" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                          </div>
-                          <div>
-                            <h3 className={`font-semibold ${isAdmin ? 'text-info' : 'text-success'}`}>
-                              {isAdmin
-                                ? 'Admin — Unlimited Verification'
-                                : hasElevatedAccess
-                                  ? 'Approved Access — Your checks are ready'
-                                  : 'Free Verification Available'}
-                            </h3>
-                            <p className={`text-sm ${isAdmin ? 'text-info' : 'text-success'}`}>
-                              {isAdmin
-                                ? 'No usage limits apply to your admin account'
-                                : hasElevatedAccess
-                                  ? 'Upload your COS document to verify its authenticity'
-                                  : 'Upload your document to verify its authenticity instantly'}
-                            </p>
-                          </div>
+                  <>
+                    <div className={`mb-6 p-4 rounded-lg border ${isAdmin ? 'bg-info/10 border-info/20' : 'bg-success/10 border-success/20'}`}>
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isAdmin ? 'bg-info' : 'bg-success'}`}>
+                          <svg className="w-5 h-5 text-primary-foreground" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                        <div>
+                          <h3 className={`font-semibold ${isAdmin ? 'text-info' : 'text-success'}`}>
+                            {isAdmin ? 'Admin — Unlimited Verification' : 'Paid CoS Verification'}
+                          </h3>
+                          <p className={`text-sm ${isAdmin ? 'text-info' : 'text-success'}`}>
+                            {isAdmin ? 'No usage limits apply to your admin account' : 'Upload your CoS document to verify its authenticity'}
+                          </p>
                         </div>
                       </div>
-
-                      <FileUploadSimple
-                        onFileUpload={handleFileUpload}
-                        onVerificationResult={handleVerificationResult}
-                        onLoading={handleLoading}
-                        onError={handleError}
-                        isAdmin={isAdmin}
-                        restrictToOneCheck={!hasElevatedAccess}
-                      />
-                    </>
-                  ) : (
-                    <div className="text-center py-8">
-                      <div className="w-16 h-16 mx-auto mb-4 bg-warning/10 rounded-full flex items-center justify-center">
-                        <svg className="w-8 h-8 text-warning" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                      <h3 className="text-xl font-bold text-foreground mb-2">Free Check Used</h3>
-                      <p className="text-muted-foreground mb-6">You've already used your free verification for today. Need more checks? See CoS credit packs (1 / 50 / 100) or Unlimited Monthly.</p>
-
-                      <div className="bg-info/10 border border-info/20 rounded-lg p-6 mb-6">
-                        <h4 className="font-semibold text-info mb-3">Need More Checks?</h4>
-                        <ul className="text-left text-info space-y-2 mb-4">
-                          {[
-                            'CoS credit packs: 1, 50 or 100 checks (one-time, never expire)',
-                            'Unlimited Monthly for high volume (subscription, auto-renews)',
-                            'Advanced metadata analysis',
-                            'Detailed verification reports',
-                          ].map((text) => (
-                            <li key={text} className="flex items-center gap-2">
-                              <svg className="w-4 h-4 text-info flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                              </svg>
-                              {text}
-                            </li>
-                          ))}
-                        </ul>
-                        <Button asChild className="w-full">
-                          <Link href="/cos-pricing">View COS Check Plans →</Link>
-                        </Button>
-                      </div>
-
-                      <p className="text-sm text-muted-foreground">Your free check will reset tomorrow. Come back then for another free verification!</p>
                     </div>
-                  )}
+
+                    <FileUploadSimple
+                      onFileUpload={handleFileUpload}
+                      onVerificationResult={handleVerificationResult}
+                      onLoading={handleLoading}
+                      onError={handleError}
+                      isAdmin={isAdmin}
+                      restrictToOneCheck={!hasElevatedAccess}
+                    />
+                  </>
                 </div>
               ) : (
                 <div>
@@ -484,7 +390,7 @@ export default function COSDashboard() {
                     <h3 className="text-base font-semibold text-foreground">Analysis Complete</h3>
                     <button
                       onClick={() => {
-                        setShowFreeCheck(false);
+                        setShowCheck(false);
                         setVerificationResult(null);
                       }}
                       className="text-sm text-muted-foreground hover:text-foreground transition-colors px-3 py-1 rounded-lg border border-border hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -498,6 +404,7 @@ export default function COSDashboard() {
                     result={verificationResult}
                     verificationId={verificationResult.verificationId}
                     isAdmin={isAdmin}
+                    canViewHumanReviewDetails={isAdmin || hasPaidCosAccess}
                   />
 
                   {/* Structured metadata panel — admin only */}
@@ -522,7 +429,7 @@ export default function COSDashboard() {
         }}
         onTryFreeCheck={() => {
           setShowDemo(false);
-          setShowFreeCheck(true);
+          setShowCheck(true);
           resetDemo();
         }}
       />

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { CheckCircle, XCircle, AlertTriangle, Info, Shield, Copy, ChevronDown, ChevronUp, Lock, HelpCircle } from "lucide-react";
+import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -23,9 +24,10 @@ interface VerificationResultsProps {
     documentHash?: string;
   };
   verificationId?: number;
+  canViewHumanReviewDetails?: boolean;
 }
 
-export default function VerificationResults({ result, verificationId }: VerificationResultsProps) {
+export default function VerificationResults({ result, verificationId, canViewHumanReviewDetails = false }: VerificationResultsProps) {
   const [showFeedback, setShowFeedback] = useState(false);
   const [expandedChecks, setExpandedChecks] = useState<Record<number, boolean>>({});
   const { toast } = useToast();
@@ -35,6 +37,7 @@ export default function VerificationResults({ result, verificationId }: Verifica
     : { initial: { opacity: 0, y: 24 }, animate: { opacity: 1, y: 0 }, transition: spring };
 
   const checks = result.checks || [];
+  const humanReviewCheckName = "Admin Human Review Override";
   const passedCount = checks.filter(c => c.passed).length;
   const totalChecks = checks.length;
   const confidencePercent = Math.round(result.confidence * 100);
@@ -236,6 +239,46 @@ export default function VerificationResults({ result, verificationId }: Verifica
               {checks.map((check, index) => {
                 const sev = severityConfig[check.severity] || severityConfig.info;
                 const isExpanded = expandedChecks[index];
+                const isHumanReviewCheck = check.name === humanReviewCheckName;
+
+                if (isHumanReviewCheck && !canViewHumanReviewDetails) {
+                  return (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ ...spring, delay: index * 0.05 }}
+                      className="relative overflow-hidden border border-info/25 rounded-xl bg-info/[0.04]"
+                      aria-label="Human Review with details is available with paid CoS access"
+                    >
+                      <div className="flex items-center justify-between gap-3 px-4 py-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <Lock className="w-4 h-4 text-info flex-shrink-0" aria-hidden="true" />
+                          <span className="text-sm font-medium text-foreground">Human Review with details</span>
+                          <span className="text-xs px-2 py-0.5 rounded-full font-semibold tracking-wider uppercase flex-shrink-0 bg-info/10 text-info">
+                            Paid access
+                          </span>
+                        </div>
+                        <Lock className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" aria-hidden="true" />
+                      </div>
+                      <div className="relative mx-4 mb-4 overflow-hidden rounded-lg border border-info/15 bg-background/70">
+                        <p className="select-none px-4 py-3 text-sm leading-relaxed text-muted-foreground blur-sm" aria-hidden="true">
+                          A human administrator reviewed this exact document. The detailed finding and supporting reason are available with paid CoS access.
+                        </p>
+                        <div className="absolute inset-0 flex items-center justify-center bg-background/45 px-4 text-center backdrop-blur-[1px]">
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">Unlock the human review details</p>
+                            <p className="mt-1 text-xs text-muted-foreground">See the reviewer’s finding and supporting reason.</p>
+                            <Button asChild size="sm" className="mt-3 rounded-full">
+                              <Link href="/cos-pricing">View CoS plans</Link>
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                }
+
                 return (
                   <motion.div
                     key={index}
