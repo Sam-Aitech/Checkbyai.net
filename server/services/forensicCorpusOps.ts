@@ -9,9 +9,9 @@
  *  - Same (input, seed) always yields the same output. No Date, no Math.random.
  *  - Operators that cannot apply (missing tag/structure) return `skipped: true`
  *    with bytes unchanged — the generator records this instead of crashing.
- *  - `expectedGate` documents what the CURRENT champion gate (6-check +
- *    pattern rules) is believed to say. The shadow eval measures actual vs
- *    expected; surprises are the point.
+ *  - `expectedGate` documents what the CURRENT champion gate (strict SMS
+ *    17-gate + pattern rules) is believed to say. The shadow eval measures
+ *    actual vs expected; surprises are the point.
  *
  * Corpus discipline: outputs are derived-forgery simulations, NOT confirmed
  * fakes. Never train on `suspicious` as `fake`.

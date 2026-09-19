@@ -377,7 +377,7 @@ export function registerAdminRoutes(app: Express): void {
       if (trustedRef?.matched) {
         trustedContext += '\n<trusted_reference>\n';
         trustedContext += `Exact trusted match: true\nPattern: ${trustedRef.filename || 'unknown'} (id ${trustedRef.patternId ?? 'unknown'})\nSHA-256: ${trustedRef.documentHash || (verification as any).documentHash || 'unknown'}\n`;
-        trustedContext += 'This document is byte-identical to an admin-approved reference that passed all six mandatory forensic checks. Explain this fact; do not change the verdict.\n</trusted_reference>\n';
+          trustedContext += 'This document is byte-identical to an admin-approved reference that passed all seventeen mandatory forensic checks (checks 1-17). Explain this fact; do not change the verdict.\n</trusted_reference>\n';
       } else {
         trustedContext += '\n<trusted_reference>\nExact trusted match: false\nNo VALIDATED admin reference shares this document SHA-256. Assess on forensic evidence alone.\n</trusted_reference>\n';
       }

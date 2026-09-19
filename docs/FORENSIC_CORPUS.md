@@ -20,7 +20,7 @@ reproducibility**.
 data/forensic-corpus/v0/
   genuine/                     + .provenance.json per file
   synthetic/                   generated, { seedSha256, operator, seed, params }
-  redteam/                     engineered to pass the current 6-check gate
+  redteam/                     engineered to pass the current gate (string-level clones)
   quarantine_confirmed_fake/   EMPTY — see its README for the entry gate
 ```
 
