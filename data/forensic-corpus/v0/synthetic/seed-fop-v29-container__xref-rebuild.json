@@ -1,0 +1,15 @@
+{
+  "group": "synthetic",
+  "seedId": "seed-fop-v29-container",
+  "seedSha256": "1c664a7f36a65a14b3f560d355fa5b6ef80237c7c19c95d1a2873e5252449a15",
+  "operator": "xref-rebuild",
+  "tactic": "Tool rebuild — xref re-emitted, revision chain untouched.",
+  "expectedGate": "GENUINE",
+  "subSeed": 1906165327,
+  "operatorParams": {
+    "inserted": "xref 0 1"
+  },
+  "sha256": "4fcc790bec3ccbb9a13fe65edad9570bdb91b224a73157de811d3e39eb08cb5d",
+  "generator": "corpus-gen-v1",
+  "masterSeed": 42
+}

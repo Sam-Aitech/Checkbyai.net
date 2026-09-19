@@ -1,0 +1,716 @@
+{
+  "generator": "discrimination-v1",
+  "trustedSeeds": [
+    "genuine/seed-fop-v29-container.pdf",
+    "genuine/seed-fop-v29-plain.pdf",
+    "genuine/seed-linearized.pdf"
+  ],
+  "caseCount": 57,
+  "championRedteamBypass": "12/12",
+  "challengerRedteamBypass": "3/12",
+  "bypassCutRelative": 0.75,
+  "genuineRegressions": 0,
+  "promotionBar": {
+    "bypassCutMet": true,
+    "zeroGenuineRegressions": true,
+    "fprMeasured": false,
+    "verdict": "BLOCKED: bypass cut and genuine stability are measurable here, but FPR on confirmed fakes is not (quarantine empty). No promotion without it."
+  },
+  "expC_opcodeProfile": {
+    "distinctValues": [
+      "0/0"
+    ],
+    "conclusion": "BLOCKED: stand-in seeds carry no text content streams — opcode profiling requires real captures."
+  },
+  "byOperator": {
+    "seed-fop-v29-container:rt-content-swap": {
+      "champion": [
+        "genuine"
+      ],
+      "challenger": [
+        "suspicious"
+      ]
+    },
+    "seed-fop-v29-container:rt-hidden-object": {
+      "champion": [
+        "genuine"
+      ],
+      "challenger": [
+        "suspicious"
+      ]
+    },
+    "seed-fop-v29-container:rt-date-clone": {
+      "champion": [
+        "genuine"
+      ],
+      "challenger": [
+        "genuine"
+      ]
+    },
+    "seed-fop-v29-container:rt-deep-backdate": {
+      "champion": [
+        "genuine"
+      ],
+      "challenger": [
+        "fake"
+      ]
+    },
+    "seed-fop-v29-plain:rt-content-swap": {
+      "champion": [
+        "genuine"
+      ],
+      "challenger": [
+        "suspicious"
+      ]
+    },
+    "seed-fop-v29-plain:rt-hidden-object": {
+      "champion": [
+        "genuine"
+      ],
+      "challenger": [
+        "suspicious"
+      ]
+    },
+    "seed-fop-v29-plain:rt-date-clone": {
+      "champion": [
+        "genuine"
+      ],
+      "challenger": [
+        "genuine"
+      ]
+    },
+    "seed-fop-v29-plain:rt-deep-backdate": {
+      "champion": [
+        "genuine"
+      ],
+      "challenger": [
+        "fake"
+      ]
+    },
+    "seed-linearized:rt-content-swap": {
+      "champion": [
+        "genuine"
+      ],
+      "challenger": [
+        "suspicious"
+      ]
+    },
+    "seed-linearized:rt-hidden-object": {
+      "champion": [
+        "genuine"
+      ],
+      "challenger": [
+        "suspicious"
+      ]
+    },
+    "seed-linearized:rt-date-clone": {
+      "champion": [
+        "genuine"
+      ],
+      "challenger": [
+        "genuine"
+      ]
+    },
+    "seed-linearized:rt-deep-backdate": {
+      "champion": [
+        "genuine"
+      ],
+      "challenger": [
+        "fake"
+      ]
+    }
+  },
+  "rows": [
+    {
+      "group": "genuine",
+      "file": "genuine/seed-fop-v29-container.pdf",
+      "seedId": "seed-fop-v29-container",
+      "operator": null,
+      "champion": "genuine",
+      "challenger": "genuine",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "genuine",
+      "file": "genuine/seed-fop-v29-plain.pdf",
+      "seedId": "seed-fop-v29-plain",
+      "operator": null,
+      "champion": "genuine",
+      "challenger": "genuine",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "genuine",
+      "file": "genuine/seed-linearized.pdf",
+      "seedId": "seed-linearized",
+      "operator": null,
+      "champion": "genuine",
+      "challenger": "genuine",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-fop-v29-container__xmp-value-swap.pdf",
+      "seedId": "seed-fop-v29-container",
+      "operator": "xmp-value-swap",
+      "champion": "suspicious",
+      "challenger": "suspicious",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-fop-v29-container__xmp-field-drop.pdf",
+      "seedId": "seed-fop-v29-container",
+      "operator": "xmp-field-drop",
+      "champion": "suspicious",
+      "challenger": "suspicious",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-fop-v29-container__xmp-order-shuffle.pdf",
+      "seedId": "seed-fop-v29-container",
+      "operator": "xmp-order-shuffle",
+      "champion": "suspicious",
+      "challenger": "suspicious",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-fop-v29-container__xmp-rebuild.pdf",
+      "seedId": "seed-fop-v29-container",
+      "operator": "xmp-rebuild",
+      "champion": "suspicious",
+      "challenger": "suspicious",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-fop-v29-container__info-producer-spoof.pdf",
+      "seedId": "seed-fop-v29-container",
+      "operator": "info-producer-spoof",
+      "champion": "genuine",
+      "challenger": "genuine",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-fop-v29-container__tool-spoof.pdf",
+      "seedId": "seed-fop-v29-container",
+      "operator": "tool-spoof",
+      "champion": "suspicious",
+      "challenger": "suspicious",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-fop-v29-container__date-skew.pdf",
+      "seedId": "seed-fop-v29-container",
+      "operator": "date-skew",
+      "champion": "genuine",
+      "challenger": "genuine",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-fop-v29-container__history-inject.pdf",
+      "seedId": "seed-fop-v29-container",
+      "operator": "history-inject",
+      "champion": "genuine",
+      "challenger": "genuine",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-fop-v29-container__xref-rebuild.pdf",
+      "seedId": "seed-fop-v29-container",
+      "operator": "xref-rebuild",
+      "champion": "genuine",
+      "challenger": "genuine",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-fop-v29-container__incremental-append.pdf",
+      "seedId": "seed-fop-v29-container",
+      "operator": "incremental-append",
+      "champion": "suspicious",
+      "challenger": "suspicious",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-fop-v29-container__linearize-toggle.pdf",
+      "seedId": "seed-fop-v29-container",
+      "operator": "linearize-toggle",
+      "champion": "genuine",
+      "challenger": "genuine",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-fop-v29-container__metadata-strip.pdf",
+      "seedId": "seed-fop-v29-container",
+      "operator": "metadata-strip",
+      "champion": "suspicious",
+      "challenger": "suspicious",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-fop-v29-container__print-to-pdf.pdf",
+      "seedId": "seed-fop-v29-container",
+      "operator": "print-to-pdf",
+      "champion": "suspicious",
+      "challenger": "suspicious",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-fop-v29-container__image-only-rebuild.pdf",
+      "seedId": "seed-fop-v29-container",
+      "operator": "image-only-rebuild",
+      "champion": "suspicious",
+      "challenger": "suspicious",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-fop-v29-plain__xmp-value-swap.pdf",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "xmp-value-swap",
+      "champion": "suspicious",
+      "challenger": "suspicious",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-fop-v29-plain__xmp-field-drop.pdf",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "xmp-field-drop",
+      "champion": "suspicious",
+      "challenger": "suspicious",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-fop-v29-plain__xmp-order-shuffle.pdf",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "xmp-order-shuffle",
+      "champion": "suspicious",
+      "challenger": "suspicious",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-fop-v29-plain__xmp-rebuild.pdf",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "xmp-rebuild",
+      "champion": "suspicious",
+      "challenger": "suspicious",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-fop-v29-plain__info-producer-spoof.pdf",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "info-producer-spoof",
+      "champion": "genuine",
+      "challenger": "genuine",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-fop-v29-plain__tool-spoof.pdf",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "tool-spoof",
+      "champion": "suspicious",
+      "challenger": "suspicious",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-fop-v29-plain__date-skew.pdf",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "date-skew",
+      "champion": "genuine",
+      "challenger": "genuine",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-fop-v29-plain__history-inject.pdf",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "history-inject",
+      "champion": "genuine",
+      "challenger": "genuine",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-fop-v29-plain__xref-rebuild.pdf",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "xref-rebuild",
+      "champion": "genuine",
+      "challenger": "genuine",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-fop-v29-plain__incremental-append.pdf",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "incremental-append",
+      "champion": "suspicious",
+      "challenger": "suspicious",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-fop-v29-plain__linearize-toggle.pdf",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "linearize-toggle",
+      "champion": "genuine",
+      "challenger": "genuine",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-fop-v29-plain__metadata-strip.pdf",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "metadata-strip",
+      "champion": "suspicious",
+      "challenger": "suspicious",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-fop-v29-plain__print-to-pdf.pdf",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "print-to-pdf",
+      "champion": "suspicious",
+      "challenger": "suspicious",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-fop-v29-plain__image-only-rebuild.pdf",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "image-only-rebuild",
+      "champion": "suspicious",
+      "challenger": "suspicious",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-linearized__xmp-value-swap.pdf",
+      "seedId": "seed-linearized",
+      "operator": "xmp-value-swap",
+      "champion": "suspicious",
+      "challenger": "suspicious",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-linearized__xmp-field-drop.pdf",
+      "seedId": "seed-linearized",
+      "operator": "xmp-field-drop",
+      "champion": "suspicious",
+      "challenger": "suspicious",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-linearized__xmp-order-shuffle.pdf",
+      "seedId": "seed-linearized",
+      "operator": "xmp-order-shuffle",
+      "champion": "suspicious",
+      "challenger": "suspicious",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-linearized__xmp-rebuild.pdf",
+      "seedId": "seed-linearized",
+      "operator": "xmp-rebuild",
+      "champion": "suspicious",
+      "challenger": "suspicious",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-linearized__info-producer-spoof.pdf",
+      "seedId": "seed-linearized",
+      "operator": "info-producer-spoof",
+      "champion": "genuine",
+      "challenger": "genuine",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-linearized__tool-spoof.pdf",
+      "seedId": "seed-linearized",
+      "operator": "tool-spoof",
+      "champion": "fake",
+      "challenger": "fake",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-linearized__date-skew.pdf",
+      "seedId": "seed-linearized",
+      "operator": "date-skew",
+      "champion": "genuine",
+      "challenger": "genuine",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-linearized__history-inject.pdf",
+      "seedId": "seed-linearized",
+      "operator": "history-inject",
+      "champion": "genuine",
+      "challenger": "genuine",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-linearized__xref-rebuild.pdf",
+      "seedId": "seed-linearized",
+      "operator": "xref-rebuild",
+      "champion": "genuine",
+      "challenger": "genuine",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-linearized__incremental-append.pdf",
+      "seedId": "seed-linearized",
+      "operator": "incremental-append",
+      "champion": "suspicious",
+      "challenger": "suspicious",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-linearized__linearize-toggle.pdf",
+      "seedId": "seed-linearized",
+      "operator": "linearize-toggle",
+      "champion": "suspicious",
+      "challenger": "suspicious",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-linearized__metadata-strip.pdf",
+      "seedId": "seed-linearized",
+      "operator": "metadata-strip",
+      "champion": "suspicious",
+      "challenger": "suspicious",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-linearized__print-to-pdf.pdf",
+      "seedId": "seed-linearized",
+      "operator": "print-to-pdf",
+      "champion": "suspicious",
+      "challenger": "suspicious",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "synthetic",
+      "file": "synthetic/seed-linearized__image-only-rebuild.pdf",
+      "seedId": "seed-linearized",
+      "operator": "image-only-rebuild",
+      "champion": "suspicious",
+      "challenger": "suspicious",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "redteam",
+      "file": "redteam/seed-fop-v29-container__rt-content-swap.pdf",
+      "seedId": "seed-fop-v29-container",
+      "operator": "rt-content-swap",
+      "champion": "genuine",
+      "challenger": "suspicious",
+      "changed": true,
+      "reasons": [
+        "Near-reference content divergence vs trusted generator output in: title — human review recommended (user-guidance-only, not evidence)"
+      ]
+    },
+    {
+      "group": "redteam",
+      "file": "redteam/seed-fop-v29-container__rt-hidden-object.pdf",
+      "seedId": "seed-fop-v29-container",
+      "operator": "rt-hidden-object",
+      "champion": "genuine",
+      "challenger": "suspicious",
+      "changed": true,
+      "reasons": [
+        "Near-reference structural divergence: object inventory 2 matches no trusted inventory — possible graft or rebuild (user-guidance-only, not evidence)"
+      ]
+    },
+    {
+      "group": "redteam",
+      "file": "redteam/seed-fop-v29-container__rt-date-clone.pdf",
+      "seedId": "seed-fop-v29-container",
+      "operator": "rt-date-clone",
+      "champion": "genuine",
+      "challenger": "genuine",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "redteam",
+      "file": "redteam/seed-fop-v29-container__rt-deep-backdate.pdf",
+      "seedId": "seed-fop-v29-container",
+      "operator": "rt-deep-backdate",
+      "champion": "genuine",
+      "challenger": "fake",
+      "changed": true,
+      "reasons": [
+        "Anachronism: Creation year 1999 predates the XMP specification (2001) but the file carries an XMP packet",
+        "Anachronism: Creation year 1999 predates PDF 1.4 (2001)"
+      ]
+    },
+    {
+      "group": "redteam",
+      "file": "redteam/seed-fop-v29-plain__rt-content-swap.pdf",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "rt-content-swap",
+      "champion": "genuine",
+      "challenger": "suspicious",
+      "changed": true,
+      "reasons": [
+        "Near-reference content divergence vs trusted generator output in: title — human review recommended (user-guidance-only, not evidence)"
+      ]
+    },
+    {
+      "group": "redteam",
+      "file": "redteam/seed-fop-v29-plain__rt-hidden-object.pdf",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "rt-hidden-object",
+      "champion": "genuine",
+      "challenger": "suspicious",
+      "changed": true,
+      "reasons": [
+        "Near-reference structural divergence: object inventory 2 matches no trusted inventory — possible graft or rebuild (user-guidance-only, not evidence)"
+      ]
+    },
+    {
+      "group": "redteam",
+      "file": "redteam/seed-fop-v29-plain__rt-date-clone.pdf",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "rt-date-clone",
+      "champion": "genuine",
+      "challenger": "genuine",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "redteam",
+      "file": "redteam/seed-fop-v29-plain__rt-deep-backdate.pdf",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "rt-deep-backdate",
+      "champion": "genuine",
+      "challenger": "fake",
+      "changed": true,
+      "reasons": [
+        "Anachronism: Creation year 1999 predates the XMP specification (2001) but the file carries an XMP packet",
+        "Anachronism: Creation year 1999 predates PDF 1.4 (2001)"
+      ]
+    },
+    {
+      "group": "redteam",
+      "file": "redteam/seed-linearized__rt-content-swap.pdf",
+      "seedId": "seed-linearized",
+      "operator": "rt-content-swap",
+      "champion": "genuine",
+      "challenger": "suspicious",
+      "changed": true,
+      "reasons": [
+        "Near-reference content divergence vs trusted generator output in: title — human review recommended (user-guidance-only, not evidence)"
+      ]
+    },
+    {
+      "group": "redteam",
+      "file": "redteam/seed-linearized__rt-hidden-object.pdf",
+      "seedId": "seed-linearized",
+      "operator": "rt-hidden-object",
+      "champion": "genuine",
+      "challenger": "suspicious",
+      "changed": true,
+      "reasons": [
+        "Near-reference structural divergence: object inventory 2 matches no trusted inventory — possible graft or rebuild (user-guidance-only, not evidence)"
+      ]
+    },
+    {
+      "group": "redteam",
+      "file": "redteam/seed-linearized__rt-date-clone.pdf",
+      "seedId": "seed-linearized",
+      "operator": "rt-date-clone",
+      "champion": "genuine",
+      "challenger": "genuine",
+      "changed": false,
+      "reasons": []
+    },
+    {
+      "group": "redteam",
+      "file": "redteam/seed-linearized__rt-deep-backdate.pdf",
+      "seedId": "seed-linearized",
+      "operator": "rt-deep-backdate",
+      "champion": "genuine",
+      "challenger": "fake",
+      "changed": true,
+      "reasons": [
+        "Anachronism: Creation year 1999 predates the XMP specification (2001) but the file carries an XMP packet",
+        "Anachronism: Creation year 1999 predates PDF 1.4 (2001)"
+      ]
+    }
+  ]
+}

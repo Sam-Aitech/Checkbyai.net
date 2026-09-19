@@ -1,0 +1,402 @@
+{
+  "generator": "corpus-gen-v1",
+  "masterSeed": 42,
+  "cases": [
+    {
+      "group": "genuine",
+      "seedId": "seed-fop-v29-container",
+      "file": "genuine/seed-fop-v29-container.pdf",
+      "sha256": "1c664a7f36a65a14b3f560d355fa5b6ef80237c7c19c95d1a2873e5252449a15"
+    },
+    {
+      "group": "genuine",
+      "seedId": "seed-fop-v29-plain",
+      "file": "genuine/seed-fop-v29-plain.pdf",
+      "sha256": "c58f55016df7c1cd660d6260c73ce8907058f6f857ede586798b0becffdde1f7"
+    },
+    {
+      "group": "genuine",
+      "seedId": "seed-linearized",
+      "file": "genuine/seed-linearized.pdf",
+      "sha256": "104145808b6594a4f687bf8a172e659d98b99b03c0c5874d1a3c392c4781bb01"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-fop-v29-container",
+      "operator": "xmp-value-swap",
+      "file": "synthetic/seed-fop-v29-container__xmp-value-swap.pdf",
+      "sha256": "9b0762f20faa706198b864308df1f9ea64eb6ee0ff4da10dab7f90de346f4121"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-fop-v29-container",
+      "operator": "xmp-field-drop",
+      "file": "synthetic/seed-fop-v29-container__xmp-field-drop.pdf",
+      "sha256": "9352e1a2b93d9342423e3d7321907ea122b8489743eb98c8d7daec0ce92b2bd4"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-fop-v29-container",
+      "operator": "xmp-order-shuffle",
+      "file": "synthetic/seed-fop-v29-container__xmp-order-shuffle.pdf",
+      "sha256": "05f7dd4df5d67e1ebaa32251a4f0f2b3b758a357385315653c344fa88288a2dc"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-fop-v29-container",
+      "operator": "xmp-rebuild",
+      "file": "synthetic/seed-fop-v29-container__xmp-rebuild.pdf",
+      "sha256": "0b8b6b2e8f4e4488891e669cfe8b0cb719407c9c4e5e5bdf1f80d4f2cadff59e"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-fop-v29-container",
+      "operator": "info-producer-spoof",
+      "file": "synthetic/seed-fop-v29-container__info-producer-spoof.pdf",
+      "sha256": "e5b9552a6d3f6df265ab90f5bc9e6976a7eb7493256d52cf0446977f9394752d"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-fop-v29-container",
+      "operator": "tool-spoof",
+      "file": "synthetic/seed-fop-v29-container__tool-spoof.pdf",
+      "sha256": "15e6bacd11b95ff886b2e10447ed71aed18442010d17b5cc9c216d9ab8870d89"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-fop-v29-container",
+      "operator": "date-skew",
+      "file": "synthetic/seed-fop-v29-container__date-skew.pdf",
+      "sha256": "582fe1a3deeff64a80ca6db70702a110291d174e901761f0cbf37d891398fd29"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-fop-v29-container",
+      "operator": "history-inject",
+      "file": "synthetic/seed-fop-v29-container__history-inject.pdf",
+      "sha256": "33f732e74f7e1967775ae2a39e6235322a703883d7aac5ebb93d2bf01711ba8e"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-fop-v29-container",
+      "operator": "xref-rebuild",
+      "file": "synthetic/seed-fop-v29-container__xref-rebuild.pdf",
+      "sha256": "4fcc790bec3ccbb9a13fe65edad9570bdb91b224a73157de811d3e39eb08cb5d"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-fop-v29-container",
+      "operator": "incremental-append",
+      "file": "synthetic/seed-fop-v29-container__incremental-append.pdf",
+      "sha256": "0a0db5669e9eb4283d2897f671888da8b9c99088a9ad5fb3c4411b4e5ce6c8e2"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-fop-v29-container",
+      "operator": "linearize-toggle",
+      "file": "synthetic/seed-fop-v29-container__linearize-toggle.pdf",
+      "sha256": "920f93b3ebe9b11bff66aa4cd60999437427af2f13264f68137cfec6b7f479a0"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-fop-v29-container",
+      "operator": "metadata-strip",
+      "file": "synthetic/seed-fop-v29-container__metadata-strip.pdf",
+      "sha256": "3add24fdcc92988cf464fba323395799c0ef4c4efef37c8d237ff4cbca5ad837"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-fop-v29-container",
+      "operator": "print-to-pdf",
+      "file": "synthetic/seed-fop-v29-container__print-to-pdf.pdf",
+      "sha256": "5d1fc5a12883bccc492f8f0a5d9f31ca3e2657b0067662a88e5d58d961118601"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-fop-v29-container",
+      "operator": "image-only-rebuild",
+      "file": "synthetic/seed-fop-v29-container__image-only-rebuild.pdf",
+      "sha256": "c8a23933121e628517eec72a245c2431cceec070a446e370944302a6f660c11d"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "xmp-value-swap",
+      "file": "synthetic/seed-fop-v29-plain__xmp-value-swap.pdf",
+      "sha256": "fb5974e9830d260eb653ca76e804bbc9374f892e094e5ee6545eaace311d2620"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "xmp-field-drop",
+      "file": "synthetic/seed-fop-v29-plain__xmp-field-drop.pdf",
+      "sha256": "3d5375016a2f83ad007628af55ae86ea06304fb9fb3ea54562f73631b747d99a"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "xmp-order-shuffle",
+      "file": "synthetic/seed-fop-v29-plain__xmp-order-shuffle.pdf",
+      "sha256": "07af7a2deb0e5534bdbba008e42975e1d9cef38d595386ad9b62d1cbc8a49d03"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "xmp-rebuild",
+      "file": "synthetic/seed-fop-v29-plain__xmp-rebuild.pdf",
+      "sha256": "0b8b6b2e8f4e4488891e669cfe8b0cb719407c9c4e5e5bdf1f80d4f2cadff59e"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "info-producer-spoof",
+      "file": "synthetic/seed-fop-v29-plain__info-producer-spoof.pdf",
+      "sha256": "a80b0f8a09a6a74c611fae54ab57ab440e24f650cf394db1d5050927162c8856"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "tool-spoof",
+      "file": "synthetic/seed-fop-v29-plain__tool-spoof.pdf",
+      "sha256": "5585b48ede5eb4ff0aa622a11288e7b961c2886d78177b6e798a3921304316fa"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "date-skew",
+      "file": "synthetic/seed-fop-v29-plain__date-skew.pdf",
+      "sha256": "b8a5487cbfdd9faf0fd553a1c5b93aafeb48408526381469df608ebea1b70a28"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "history-inject",
+      "file": "synthetic/seed-fop-v29-plain__history-inject.pdf",
+      "sha256": "b0ed6cf7ea90cea405bc69d1b386372a255df04353db18e2840d424bbf9037ea"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "xref-rebuild",
+      "file": "synthetic/seed-fop-v29-plain__xref-rebuild.pdf",
+      "sha256": "0070bbaaab98eefd7ebcef031e9604a3025f87641d7c096bf101a27c018666e2"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "incremental-append",
+      "file": "synthetic/seed-fop-v29-plain__incremental-append.pdf",
+      "sha256": "61e998a0a7008ddc7fe8be6bc86855f995db5f4dbde689c149060e657b03ad2e"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "linearize-toggle",
+      "file": "synthetic/seed-fop-v29-plain__linearize-toggle.pdf",
+      "sha256": "84106b3fd2b823dedbf70885b70c3065ec2945d9a066bbfcbc6e3a14b96572ad"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "metadata-strip",
+      "file": "synthetic/seed-fop-v29-plain__metadata-strip.pdf",
+      "sha256": "3add24fdcc92988cf464fba323395799c0ef4c4efef37c8d237ff4cbca5ad837"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "print-to-pdf",
+      "file": "synthetic/seed-fop-v29-plain__print-to-pdf.pdf",
+      "sha256": "5d1fc5a12883bccc492f8f0a5d9f31ca3e2657b0067662a88e5d58d961118601"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "image-only-rebuild",
+      "file": "synthetic/seed-fop-v29-plain__image-only-rebuild.pdf",
+      "sha256": "c8a23933121e628517eec72a245c2431cceec070a446e370944302a6f660c11d"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-linearized",
+      "operator": "xmp-value-swap",
+      "file": "synthetic/seed-linearized__xmp-value-swap.pdf",
+      "sha256": "1fb26dd275bb6eb0129efb055ed80274dcbdd9c985a9d8b762dc6db57da83be7"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-linearized",
+      "operator": "xmp-field-drop",
+      "file": "synthetic/seed-linearized__xmp-field-drop.pdf",
+      "sha256": "b50267cb271631f686743ca2d703252ecdb03fa26f857ee008dd9184385692dd"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-linearized",
+      "operator": "xmp-order-shuffle",
+      "file": "synthetic/seed-linearized__xmp-order-shuffle.pdf",
+      "sha256": "ea0fad2a26916c15480e9c289fc0e44a72447bf21d133d008438426afc89492f"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-linearized",
+      "operator": "xmp-rebuild",
+      "file": "synthetic/seed-linearized__xmp-rebuild.pdf",
+      "sha256": "8d26d106b64b07dcbb1f44a52ff634d6d6378f74c3729bd626ff7c66ee579d5a"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-linearized",
+      "operator": "info-producer-spoof",
+      "file": "synthetic/seed-linearized__info-producer-spoof.pdf",
+      "sha256": "feaaae36c9efe5cb1bace7b43f6c0e12d48225e5818080b6221a404dcd184f08"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-linearized",
+      "operator": "tool-spoof",
+      "file": "synthetic/seed-linearized__tool-spoof.pdf",
+      "sha256": "1de21d53241709b879743b3ef2fd6976f8c441df4b1e1d1888763b10d326430c"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-linearized",
+      "operator": "date-skew",
+      "file": "synthetic/seed-linearized__date-skew.pdf",
+      "sha256": "d2edad627a0771bb0aaa1053e0bb9622718a5316b385aeb1b20cf42a25b7ee3e"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-linearized",
+      "operator": "history-inject",
+      "file": "synthetic/seed-linearized__history-inject.pdf",
+      "sha256": "e76ff34a6925021039b6b174beedfd79daafb0a4744de803c470cbd53684bcce"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-linearized",
+      "operator": "xref-rebuild",
+      "file": "synthetic/seed-linearized__xref-rebuild.pdf",
+      "sha256": "fe113a26b179c8bd299ea9731b4fe05e2951eea71a1356408209ac7c1268ab42"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-linearized",
+      "operator": "incremental-append",
+      "file": "synthetic/seed-linearized__incremental-append.pdf",
+      "sha256": "9f16db56f0235bed5b021bdeb03288fc2ea9ec48b77a80edd1f7834611e0f26f"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-linearized",
+      "operator": "linearize-toggle",
+      "file": "synthetic/seed-linearized__linearize-toggle.pdf",
+      "sha256": "2c1c8f4c583dc1389acfcc01ab62b1d517cce3abd50dee1344fa30cd3e4ff212"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-linearized",
+      "operator": "metadata-strip",
+      "file": "synthetic/seed-linearized__metadata-strip.pdf",
+      "sha256": "fd969f22f50e2e4fc059a659fe351950f00763f388618b8c0196206a23c31d98"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-linearized",
+      "operator": "print-to-pdf",
+      "file": "synthetic/seed-linearized__print-to-pdf.pdf",
+      "sha256": "785d8af83d1426927132a8e1e347a9dda90f174ac1ab9bb95e8d86274963d83e"
+    },
+    {
+      "group": "synthetic",
+      "seedId": "seed-linearized",
+      "operator": "image-only-rebuild",
+      "file": "synthetic/seed-linearized__image-only-rebuild.pdf",
+      "sha256": "c8a23933121e628517eec72a245c2431cceec070a446e370944302a6f660c11d"
+    },
+    {
+      "group": "redteam",
+      "seedId": "seed-fop-v29-container",
+      "operator": "rt-content-swap",
+      "file": "redteam/seed-fop-v29-container__rt-content-swap.pdf",
+      "sha256": "7b57291c7a610e67b8c41b15cac1eb72fdaa84a39a82f7c775daef114a9a796c"
+    },
+    {
+      "group": "redteam",
+      "seedId": "seed-fop-v29-container",
+      "operator": "rt-hidden-object",
+      "file": "redteam/seed-fop-v29-container__rt-hidden-object.pdf",
+      "sha256": "8f8a2429298f7e8b3dfa2f59bcbdfca3bbabb43d1d4fdfb504204097b327183e"
+    },
+    {
+      "group": "redteam",
+      "seedId": "seed-fop-v29-container",
+      "operator": "rt-date-clone",
+      "file": "redteam/seed-fop-v29-container__rt-date-clone.pdf",
+      "sha256": "f6895ebcfb2941d410a196d52bf923e1908b85af2ec7ea5c25aab7695a35ce86"
+    },
+    {
+      "group": "redteam",
+      "seedId": "seed-fop-v29-container",
+      "operator": "rt-deep-backdate",
+      "file": "redteam/seed-fop-v29-container__rt-deep-backdate.pdf",
+      "sha256": "63c604b63186d04a6d3e7e5d57ff15a419a18e75494e9d213347f29d37d0f6b2"
+    },
+    {
+      "group": "redteam",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "rt-content-swap",
+      "file": "redteam/seed-fop-v29-plain__rt-content-swap.pdf",
+      "sha256": "5215c5809ced5e78d9e6591713cd8be0eb3b35e54fdc3319f072329b4f47b824"
+    },
+    {
+      "group": "redteam",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "rt-hidden-object",
+      "file": "redteam/seed-fop-v29-plain__rt-hidden-object.pdf",
+      "sha256": "7e0d7561ce02cd933e0a568e356cee799c1b736a786aa81e9e65f19445eb7934"
+    },
+    {
+      "group": "redteam",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "rt-date-clone",
+      "file": "redteam/seed-fop-v29-plain__rt-date-clone.pdf",
+      "sha256": "246cea97c7b837029405923e7cd0123cf03afb6689b2efc2ee2cb0aff1e4d15f"
+    },
+    {
+      "group": "redteam",
+      "seedId": "seed-fop-v29-plain",
+      "operator": "rt-deep-backdate",
+      "file": "redteam/seed-fop-v29-plain__rt-deep-backdate.pdf",
+      "sha256": "20b8b78d4bfb1bed644e35035f7dcbb44938728177a1220868901f8d78412f27"
+    },
+    {
+      "group": "redteam",
+      "seedId": "seed-linearized",
+      "operator": "rt-content-swap",
+      "file": "redteam/seed-linearized__rt-content-swap.pdf",
+      "sha256": "8714141f4b3be9aaf28b094f114c977a0d77bd28be9a67ff7d5c5dced9a8ef34"
+    },
+    {
+      "group": "redteam",
+      "seedId": "seed-linearized",
+      "operator": "rt-hidden-object",
+      "file": "redteam/seed-linearized__rt-hidden-object.pdf",
+      "sha256": "fdb22ca168df7e42d271d57cb3236698f799e5f261384f9fab52856522e1b651"
+    },
+    {
+      "group": "redteam",
+      "seedId": "seed-linearized",
+      "operator": "rt-date-clone",
+      "file": "redteam/seed-linearized__rt-date-clone.pdf",
+      "sha256": "ce12bfbf8fda75f6b37a46928b7ed85b457f6be0395a2164f5b16bc7a2c03309"
+    },
+    {
+      "group": "redteam",
+      "seedId": "seed-linearized",
+      "operator": "rt-deep-backdate",
+      "file": "redteam/seed-linearized__rt-deep-backdate.pdf",
+      "sha256": "0fc51508b1b5a2dadda82e4538de236d6580fb7f5758733b545d94bcff19a201"
+    }
+  ]
+}

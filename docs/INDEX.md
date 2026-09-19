@@ -19,6 +19,7 @@
 | [ENTERPRISE_EXECUTION_PLAN.md](ENTERPRISE_EXECUTION_PLAN.md) | Leadership / Engineering / Ops | CTO-approved hardening roadmap for enterprise readiness, delivery order, and exit criteria |
 | [EXECUTION_PHASES_0_8.md](EXECUTION_PHASES_0_8.md) | Leadership / Engineering / PM | End-to-end program status from Phase 0 through Phase 8 (completed vs remaining, GitHub build plan) |
 | [COS_CHECK_MIS.md](COS_CHECK_MIS.md) | Engineering | COS Check Metadata Inspector architecture, 6-point authenticity checks, type definitions, client integration |
+| [FORENSIC_CORPUS.md](FORENSIC_CORPUS.md) | Engineering | PDF forensic hardening program: corpus taxonomy, Phase 1 baseline, Phase 2 robustness matrix, Phase 3 discrimination results, evidence-bundle contract |
 
 ---
 

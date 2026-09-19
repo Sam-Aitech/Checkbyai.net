@@ -1,0 +1,15 @@
+{
+  "group": "synthetic",
+  "seedId": "seed-fop-v29-container",
+  "seedSha256": "1c664a7f36a65a14b3f560d355fa5b6ef80237c7c19c95d1a2873e5252449a15",
+  "operator": "linearize-toggle",
+  "tactic": "Fast-web-view conversion — structural flag flips, content same.",
+  "expectedGate": "GENUINE",
+  "subSeed": 1219162296,
+  "operatorParams": {
+    "direction": "add"
+  },
+  "sha256": "920f93b3ebe9b11bff66aa4cd60999437427af2f13264f68137cfec6b7f479a0",
+  "generator": "corpus-gen-v1",
+  "masterSeed": 42
+}

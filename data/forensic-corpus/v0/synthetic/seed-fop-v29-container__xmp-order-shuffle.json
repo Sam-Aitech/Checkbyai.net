@@ -1,0 +1,15 @@
+{
+  "group": "synthetic",
+  "seedId": "seed-fop-v29-container",
+  "seedSha256": "1c664a7f36a65a14b3f560d355fa5b6ef80237c7c19c95d1a2873e5252449a15",
+  "operator": "xmp-order-shuffle",
+  "tactic": "Reordering — serializer emits blocks in a different order.",
+  "expectedGate": "EDITED",
+  "subSeed": 3071999550,
+  "operatorParams": {
+    "swappedBlocks": 2
+  },
+  "sha256": "05f7dd4df5d67e1ebaa32251a4f0f2b3b758a357385315653c344fa88288a2dc",
+  "generator": "corpus-gen-v1",
+  "masterSeed": 42
+}

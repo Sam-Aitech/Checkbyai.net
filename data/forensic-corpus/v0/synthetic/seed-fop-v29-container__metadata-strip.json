@@ -1,0 +1,15 @@
+{
+  "group": "synthetic",
+  "seedId": "seed-fop-v29-container",
+  "seedSha256": "1c664a7f36a65a14b3f560d355fa5b6ef80237c7c19c95d1a2873e5252449a15",
+  "operator": "metadata-strip",
+  "tactic": "Metadata stripping — XMP gone, Info dict remains.",
+  "expectedGate": "EDITED",
+  "subSeed": 93916998,
+  "operatorParams": {
+    "removedBytes": 955
+  },
+  "sha256": "3add24fdcc92988cf464fba323395799c0ef4c4efef37c8d237ff4cbca5ad837",
+  "generator": "corpus-gen-v1",
+  "masterSeed": 42
+}

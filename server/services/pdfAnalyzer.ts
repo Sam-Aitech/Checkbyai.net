@@ -2,6 +2,13 @@ import * as fs from 'fs';
 import { logger } from '../utils/logger';
 import { XMLParser } from 'fast-xml-parser';
 import { sanitizeUploadPath, toConfinedFsPath } from '../utils/uploadGuard';
+import {
+  FORENSIC_FEATURE_SCHEMA_VERSION,
+  FORENSIC_PARSER_NAME,
+  FORENSIC_PARSER_VERSION,
+  type IForensicParser,
+  type StructuralFeatures,
+} from './forensicTypes';
 
 /**
  * Yields control back to the Node.js event loop, preventing CPU-intensive
@@ -160,7 +167,117 @@ function mentions(text: string, value: string): boolean {
   return trimmed.length >= MIN_PRODUCER_MATCH_LENGTH && text.includes(trimmed);
 }
 
-export class PDFAnalyzer {
+export class PDFAnalyzer implements IForensicParser {
+  readonly parserName = FORENSIC_PARSER_NAME;
+  readonly parserVersion = FORENSIC_PARSER_VERSION;
+
+  /**
+   * Deterministic structural feature extraction over the raw PDF binary string.
+   *
+   * Pure function of `pdfBinary` (no I/O, no randomness, no Date): same bytes
+   * always yield the same features. Kept deliberately cheap (bounded scans,
+   * sampled entropy) so it can run in the hot path alongside the existing
+   * Info/XMP regex pipeline. It does NOT change any verdict — callers attach
+   * the result to the internal evidence bundle for offline robustness analysis.
+   */
+  extractStructuralFeatures(pdfBinary: string): StructuralFeatures {
+    const binary = pdfBinary ?? '';
+    const startxrefCount = (binary.match(/startxref/g) ?? []).length;
+    const isLinearized = /\/Linearized[\s/]/.test(binary.slice(0, 4096));
+    const incrementalUpdatesAboveBaseline = Math.max(0, startxrefCount - (isLinearized ? 2 : 1));
+    // Standalone `xref` section markers only: the leading `(?<![A-Za-z])`
+    // excludes the `xref` substring inside every `startxref` token, which the
+    // previous pattern double-counted (an appended revision with a new
+    // startxref then looked like a new xref table for the wrong reason).
+    const xrefSectionCount = (binary.match(/(?<![A-Za-z])xref(?![A-Za-z])/g) ?? []).length;
+    const hasPrevChain = /\/Prev\s+\d+/.test(binary);
+    const objectCountEstimate = (binary.match(/\d+\s+\d+\s+obj\b/g) ?? []).length;
+    const streamCount = (binary.match(/\bstream\r?\n/g) ?? []).length;
+    const fontCountEstimate = this.extractFonts(binary).length;
+    const fontDescriptorCount = (binary.match(/\/FontDescriptor/g) ?? []).length;
+    const embeddedFontCount = (binary.match(/\/FontFile\d?/g) ?? []).length;
+    const textBlockCount = (binary.match(/BT\b[\s\S]*?\bET\b/g) ?? []).length;
+    const textOperatorCount = (binary.match(/\b(Tj|TJ|Tm|Tf)\b/g) ?? []).length;
+    return {
+      schemaVersion: FORENSIC_FEATURE_SCHEMA_VERSION,
+      startxrefCount,
+      isLinearized,
+      incrementalUpdatesAboveBaseline,
+      xrefSectionCount,
+      hasPrevChain,
+      objectCountEstimate,
+      streamCount,
+      streamLengthMismatchCount: this.countStreamLengthMismatches(binary),
+      fontCountEstimate,
+      hasUnembeddedFont: fontDescriptorCount > embeddedFontCount,
+      textBlockCount,
+      textOperatorCount,
+      wholeFileEntropyBitsPerByte: this.sampledShannonEntropy(binary),
+      fileSizeBytes: binary.length,
+    };
+  }
+
+  /**
+   * Sampled `/Length` integrity check: for up to 50 streams, compares the
+   * declared `/Length N` preceding `stream` against the measured bytes until
+   * `endstream`. A mismatch means the body was edited without updating the
+   * dictionary — invisible to metadata-only checks. Bounded and deterministic.
+   */
+  private countStreamLengthMismatches(pdfBinary: string): number {
+    let mismatches = 0;
+    let checked = 0;
+    let searchFrom = 0;
+    try {
+      while (checked < 50) {
+        const streamIdx = pdfBinary.indexOf('stream', searchFrom);
+        if (streamIdx === -1) break;
+        // Only count real stream keywords (followed by CRLF/LF), not prose.
+        const after = pdfBinary.slice(streamIdx + 6, streamIdx + 8);
+        if (after[0] !== '\r' && after[0] !== '\n') {
+          searchFrom = streamIdx + 6;
+          continue;
+        }
+        const dictWindow = pdfBinary.slice(Math.max(0, streamIdx - 512), streamIdx);
+        const lengthMatch = dictWindow.match(/\/Length\s+(\d+)(?![\d])/);
+        const bodyStart = pdfBinary.indexOf('\n', streamIdx) + 1;
+        const endIdx = pdfBinary.indexOf('endstream', bodyStart);
+        if (lengthMatch && bodyStart > 0 && endIdx > bodyStart) {
+          const declared = parseInt(lengthMatch[1], 10);
+          // Body includes the trailing EOL before endstream per spec convention.
+          const measured = endIdx - bodyStart;
+          if (Number.isFinite(declared) && Math.abs(measured - declared) > 2) mismatches++;
+          checked++;
+        }
+        // Clamp forward: a lone-\r file with no later `\n` yields
+        // bodyStart 0 and an endIdx behind the cursor — without the max()
+        // the cursor would regress and this loop would never terminate on
+        // hostile input. Progress past streamIdx is guaranteed either way.
+        searchFrom = Math.max(endIdx === -1 ? streamIdx + 6 : endIdx + 9, streamIdx + 6);
+      }
+    } catch {
+      // Feature extraction must never throw — return best effort.
+    }
+    return mismatches;
+  }
+
+  /**
+   * Shannon entropy over a bounded prefix (first 1MiB) so 10MB uploads stay
+   * cheap. Deterministic; rounded to 2dp. Documented sampling — not a secret.
+   */
+  private sampledShannonEntropy(pdfBinary: string): number {
+    const N = Math.min(pdfBinary.length, 1024 * 1024);
+    if (N === 0) return 0;
+    const freq = new Array<number>(256).fill(0);
+    for (let i = 0; i < N; i++) freq[pdfBinary.charCodeAt(i) & 0xff]++;
+    let entropy = 0;
+    for (const count of freq) {
+      if (count === 0) continue;
+      const p = count / N;
+      entropy -= p * Math.log2(p);
+    }
+    return Math.round(entropy * 100) / 100;
+  }
+
   async extractMetadata(filePath: string): Promise<PDFMetadata> {
     try {
             // Path-traversal guard: assert filePath is inside the uploads directory

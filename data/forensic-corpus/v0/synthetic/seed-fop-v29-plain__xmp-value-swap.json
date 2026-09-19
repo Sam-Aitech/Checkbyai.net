@@ -1,0 +1,17 @@
+{
+  "group": "synthetic",
+  "seedId": "seed-fop-v29-plain",
+  "seedSha256": "c58f55016df7c1cd660d6260c73ce8907058f6f857ede586798b0becffdde1f7",
+  "operator": "xmp-value-swap",
+  "tactic": "Selective metadata edit — forger changes one XMP timestamp.",
+  "expectedGate": "EDITED",
+  "subSeed": 2766016030,
+  "operatorParams": {
+    "field": "xmp:CreateDate",
+    "from": "2026-08-10T10:15:00Z",
+    "to": "2025-01-15T10:15:00Z"
+  },
+  "sha256": "fb5974e9830d260eb653ca76e804bbc9374f892e094e5ee6545eaace311d2620",
+  "generator": "corpus-gen-v1",
+  "masterSeed": 42
+}

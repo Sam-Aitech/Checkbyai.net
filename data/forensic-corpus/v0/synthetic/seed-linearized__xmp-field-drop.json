@@ -1,0 +1,15 @@
+{
+  "group": "synthetic",
+  "seedId": "seed-linearized",
+  "seedSha256": "104145808b6594a4f687bf8a172e659d98b99b03c0c5874d1a3c392c4781bb01",
+  "operator": "xmp-field-drop",
+  "tactic": "Field stripping — tool drops a Dublin Core property.",
+  "expectedGate": "EDITED",
+  "subSeed": 2247614802,
+  "operatorParams": {
+    "field": "dc:language"
+  },
+  "sha256": "b50267cb271631f686743ca2d703252ecdb03fa26f857ee008dd9184385692dd",
+  "generator": "corpus-gen-v1",
+  "masterSeed": 42
+}

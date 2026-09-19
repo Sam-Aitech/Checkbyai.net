@@ -1,0 +1,163 @@
+{
+  "generator": "robustness-matrix-v1",
+  "masterSeed": 42,
+  "cellCount": 588,
+  "scores": {
+    "robustness": 0.9594017094017094,
+    "sensitivity": 1,
+    "scoredCells": 468,
+    "counts": {
+      "stable-robust": 449,
+      "sensitive": 18,
+      "side-effect": 1,
+      "blind": 0,
+      "volatile": 84,
+      "rebuild": 36
+    },
+    "perFeature": {
+      "startxrefCount": 0.9230769230769231,
+      "isLinearized": 0.9230769230769231,
+      "incrementalUpdatesAboveBaseline": 0.8974358974358975,
+      "xrefSectionCount": 0.9230769230769231,
+      "hasPrevChain": 0.9230769230769231,
+      "objectCountEstimate": 0.9230769230769231,
+      "streamCount": 1,
+      "streamLengthMismatchCount": 1,
+      "fontCountEstimate": 1,
+      "hasUnembeddedFont": 1,
+      "textBlockCount": 1,
+      "textOperatorCount": 1
+    },
+    "perOperator": {
+      "xmp-value-swap": 1,
+      "xmp-field-drop": 1,
+      "xmp-order-shuffle": 1,
+      "xmp-rebuild": 1,
+      "info-producer-spoof": 1,
+      "tool-spoof": 1,
+      "date-skew": 1,
+      "history-inject": 1,
+      "xref-rebuild": 0.9166666666666666,
+      "incremental-append": 0.6666666666666666,
+      "linearize-toggle": 0.8888888888888888,
+      "metadata-strip": 1,
+      "print-to-pdf": 1,
+      "image-only-rebuild": null
+    }
+  },
+  "sideEffects": [
+    {
+      "seed": "seed-linearized",
+      "operator": "linearize-toggle",
+      "field": "incrementalUpdatesAboveBaseline",
+      "baseline": 0,
+      "derived": 1
+    }
+  ],
+  "blinds": [],
+  "redteamMovements": [
+    {
+      "file": "redteam/seed-fop-v29-container__rt-content-swap.pdf",
+      "operator": "seed-fop-v29-container:rt-content-swap",
+      "movedFields": [
+        "fileSizeBytes (1202→1216)",
+        "wholeFileEntropyBitsPerByte (5.35→5.37)"
+      ],
+      "movedCount": 2
+    },
+    {
+      "file": "redteam/seed-fop-v29-container__rt-hidden-object.pdf",
+      "operator": "seed-fop-v29-container:rt-hidden-object",
+      "movedFields": [
+        "objectCountEstimate (1→2)",
+        "fileSizeBytes (1202→1237)"
+      ],
+      "movedCount": 2
+    },
+    {
+      "file": "redteam/seed-fop-v29-container__rt-date-clone.pdf",
+      "operator": "seed-fop-v29-container:rt-date-clone",
+      "movedFields": [
+        "wholeFileEntropyBitsPerByte (5.35→5.33)"
+      ],
+      "movedCount": 1
+    },
+    {
+      "file": "redteam/seed-fop-v29-container__rt-deep-backdate.pdf",
+      "operator": "seed-fop-v29-container:rt-deep-backdate",
+      "movedFields": [
+        "wholeFileEntropyBitsPerByte (5.35→5.33)"
+      ],
+      "movedCount": 1
+    },
+    {
+      "file": "redteam/seed-fop-v29-plain__rt-content-swap.pdf",
+      "operator": "seed-fop-v29-plain:rt-content-swap",
+      "movedFields": [
+        "fileSizeBytes (1130→1144)",
+        "wholeFileEntropyBitsPerByte (5.35→5.37)"
+      ],
+      "movedCount": 2
+    },
+    {
+      "file": "redteam/seed-fop-v29-plain__rt-hidden-object.pdf",
+      "operator": "seed-fop-v29-plain:rt-hidden-object",
+      "movedFields": [
+        "objectCountEstimate (1→2)",
+        "fileSizeBytes (1130→1165)"
+      ],
+      "movedCount": 2
+    },
+    {
+      "file": "redteam/seed-fop-v29-plain__rt-date-clone.pdf",
+      "operator": "seed-fop-v29-plain:rt-date-clone",
+      "movedFields": [
+        "wholeFileEntropyBitsPerByte (5.35→5.33)"
+      ],
+      "movedCount": 1
+    },
+    {
+      "file": "redteam/seed-fop-v29-plain__rt-deep-backdate.pdf",
+      "operator": "seed-fop-v29-plain:rt-deep-backdate",
+      "movedFields": [
+        "wholeFileEntropyBitsPerByte (5.35→5.33)"
+      ],
+      "movedCount": 1
+    },
+    {
+      "file": "redteam/seed-linearized__rt-content-swap.pdf",
+      "operator": "seed-linearized:rt-content-swap",
+      "movedFields": [
+        "fileSizeBytes (1277→1291)",
+        "wholeFileEntropyBitsPerByte (5.36→5.38)"
+      ],
+      "movedCount": 2
+    },
+    {
+      "file": "redteam/seed-linearized__rt-hidden-object.pdf",
+      "operator": "seed-linearized:rt-hidden-object",
+      "movedFields": [
+        "objectCountEstimate (1→2)",
+        "fileSizeBytes (1277→1312)"
+      ],
+      "movedCount": 2
+    },
+    {
+      "file": "redteam/seed-linearized__rt-date-clone.pdf",
+      "operator": "seed-linearized:rt-date-clone",
+      "movedFields": [
+        "wholeFileEntropyBitsPerByte (5.36→5.35)"
+      ],
+      "movedCount": 1
+    },
+    {
+      "file": "redteam/seed-linearized__rt-deep-backdate.pdf",
+      "operator": "seed-linearized:rt-deep-backdate",
+      "movedFields": [
+        "wholeFileEntropyBitsPerByte (5.36→5.35)"
+      ],
+      "movedCount": 1
+    }
+  ],
+  "skipped": []
+}

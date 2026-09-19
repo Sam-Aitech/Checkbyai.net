@@ -10,6 +10,11 @@ import { PDFAnalyzer } from "../services/pdfAnalyzer";
 import { COSAuthenticityChecker } from "../services/cosAuthenticityChecker";
 import { combineWithCosVerdict } from "../utils/cosVerdictCombiner";
 import { resolveVerificationWithTrust } from "../utils/trustedReference";
+import {
+  buildForensicEvidence,
+  emptyStructuralFeatures,
+  toEvidenceVerdict,
+} from "../services/forensicTypes";
 import { withRetry } from "../utils/dbRetry";
 import { emitToUser } from "../services/socketGateway";
 import { logger } from "../utils/logger";
@@ -89,6 +94,24 @@ export async function processPdfVerifyJob(job: Job<PdfVerifyJobData>): Promise<{
       result = 'fake';
       analysis = buildAdminOverrideAnalysis('fake', priorFlag.adminFeedback || 'Flagged as fake by a human reviewer.');
       metadata = (priorFlag.metadata as any) || {};
+      (analysis as any).forensicEvidence = buildForensicEvidence({
+        documentHash,
+        extractedFeatures: {},
+        structuralFeatures: emptyStructuralFeatures(),
+        forensicChecks: (Array.isArray((analysis as any).checks) ? (analysis as any).checks : []).map((c: any) => ({
+          checkId: `override:${c.name ?? 'admin-review'}`,
+          passed: !!c.passed,
+          detail: c.message,
+        })),
+        provenance: {
+          uploadMethod: 'bullmq-worker',
+          filenameSanitized: path.basename(originalname),
+          magicVerified: true,
+          processingTimestamp: new Date().toISOString(),
+        },
+        finalVerdict: 'FAKE',
+        finalConfidence: 99,
+      });
     } else if (priorApproval) {
       isAdminOverride = true;
       adminOverrideStatus = 'approved';
@@ -96,6 +119,24 @@ export async function processPdfVerifyJob(job: Job<PdfVerifyJobData>): Promise<{
       result = 'genuine';
       analysis = buildAdminOverrideAnalysis('approved', priorApproval.adminFeedback || 'Confirmed genuine by a human reviewer.');
       metadata = (priorApproval.metadata as any) || {};
+      (analysis as any).forensicEvidence = buildForensicEvidence({
+        documentHash,
+        extractedFeatures: {},
+        structuralFeatures: emptyStructuralFeatures(),
+        forensicChecks: (Array.isArray((analysis as any).checks) ? (analysis as any).checks : []).map((c: any) => ({
+          checkId: `override:${c.name ?? 'admin-review'}`,
+          passed: !!c.passed,
+          detail: c.message,
+        })),
+        provenance: {
+          uploadMethod: 'bullmq-worker',
+          filenameSanitized: path.basename(originalname),
+          magicVerified: true,
+          processingTimestamp: new Date().toISOString(),
+        },
+        finalVerdict: 'GENUINE',
+        finalConfidence: 99,
+      });
     } else {
       await job.updateProgress(10);
       const pdfAnalyzer = new PDFAnalyzer();
@@ -145,6 +186,59 @@ export async function processPdfVerifyJob(job: Job<PdfVerifyJobData>): Promise<{
       analysis.confidence = outcome.confidence;
       analysis.checks = outcome.checks;
       (analysis as any).trustedReference = outcome.trustedReference;
+      // Immutable internal evidence bundle — verdict logic above untouched.
+      try {
+        const structuralFeatures = pdfAnalyzer.extractStructuralFeatures(pdfBinary);
+        const parsedXmp = (extractedMetadata as any).parsedXmp ?? {};
+        const requiredXmp = ['dc:date', 'dc:format', 'dc:language', 'pdf:PDFVersion', 'pdf:Producer', 'xmp:CreateDate', 'xmp:CreatorTool', 'xmp:MetadataDate'];
+        const xmpPresence: Record<string, boolean> = {};
+        for (const f of requiredXmp) xmpPresence[f] = !!parsedXmp[f];
+        (analysis as any).forensicEvidence = buildForensicEvidence({
+          documentHash,
+          extractedFeatures: {
+            producer: (extractedMetadata as any).producer ?? null,
+            creator: (extractedMetadata as any).creator ?? null,
+            pdfVersion: (extractedMetadata as any).pdfVersion ?? null,
+            creationDate: (extractedMetadata as any).creationDate ?? null,
+            modificationDate: (extractedMetadata as any).modificationDate ?? null,
+            pages: (extractedMetadata as any).pages ?? null,
+            fontCount: (extractedMetadata as any).fontCount ?? 0,
+            wordCount: (extractedMetadata as any).wordCount ?? null,
+            characterCount: (extractedMetadata as any).characterCount ?? null,
+            isEncrypted: (extractedMetadata as any).isEncrypted ?? false,
+            hasDigitalSignature: (extractedMetadata as any).hasDigitalSignature ?? false,
+            xmpPresence,
+            hasRealXmp: !!(extractedMetadata as any).rawXmpData,
+          },
+          structuralFeatures,
+          forensicChecks: [
+            ...(Array.isArray(outcome.checks) ? outcome.checks : []).map((c: any) => ({
+              checkId: `pattern:${c.name ?? 'unknown'}`,
+              passed: !!c.passed,
+              detail: c.message,
+            })),
+            ...(Array.isArray(cosCheckResult.checks) ? cosCheckResult.checks : []).map((c: any) => ({
+              checkId: `cos:${c.name ?? 'unknown'}`,
+              passed: !!c.passed,
+              detail: c.detail,
+            })),
+          ],
+          provenance: {
+            uploadMethod: 'bullmq-worker',
+            filenameSanitized: path.basename(originalname),
+            magicVerified: true,
+            processingTimestamp: new Date().toISOString(),
+          },
+          finalVerdict: toEvidenceVerdict(outcome.result),
+          finalConfidence: outcome.confidence,
+          abstentionReason:
+            outcome.result === 'suspicious'
+              ? (cosCheckResult.reason ?? 'Conflicting or unverifiable signals — human review recommended.')
+              : null,
+        });
+      } catch (e) {
+        logger.warn({ err: e }, '[PDFWorker] forensic evidence bundle build failed (non-fatal)');
+      }
       metadata = {
         format: 'Pdf',
         mimeType: 'application/pdf',

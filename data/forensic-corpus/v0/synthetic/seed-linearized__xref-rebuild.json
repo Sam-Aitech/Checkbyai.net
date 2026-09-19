@@ -1,0 +1,15 @@
+{
+  "group": "synthetic",
+  "seedId": "seed-linearized",
+  "seedSha256": "104145808b6594a4f687bf8a172e659d98b99b03c0c5874d1a3c392c4781bb01",
+  "operator": "xref-rebuild",
+  "tactic": "Tool rebuild — xref re-emitted, revision chain untouched.",
+  "expectedGate": "GENUINE",
+  "subSeed": 2638602419,
+  "operatorParams": {
+    "inserted": "xref 0 1"
+  },
+  "sha256": "fe113a26b179c8bd299ea9731b4fe05e2951eea71a1356408209ac7c1268ab42",
+  "generator": "corpus-gen-v1",
+  "masterSeed": 42
+}

@@ -1,0 +1,15 @@
+{
+  "group": "synthetic",
+  "seedId": "seed-fop-v29-plain",
+  "seedSha256": "c58f55016df7c1cd660d6260c73ce8907058f6f857ede586798b0becffdde1f7",
+  "operator": "incremental-append",
+  "tactic": "Re-save — new revision appended with Prev chain.",
+  "expectedGate": "EDITED",
+  "subSeed": 2271818382,
+  "operatorParams": {
+    "prev": 84100
+  },
+  "sha256": "61e998a0a7008ddc7fe8be6bc86855f995db5f4dbde689c149060e657b03ad2e",
+  "generator": "corpus-gen-v1",
+  "masterSeed": 42
+}

@@ -1,0 +1,16 @@
+{
+  "group": "redteam",
+  "seedId": "seed-fop-v29-plain",
+  "seedSha256": "c58f55016df7c1cd660d6260c73ce8907058f6f857ede586798b0becffdde1f7",
+  "operator": "rt-deep-backdate",
+  "tactic": "Impossible backdating — every date agrees, but the claimed year predates both the XMP spec (2001) and PDF 1.4 (2001). Champion-blind by design; the anachronism challenger should catch it.",
+  "expectedGate": "GENUINE",
+  "subSeed": 3895344548,
+  "operatorParams": {
+    "backdatedTo": "1999-01-15",
+    "impossible": "pre-XMP, pre-PDF-1.4"
+  },
+  "sha256": "20b8b78d4bfb1bed644e35035f7dcbb44938728177a1220868901f8d78412f27",
+  "generator": "corpus-gen-v1",
+  "masterSeed": 42
+}

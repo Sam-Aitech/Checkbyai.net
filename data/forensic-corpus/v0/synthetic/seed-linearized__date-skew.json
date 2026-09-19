@@ -1,0 +1,17 @@
+{
+  "group": "synthetic",
+  "seedId": "seed-linearized",
+  "seedSha256": "104145808b6594a4f687bf8a172e659d98b99b03c0c5874d1a3c392c4781bb01",
+  "operator": "date-skew",
+  "tactic": "Backdate/forward-date — only the modification stamp moves.",
+  "expectedGate": "NON-GENUINE",
+  "subSeed": 1139215407,
+  "operatorParams": {
+    "from": "D:20260810101500Z",
+    "to": "D:20260915101500Z",
+    "skewDays": 36
+  },
+  "sha256": "d2edad627a0771bb0aaa1053e0bb9622718a5316b385aeb1b20cf42a25b7ee3e",
+  "generator": "corpus-gen-v1",
+  "masterSeed": 42
+}

@@ -1,0 +1,15 @@
+{
+  "version": "generation-invariants-v1",
+  "warning": "Common specification history for shadow-mode anachronism checks only. Verify against primary sources before any evidential use. Anything marked unknown is NOT asserted.",
+  "pdfVersions": {
+    "1.4": { "specYear": 2001, "note": "Acrobat 5 era" },
+    "1.5": { "specYear": 2003, "note": "Acrobat 6 era" },
+    "1.6": { "specYear": 2004, "note": "Acrobat 7 era" },
+    "1.7": { "specYear": 2006, "note": "Acrobat 8 era, later ISO 32000-1:2008" }
+  },
+  "xmpIntroducedYear": 2001,
+  "xmpNote": "Adobe XMP specification first published 2001. A document claiming an XMP packet with a creation year before 2001 is impossible.",
+  "producers": {
+    "apache-fop": { "firstReleaseYear": "unknown", "note": "NOT asserted — do not use for anachronism checks until sourced" }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "group": "synthetic",
+  "seedId": "seed-fop-v29-container",
+  "seedSha256": "1c664a7f36a65a14b3f560d355fa5b6ef80237c7c19c95d1a2873e5252449a15",
+  "operator": "info-producer-spoof",
+  "tactic": "Version drift / consistent spoof — strings agree with each other.",
+  "expectedGate": "GENUINE",
+  "subSeed": 4133857431,
+  "operatorParams": {
+    "from": "Apache FOP Version 2.9",
+    "to": "Apache FOP Version 2.3"
+  },
+  "sha256": "e5b9552a6d3f6df265ab90f5bc9e6976a7eb7493256d52cf0446977f9394752d",
+  "generator": "corpus-gen-v1",
+  "masterSeed": 42
+}

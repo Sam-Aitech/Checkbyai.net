@@ -16,6 +16,11 @@ import { getClientIp, hashIpAddress } from "../ipRateLimit";
 import { sanitizeUploadPath, assertSafeUploadFilename, assertPdfMagicBytes, toConfinedFsPath } from "../utils/uploadGuard";
 import { combineWithCosVerdict } from "../utils/cosVerdictCombiner";
 import { resolveVerificationWithTrust } from "../utils/trustedReference";
+import {
+  buildForensicEvidence,
+  emptyStructuralFeatures,
+  toEvidenceVerdict,
+} from "../services/forensicTypes";
 import { success } from "../lib/response";
 import { asyncHandler } from "../lib/errorHandler";
 import { ApiError } from "../lib/apiError";
@@ -246,6 +251,26 @@ export function registerVerificationRoutes(app: Express): void {
         const reason = priorAdminFlag.adminFeedback || 'Flagged as fake by a human reviewer.';
         analysis = buildAdminOverrideAnalysis('fake', reason);
         metadata = (priorAdminFlag.metadata as any) || {};
+        // Parser did not run on this path — record an explicit override bundle
+        // so every persisted verification still carries pinned versions + hash.
+        (analysis as any).forensicEvidence = buildForensicEvidence({
+          documentHash,
+          extractedFeatures: {},
+          structuralFeatures: emptyStructuralFeatures(),
+          forensicChecks: (Array.isArray((analysis as any).checks) ? (analysis as any).checks : []).map((c: any) => ({
+            checkId: `override:${c.name ?? 'admin-review'}`,
+            passed: !!c.passed,
+            detail: c.message,
+          })),
+          provenance: {
+            uploadMethod: 'api-verify-upload',
+            filenameSanitized: path.basename(req.file!.originalname),
+            magicVerified: true,
+            processingTimestamp: new Date().toISOString(),
+          },
+          finalVerdict: 'FAKE',
+          finalConfidence: 99,
+        });
       } else if (priorAdminApproval) {
         isAdminOverride = true;
         adminOverrideStatus = 'approved';
@@ -254,6 +279,24 @@ export function registerVerificationRoutes(app: Express): void {
         const reason = priorAdminApproval.adminFeedback || 'Confirmed genuine by a human reviewer.';
         analysis = buildAdminOverrideAnalysis('approved', reason);
         metadata = (priorAdminApproval.metadata as any) || {};
+        (analysis as any).forensicEvidence = buildForensicEvidence({
+          documentHash,
+          extractedFeatures: {},
+          structuralFeatures: emptyStructuralFeatures(),
+          forensicChecks: (Array.isArray((analysis as any).checks) ? (analysis as any).checks : []).map((c: any) => ({
+            checkId: `override:${c.name ?? 'admin-review'}`,
+            passed: !!c.passed,
+            detail: c.message,
+          })),
+          provenance: {
+            uploadMethod: 'api-verify-upload',
+            filenameSanitized: path.basename(req.file!.originalname),
+            magicVerified: true,
+            processingTimestamp: new Date().toISOString(),
+          },
+          finalVerdict: 'GENUINE',
+          finalConfidence: 99,
+        });
       } else {
         const pdfQueue = getPdfVerifyQueue();
         const shouldQueue = isQueueAvailable() && !!pdfQueue && !isAdminOverride;
@@ -338,6 +381,63 @@ export function registerVerificationRoutes(app: Express): void {
         analysis.confidence = outcome.confidence;
         analysis.checks = outcome.checks;
         analysis.trustedReference = outcome.trustedReference;
+        // ── Immutable internal evidence bundle (user-guidance-only) ─────────
+        // Verdict logic above is untouched. Structural features are measured
+        // here for offline robustness analysis; the served verdict still comes
+        // solely from the existing pattern + six-check pipeline.
+        try {
+          const structuralFeatures = pdfAnalyzer.extractStructuralFeatures(pdfBinary);
+          const parsedXmp = (extractedMetadata as any).parsedXmp ?? {};
+          const requiredXmp = ['dc:date', 'dc:format', 'dc:language', 'pdf:PDFVersion', 'pdf:Producer', 'xmp:CreateDate', 'xmp:CreatorTool', 'xmp:MetadataDate'];
+          const xmpPresence: Record<string, boolean> = {};
+          for (const f of requiredXmp) xmpPresence[f] = !!parsedXmp[f];
+          const forensicChecks = [
+            ...(Array.isArray(outcome.checks) ? outcome.checks : []).map((c: any) => ({
+              checkId: `pattern:${c.name ?? 'unknown'}`,
+              passed: !!c.passed,
+              detail: c.message,
+            })),
+            ...(Array.isArray(cosCheckResult.checks) ? cosCheckResult.checks : []).map((c: any) => ({
+              checkId: `cos:${c.name ?? 'unknown'}`,
+              passed: !!c.passed,
+              detail: c.detail,
+            })),
+          ];
+          (analysis as any).forensicEvidence = buildForensicEvidence({
+            documentHash,
+            extractedFeatures: {
+              producer: extractedMetadata.producer ?? null,
+              creator: extractedMetadata.creator ?? null,
+              pdfVersion: extractedMetadata.pdfVersion ?? null,
+              creationDate: extractedMetadata.creationDate ?? null,
+              modificationDate: extractedMetadata.modificationDate ?? null,
+              pages: extractedMetadata.pages ?? null,
+              fontCount: extractedMetadata.fontCount ?? 0,
+              wordCount: extractedMetadata.wordCount ?? null,
+              characterCount: extractedMetadata.characterCount ?? null,
+              isEncrypted: extractedMetadata.isEncrypted ?? false,
+              hasDigitalSignature: extractedMetadata.hasDigitalSignature ?? false,
+              xmpPresence,
+              hasRealXmp: !!(extractedMetadata as any).rawXmpData,
+            },
+            structuralFeatures,
+            forensicChecks,
+            provenance: {
+              uploadMethod: 'api-verify-upload',
+              filenameSanitized: path.basename(req.file!.originalname),
+              magicVerified: true,
+              processingTimestamp: new Date().toISOString(),
+            },
+            finalVerdict: toEvidenceVerdict(outcome.result),
+            finalConfidence: outcome.confidence,
+            abstentionReason:
+              outcome.result === 'suspicious'
+                ? (cosCheckResult.reason ?? 'Conflicting or unverifiable signals — human review recommended.')
+                : null,
+          });
+        } catch (e) {
+          logger.warn({ err: e }, '[Verify] forensic evidence bundle build failed (non-fatal)');
+        }
         metadata = {
           format: 'Pdf', mimeType: 'application/pdf', pdfVersion: extractedMetadata.pdfVersion || null, title: extractedMetadata.title || null,
           author: extractedMetadata.author || null, subject: extractedMetadata.subject || null, creator: extractedMetadata.creator || null,
