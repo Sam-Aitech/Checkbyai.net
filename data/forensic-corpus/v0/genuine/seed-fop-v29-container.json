@@ -1,9 +1,0 @@
-{
-  "kind": "fixture-derived-standin",
-  "seedId": "seed-fop-v29-container",
-  "description": "Apache FOP 2.9, DC values in RDF containers (canonical genuine shape)",
-  "warning": "NOT a captured Home Office PDF. Mirrors the FOP 2.9 structure for pipeline development only; replace with provenanced captures when available.",
-  "sha256": "1c664a7f36a65a14b3f560d355fa5b6ef80237c7c19c95d1a2873e5252449a15",
-  "generator": "corpus-gen-v1",
-  "masterSeed": 42
-}

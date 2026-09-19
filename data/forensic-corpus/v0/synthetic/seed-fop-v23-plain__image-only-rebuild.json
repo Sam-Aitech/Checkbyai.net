@@ -1,0 +1,15 @@
+{
+  "group": "synthetic",
+  "seedId": "seed-fop-v23-plain",
+  "seedSha256": "2e045c80af13cbd0df8d6f4dee1e884d3b174604952bded658cb3720256392ca",
+  "operator": "image-only-rebuild",
+  "tactic": "Flattening — text layer destroyed, pages become images.",
+  "expectedGate": "EDITED",
+  "subSeed": 1039238679,
+  "operatorParams": {
+    "textBlocksExpected": 0
+  },
+  "sha256": "c8a23933121e628517eec72a245c2431cceec070a446e370944302a6f660c11d",
+  "generator": "corpus-gen-v1",
+  "masterSeed": 42
+}

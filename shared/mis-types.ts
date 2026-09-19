@@ -1,6 +1,8 @@
 export type COSVerdict = 'GENUINE' | 'EDITED';
 
 export interface COSCheck {
+  /** Stable machine ID (`check-01`…`check-17`) — recorded on flag, used for signal binding. */
+  checkId?: string;
   name: string;
   passed: boolean;
   detail: string;

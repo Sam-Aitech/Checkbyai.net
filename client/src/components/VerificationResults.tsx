@@ -18,6 +18,7 @@ interface VerificationResultsProps {
       passed: boolean;
       severity: 'critical' | 'warning' | 'info';
       message: string;
+      kind?: 'forensic' | 'advisory';
     }>;
     receiptId?: string;
     documentHash?: string;
@@ -27,7 +28,7 @@ interface VerificationResultsProps {
 
 export default function VerificationResults({ result, verificationId }: VerificationResultsProps) {
   const [showFeedback, setShowFeedback] = useState(false);
-  const [expandedChecks, setExpandedChecks] = useState<Record<number, boolean>>({});
+  const [expandedChecks, setExpandedChecks] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
   const shouldReduceMotion = useReducedMotion();
   const entrance = shouldReduceMotion
@@ -35,11 +36,15 @@ export default function VerificationResults({ result, verificationId }: Verifica
     : { initial: { opacity: 0, y: 24 }, animate: { opacity: 1, y: 0 }, transition: spring };
 
   const checks = result.checks || [];
-  const passedCount = checks.filter(c => c.passed).length;
-  const totalChecks = checks.length;
+  // Advisory rows are administrator context, not document findings: they are
+  // rendered in a separate neutral section and excluded from every tally.
+  const forensicChecks = checks.filter(c => c.kind !== 'advisory');
+  const advisoryChecks = checks.filter(c => c.kind === 'advisory');
+  const passedCount = forensicChecks.filter(c => c.passed).length;
+  const totalChecks = forensicChecks.length;
   const confidencePercent = Math.round(result.confidence * 100);
 
-  const toggleCheck = (index: number) => {
+  const toggleCheck = (index: number | string) => {
     setExpandedChecks(prev => ({ ...prev, [index]: !prev[index] }));
   };
 
@@ -225,7 +230,7 @@ export default function VerificationResults({ result, verificationId }: Verifica
         </Card>
       )}
 
-      {checks.length > 0 && (
+      {forensicChecks.length > 0 && (
         <Card className="border border-border rounded-xl shadow-none">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-4">
@@ -233,7 +238,7 @@ export default function VerificationResults({ result, verificationId }: Verifica
               <h4 className="editorial-caption text-muted-foreground">Forensic Checks</h4>
             </div>
             <div className="space-y-1.5">
-              {checks.map((check, index) => {
+              {forensicChecks.map((check, index) => {
                 const sev = severityConfig[check.severity] || severityConfig.info;
                 const isExpanded = expandedChecks[index];
                 return (
@@ -286,6 +291,70 @@ export default function VerificationResults({ result, verificationId }: Verifica
           </CardContent>
         </Card>
       )}
+
+      {advisoryChecks.length > 0 && (
+        <Card className="border border-border rounded-xl shadow-none">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <Info className="w-4 h-4 text-info" />
+              <h4 className="editorial-caption text-muted-foreground">Administrator notes</h4>
+            </div>
+            <p className="text-xs text-muted-foreground mb-4 ml-6">
+              Context from past human reviews — shown for transparency. These notes did not affect this verdict.
+            </p>
+            <div className="space-y-1.5">
+              {advisoryChecks.map((check, index) => {
+                const isExpanded = expandedChecks[`advisory-${index}`];
+                return (
+                  <motion.div
+                    key={`advisory-${index}`}
+                    initial={{ opacity: 0, x: -8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ ...spring, delay: index * 0.05 }}
+                    className="border border-border rounded-xl transition-colors bg-info/[0.04]"
+                  >
+                    <button
+                      onClick={() => toggleCheck(`advisory-${index}`)}
+                      aria-expanded={!!isExpanded}
+                      aria-controls={`advisory-panel-${index}`}
+                      className="w-full flex items-center justify-between px-4 py-3 text-left rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <Info className="w-4 h-4 text-info flex-shrink-0" aria-hidden="true" />
+                        <span className="text-sm font-medium text-foreground truncate">{check.name}</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full font-semibold tracking-wider uppercase flex-shrink-0 bg-info/10 text-info">
+                          Note
+                        </span>
+                      </div>
+                      {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" aria-hidden="true" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" aria-hidden="true" />}
+                    </button>
+                    <AnimatePresence>
+                      {isExpanded && (
+                        <motion.div
+                          id={`advisory-panel-${index}`}
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={spring}
+                          className="overflow-hidden"
+                        >
+                          <div className="px-4 pb-3 pt-0">
+                            <p className="text-sm text-muted-foreground ml-7">{check.message}</p>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <p className="text-xs text-muted-foreground editorial-body px-1">
+        Technical file screening only — it does not confirm the CoS reference number is valid, assigned, or unrevoked on the live Home Office database.
+      </p>
 
       {totalChecks > 0 && (
         <Card className="border border-border rounded-xl shadow-none">

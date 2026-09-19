@@ -39,10 +39,13 @@ import {
 } from "../utils/sponsorMonitorDiagnostics";
 import { rebuildSponsorIndex } from "../utils/sponsorSearch";
 import { isQueueAvailable, getSponsorRefreshQueue } from "../services/jobQueue";
+import { producerFamily } from "../services/forensicTypes";
 import { cacheFlushPattern } from "../utils/redisClient";
 import { getWatchLimit } from "../utils/tierConfig";
 
-const TRUSTED_COS_FORENSIC_VERSION = 1;
+// Bumped 1 → 2 when the 6-check gate was replaced by the strict SMS 17-gate:
+// references validated under v1 were judged by different checks.
+const TRUSTED_COS_FORENSIC_VERSION = 2;
 
 function sanitizeForPrompt(text: string): string {
   return text.replace(/[<>`{}]/g, '');
@@ -2026,22 +2029,55 @@ Format your response in clear, professional markdown.`;
 
       if (adminStatus === 'fake' && adminFeedback?.trim()) {
         try {
-          const overrideDate = new Date().toISOString().split('T')[0];
-          const originalResult = verification.result;
-          const originalConfidence = verification.confidence;
           const producer = (verification.metadata as any)?.producer || 'Unknown';
-          const ruleText =
-            `CRITICAL ADMIN OVERRIDE [${overrideDate}]: Document initially verified as '${originalResult}' (${originalConfidence}% confidence) was confirmed FAKE by a human expert.\n` +
-            `Producer: ${producer}\n` +
-            `Admin reasoning: ${sanitizeForPrompt(adminFeedback.trim())}\n` +
-            `Action required: Apply heightened scrutiny to documents with similar metadata patterns. Do not classify as Genuine without explicit justification.`;
-
-          await storage.createGlobalAiRule({
-            category: 'hitl-override',
-            ruleText,
-            priority: 100,
-            isActive: true,
+          // Record the machine signal: WHICH checks failed on this confirmed
+          // fake (the auditor's own check-ID vocabulary), so future matching
+          // tests the same anomaly — never the producer string alone. Rows
+          // without a stored cosCheck (e.g. admin overrides) get no signal
+          // block and stay permanently display-only.
+          const storedChecks = (verification.analysisDetails as any)?.cosCheck?.checks;
+          const failedIds = Array.isArray(storedChecks)
+            ? storedChecks
+              .filter((c: any) => c && !c.passed && typeof (c.checkId ?? c.name) === 'string')
+              .map((c: any) => c.checkId ?? c.name)
+            : [];
+          const family = producerFamily(producer);
+          const signalBlock = failedIds.length > 0
+            ? `\nSignal(check-ids): ${failedIds.join(', ')}\nSignal(producer-family): ${family}`
+            : '';
+          // One note per (producer, failure signature): repeated markings of
+          // the same anomaly must not stack duplicate rules. A different
+          // failure signature on the same producer IS a new note.
+          const signature = `Producer: ${producer}|${failedIds.slice().sort().join(',')}`;
+          const activeRules = await storage.getActiveGlobalAiRules().catch(() => []);
+          const alreadyNoted = activeRules.some((r: any) => {
+            if (r.category !== 'hitl-override' || typeof r.ruleText !== 'string') return false;
+            if (!r.ruleText.includes(`Producer: ${producer}`)) return false;
+            const m = r.ruleText.match(/Signal\(check-ids\):\s*([a-z0-9\-, ]+)/i);
+            const existing = m
+              ? m[1].split(',').map((s: string) => s.trim().toLowerCase()).filter((s: string) => /^check-\d{2}$/.test(s)).sort().join(',')
+              : '';
+            return existing === failedIds.slice().sort().join(',');
           });
+          if (!alreadyNoted) {
+            const overrideDate = new Date().toISOString().split('T')[0];
+            const originalResult = verification.result;
+            const originalConfidence = verification.confidence;
+            const ruleText =
+              `ADMIN NOTE [${overrideDate}]: Document initially verified as '${originalResult}' (${originalConfidence}% confidence) was confirmed FAKE by a human expert.\n` +
+              `Producer: ${producer}\n` +
+              `Admin reasoning: ${sanitizeForPrompt(adminFeedback.trim())}\n` +
+              `Applies to documents failing the same checks; otherwise displayed as context only.${signalBlock}`;
+            await storage.createGlobalAiRule({
+              category: 'hitl-override',
+              ruleText,
+              priority: 100,
+              isActive: true,
+            });
+            logger.info(`[Admin] hitl-override note created (${signature || 'no-signal'}).`);
+          } else {
+            logger.info(`[Admin] hitl-override note already exists (${signature}) — skipping duplicate rule creation.`);
+          }
         } catch (ruleError) {
           logger.error({ err: ruleError }, 'Failed to create AI rule from admin override (non-fatal):');
         }

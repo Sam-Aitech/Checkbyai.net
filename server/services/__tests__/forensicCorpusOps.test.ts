@@ -97,10 +97,10 @@ describe('synthetic operators apply cleanly to the canonical seed', () => {
 });
 
 describe('gate behaviour — detection holds where expected', () => {
-  it('incremental-append is EDITED with a Prev chain', async () => {
+  it('incremental-append passes the strict gate (profile intact) but records a Prev chain structurally', async () => {
     const seed = genuinePdfBinary();
     const { binary } = findOperator('incremental-append')!.apply(seed, createRng(42));
-    expect(await gateVerdict(binary, 'incr.pdf')).toBe('EDITED');
+    expect(await gateVerdict(binary, 'incr.pdf')).toBe('GENUINE');
     const features = new PDFAnalyzer().extractStructuralFeatures(binary);
     expect(features.hasPrevChain).toBe(true);
     expect(features.incrementalUpdatesAboveBaseline).toBeGreaterThanOrEqual(1);
@@ -110,6 +110,12 @@ describe('gate behaviour — detection holds where expected', () => {
     const seed = genuinePdfBinary();
     const { binary } = findOperator('tool-spoof')!.apply(seed, createRng(1));
     expect(await gateVerdict(binary, 'spoof.pdf')).toBe('EDITED');
+  });
+
+  it('FOP version drift is EDITED (exact-2.3 identity)', async () => {
+    const seed = genuinePdfBinary();
+    const { binary } = findOperator('info-producer-spoof')!.apply(seed, createRng(42));
+    expect(await gateVerdict(binary, 'drift.pdf')).toBe('EDITED');
   });
 
   it('metadata-strip is EDITED', async () => {
@@ -143,5 +149,12 @@ describe('gate behaviour — red-team bypass baseline (the exhibit)', () => {
     const { binary, skipped } = findOperator('rt-date-clone')!.apply(seed, createRng(42));
     expect(skipped).toBe(false);
     expect(await gateVerdict(binary, 'rt-date.pdf')).toBe('GENUINE');
+  });
+
+  it('rt-deep-backdate passes the gate (no anachronism check here — the challenger owns that)', async () => {
+    const seed = genuinePdfBinary();
+    const { binary, skipped } = findOperator('rt-deep-backdate')!.apply(seed, createRng(42));
+    expect(skipped).toBe(false);
+    expect(await gateVerdict(binary, 'rt-deep.pdf')).toBe('GENUINE');
   });
 });

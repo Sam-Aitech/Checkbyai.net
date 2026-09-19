@@ -156,10 +156,15 @@ export async function processPdfVerifyJob(job: Job<PdfVerifyJobData>): Promise<{
         globalRules: (activeRules as any[]).map((r: any) => ({ category: r.category, ruleText: r.ruleText, priority: r.priority })),
         hitlKnowledge: (hitlFakes as any[]).map((v: any) => ({ filename: v.filename, result: v.result, confidence: v.confidence, adminFeedback: v.adminFeedback, metadata: v.metadata })),
       };
-      const [analysisResult, cosCheckResult] = await Promise.all([
-        pdfAnalyzer.analyzeAgainstTrustedPatterns(extractedMetadata, trustedPatterns, adminContext),
-        Promise.resolve(new COSAuthenticityChecker().check(pdfBinary, extractedMetadata)),
-      ]);
+      // The 17-gate runs FIRST (synchronous): its failed check IDs feed
+      // check-ID signal matching inside pattern analysis below.
+      const cosCheckResult = new COSAuthenticityChecker().check(pdfBinary, extractedMetadata);
+      const analysisResult = await pdfAnalyzer.analyzeAgainstTrustedPatterns(extractedMetadata, trustedPatterns, {
+        ...adminContext,
+        currentFailedCheckIds: cosCheckResult.checks
+          .filter((c) => !c.passed)
+          .map((c) => c.checkId ?? c.name),
+      });
       analysis = analysisResult;
       (analysis as any).cosCheck = cosCheckResult;
       const outcome = resolveVerificationWithTrust(

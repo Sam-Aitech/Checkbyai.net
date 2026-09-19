@@ -1,8 +1,8 @@
 {
   "generator": "discrimination-v1",
   "trustedSeeds": [
-    "genuine/seed-fop-v29-container.pdf",
-    "genuine/seed-fop-v29-plain.pdf",
+    "genuine/seed-fop-v23-container.pdf",
+    "genuine/seed-fop-v23-plain.pdf",
     "genuine/seed-linearized.pdf"
   ],
   "caseCount": 57,
@@ -18,12 +18,13 @@
   },
   "expC_opcodeProfile": {
     "distinctValues": [
+      "2/38",
       "0/0"
     ],
-    "conclusion": "BLOCKED: stand-in seeds carry no text content streams — opcode profiling requires real captures."
+    "conclusion": "UNBLOCKED: corpus carries text ops — proceed to profile analysis."
   },
   "byOperator": {
-    "seed-fop-v29-container:rt-content-swap": {
+    "seed-fop-v23-container:rt-content-swap": {
       "champion": [
         "genuine"
       ],
@@ -31,7 +32,7 @@
         "suspicious"
       ]
     },
-    "seed-fop-v29-container:rt-hidden-object": {
+    "seed-fop-v23-container:rt-hidden-object": {
       "champion": [
         "genuine"
       ],
@@ -39,7 +40,7 @@
         "suspicious"
       ]
     },
-    "seed-fop-v29-container:rt-date-clone": {
+    "seed-fop-v23-container:rt-date-clone": {
       "champion": [
         "genuine"
       ],
@@ -47,7 +48,7 @@
         "genuine"
       ]
     },
-    "seed-fop-v29-container:rt-deep-backdate": {
+    "seed-fop-v23-container:rt-deep-backdate": {
       "champion": [
         "genuine"
       ],
@@ -55,7 +56,7 @@
         "fake"
       ]
     },
-    "seed-fop-v29-plain:rt-content-swap": {
+    "seed-fop-v23-plain:rt-content-swap": {
       "champion": [
         "genuine"
       ],
@@ -63,7 +64,7 @@
         "suspicious"
       ]
     },
-    "seed-fop-v29-plain:rt-hidden-object": {
+    "seed-fop-v23-plain:rt-hidden-object": {
       "champion": [
         "genuine"
       ],
@@ -71,7 +72,7 @@
         "suspicious"
       ]
     },
-    "seed-fop-v29-plain:rt-date-clone": {
+    "seed-fop-v23-plain:rt-date-clone": {
       "champion": [
         "genuine"
       ],
@@ -79,7 +80,7 @@
         "genuine"
       ]
     },
-    "seed-fop-v29-plain:rt-deep-backdate": {
+    "seed-fop-v23-plain:rt-deep-backdate": {
       "champion": [
         "genuine"
       ],
@@ -123,8 +124,8 @@
   "rows": [
     {
       "group": "genuine",
-      "file": "genuine/seed-fop-v29-container.pdf",
-      "seedId": "seed-fop-v29-container",
+      "file": "genuine/seed-fop-v23-container.pdf",
+      "seedId": "seed-fop-v23-container",
       "operator": null,
       "champion": "genuine",
       "challenger": "genuine",
@@ -133,8 +134,8 @@
     },
     {
       "group": "genuine",
-      "file": "genuine/seed-fop-v29-plain.pdf",
-      "seedId": "seed-fop-v29-plain",
+      "file": "genuine/seed-fop-v23-plain.pdf",
+      "seedId": "seed-fop-v23-plain",
       "operator": null,
       "champion": "genuine",
       "challenger": "genuine",
@@ -153,8 +154,8 @@
     },
     {
       "group": "synthetic",
-      "file": "synthetic/seed-fop-v29-container__xmp-value-swap.pdf",
-      "seedId": "seed-fop-v29-container",
+      "file": "synthetic/seed-fop-v23-container__xmp-value-swap.pdf",
+      "seedId": "seed-fop-v23-container",
       "operator": "xmp-value-swap",
       "champion": "suspicious",
       "challenger": "suspicious",
@@ -163,8 +164,8 @@
     },
     {
       "group": "synthetic",
-      "file": "synthetic/seed-fop-v29-container__xmp-field-drop.pdf",
-      "seedId": "seed-fop-v29-container",
+      "file": "synthetic/seed-fop-v23-container__xmp-field-drop.pdf",
+      "seedId": "seed-fop-v23-container",
       "operator": "xmp-field-drop",
       "champion": "suspicious",
       "challenger": "suspicious",
@@ -173,8 +174,8 @@
     },
     {
       "group": "synthetic",
-      "file": "synthetic/seed-fop-v29-container__xmp-order-shuffle.pdf",
-      "seedId": "seed-fop-v29-container",
+      "file": "synthetic/seed-fop-v23-container__xmp-order-shuffle.pdf",
+      "seedId": "seed-fop-v23-container",
       "operator": "xmp-order-shuffle",
       "champion": "suspicious",
       "challenger": "suspicious",
@@ -183,8 +184,8 @@
     },
     {
       "group": "synthetic",
-      "file": "synthetic/seed-fop-v29-container__xmp-rebuild.pdf",
-      "seedId": "seed-fop-v29-container",
+      "file": "synthetic/seed-fop-v23-container__xmp-rebuild.pdf",
+      "seedId": "seed-fop-v23-container",
       "operator": "xmp-rebuild",
       "champion": "suspicious",
       "challenger": "suspicious",
@@ -193,18 +194,18 @@
     },
     {
       "group": "synthetic",
-      "file": "synthetic/seed-fop-v29-container__info-producer-spoof.pdf",
-      "seedId": "seed-fop-v29-container",
+      "file": "synthetic/seed-fop-v23-container__info-producer-spoof.pdf",
+      "seedId": "seed-fop-v23-container",
       "operator": "info-producer-spoof",
-      "champion": "genuine",
-      "challenger": "genuine",
+      "champion": "suspicious",
+      "challenger": "suspicious",
       "changed": false,
       "reasons": []
     },
     {
       "group": "synthetic",
-      "file": "synthetic/seed-fop-v29-container__tool-spoof.pdf",
-      "seedId": "seed-fop-v29-container",
+      "file": "synthetic/seed-fop-v23-container__tool-spoof.pdf",
+      "seedId": "seed-fop-v23-container",
       "operator": "tool-spoof",
       "champion": "suspicious",
       "challenger": "suspicious",
@@ -213,8 +214,8 @@
     },
     {
       "group": "synthetic",
-      "file": "synthetic/seed-fop-v29-container__date-skew.pdf",
-      "seedId": "seed-fop-v29-container",
+      "file": "synthetic/seed-fop-v23-container__date-skew.pdf",
+      "seedId": "seed-fop-v23-container",
       "operator": "date-skew",
       "champion": "genuine",
       "challenger": "genuine",
@@ -223,8 +224,8 @@
     },
     {
       "group": "synthetic",
-      "file": "synthetic/seed-fop-v29-container__history-inject.pdf",
-      "seedId": "seed-fop-v29-container",
+      "file": "synthetic/seed-fop-v23-container__history-inject.pdf",
+      "seedId": "seed-fop-v23-container",
       "operator": "history-inject",
       "champion": "genuine",
       "challenger": "genuine",
@@ -233,8 +234,8 @@
     },
     {
       "group": "synthetic",
-      "file": "synthetic/seed-fop-v29-container__xref-rebuild.pdf",
-      "seedId": "seed-fop-v29-container",
+      "file": "synthetic/seed-fop-v23-container__xref-rebuild.pdf",
+      "seedId": "seed-fop-v23-container",
       "operator": "xref-rebuild",
       "champion": "genuine",
       "challenger": "genuine",
@@ -243,18 +244,20 @@
     },
     {
       "group": "synthetic",
-      "file": "synthetic/seed-fop-v29-container__incremental-append.pdf",
-      "seedId": "seed-fop-v29-container",
+      "file": "synthetic/seed-fop-v23-container__incremental-append.pdf",
+      "seedId": "seed-fop-v23-container",
       "operator": "incremental-append",
-      "champion": "suspicious",
+      "champion": "genuine",
       "challenger": "suspicious",
-      "changed": false,
-      "reasons": []
+      "changed": true,
+      "reasons": [
+        "Near-reference structural divergence: object inventory 8 matches no trusted inventory — possible graft or rebuild (user-guidance-only, not evidence)"
+      ]
     },
     {
       "group": "synthetic",
-      "file": "synthetic/seed-fop-v29-container__linearize-toggle.pdf",
-      "seedId": "seed-fop-v29-container",
+      "file": "synthetic/seed-fop-v23-container__linearize-toggle.pdf",
+      "seedId": "seed-fop-v23-container",
       "operator": "linearize-toggle",
       "champion": "genuine",
       "challenger": "genuine",
@@ -263,8 +266,8 @@
     },
     {
       "group": "synthetic",
-      "file": "synthetic/seed-fop-v29-container__metadata-strip.pdf",
-      "seedId": "seed-fop-v29-container",
+      "file": "synthetic/seed-fop-v23-container__metadata-strip.pdf",
+      "seedId": "seed-fop-v23-container",
       "operator": "metadata-strip",
       "champion": "suspicious",
       "challenger": "suspicious",
@@ -273,8 +276,8 @@
     },
     {
       "group": "synthetic",
-      "file": "synthetic/seed-fop-v29-container__print-to-pdf.pdf",
-      "seedId": "seed-fop-v29-container",
+      "file": "synthetic/seed-fop-v23-container__print-to-pdf.pdf",
+      "seedId": "seed-fop-v23-container",
       "operator": "print-to-pdf",
       "champion": "suspicious",
       "challenger": "suspicious",
@@ -283,8 +286,8 @@
     },
     {
       "group": "synthetic",
-      "file": "synthetic/seed-fop-v29-container__image-only-rebuild.pdf",
-      "seedId": "seed-fop-v29-container",
+      "file": "synthetic/seed-fop-v23-container__image-only-rebuild.pdf",
+      "seedId": "seed-fop-v23-container",
       "operator": "image-only-rebuild",
       "champion": "suspicious",
       "challenger": "suspicious",
@@ -293,8 +296,8 @@
     },
     {
       "group": "synthetic",
-      "file": "synthetic/seed-fop-v29-plain__xmp-value-swap.pdf",
-      "seedId": "seed-fop-v29-plain",
+      "file": "synthetic/seed-fop-v23-plain__xmp-value-swap.pdf",
+      "seedId": "seed-fop-v23-plain",
       "operator": "xmp-value-swap",
       "champion": "suspicious",
       "challenger": "suspicious",
@@ -303,8 +306,8 @@
     },
     {
       "group": "synthetic",
-      "file": "synthetic/seed-fop-v29-plain__xmp-field-drop.pdf",
-      "seedId": "seed-fop-v29-plain",
+      "file": "synthetic/seed-fop-v23-plain__xmp-field-drop.pdf",
+      "seedId": "seed-fop-v23-plain",
       "operator": "xmp-field-drop",
       "champion": "suspicious",
       "challenger": "suspicious",
@@ -313,8 +316,8 @@
     },
     {
       "group": "synthetic",
-      "file": "synthetic/seed-fop-v29-plain__xmp-order-shuffle.pdf",
-      "seedId": "seed-fop-v29-plain",
+      "file": "synthetic/seed-fop-v23-plain__xmp-order-shuffle.pdf",
+      "seedId": "seed-fop-v23-plain",
       "operator": "xmp-order-shuffle",
       "champion": "suspicious",
       "challenger": "suspicious",
@@ -323,8 +326,8 @@
     },
     {
       "group": "synthetic",
-      "file": "synthetic/seed-fop-v29-plain__xmp-rebuild.pdf",
-      "seedId": "seed-fop-v29-plain",
+      "file": "synthetic/seed-fop-v23-plain__xmp-rebuild.pdf",
+      "seedId": "seed-fop-v23-plain",
       "operator": "xmp-rebuild",
       "champion": "suspicious",
       "challenger": "suspicious",
@@ -333,18 +336,18 @@
     },
     {
       "group": "synthetic",
-      "file": "synthetic/seed-fop-v29-plain__info-producer-spoof.pdf",
-      "seedId": "seed-fop-v29-plain",
+      "file": "synthetic/seed-fop-v23-plain__info-producer-spoof.pdf",
+      "seedId": "seed-fop-v23-plain",
       "operator": "info-producer-spoof",
-      "champion": "genuine",
-      "challenger": "genuine",
+      "champion": "suspicious",
+      "challenger": "suspicious",
       "changed": false,
       "reasons": []
     },
     {
       "group": "synthetic",
-      "file": "synthetic/seed-fop-v29-plain__tool-spoof.pdf",
-      "seedId": "seed-fop-v29-plain",
+      "file": "synthetic/seed-fop-v23-plain__tool-spoof.pdf",
+      "seedId": "seed-fop-v23-plain",
       "operator": "tool-spoof",
       "champion": "suspicious",
       "challenger": "suspicious",
@@ -353,8 +356,8 @@
     },
     {
       "group": "synthetic",
-      "file": "synthetic/seed-fop-v29-plain__date-skew.pdf",
-      "seedId": "seed-fop-v29-plain",
+      "file": "synthetic/seed-fop-v23-plain__date-skew.pdf",
+      "seedId": "seed-fop-v23-plain",
       "operator": "date-skew",
       "champion": "genuine",
       "challenger": "genuine",
@@ -363,8 +366,8 @@
     },
     {
       "group": "synthetic",
-      "file": "synthetic/seed-fop-v29-plain__history-inject.pdf",
-      "seedId": "seed-fop-v29-plain",
+      "file": "synthetic/seed-fop-v23-plain__history-inject.pdf",
+      "seedId": "seed-fop-v23-plain",
       "operator": "history-inject",
       "champion": "genuine",
       "challenger": "genuine",
@@ -373,8 +376,8 @@
     },
     {
       "group": "synthetic",
-      "file": "synthetic/seed-fop-v29-plain__xref-rebuild.pdf",
-      "seedId": "seed-fop-v29-plain",
+      "file": "synthetic/seed-fop-v23-plain__xref-rebuild.pdf",
+      "seedId": "seed-fop-v23-plain",
       "operator": "xref-rebuild",
       "champion": "genuine",
       "challenger": "genuine",
@@ -383,18 +386,20 @@
     },
     {
       "group": "synthetic",
-      "file": "synthetic/seed-fop-v29-plain__incremental-append.pdf",
-      "seedId": "seed-fop-v29-plain",
+      "file": "synthetic/seed-fop-v23-plain__incremental-append.pdf",
+      "seedId": "seed-fop-v23-plain",
       "operator": "incremental-append",
-      "champion": "suspicious",
+      "champion": "genuine",
       "challenger": "suspicious",
-      "changed": false,
-      "reasons": []
+      "changed": true,
+      "reasons": [
+        "Near-reference structural divergence: object inventory 8 matches no trusted inventory — possible graft or rebuild (user-guidance-only, not evidence)"
+      ]
     },
     {
       "group": "synthetic",
-      "file": "synthetic/seed-fop-v29-plain__linearize-toggle.pdf",
-      "seedId": "seed-fop-v29-plain",
+      "file": "synthetic/seed-fop-v23-plain__linearize-toggle.pdf",
+      "seedId": "seed-fop-v23-plain",
       "operator": "linearize-toggle",
       "champion": "genuine",
       "challenger": "genuine",
@@ -403,8 +408,8 @@
     },
     {
       "group": "synthetic",
-      "file": "synthetic/seed-fop-v29-plain__metadata-strip.pdf",
-      "seedId": "seed-fop-v29-plain",
+      "file": "synthetic/seed-fop-v23-plain__metadata-strip.pdf",
+      "seedId": "seed-fop-v23-plain",
       "operator": "metadata-strip",
       "champion": "suspicious",
       "challenger": "suspicious",
@@ -413,8 +418,8 @@
     },
     {
       "group": "synthetic",
-      "file": "synthetic/seed-fop-v29-plain__print-to-pdf.pdf",
-      "seedId": "seed-fop-v29-plain",
+      "file": "synthetic/seed-fop-v23-plain__print-to-pdf.pdf",
+      "seedId": "seed-fop-v23-plain",
       "operator": "print-to-pdf",
       "champion": "suspicious",
       "challenger": "suspicious",
@@ -423,8 +428,8 @@
     },
     {
       "group": "synthetic",
-      "file": "synthetic/seed-fop-v29-plain__image-only-rebuild.pdf",
-      "seedId": "seed-fop-v29-plain",
+      "file": "synthetic/seed-fop-v23-plain__image-only-rebuild.pdf",
+      "seedId": "seed-fop-v23-plain",
       "operator": "image-only-rebuild",
       "champion": "suspicious",
       "challenger": "suspicious",
@@ -476,8 +481,8 @@
       "file": "synthetic/seed-linearized__info-producer-spoof.pdf",
       "seedId": "seed-linearized",
       "operator": "info-producer-spoof",
-      "champion": "genuine",
-      "challenger": "genuine",
+      "champion": "suspicious",
+      "challenger": "suspicious",
       "changed": false,
       "reasons": []
     },
@@ -526,18 +531,20 @@
       "file": "synthetic/seed-linearized__incremental-append.pdf",
       "seedId": "seed-linearized",
       "operator": "incremental-append",
-      "champion": "suspicious",
+      "champion": "genuine",
       "challenger": "suspicious",
-      "changed": false,
-      "reasons": []
+      "changed": true,
+      "reasons": [
+        "Near-reference structural divergence: object inventory 8 matches no trusted inventory — possible graft or rebuild (user-guidance-only, not evidence)"
+      ]
     },
     {
       "group": "synthetic",
       "file": "synthetic/seed-linearized__linearize-toggle.pdf",
       "seedId": "seed-linearized",
       "operator": "linearize-toggle",
-      "champion": "suspicious",
-      "challenger": "suspicious",
+      "champion": "genuine",
+      "challenger": "genuine",
       "changed": false,
       "reasons": []
     },
@@ -573,8 +580,8 @@
     },
     {
       "group": "redteam",
-      "file": "redteam/seed-fop-v29-container__rt-content-swap.pdf",
-      "seedId": "seed-fop-v29-container",
+      "file": "redteam/seed-fop-v23-container__rt-content-swap.pdf",
+      "seedId": "seed-fop-v23-container",
       "operator": "rt-content-swap",
       "champion": "genuine",
       "challenger": "suspicious",
@@ -585,20 +592,20 @@
     },
     {
       "group": "redteam",
-      "file": "redteam/seed-fop-v29-container__rt-hidden-object.pdf",
-      "seedId": "seed-fop-v29-container",
+      "file": "redteam/seed-fop-v23-container__rt-hidden-object.pdf",
+      "seedId": "seed-fop-v23-container",
       "operator": "rt-hidden-object",
       "champion": "genuine",
       "challenger": "suspicious",
       "changed": true,
       "reasons": [
-        "Near-reference structural divergence: object inventory 2 matches no trusted inventory — possible graft or rebuild (user-guidance-only, not evidence)"
+        "Near-reference structural divergence: object inventory 8 matches no trusted inventory — possible graft or rebuild (user-guidance-only, not evidence)"
       ]
     },
     {
       "group": "redteam",
-      "file": "redteam/seed-fop-v29-container__rt-date-clone.pdf",
-      "seedId": "seed-fop-v29-container",
+      "file": "redteam/seed-fop-v23-container__rt-date-clone.pdf",
+      "seedId": "seed-fop-v23-container",
       "operator": "rt-date-clone",
       "champion": "genuine",
       "challenger": "genuine",
@@ -607,8 +614,8 @@
     },
     {
       "group": "redteam",
-      "file": "redteam/seed-fop-v29-container__rt-deep-backdate.pdf",
-      "seedId": "seed-fop-v29-container",
+      "file": "redteam/seed-fop-v23-container__rt-deep-backdate.pdf",
+      "seedId": "seed-fop-v23-container",
       "operator": "rt-deep-backdate",
       "champion": "genuine",
       "challenger": "fake",
@@ -620,8 +627,8 @@
     },
     {
       "group": "redteam",
-      "file": "redteam/seed-fop-v29-plain__rt-content-swap.pdf",
-      "seedId": "seed-fop-v29-plain",
+      "file": "redteam/seed-fop-v23-plain__rt-content-swap.pdf",
+      "seedId": "seed-fop-v23-plain",
       "operator": "rt-content-swap",
       "champion": "genuine",
       "challenger": "suspicious",
@@ -632,20 +639,20 @@
     },
     {
       "group": "redteam",
-      "file": "redteam/seed-fop-v29-plain__rt-hidden-object.pdf",
-      "seedId": "seed-fop-v29-plain",
+      "file": "redteam/seed-fop-v23-plain__rt-hidden-object.pdf",
+      "seedId": "seed-fop-v23-plain",
       "operator": "rt-hidden-object",
       "champion": "genuine",
       "challenger": "suspicious",
       "changed": true,
       "reasons": [
-        "Near-reference structural divergence: object inventory 2 matches no trusted inventory — possible graft or rebuild (user-guidance-only, not evidence)"
+        "Near-reference structural divergence: object inventory 8 matches no trusted inventory — possible graft or rebuild (user-guidance-only, not evidence)"
       ]
     },
     {
       "group": "redteam",
-      "file": "redteam/seed-fop-v29-plain__rt-date-clone.pdf",
-      "seedId": "seed-fop-v29-plain",
+      "file": "redteam/seed-fop-v23-plain__rt-date-clone.pdf",
+      "seedId": "seed-fop-v23-plain",
       "operator": "rt-date-clone",
       "champion": "genuine",
       "challenger": "genuine",
@@ -654,8 +661,8 @@
     },
     {
       "group": "redteam",
-      "file": "redteam/seed-fop-v29-plain__rt-deep-backdate.pdf",
-      "seedId": "seed-fop-v29-plain",
+      "file": "redteam/seed-fop-v23-plain__rt-deep-backdate.pdf",
+      "seedId": "seed-fop-v23-plain",
       "operator": "rt-deep-backdate",
       "champion": "genuine",
       "challenger": "fake",
@@ -686,7 +693,7 @@
       "challenger": "suspicious",
       "changed": true,
       "reasons": [
-        "Near-reference structural divergence: object inventory 2 matches no trusted inventory — possible graft or rebuild (user-guidance-only, not evidence)"
+        "Near-reference structural divergence: object inventory 8 matches no trusted inventory — possible graft or rebuild (user-guidance-only, not evidence)"
       ]
     },
     {

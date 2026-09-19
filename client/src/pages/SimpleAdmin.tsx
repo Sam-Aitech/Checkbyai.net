@@ -436,6 +436,9 @@ export default function SimpleAdmin() {
   // Global AI rules state
   const [globalRules, setGlobalRules] = useState<GlobalAiRule[]>([]);
   const [rulesLoading, setRulesLoading] = useState(false);
+  // HITL fake-case knowledge state (past human-confirmed fakes)
+  const [hitlCases, setHitlCases] = useState<any[]>([]);
+  const [hitlLoading, setHitlLoading] = useState(false);
   const [newRuleCategory, setNewRuleCategory] = useState('');
   const [newRuleText, setNewRuleText] = useState('');
   const [newRulePriority, setNewRulePriority] = useState(0);
@@ -1059,16 +1062,67 @@ export default function SimpleAdmin() {
     }
   };
 
+  // Parses the machine signal block auto-appended to hitl-override rules at
+  // flag time (Signal(check-ids) + Signal(producer-family)). Null = legacy
+  // free-text row, permanently display-only.
+  const parseRuleSignal = (ruleText: string): { checkIds: string[]; family: string | null } | null => {
+    if (typeof ruleText !== 'string') return null;
+    const m = ruleText.match(/Signal\(check-ids\):\s*([a-z0-9\-, ]+)/i);
+    if (!m) return null;
+    const checkIds = m[1].split(',').map(s => s.trim().toLowerCase()).filter(s => /^check-\d{2}$/.test(s));
+    if (checkIds.length === 0) return null;
+    const f = ruleText.match(/Signal\(producer-family\):\s*(\S+)/i);
+    return { checkIds, family: f ? f[1].toLowerCase() : null };
+  };
+
+  // Failed check IDs stored on a past verification row (its own cosCheck).
+  const storedCaseSignal = (row: any): string[] => {
+    const checks = row?.analysisDetails?.cosCheck?.checks;
+    if (!Array.isArray(checks)) return [];
+    return checks.filter((c: any) => c && !c.passed).map((c: any) => c.checkId ?? c.name).filter((s: any) => typeof s === 'string');
+  };
+
+  const loadHitlCases = useCallback(async () => {
+    setHitlLoading(true);
+    try {
+      const res = await fetch('/api/knowledge-base?limit=50', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setHitlCases(Array.isArray(data) ? data : (data.entries ?? []));
+      }
+    } catch (error) {
+      console.error('Failed to load HITL cases:', error);
+    } finally {
+      setHitlLoading(false);
+    }
+  }, []);
+
+  const deleteHitlCase = async (id: number, filename: string) => {
+    if (!window.confirm(`Remove past fake case "${filename}" from expert knowledge? Future verifications will no longer see it as context. The log row itself is soft-deleted.`)) return;
+    try {
+      const res = await fetch(`/api/logs/${id}`, { method: 'DELETE', credentials: 'include' });
+      if (res.ok) {
+        toast({ title: 'Case removed from knowledge' });
+        loadHitlCases();
+      } else {
+        toast({ title: 'Failed to remove case', variant: 'destructive' });
+      }
+    } catch (error) {
+      toast({ title: 'Failed to remove case', variant: 'destructive' });
+    }
+  };
+
   useEffect(() => {
     if (isAuthenticated && activeTab === 'knowledge') {
       loadGlobalRules();
+      loadHitlCases();
     }
     if (isAuthenticated && activeTab === 'sponsor') {
       loadSponsorMonitorData();
       loadStorageStats();
       loadJobHistory();
     }
-  }, [isAuthenticated, activeTab, loadGlobalRules, loadSponsorMonitorData, loadStorageStats, loadJobHistory]);
+  }, [isAuthenticated, activeTab, loadGlobalRules, loadHitlCases, loadSponsorMonitorData, loadStorageStats, loadJobHistory]);
 
   useEffect(() => {
     if (isAuthenticated && activeTab === 'notifications') {
@@ -3376,6 +3430,20 @@ export default function SimpleAdmin() {
                                     </Badge>
                                   )}
                                   <span className="font-mono text-xs text-muted-foreground">p={rule.priority}</span>
+                                  {(() => {
+                                    const sig = parseRuleSignal(rule.ruleText);
+                                    return sig ? (
+                                      <Badge title={`Fires only on documents failing the same checks (${sig.checkIds.join(', ')}) from the same generator family${sig.family ? ` (${sig.family})` : ''}`}
+                                        className="bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20 rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap">
+                                        signal: {sig.checkIds.join(', ')}
+                                      </Badge>
+                                    ) : (
+                                      <Badge title="Legacy free-text note — displayed as context only, never matched"
+                                        className="bg-muted text-muted-foreground border-border rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap">
+                                        legacy note
+                                      </Badge>
+                                    );
+                                  })()}
                                 </div>
                                 <p className="text-sm text-gray-700 dark:text-slate-300 leading-snug">{rule.ruleText}</p>
                               </div>
@@ -3422,6 +3490,95 @@ export default function SimpleAdmin() {
                           )}
                         </div>
                       ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* ── Past fake cases (HITL knowledge) ── */}
+              <Card className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 shadow-sm">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-gray-900 dark:text-white text-base">
+                        Past fake cases
+                        {hitlCases.length > 0 && (
+                          <span className="ml-2 text-sm font-normal text-gray-500 dark:text-slate-400">
+                            ({hitlCases.length} cases)
+                          </span>
+                        )}
+                      </CardTitle>
+                      <CardDescription className="text-gray-500 dark:text-slate-400 text-xs mt-0.5">
+                        Human-confirmed fakes reused as verification context. Cases with a recorded failure
+                        signature influence same-signature documents; legacy rows are notes only. Removing a
+                        case stops it appearing on future verifications (log row is soft-deleted).
+                      </CardDescription>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={loadHitlCases}
+                      disabled={hitlLoading}
+                      aria-label="Refresh past cases"
+                      className="border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 shrink-0"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${hitlLoading ? 'animate-spin' : ''}`} />
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {hitlLoading && (
+                    <div className="flex justify-center py-12">
+                      <div className="w-8 h-8 border-4 border-pink-200 border-t-pink-500 rounded-full animate-spin" />
+                    </div>
+                  )}
+                  {!hitlLoading && hitlCases.length === 0 && (
+                    <p className="text-xs text-gray-500 dark:text-slate-400 text-center py-8">
+                      No human-confirmed fake cases yet.
+                    </p>
+                  )}
+                  {!hitlLoading && hitlCases.length > 0 && (
+                    <div className="space-y-2">
+                      {hitlCases.map((c: any) => {
+                        const sig = storedCaseSignal(c);
+                        return (
+                          <div
+                            key={c.id}
+                            className="rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 p-3 flex items-start gap-3"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                                <span className="text-sm font-medium text-gray-900 dark:text-white truncate">{c.filename}</span>
+                                {sig.length > 0 ? (
+                                  <Badge className="bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20 rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap">
+                                    signal: {sig.join(', ')}
+                                  </Badge>
+                                ) : (
+                                  <Badge className="bg-muted text-muted-foreground border-border rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap">
+                                    legacy note
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-500 dark:text-slate-400">
+                                Producer: {(c.metadata as any)?.producer || 'Unknown'}
+                                {c.adminFeedback ? ` · “${String(c.adminFeedback).substring(0, 160)}”` : ''}
+                              </p>
+                              <p className="text-[11px] text-gray-400 dark:text-slate-500 mt-0.5">
+                                Flagged {c.adminReviewedAt ? new Date(c.adminReviewedAt).toLocaleString() : 'date unknown'}
+                              </p>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => deleteHitlCase(c.id, c.filename)}
+                              title="Remove case from knowledge"
+                              className="w-7 h-7 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 shrink-0"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </CardContent>
@@ -4194,25 +4351,32 @@ export default function SimpleAdmin() {
                 <h4 className="text-sm font-medium text-gray-500 dark:text-slate-400 mb-2">Analysis Details</h4>
                 <div className="space-y-2">
                   {selectedLog.analysisDetails?.checks?.map((check: any, idx: number) => (
-                    <div 
-                      key={idx} 
+                    <div
+                      key={idx}
                       className={`p-2 rounded text-sm ${
-                        check.passed 
-                          ? 'bg-green-500/10 border border-green-500/30' 
-                          : check.severity === 'critical' 
-                            ? 'bg-red-500/10 border border-red-500/30'
-                            : 'bg-yellow-500/10 border border-yellow-500/30'
+                        check.passed
+                          ? 'bg-green-500/10 border border-green-500/30'
+                          : check.kind === 'advisory'
+                            ? 'bg-blue-500/10 border border-blue-500/30'
+                            : check.severity === 'critical'
+                              ? 'bg-red-500/10 border border-red-500/30'
+                              : 'bg-yellow-500/10 border border-yellow-500/30'
                       }`}
                     >
                       <div className="flex items-center gap-2">
                         {check.passed ? (
                           <CheckCircle className="w-4 h-4 text-green-400" />
+                        ) : check.kind === 'advisory' ? (
+                          <Info className="w-4 h-4 text-blue-400" />
                         ) : check.severity === 'critical' ? (
                           <XCircle className="w-4 h-4 text-red-400" />
                         ) : (
                           <AlertTriangle className="w-4 h-4 text-yellow-400" />
                         )}
                         <span className="text-gray-700 dark:text-slate-200 font-medium">{check.name}</span>
+                        {check.kind === 'advisory' && (
+                          <span className="text-[10px] uppercase tracking-wider text-blue-400 font-semibold">note</span>
+                        )}
                       </div>
                       <p className="text-gray-500 dark:text-slate-400 mt-1 ml-6">{check.message}</p>
                     </div>

@@ -504,6 +504,8 @@ export function deriveAiAnnotations(checks?: any[]): AiAnnotations {
   for (const check of checks) {
     if (check.passed) continue; // only flag failed checks
 
+    // Advisory notes never become field flags — they are context, not findings.
+    if (check.kind === 'advisory') continue;
     const name = (check.name || '').toLowerCase();
     const severity: FieldAnnotation['severity'] =
       check.severity === 'critical' ? 'critical' :

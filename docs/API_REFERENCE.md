@@ -833,8 +833,8 @@ Lists all admin-uploaded trusted COS patterns.
 
 ### `POST /api/admin/trusted-patterns`
 Uploads a genuine COS document as a forensic-validated trusted reference.
-The server computes `SHA-256` over the exact bytes and runs all six
-`COSAuthenticityChecker` checks. Only `GENUINE` uploads are stored with
+The server computes `SHA-256` over the exact bytes and runs the strict SMS
+17-gate (`COSAuthenticityChecker`: checks 1–17 in order). Only `GENUINE` uploads are stored with
 `patterns = { trustType: 'admin_reference', documentHash, forensicVersion,
 trustStatus: 'VALIDATED', validatedAt }`.
 

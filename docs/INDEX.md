@@ -56,7 +56,7 @@ Phase 5: generateHeadline() + monitor_job_runs audit
 | `server/utils/sponsorSearch.ts` | In-memory Fuse.js search index |
 | `server/utils/sponsorListFetcher.ts` | gov.uk CSV URL discovery + DTO types (SponsorChange, ChangeType) |
 | `server/services/pdfAnalyzer.ts` | PDF forensic analysis engine |
-| `server/services/cosAuthenticityChecker.ts` | COS Check Metadata Inspector — 6-point authenticity verification |
+| `server/services/cosAuthenticityChecker.ts` | COS Check Metadata Inspector — strict SMS 17-gate (checks 1–17, exact FOP 2.3, instant timestamp equality) |
 | `server/services/aiService.ts` | AI provider abstraction + fallback chain |
 | `server/utils/tierConfig.ts` | Subscription tier feature gates |
 | `server/db.ts` | Neon PostgreSQL pool + Drizzle ORM |

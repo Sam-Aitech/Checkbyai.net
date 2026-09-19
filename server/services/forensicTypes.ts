@@ -204,6 +204,18 @@ export function emptyStructuralFeatures(): StructuralFeatures {
   };
 }
 
+/**
+ * Coarse producer family: FOP versions collapse (mirrors the champion's
+ * family rule); anything else is exact lowercase. Used to scope admin-note
+ * relevance — never as a forensic verdict input.
+ */
+export function producerFamily(producer: unknown): string {
+  const norm = (typeof producer === 'string' ? producer : '').toLowerCase().trim();
+  if (!norm) return 'unknown';
+  if (norm.includes('apache') && norm.includes('fop')) return 'apache-fop';
+  return norm;
+}
+
 /** Map the lowercase pattern-layer result to the evidence-layer verdict. */
 export function toEvidenceVerdict(
   patternResult: 'genuine' | 'suspicious' | 'fake',

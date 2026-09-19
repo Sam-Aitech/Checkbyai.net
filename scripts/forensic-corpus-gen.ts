@@ -54,12 +54,12 @@ interface SeedDef {
 
 const SEEDS: SeedDef[] = [
   {
-    seedId: 'seed-fop-v29-container',
+    seedId: 'seed-fop-v23-container',
     build: () => genuinePdfBinary(FOP_XMP_WITH_CONTAINERS),
     description: 'Apache FOP 2.9, DC values in RDF containers (canonical genuine shape)',
   },
   {
-    seedId: 'seed-fop-v29-plain',
+    seedId: 'seed-fop-v23-plain',
     build: () => genuinePdfBinary(FOP_XMP_PLAIN),
     description: 'Apache FOP 2.9, DC values as bare text nodes (alternate config)',
   },

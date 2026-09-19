@@ -38,24 +38,24 @@ measure which signals survive (Phase 2 robustness matrix).
 | 2 | xmp-field-drop | remove 1 of the 8 required XMP fields | XMP presence |
 | 3 | xmp-order-shuffle | reorder XMP tags | XMP order |
 | 4 | xmp-rebuild | strip + re-emit XMP with same values | order/container regex, history |
-| 5 | info-producer-spoof | Producer/Creator → `Apache FOP` | producer checks (false negative intended) |
-| 6 | tool-spoof | Producer → iLovePDF/Canva/Word etc. | editing-tool fingerprint |
-| 7 | date-skew | ModDate +N days / Mod<Create | date consistency |
-| 8 | history-inject | append xmpMM:History entry (editor agent) | history check |
-| 9 | xref-rebuild | re-emit xref/startxref (same content) | startxref count |
-| 10 | incremental-append | append incremental section | incremental-updates |
-| 11 | linearize-toggle | add/strip `/Linearized` | linearized baseline |
+| 5 | info-producer-spoof | FOP 2.3 → FOP 2.9, applied consistently | exact-2.3 identity (checks 4/5/14/16) |
+| 6 | tool-spoof | Producer → iLovePDF/Canva/Smallpdf | exact-2.3 identity |
+| 7 | date-skew | ModDate +36d, CreationDate fixed | pattern-layer date warning (single → stays genuine) |
+| 8 | history-inject | append xmpMM:History entry (Photoshop agent) | pattern history rule (combiner still overrides → genuine) |
+| 9 | xref-rebuild | insert standalone xref section | xrefSectionCount (structural; gate-blind) |
+| 10 | incremental-append | append incremental section + Prev chain | nothing in the strict 17-gate (GENUINE by design; Prev chain recorded structurally) |
+| 11 | linearize-toggle | add/strip `/Linearized` | isLinearized flip only (inserted after the %PDF- header so check 1 stays intact) |
 | 12 | metadata-strip | remove Info + XMP entirely | presence checks → SUSPICIOUS |
 | 13 | print-to-pdf | re-export (loses XMP containers) | containers, order, fonts |
 | 14 | image-only-rebuild | rasterize + re-embed (no text ops) | BT/ET counts, wordcount, entropy |
 
-Operators 5, 9, 10, 11 are the **red-team core**: combined they simulate an
-attacker who read the 6-check logic and cloned all string-level signals.
-The question Phase 1 answers is whether `feature-schema-v1` structural
-signals (`xrefSectionCount`, `hasPrevChain`, `objectCountEstimate`,
-`streamCount`, `streamLengthMismatchCount`, `hasUnembeddedFont`,
-`textBlockCount`/`textOperatorCount`, entropy) still discriminate when all
-strings are cloned.
+Seeds mirror the SMS profile since the 17-gate rebuild (FOP 2.3, `x-unknown`,
+coherent 2025-07-08 instant, 2 pages, Helvetica, ~576 words / ~3816 chars —
+mid-band for checks 8–9). The question Phase 1 answers is whether
+`feature-schema-v1` structural signals (`xrefSectionCount`, `hasPrevChain`,
+`objectCountEstimate`, `streamCount`, `streamLengthMismatchCount`,
+`hasUnembeddedFont`, `textBlockCount`/`textOperatorCount`, entropy) still
+discriminate when all strings are cloned.
 
 ## 3. Phase 1 experiment (the only one that matters now)
 
@@ -95,24 +95,27 @@ quarantine never read).
 | Group | Genuine | Suspicious | Fake |
 |-------|---------|------------|------|
 | genuine (3) | 3 | 0 | 0 |
-| synthetic (42) | 14 | 27 | 1 |
+| synthetic (42) | 15 | 26 | 1 |
 | redteam (12) | **12 (bypass rate 1.0)** | 0 | 0 |
 
-Latency: p50 4ms, p95 7ms. Key surprises (expected → actual):
+Latency: p50 4ms, p95 10ms. Key surprises (expected → actual):
 
 - `date-skew` → genuine: a single -20 warning (confidence 80) is not enough
   to reach `suspicious` — documents weak-single-warning behaviour.
 - `history-inject` (Photoshop agent) → genuine: the pattern layer says fake,
-  but the combiner trusts a GENUINE six-check over it — combiner override
+  but the combiner trusts a GENUINE gate over it — combiner override
   behaviour now measured, not assumed.
-- `linearize-toggle` on the linearized seed → suspicious: stripping the
-  `/Linearized` header while leaving 2x `startxref` correctly reads as a
-  re-save. The gate is smarter here than the operator author assumed.
+- `incremental-append` → genuine (was EDITED under the retired 6-check
+  gate): the strict 17-gate does not judge revisions — all profile strings
+  intact. The Prev chain + object graft remain recorded structurally.
+- `linearize-toggle` both directions → genuine: the add direction inserts
+  after the `%PDF-` header (a prepend-before-magic variant correctly fails
+  check 1 — the operator was fixed to test the flag, not file corruption).
 - All four red-team operators (`rt-content-swap`, `rt-hidden-object`,
   `rt-date-clone`, `rt-deep-backdate`) pass the gate while changing content,
   object count, and dates respectively — including a backdate to 1999, before
-  XMP and PDF 1.4 existed. `rt-hidden-object` moves `objectCountEstimate` +1
-  while the gate stays GENUINE — first proof that a structural signal sees
+  XMP and PDF 1.4 existed. `rt-hidden-object` moves `objectCountEstimate`
+  7→8 while the gate stays GENUINE — proof that a structural signal sees
   what strings miss.
 
 Promotion bar for any challenger (unchanged): cut red-team bypass by ≥50%
@@ -149,8 +152,9 @@ Red-team movement exhibit (structural fields moved per attack, all 3 seeds):
 | Attack | Scored signals moved | Only volatile moved |
 |--------|---------------------|---------------------|
 | `rt-content-swap` (Title altered) | none | fileSize, entropy |
-| `rt-hidden-object` (grafted obj 99) | **objectCountEstimate 1→2** | fileSize |
-| `rt-date-clone` (consistent backdate) | none | entropy only |
+| `rt-hidden-object` (grafted obj 99) | **objectCountEstimate 7→8** | fileSize |
+| `rt-date-clone` (consistent backdate) | none | nothing measurable (same-length swap, entropy unchanged at 2dp) |
+| `rt-deep-backdate` (1999 backdate) | none | nothing measurable |
 
 So: the graft is already caught structurally (`objectCountEstimate`), while
 content-swap and consistent backdating move nothing scored — the precise,
@@ -171,7 +175,7 @@ which is **shadow-only and must never be imported from served-verdict paths**.
 |------------|-----------|--------|
 | Exp A (near-reference binding) | Content fields (title/author/subject) + object inventory must agree with a same-generator trusted reference; divergence downgrades genuine→suspicious | Champion bypass 12/12 → challenger 3/12 (**75% cut**), 0 genuine regressions |
 | Exp B (generation invariants) | `generation-invariants.json` (PDF spec years, XMP 2001); impossible dates condemn | `rt-deep-backdate` (1999) → fake on all seeds; plausible 2025 backdate still passes (documented residual blindness) |
-| Exp C (text-opcode profile) | `textBlockCount`/`textOperatorCount` distribution over corpus | **BLOCKED**: all cases 0/0 — stand-in seeds carry no text streams; requires real captures |
+| Exp C (text-opcode profile) | `textBlockCount`/`textOperatorCount` distribution over corpus | **UNBLOCKED by seed enrichment**: genuine seeds read 2 blocks / 38 ops vs image-only 0/0 — opcode-divergence analysis can now proceed on real captures |
 
 Per-attack challenger outcomes (all 3 seeds identical): `rt-content-swap` →
 suspicious (content), `rt-hidden-object` → suspicious (structural),
@@ -188,7 +192,32 @@ improvement in guidance quality, but subtle consistent forgeries remain
 detectable only through trusted provenance — and no technical invention
 separable from that has yet been demonstrated for the patent attorney.
 
-## 9. Evidence bundle contract
+## 9. SMS generation profile (ground truth, 2026-09-19)
+
+Source: admin-supplied SMS audit brief + trusted-pattern editor screenshots.
+The served gate (`COSAuthenticityChecker`) implements exactly these 17 checks
+in this order; anything else (revision topology, tool lists, fuzzy versions)
+was retired from the gate and lives in the evidence layer or not at all.
+
+- Format `Pdf` / `application/pdf` / header `1.4` (checks 1–3).
+- Creator = Producer = `Apache FOP Version 2.3` exactly; valid CreationDate (4–6).
+- 2 pages; 300–700 words; 3500–6000 chars; zero text = fail (7–9, soft otherwise).
+- XMP in order: `dc:date` (UTC ISO-8601) / `dc:format` / `dc:language=x-unknown` /
+  `pdf:PDFVersion=1.4` / `pdf:Producer=2.3` / `xmp:CreateDate≡CreationDate` /
+  `xmp:CreatorTool=2.3` / `xmp:MetadataDate≡xmp:CreateDate`, instant-compared
+  to the second, timezone-aware (10–17). `MetadataDate > CreateDate` = alteration.
+- Missing XMP block fails 10–17 outright.
+
+OPEN QUESTION (needs the real CoS bytes): the screenshot pair shows Info
+`20:59:56` against XMP `21:59:56Z`. If the Info value carries `+01'00'`, that
+instant is 19:59:56Z — NOT equal to the XMP instant, and check 15 would fail
+a genuine document. Candidates: (a) the UI displays wall-time without the
+offset and the true bytes cohere; (b) FOP writes inconsistent zone
+representations (itself a generator fingerprint worth recording). When the
+real CoS is tested, a check-15 failure decides it: pull the raw Info bytes
+before touching the gate.
+
+## 10. Evidence bundle contract
 
 Every verification persists `analysisDetails.forensicEvidence`:
 

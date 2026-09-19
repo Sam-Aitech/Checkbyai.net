@@ -17,6 +17,11 @@
  */
 
 import type { PDFMetadata } from './pdfAnalyzer';
+import { producerFamily } from './forensicTypes';
+
+// Re-exported for existing importers; canonical home is forensicTypes.ts
+// (production-safe — this module itself stays shadow-only).
+export { producerFamily };
 
 export interface GenerationInvariants {
   version: string;
@@ -69,14 +74,6 @@ export function checkAnachronism(
   }
 
   return { anachronistic: reasons.length > 0, reasons };
-}
-
-/** Coarse producer family: FOP versions collapse (mirrors the champion rule); else exact lowercase. */
-export function producerFamily(producer: unknown): string {
-  const norm = (typeof producer === 'string' ? producer : '').toLowerCase().trim();
-  if (!norm) return 'unknown';
-  if (norm.includes('apache') && norm.includes('fop')) return 'apache-fop';
-  return norm;
 }
 
 export interface ContentDivergence {

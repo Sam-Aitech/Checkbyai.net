@@ -18,7 +18,7 @@ interface Verification {
   id: number; receiptId: string | null; documentHash: string | null;
   filename: string; result: "genuine" | "suspicious" | "fake";
   confidence: number; verifiedAt: string; adminStatus: string;
-  checks: Array<{ name: string; passed: boolean; severity: string; message: string }>;
+  checks: Array<{ name: string; passed: boolean; severity: string; message: string; kind?: 'forensic' | 'advisory' }>;
 }
 
 const fmtShort = (s: string) => { const d = new Date(s); return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" }) + " · " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }); };
@@ -135,7 +135,7 @@ function HistoryContent() {
                                     <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                       {ch.passed ? <CheckCircle2 style={{ width: 13, height: 13, color: T.emerald, flexShrink: 0 }} /> : <XCircle style={{ width: 13, height: 13, color: T.red, flexShrink: 0 }} />}
                                       <span style={{ fontSize: 13, color: ch.passed ? T.sub : T.text, fontWeight: ch.passed ? 400 : 500 }}>{ch.name}</span>
-                                      {!ch.passed && <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 700, color: ch.severity === "critical" ? T.red : ch.severity === "warning" ? T.amber : T.cyan, textTransform: "uppercase" }}>{ch.severity}</span>}
+                                      {!ch.passed && <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 700, color: ch.kind === "advisory" ? T.cyan : ch.severity === "critical" ? T.red : ch.severity === "warning" ? T.amber : T.cyan, textTransform: "uppercase" }}>{ch.kind === "advisory" ? "note" : ch.severity}</span>}
                                     </div>
                                   ))}
                                 </div>

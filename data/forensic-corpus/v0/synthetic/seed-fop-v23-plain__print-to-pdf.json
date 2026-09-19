@@ -1,0 +1,16 @@
+{
+  "group": "synthetic",
+  "seedId": "seed-fop-v23-plain",
+  "seedSha256": "2e045c80af13cbd0df8d6f4dee1e884d3b174604952bded658cb3720256392ca",
+  "operator": "print-to-pdf",
+  "tactic": "Print pipeline — OS driver regenerates the file.",
+  "expectedGate": "EDITED",
+  "subSeed": 680618133,
+  "operatorParams": {
+    "producer": "Microsoft Print to PDF",
+    "xmpStripped": true
+  },
+  "sha256": "5ed8ed61afca479788e532c55b05fe403d25b0579c83ac6d89e93aec3a7533cb",
+  "generator": "corpus-gen-v1",
+  "masterSeed": 42
+}

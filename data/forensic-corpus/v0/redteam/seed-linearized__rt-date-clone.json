@@ -1,7 +1,7 @@
 {
   "group": "redteam",
   "seedId": "seed-linearized",
-  "seedSha256": "104145808b6594a4f687bf8a172e659d98b99b03c0c5874d1a3c392c4781bb01",
+  "seedSha256": "a9abce7ab5b6ff0525beb6911fa918c753e311249d7cc2cb066c1b57ced11fa3",
   "operator": "rt-date-clone",
   "tactic": "Consistent backdating — every date agrees, all in the past.",
   "expectedGate": "GENUINE",
@@ -9,7 +9,7 @@
   "operatorParams": {
     "backdatedTo": "2025-01-15"
   },
-  "sha256": "ce12bfbf8fda75f6b37a46928b7ed85b457f6be0395a2164f5b16bc7a2c03309",
+  "sha256": "f6d5edcc9bbe39534a366f67dcc777502c8744df23d5dc40e6c9747e9cd6f867",
   "generator": "corpus-gen-v1",
   "masterSeed": 42
 }

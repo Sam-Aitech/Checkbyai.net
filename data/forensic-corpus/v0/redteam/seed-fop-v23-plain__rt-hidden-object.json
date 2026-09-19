@@ -1,0 +1,15 @@
+{
+  "group": "redteam",
+  "seedId": "seed-fop-v23-plain",
+  "seedSha256": "2e045c80af13cbd0df8d6f4dee1e884d3b174604952bded658cb3720256392ca",
+  "operator": "rt-hidden-object",
+  "tactic": "Object graft — body grows with no new revision marker.",
+  "expectedGate": "GENUINE",
+  "subSeed": 1627147476,
+  "operatorParams": {
+    "graftedObject": 99
+  },
+  "sha256": "f4f2474f4f8f6029463d892e6a1c7c34b8cbe82df4df92e7e98923a9c35c9d0f",
+  "generator": "corpus-gen-v1",
+  "masterSeed": 42
+}

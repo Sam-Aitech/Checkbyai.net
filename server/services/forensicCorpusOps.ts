@@ -144,11 +144,11 @@ const xmpValueSwap: ForensicOperator = {
   tactic: 'Selective metadata edit — forger changes one XMP timestamp.',
   expectedGate: 'EDITED',
   apply(binary) {
-    const needle = '<xmp:CreateDate>2026-08-10T10:15:00Z</xmp:CreateDate>';
+    const needle = '<xmp:CreateDate>2025-07-08T21:59:56Z</xmp:CreateDate>';
     if (!binary.includes(needle)) return skip(binary, 'xmp:CreateDate tag not found');
     return ok(
-      replaceFirst(binary, needle, '<xmp:CreateDate>2025-01-15T10:15:00Z</xmp:CreateDate>'),
-      { field: 'xmp:CreateDate', from: '2026-08-10T10:15:00Z', to: '2025-01-15T10:15:00Z' },
+      replaceFirst(binary, needle, '<xmp:CreateDate>2025-01-15T21:59:56Z</xmp:CreateDate>'),
+      { field: 'xmp:CreateDate', from: '2025-07-08T21:59:56Z', to: '2025-01-15T21:59:56Z' },
     );
   },
 };
@@ -222,14 +222,14 @@ const xmpRebuild: ForensicOperator = {
 
 const infoProducerSpoof: ForensicOperator = {
   opId: 'info-producer-spoof',
-  title: 'FOP 2.9 → FOP 2.3, applied consistently',
-  tactic: 'Version drift / consistent spoof — strings agree with each other.',
-  expectedGate: 'GENUINE',
+  title: 'FOP 2.3 → FOP 2.9, applied consistently',
+  tactic: 'Version drift — all strings agree with each other, but the SMS profile pins 2.3 exactly.',
+  expectedGate: 'EDITED',
   apply(binary) {
-    if (!binary.includes('Apache FOP Version 2.9')) return skip(binary, 'FOP 2.9 marker not found');
-    return ok(binary.split('Apache FOP Version 2.9').join('Apache FOP Version 2.3'), {
-      from: 'Apache FOP Version 2.9',
-      to: 'Apache FOP Version 2.3',
+    if (!binary.includes('Apache FOP Version 2.3')) return skip(binary, 'FOP 2.3 marker not found');
+    return ok(binary.split('Apache FOP Version 2.3').join('Apache FOP Version 2.9'), {
+      from: 'Apache FOP Version 2.3',
+      to: 'Apache FOP Version 2.9',
     });
   },
 };
@@ -242,9 +242,9 @@ const toolSpoof: ForensicOperator = {
   tactic: 'Naive forgery — re-exported through a consumer tool.',
   expectedGate: 'EDITED',
   apply(binary, rng) {
-    if (!binary.includes('Apache FOP Version 2.9')) return skip(binary, 'FOP 2.9 marker not found');
+    if (!binary.includes('Apache FOP Version 2.3')) return skip(binary, 'FOP 2.3 marker not found');
     const tool = rng.pick(TOOL_SPOOF_CANDIDATES);
-    return ok(binary.split('Apache FOP Version 2.9').join(tool), { tool });
+    return ok(binary.split('Apache FOP Version 2.3').join(tool), { tool });
   },
 };
 
@@ -254,11 +254,11 @@ const dateSkew: ForensicOperator = {
   tactic: 'Backdate/forward-date — only the modification stamp moves.',
   expectedGate: 'NON-GENUINE',
   apply(binary) {
-    if (!binary.includes('D:20260810101500Z')) return skip(binary, 'expected ModDate not found');
+    if (!binary.includes('D:20250708215956Z')) return skip(binary, 'expected ModDate not found');
     // Move only the LAST occurrence (ModDate), leaving CreationDate fixed.
-    return ok(replaceLast(binary, 'D:20260810101500Z', 'D:20260915101500Z'), {
-      from: 'D:20260810101500Z',
-      to: 'D:20260915101500Z',
+    return ok(replaceLast(binary, 'D:20250708215956Z', 'D:20250813215956Z'), {
+      from: 'D:20250708215956Z',
+      to: 'D:20250813215956Z',
       skewDays: 36,
     });
   },
@@ -298,11 +298,14 @@ const xrefRebuild: ForensicOperator = {
 const incrementalAppend: ForensicOperator = {
   opId: 'incremental-append',
   title: 'Append genuine incremental update section',
-  tactic: 'Re-save — new revision appended with Prev chain.',
-  expectedGate: 'EDITED',
+  tactic:
+    'Re-save — new revision appended with Prev chain. The strict SMS 17-gate ' +
+    'does not judge revisions (all 17 profile strings intact → GENUINE); the ' +
+    'Prev chain + object graft remain recorded in the structural evidence layer.',
+  expectedGate: 'GENUINE',
   apply(binary) {
     return ok(
-      binary + '5 0 obj\n<< /Changed true >>\nendobj\ntrailer\n<< /Prev 84100 >>\nstartxref\n90500\n%%EOF\n',
+      binary + '8 0 obj\n<< /Changed true >>\nendobj\ntrailer\n<< /Prev 84100 >>\nstartxref\n90500\n%%EOF\n',
       { prev: 84100 },
     );
   },
@@ -319,9 +322,13 @@ const linearizeToggle: ForensicOperator = {
       if (toggled === binary) return skip(binary, 'linearization line not removable');
       return ok(toggled, { direction: 'strip' });
     }
-    return ok('<< /Linearized 1 /L 84210 /O 4 /E 12000 /N 2 /T 84000 >>\n' + binary, {
-      direction: 'add',
-    });
+    // Insert AFTER the %PDF- header line: prepending before the magic would
+    // corrupt check 1 (%PDF- must lead the file) and test the wrong thing.
+    if (!binary.startsWith('%PDF-1.4\n')) return skip(binary, 'no %PDF-1.4 header line');
+    return ok(
+      binary.replace('%PDF-1.4\n', '%PDF-1.4\n<< /Linearized 1 /L 84210 /O 4 /E 12000 /N 2 /T 84000 >>\n'),
+      { direction: 'add' },
+    );
   },
 };
 
@@ -344,8 +351,8 @@ const printToPdf: ForensicOperator = {
   expectedGate: 'EDITED',
   apply(binary) {
     let out = binary;
-    if (out.includes('Apache FOP Version 2.9')) {
-      out = out.split('Apache FOP Version 2.9').join('Microsoft Print to PDF');
+    if (out.includes('Apache FOP Version 2.3')) {
+      out = out.split('Apache FOP Version 2.3').join('Microsoft Print to PDF');
     } else if (!out.includes('Microsoft Print to PDF')) {
       return skip(binary, 'no producer marker to replace');
     }
@@ -432,10 +439,10 @@ const rtDateClone: ForensicOperator = {
   tactic: 'Consistent backdating — every date agrees, all in the past.',
   expectedGate: 'GENUINE',
   apply(binary) {
-    if (!binary.includes('20260810101500Z') && !binary.includes('2026-08-10T10:15:00Z')) {
+    if (!binary.includes('20250708215956Z') && !binary.includes('2025-07-08T21:59:56Z')) {
       return skip(binary, 'expected date markers not found');
     }
-    const out = binary.split('20260810101500Z').join('20250115101500Z').split('2026-08-10T10:15:00Z').join('2025-01-15T10:15:00Z');
+    const out = binary.split('20250708215956Z').join('20250115215956Z').split('2025-07-08T21:59:56Z').join('2025-01-15T21:59:56Z');
     if (out === binary) return skip(binary, 'no date markers replaced');
     return ok(out, { backdatedTo: '2025-01-15' });
   },
@@ -465,14 +472,14 @@ const rtDeepBackdate: ForensicOperator = {
     'Impossible backdating — every date agrees, but the claimed year predates both the XMP spec (2001) and PDF 1.4 (2001). Champion-blind by design; the anachronism challenger should catch it.',
   expectedGate: 'GENUINE',
   apply(binary) {
-    if (!binary.includes('20260810101500Z') && !binary.includes('2026-08-10T10:15:00Z')) {
+    if (!binary.includes('20250708215956Z') && !binary.includes('2025-07-08T21:59:56Z')) {
       return skip(binary, 'expected date markers not found');
     }
     const out = binary
-      .split('20260810101500Z')
-      .join('19990115101500Z')
-      .split('2026-08-10T10:15:00Z')
-      .join('1999-01-15T10:15:00Z');
+      .split('20250708215956Z')
+      .join('19990115215956Z')
+      .split('2025-07-08T21:59:56Z')
+      .join('1999-01-15T21:59:56Z');
     if (out === binary) return skip(binary, 'no date markers replaced');
     return ok(out, { backdatedTo: '1999-01-15', impossible: 'pre-XMP, pre-PDF-1.4' });
   },

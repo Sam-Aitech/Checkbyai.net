@@ -1,15 +1,15 @@
 {
   "group": "synthetic",
   "seedId": "seed-linearized",
-  "seedSha256": "104145808b6594a4f687bf8a172e659d98b99b03c0c5874d1a3c392c4781bb01",
+  "seedSha256": "a9abce7ab5b6ff0525beb6911fa918c753e311249d7cc2cb066c1b57ced11fa3",
   "operator": "incremental-append",
-  "tactic": "Re-save — new revision appended with Prev chain.",
-  "expectedGate": "EDITED",
+  "tactic": "Re-save — new revision appended with Prev chain. The strict SMS 17-gate does not judge revisions (all 17 profile strings intact → GENUINE); the Prev chain + object graft remain recorded in the structural evidence layer.",
+  "expectedGate": "GENUINE",
   "subSeed": 3069688833,
   "operatorParams": {
     "prev": 84100
   },
-  "sha256": "9f16db56f0235bed5b021bdeb03288fc2ea9ec48b77a80edd1f7834611e0f26f",
+  "sha256": "057a1c767dd803885aa8f8e75b0cf364741b3e14ee51b348a6230a3705567eb1",
   "generator": "corpus-gen-v1",
   "masterSeed": 42
 }
