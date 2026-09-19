@@ -1,2 +1,3 @@
 - [Development preview framing](development-preview-framing.md) — keep production anti-framing headers strict, but do not emit them in Replit development Preview.
 - [Stripe customer migration](stripe-customer-migration.md) — changing Stripe account or mode invalidates stored customer IDs; checkout must recover missing/deleted customers.
+- [Deployment dependency gate](deployment-dependency-gate.md) — Replit publish scans the complete uv lock, including transitive Python packages.
