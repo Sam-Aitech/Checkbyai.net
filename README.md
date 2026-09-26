@@ -5,7 +5,7 @@
 [![Live Demo](https://img.shields.io/badge/Live-Demo-green?style=flat-square)](https://checkbyai.net)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.5-blue)](https://www.typescriptlang.org/)
-[![Node.js](https://img.shields.io/badge/Node.js-20+-green)](https://nodejs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-22-green)](https://nodejs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14+-blue)](https://www.postgresql.org/)
 [![GitHub Issues](https://img.shields.io/github/issues/Sam-Aitech/Checkbyai.net)](https://github.com/Sam-Aitech/Checkbyai.net/issues)
 [![GitHub Stars](https://img.shields.io/github/stars/Sam-Aitech/Checkbyai.net)](https://github.com/Sam-Aitech/Checkbyai.net/stargazers)
@@ -74,10 +74,13 @@ for these tiers, not a shipped feature.
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js 20+
-- PostgreSQL 14+
-- Redis (optional — BullMQ job queue)
+- Node.js 22+ (see `.nvmrc`; Docker/CI pin 22)
+- PostgreSQL 14+ (16 in `docker-compose.yml`)
+- Redis — optional for local dev, **required in production** (job queue, rate
+  limiting, and shared cache degrade to per-process fallbacks without it)
 - Firecrawl API Key (optional)
+- Python 3.11 + [uv](https://docs.astral.sh/uv/) (optional — Python sidecar;
+  pinned by `.python-version`, see [docs/PYTHON_SIDECAR.md](docs/PYTHON_SIDECAR.md))
 - A POSIX shell (macOS/Linux, WSL, or Git Bash on Windows) — see [Windows](#windows) below
 
 ### Local Development
@@ -87,11 +90,11 @@ cd Checkbyai.net
 npm install
 cp .env.example .env
 # Fill in .env — DATABASE_URL, SESSION_SECRET, PHONE_ENCRYPTION_KEY, IP_HASH_SALT,
-# CHECKOUT_HMAC_SECRET and DIGEST_SIGNING_KEY are all required or the server exits on boot.
+# CHECKOUT_HMAC_SECRET, DIGEST_SIGNING_KEY and STRIPE_WEBHOOK_SECRET are required
+# in production or the server exits on boot. See docs/ENV_REFERENCE.md.
 
 npm run setup:binaries   # installs qsv + csvdiff into ./bin (required — see below)
-npm run db:push
-npm run db:migrate
+npm run db:migrate       # fresh DB: applies 0000 + 0024_catchup (see migrations/README.md)
 npm run dev
 ```
 
@@ -115,6 +118,21 @@ powershell -ExecutionPolicy Bypass -File scripts/setup-binaries.ps1
 
 You will still need Git Bash or WSL for `npm run dev` / `npm run start`, or set `NODE_ENV`
 in your shell beforehand and invoke `tsx server/index.ts` directly.
+
+### Testing
+
+```bash
+npm run lint          # ESLint + CSS validation
+npm run check         # TypeScript type check
+npx vitest run        # unit/integration suite (or npm run test:run)
+
+# Python sidecar (optional; requires Python 3.11 + uv)
+uv sync
+uv run --with pytest pytest
+```
+
+CI runs all of the above on every PR (`.github/workflows/ci.yml`), including
+the sidecar tests and `audit-ci` for high/critical advisories.
 
 ---
 
@@ -154,12 +172,19 @@ Checkbyai.net/
 
 ## 📄 Documentation
 
+Start at **[docs/INDEX.md](docs/INDEX.md)** — the full documentation index.
+
 | Doc | Description |
 |---|---|
-| **DEVELOPMENT.md** | Local setup, architecture, running tests |
-| **DEPLOYMENT.md** | Production deployment and scaling guide |
-| **API_REFERENCE.md** | API endpoints, schemas, and examples |
-| **SYSTEM_DESIGN.md** | Architecture and component design |
+| **[DEVELOPMENT.md](DEVELOPMENT.md)** | Local setup, architecture, running tests |
+| **[DEPLOYMENT.md](DEPLOYMENT.md)** | Production deployment and scaling guide |
+| **[docs/ENV_REFERENCE.md](docs/ENV_REFERENCE.md)** | Every environment variable, required vs optional |
+| **[docs/API_REFERENCE.md](docs/API_REFERENCE.md)** | API endpoints, schemas, and examples |
+| **[docs/SYSTEM_DESIGN.md](docs/SYSTEM_DESIGN.md)** | Architecture and component design |
+| **[docs/ARCHITECTURE_DECISIONS.md](docs/ARCHITECTURE_DECISIONS.md)** | ADRs — why the architecture looks this way |
+| **[docs/RUNBOOK.md](docs/RUNBOOK.md)** | Ops runbooks (nightly ETL, queues, incidents) |
+| **[CONTRIBUTING.md](CONTRIBUTING.md)** | Branching, PR checklist, style |
+| **[SECURITY.md](SECURITY.md)** | Vulnerability reporting policy |
 
 ---
 

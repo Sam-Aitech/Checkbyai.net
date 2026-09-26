@@ -45,7 +45,7 @@ GitHub Actions (00:35 UTC, Mon–Fri) → POST /api/ops/cron-ping  → Server
 
 ## Prerequisites
 
-- **Node.js** 20+
+- **Node.js** 22+ (`.nvmrc`, Dockerfile, and CI all pin 22)
 - **PostgreSQL** 14+ (Neon recommended)
 - **Redis** 7+ (optional — for BullMQ job queue)
 - Domain with SSL (Cloudflare recommended)
@@ -61,25 +61,46 @@ All required variables must be set before the server starts. **The server will e
 
 ### Required
 
+These are the exact fail-fast checks in `server/index.ts` (`REQUIRED_ENV_VARS`).
+The server exits at boot in production if any is missing.
+
 ```env
 # Database
 DATABASE_URL=postgresql://user:pass@host/dbname?sslmode=require
 
-# Security keys — generate each with: openssl rand -hex 64
-SESSION_SECRET=<64-char hex>
-PHONE_ENCRYPTION_KEY=<32-char hex>
-IP_HASH_SALT=<16-char hex>
-CHECKOUT_HMAC_SECRET=<32-char hex>
-DIGEST_SIGNING_KEY=<32-char hex>
+# Security keys — sizes are enforced (phoneCrypto.ts validates byte length).
+# Generate each with the matching command:
+SESSION_SECRET=<64-char hex>       # openssl rand -hex 64
+PHONE_ENCRYPTION_KEY=<64-char hex> # openssl rand -hex 32  (32 bytes = 64 hex chars)
+IP_HASH_SALT=<32-char hex>         # openssl rand -hex 16  (16 bytes = 32 hex chars)
+CHECKOUT_HMAC_SECRET=<64-char hex> # openssl rand -hex 32
+DIGEST_SIGNING_KEY=<64-char hex>   # openssl rand -hex 32
 
 # Stripe
 STRIPE_SECRET_KEY=sk_live_...
 STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PUBLISHABLE_KEY=pk_live_...  # REQUIRED on non-Replit hosts — GET /api/stripe/publishable-key 500s without it
 
-# Admin
-ADMIN_EMAIL=admin@yourdomain.com
 NODE_ENV=production
 APP_URL=https://checkbyai.net
+```
+
+### Strongly recommended (production)
+
+```env
+# Shared rate limits / job queue / cache — without Redis, queues run inline on
+# the web process and per-replica rate limits multiply (see .env.example).
+REDIS_HOST=...
+REDIS_PORT=6379
+REDIS_PASSWORD=...
+
+# Bot protection — CAPTCHA is silently skipped without this key.
+TURNSTILE_SECRET_KEY=...
+
+# External cron trigger used by .github/workflows/sponsor-monitor-cron.yml.
+# Without CRON_SECRET the /api/ops endpoints disable themselves.
+CRON_SECRET=<hex>
+CRON_URL=https://yourdomain.com
 ```
 
 ### Recommended
@@ -138,10 +159,13 @@ Verify every required variable is set in your hosting environment before proceed
 ### Step 2: Run Database Migrations
 
 ```bash
-npm run db:push       # Sync schema to DB (safe to re-run)
-# or for production migration files:
-npm run db:migrate
+npm run db:migrate    # Applies journal migrations (0000 + 0024_catchup)
 ```
+
+> First run against a pre-existing production DB needs the `__drizzle_migrations`
+> seeding described in `migrations/README.md` (production was historically patched
+> by boot-time DDL instead). `npm run db:push` is dev/staging-only — it bypasses
+> migration history and must not be used against production.
 
 ### Step 3: Install Binary Dependencies
 
@@ -221,13 +245,20 @@ npm run start:with-migrate
 
 ```
 □ DATABASE_URL         ← Neon production connection string
-□ SESSION_SECRET       ← Unique per environment
+□ SESSION_SECRET       ← Unique per environment (openssl rand -hex 64)
 □ PHONE_ENCRYPTION_KEY ← Consistent across restarts (never change in prod)
+□ IP_HASH_SALT         ← openssl rand -hex 16
+□ CHECKOUT_HMAC_SECRET ← openssl rand -hex 32
+□ DIGEST_SIGNING_KEY   ← openssl rand -hex 32
 □ STRIPE_SECRET_KEY    ← Live key (not test)
 □ STRIPE_WEBHOOK_SECRET ← From Stripe dashboard webhook settings
+□ STRIPE_PUBLISHABLE_KEY ← Required on non-Replit hosts
 □ NODE_ENV=production
 □ APP_URL              ← https://checkbyai.net (no trailing slash)
-□ ADMIN_EMAIL          ← Your admin email
+□ REDIS_HOST/PORT/PASSWORD ← Rate limits + job queue (strongly recommended)
+□ TURNSTILE_SECRET_KEY ← CAPTCHA silently disabled without it
+□ CRON_SECRET          ← External cron trigger (disabled without it)
+□ ADMIN_EMAIL          ← Optional; initial-admin seeding only
 ```
 
 ---

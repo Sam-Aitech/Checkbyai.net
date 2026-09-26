@@ -16,7 +16,7 @@ import { registerOpsRoutes } from "./routes/ops";
 import { registerSponsorPageRoutes } from "./routes/sponsorPages";
 import { registerFeedbackRoutes } from "./routes/feedback";
 import { registerPushSubscriptionRoutes } from "./routes/pushSubscriptions";
-import { rebuildSponsorIndex } from "./utils/sponsorSearch";
+import { ensureIndexReady } from "./utils/sponsorSearch";
 import { startSponsorMonitorCron, checkAndTriggerIfNeeded } from "./utils/sponsorMonitorJob";
 import { startJobAlertScheduler } from "./utils/jobAlertJob";
 import { startEnrichmentCron } from "./utils/enrichmentWorker";
@@ -70,7 +70,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerPushSubscriptionRoutes(app);
   registerEnrichmentRoutes(app);
 
-  rebuildSponsorIndex().catch((err) => {
+  // Warm the Fuse.js index exactly once. ensureIndexReady() is single-flighted
+  // (rebuildPromise), so this is safe to call alongside the caller in
+  // server/index.ts and any first search request — 1 full-table scan, not 3.
+  ensureIndexReady().catch((err) => {
     logger.error({ err }, "[SponsorSearch] Failed to build initial index:");
   });
 

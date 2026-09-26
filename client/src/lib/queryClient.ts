@@ -1,5 +1,6 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { unwrapApiEnvelope } from "./apiEnvelope";
+import { STALE_TIMES } from "./queryDefaults";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -54,7 +55,11 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: Infinity,
+      // NORMAL (60s), not Infinity: a global Infinity means any query
+      // without its own staleTime serves forever-old data while mounted
+      // (remount-after-gcTime was the only refresh path). Queries that
+      // need longer set an explicit STALE_TIMES tier — see queryDefaults.ts.
+      staleTime: STALE_TIMES.NORMAL,
       gcTime: 120_000,
       retry: false,
     },

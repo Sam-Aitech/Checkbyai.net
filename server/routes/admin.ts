@@ -2134,7 +2134,7 @@ Format your response in clear, professional markdown.`;
 
   app.get('/api/knowledge-base', requireRole("admin"), async (req: any, res) => {
     try {
-      const limit = parseInt(req.query.limit as string) || 15;
+      const limit = Math.min(parseInt(req.query.limit as string) || 15, 100);
       const knowledge = await storage.getAdminFakeKnowledge(limit);
 
       let knowledgeContext = '';
@@ -2371,7 +2371,7 @@ Format your response in clear, professional markdown.`;
   app.get('/api/admin/verification-logs-hitl', requireRole("admin"), async (req: any, res) => {
     try {
       const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 20;
+      const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
       const adminStatus = req.query.adminStatus as string;
 
       const logs = await storage.getVerificationLogsWithHITL(page, limit, adminStatus);

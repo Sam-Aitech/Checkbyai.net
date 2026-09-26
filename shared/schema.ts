@@ -340,31 +340,11 @@ export const sponsorCanonical = pgTable(
 );
 
 /**
- * @deprecated sponsor_list is retired. No new rows are written as of 2026-03-20.
- * Superseded by: sponsorCanonical (per-company state) + csv_archive (daily CSV files on disk).
- * Schedule: DROP TABLE sponsor_list after 2026-04-20 (30-day holdback).
+ * sponsor_list was retired (no new rows since 2026-03-20), superseded by
+ * sponsorCanonical (per-company state) + csv_archive (daily CSV files).
+ * The table itself is dropped in migration 0030_drop_sponsor_list.sql.
+ * Its column shapes now live locally in server/utils/sponsorRowSchema.ts.
  */
-export const sponsorList = pgTable(
-  "sponsor_list",
-  {
-    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-    organisationName: varchar("organisation_name").notNull(),
-    organisationNameNormalized: varchar("organisation_name_normalized").notNull(),
-    townCity: varchar("town_city"),
-    county: varchar("county"),
-    typeRating: varchar("type_rating"),
-    route: varchar("route"),
-    fingerprint: text("fingerprint"),
-    snapshotDate: date("snapshot_date").notNull(),
-    createdAt: timestamp("created_at").defaultNow(),
-  },
-  (table) => [
-    uniqueIndex("idx_sponsor_list_org_snapshot").on(table.organisationNameNormalized, table.snapshotDate),
-    index("idx_sponsor_list_snapshot_date").on(table.snapshotDate),
-    index("idx_sponsor_list_org_name_normalized").on(table.organisationNameNormalized),
-    index("idx_sponsor_list_fingerprint").on(table.fingerprint),
-  ]
-);
 
 // Which companies each user is monitoring
 export const companyWatches = pgTable(
@@ -871,7 +851,6 @@ export type Feedback = typeof feedback.$inferSelect;
 export type PaidSubmission = typeof paidSubmissions.$inferSelect;
 export type ExpertRequest = typeof expertRequests.$inferSelect;
 export type SponsorCanonicalEntry = typeof sponsorCanonical.$inferSelect;
-export type SponsorListEntry = typeof sponsorList.$inferSelect;  // kept for admin snapshot routes
 export type CompanyWatch = typeof companyWatches.$inferSelect;
 export type SponsorChange = typeof sponsorChanges.$inferSelect;
 export type NotificationPreference = typeof notificationPreferences.$inferSelect;
@@ -924,12 +903,6 @@ export const insertExpertRequestSchema = createInsertSchema(expertRequests).omit
   updatedAt: true
 });
 export type InsertExpertRequest = z.infer<typeof insertExpertRequestSchema>;
-
-export const insertSponsorListSchema = createInsertSchema(sponsorList).omit({
-  id: true,
-  createdAt: true,
-});
-export type InsertSponsorListEntry = z.infer<typeof insertSponsorListSchema>;
 
 export const insertCompanyWatchSchema = createInsertSchema(companyWatches).omit({
   id: true,

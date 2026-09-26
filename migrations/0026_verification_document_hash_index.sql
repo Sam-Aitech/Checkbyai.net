@@ -1,1 +1,1 @@
-CREATE INDEX "idx_verification_document_hash" ON "verification_results" USING btree ("document_hash");
+CREATE INDEX IF NOT EXISTS "idx_verification_document_hash" ON "verification_results" USING btree ("document_hash");

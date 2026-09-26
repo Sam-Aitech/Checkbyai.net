@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Response } from "express";
 import { db } from "../db";
 import { sql, eq, inArray, desc, and } from "drizzle-orm";
 import { sponsorCanonical, sponsorChanges, sponsorEnrichment, dailyDigest, monitorJobRuns } from "@shared/schema";
@@ -43,6 +43,17 @@ export function toSlug(str: string): string {
 }
 
 const SITEMAP_PAGE_SIZE = 45_000;
+
+/** Await res.write backpressure so CSV chunks never buffer unboundedly. */
+function waitForDrain(res: Response): Promise<void> {
+  return new Promise((resolve) => res.once("drain", resolve));
+}
+
+// In-process memo of the serialized search-index envelope. The endpoint's
+// data is ~10MB; without this, every Redis *hit* still paid a full
+// JSON.stringify via success()/res.json on the event loop. Keyed by index
+// version — a rebuild bumps the version and replaces the memo.
+let serializedSearchIndex: { version: number; body: string } | null = null;
 
 export function registerSponsorPageRoutes(app: Express): void {
 
@@ -159,28 +170,32 @@ export function registerSponsorPageRoutes(app: Express): void {
       return;
     }
 
-    const entries = sponsors
-      .map((s) => {
-        const slug = toSlug(s.currentName);
-        return (
-          `  <url>\n` +
-          `    <loc>${base}/sponsor/${s.id}/${slug}</loc>\n` +
-          `    <lastmod>${s.lastSeen || today}</lastmod>\n` +
-          `    <changefreq>weekly</changefreq>\n` +
-          `    <priority>0.6</priority>\n` +
-          `  </url>`
-        );
-      })
-      .join("\n");
-
+    // Stream entries in batches instead of map().join(): the old approach
+    // materialised the entire ~45k-entry page as one 4MB+ string (plus a
+    // second copy in the template concat) before the first byte went out.
     res.set("Content-Type", "application/xml");
     res.set("Cache-Control", "public, max-age=43200");
-    res.send(
+    res.write(
       `<?xml version="1.0" encoding="UTF-8"?>\n` +
-      `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
-      `${entries}\n` +
-      `</urlset>`
+      `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`
     );
+
+    let batch = "";
+    sponsors.forEach((s, i) => {
+      const slug = toSlug(s.currentName);
+      batch +=
+        `  <url>\n` +
+        `    <loc>${base}/sponsor/${s.id}/${slug}</loc>\n` +
+        `    <lastmod>${s.lastSeen || today}</lastmod>\n` +
+        `    <changefreq>weekly</changefreq>\n` +
+        `    <priority>0.6</priority>\n` +
+        `  </url>\n`;
+      if ((i + 1) % 1_000 === 0) {
+        res.write(batch);
+        batch = "";
+      }
+    });
+    res.end(batch + `</urlset>`);
   }));
 
   // ── Client-side instant search index ────────────────────────────────────
@@ -188,25 +203,44 @@ export function registerSponsorPageRoutes(app: Express): void {
   // Backed by the same in-memory Fuse.js dataset — no extra DB query when warm.
   // The gzip compression middleware (level 6) reduces ~10MB → ~1.5MB in transit.
   // Cached 12hr in Redis + HTTP (CDN-friendly). Invalidated on nightly index rebuild.
-  app.get("/api/sponsors/search-index.json", asyncHandler(async (_req: any, res) => {
+  app.get("/api/sponsors/search-index.json", asyncHandler(async (req: any, res) => {
     const version = getIndexVersion();
-    const cacheKey = `sponsors:search-index-json:v${version}`;
-    const cached = await cacheGet<SearchIndexEntry[]>(cacheKey);
-    if (cached) {
-      res.set("Content-Type", "application/json");
-      res.set("Cache-Control", "public, max-age=300");
-      res.set("ETag", `"search-v${version}"`);
-      success(res, cached);
+    const etag = `"search-v${version}"`;
+
+    // ETag equals the index version, so a rebuild always busts the cache.
+    // Early 304 BEFORE any serialization: previously repeat visitors still
+    // paid JSON.stringify(~10MB) on the event loop even when the client
+    // already had the bytes (express only evaluates freshness inside res.send,
+    // after the body is built).
+    if (req.headers["if-none-match"] === etag) {
+      res.status(304).end();
       return;
     }
 
-    await ensureIndexReady();
-    const data = getIndexData();
-    await cacheSet(cacheKey, data, 300);
-    res.set("Content-Type", "application/json");
+    // Warm memo: serve the exact bytes of the last serialization.
+    if (serializedSearchIndex?.version === version) {
+      res.set("Content-Type", "application/json; charset=utf-8");
+      res.set("Cache-Control", "public, max-age=300");
+      res.set("ETag", etag);
+      res.send(serializedSearchIndex.body);
+      return;
+    }
+
+    const cacheKey = `sponsors:search-index-json:v${version}`;
+    let data = await cacheGet<SearchIndexEntry[]>(cacheKey);
+    if (!data) {
+      await ensureIndexReady();
+      data = getIndexData();
+      await cacheSet(cacheKey, data, 300);
+    }
+
+    const body = JSON.stringify({ success: true, data });
+    serializedSearchIndex = { version, body };
+
+    res.set("Content-Type", "application/json; charset=utf-8");
     res.set("Cache-Control", "public, max-age=300");
-    res.set("ETag", `"search-v${getIndexVersion()}"`);
-    success(res, data);
+    res.set("ETag", etag);
+    res.send(body);
   }));
 
   // ── Recently revoked ─────────────────────────────────────────────────────
@@ -365,34 +399,68 @@ export function registerSponsorPageRoutes(app: Express): void {
   // Full current register (ACTIVE + NEWLY_GRANTED) as a downloadable CSV.
   // UTF-8 BOM prepended so Excel opens it correctly without manual encoding steps.
   // 5 downloads/hour per IP; 12hr HTTP cache for CDN.
+  //
+  // Streams in keyset-paginated 5k-row chunks (ORDER BY current_name, id via
+  // idx_sc_current_name_id) instead of materialising all ~140k rows + a ~14MB
+  // joined string on the event loop. Backpressure-aware: each chunk awaits
+  // 'drain' when the socket is full, and stops immediately if the client
+  // disconnects mid-download.
   app.get("/api/sponsors/export.csv", csvRateLimit, asyncHandler(async (_req: any, res) => {
     const today = new Date().toISOString().split("T")[0];
-    const rows = await db.execute(sql`
-      SELECT
-        current_name   AS name,
-        town_city      AS town,
-        type_rating    AS type_rating,
-        route,
-        status,
-        granted_at
-      FROM sponsor_canonical
-      WHERE status IN ('ACTIVE', 'NEWLY_GRANTED')
-      ORDER BY current_name ASC
-    `);
-
-    const header = "Organisation Name,Town/City,Type & Rating,Route,Status,Licence Granted\r\n";
-    const body = (rows.rows as any[]).map((r) => [
-      csvEscape(r.name      || ""),
-      csvEscape(r.town      || ""),
-      csvEscape(r.type_rating || ""),
-      csvEscape(r.route     || ""),
-      csvEscape(r.status    || ""),
-      r.granted_at ? String(r.granted_at).slice(0, 10) : "",
-    ].join(",")).join("\r\n");
+    const CHUNK_SIZE = 5_000;
 
     res.set("Content-Type", "text/csv; charset=utf-8");
     res.set("Content-Disposition", `attachment; filename="uk-licensed-sponsors-${today}.csv"`);
     res.set("Cache-Control", "public, max-age=43200");
-    res.send("\uFEFF" + header + body);
+    res.write("\uFEFF" + "Organisation Name,Town/City,Type & Rating,Route,Status,Licence Granted\r\n");
+
+    let clientClosed = false;
+    res.on("close", () => { clientClosed = true; });
+
+    let lastName = "";
+    let lastId = 0;
+
+    for (;;) {
+      if (clientClosed) return;
+
+      const chunk = await db.execute(sql`
+        SELECT
+          id,
+          current_name   AS name,
+          town_city      AS town,
+          type_rating    AS type_rating,
+          route,
+          status,
+          granted_at
+        FROM sponsor_canonical
+        WHERE status IN ('ACTIVE', 'NEWLY_GRANTED')
+          AND (current_name, id) > (${lastName}, ${lastId})
+        ORDER BY current_name ASC, id ASC
+        LIMIT ${CHUNK_SIZE}
+      `);
+
+      const rows = chunk.rows as any[];
+      if (rows.length === 0) break;
+
+      let buf = "";
+      for (const r of rows) {
+        buf += [
+          csvEscape(r.name      || ""),
+          csvEscape(r.town      || ""),
+          csvEscape(r.type_rating || ""),
+          csvEscape(r.route     || ""),
+          csvEscape(r.status    || ""),
+          r.granted_at ? String(r.granted_at).slice(0, 10) : "",
+        ].join(",") + "\r\n";
+      }
+      if (!res.write(buf)) await waitForDrain(res);
+
+      const last = rows[rows.length - 1];
+      lastName = last.name;
+      lastId = last.id;
+      if (rows.length < CHUNK_SIZE) break;
+    }
+
+    res.end();
   }));
 }

@@ -12,3 +12,26 @@ backend/etl_sponsors.db
 
 # Test coverage output
 coverage
+
+# ── Secrets: never commit local env files (.env.example is the only tracked reference) ──
+.env
+.env.*
+!.env.example
+
+# ── PII / user-generated data: runtime-local only ──
+# Uploaded documents (multer dest + uploadGuard UPLOADS_DIR)
+uploads/
+# Daily Home Office register archives (company data, ~140k rows/day) —
+# runtime ETL reads these from local disk; rebuild gap-days from DB via
+# buildGapDayDiff() if missing after a fresh clone.
+data/archives/
+
+# Local DB / scratch
+*.sqlite3
+*.db-journal
+
+# ── Python sidecar artifacts ──
+__pycache__/
+*.py[cod]
+.pytest_cache/
+uv-cache/

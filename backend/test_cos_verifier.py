@@ -1,297 +1,108 @@
 #!/usr/bin/env python3
 """
-Test suite for COS Verification System
-Validates AI comparison engine with various document scenarios
+Contract tests for the public CoS verification API surface.
+
+cos_verifier.py / ai_engine.py are deliberately stripped to typed stubs —
+the proprietary engine lives in a private repository (commit 3f35d77).
+These tests pin that contract:
+
+  * the stub classes instantiate and raise NotImplementedError on every
+    business-logic method (so an accidental call in app code fails loudly),
+  * removed legacy methods (load_trusted_patterns / verify_cos) stay gone,
+  * VerificationResult validates its own invariants.
+
+The real, built-in comparison logic exercised end-to-end lives in
+test_integration.py (main.compare_with_trusted).
 """
 
-import json
-from cos_verifier import COSVerifier
+import asyncio
 
-def test_genuine_document():
-    """Test verification of genuine document with exact metadata match"""
-    verifier = COSVerifier()
-    
-    # Load trusted patterns
-    trusted_patterns = [
-        {
-            "id": 1,
-            "filename": "genuine_cos_1.pdf",
-            "metadata": {
-                "dc:date": "2023-10-01T12:00:00Z",
-                "dc:language": "en-US",
-                "pdf:Producer": "Apache FOP Version 2.3",
-                "xmp:CreateDate": "2023-10-01T12:00:00Z",
-                "xmp:CreatorTool": "Apache FOP Version 2.3",
-                "xmp:MetadataDate": "2023-10-01T12:00:00Z"
-            }
-        }
-    ]
-    
-    verifier.load_trusted_patterns(trusted_patterns)
-    
-    # Test with identical metadata
-    extracted_metadata = {
-        "dc:date": "2023-10-01T12:00:00Z",
-        "dc:language": "en-US",
-        "pdf:Producer": "Apache FOP Version 2.3",
-        "xmp:CreateDate": "2023-10-01T12:00:00Z",
-        "xmp:CreatorTool": "Apache FOP Version 2.3",
-        "xmp:MetadataDate": "2023-10-01T12:00:00Z"
-    }
-    
-    result = verifier.verify_cos(extracted_metadata)
-    assert result["type"] == "Genuine", "Should identify genuine document"
-    assert result["confidence"] > 0.95, "High confidence expected for genuine document"
-    assert len(result["mismatched_fields"]) == 0, "No mismatched fields expected for identical documents"
-    print(f"✓ Genuine document test passed: {result['confidence']:.2f} confidence")
+from cos_verifier import AbstractCOSVerifier, COSVerifier, VerificationResult
 
-def test_edited_document():
-    """Test verification of edited document with partial metadata match"""
-    verifier = COSVerifier()
-    
-    # Load trusted patterns
-    trusted_patterns = [
-        {
-            "id": 1,
-            "filename": "genuine_cos_1.pdf",
-            "metadata": {
-                "dc:date": "2023-10-01T12:00:00Z",
-                "dc:language": "en-US",
-                "pdf:Producer": "Apache FOP Version 2.3",
-                "xmp:CreateDate": "2023-10-01T12:00:00Z",
-                "xmp:CreatorTool": "Apache FOP Version 2.3",
-                "xmp:MetadataDate": "2023-10-01T12:00:00Z"
-            }
-        }
-    ]
-    
-    verifier.load_trusted_patterns(trusted_patterns)
-    
-    # Test with modified metadata (edited document)
-    extracted_metadata = {
-        "dc:date": "2023-11-15T15:30:00Z",  # Changed date
-        "dc:language": "en-US",
-        "pdf:Producer": "Adobe Acrobat Pro DC",  # Changed producer
-        "xmp:CreateDate": "2023-11-15T15:30:00Z",  # Changed
-        "xmp:CreatorTool": "Apache FOP Version 2.3",  # Original
-        "xmp:MetadataDate": "2023-11-15T15:30:00Z"  # Changed
-    }
-    
-    result = verifier.verify_cos(extracted_metadata)
-    assert result["type"] in ["Edited", "Fake"], "Should identify as edited or fake document"
-    assert result["confidence"] < 0.9, "Lower confidence expected for edited document"
-    assert len(result["mismatched_fields"]) > 0, "Should have mismatched fields"
-    print(f"✓ Edited document test passed: {result['type']} with {result['confidence']:.2f} confidence")
 
-def test_minor_edit_detection():
-    """Test detection of documents with minimal edits (single field change)"""
-    verifier = COSVerifier()
-    
-    # Load trusted patterns
-    trusted_patterns = [
-        {
-            "id": 1,
-            "filename": "genuine_cos_1.pdf",
-            "metadata": {
-                "dc:date": "2023-10-01T12:00:00Z",
-                "dc:language": "en-US",
-                "pdf:Producer": "Apache FOP Version 2.3",
-                "xmp:CreateDate": "2023-10-01T12:00:00Z",
-                "xmp:CreatorTool": "Apache FOP Version 2.3",
-                "xmp:MetadataDate": "2023-10-01T12:00:00Z"
-            }
-        }
-    ]
-    
-    verifier.load_trusted_patterns(trusted_patterns)
-    
-    # Test with slightly modified metadata (minor edit)
-    extracted_metadata = {
-        "dc:date": "2023-10-02T12:00:00Z",  # Changed date by one day
-        "dc:language": "en-US",
-        "pdf:Producer": "Apache FOP Version 2.3",
-        "xmp:CreateDate": "2023-10-01T12:00:00Z",
-        "xmp:CreatorTool": "Apache FOP Version 2.3",
-        "xmp:MetadataDate": "2023-10-01T12:00:00Z"
-    }
-    
-    result = verifier.verify_cos(extracted_metadata)
-    
-    # Should detect the edit but with high confidence since only one field changed
-    expected_types = ["Edited", "Genuine"]  # Allow Genuine for very minor changes
-    assert result["type"] in expected_types, f"Should identify as edited or genuine, got {result['type']}"
-    
-    if result["type"] == "Edited":
-        assert "dc:date" in result["mismatched_fields"], "Date field should show mismatch"
-        print(f"✓ Minor edit test passed: detected {result['type']} with {result['confidence']:.2f} confidence")
-    else:
-        # If classified as genuine, confidence should still be high but slightly lower
-        assert result["confidence"] > 0.85, f"High confidence expected for minor change, got {result['confidence']:.2f}"
-        print(f"✓ Minor edit test passed: classified as {result['type']} (acceptable for minimal change)")
-    
-    print(f"   Mismatched fields: {result['mismatched_fields']}")
-
-def test_fake_document():
-    """Test verification of completely fake document"""
-    verifier = COSVerifier()
-    
-    # Load trusted patterns
-    trusted_patterns = [
-        {
-            "id": 1,
-            "filename": "genuine_cos_1.pdf",
-            "metadata": {
-                "dc:date": "2023-10-01T12:00:00Z",
-                "dc:language": "en-US",
-                "pdf:Producer": "Apache FOP Version 2.3",
-                "xmp:CreateDate": "2023-10-01T12:00:00Z",
-                "xmp:CreatorTool": "Apache FOP Version 2.3",
-                "xmp:MetadataDate": "2023-10-01T12:00:00Z"
-            }
-        }
-    ]
-    
-    verifier.load_trusted_patterns(trusted_patterns)
-    
-    # Test with completely different metadata (fake document)
-    extracted_metadata = {
-        "dc:date": "2022-01-01T12:00:00Z",
-        "dc:language": "fr-FR",
-        "pdf:Producer": "Adobe Acrobat Pro DC",
-        "xmp:CreateDate": "2022-01-01T12:00:00Z",
-        "xmp:CreatorTool": "Adobe Acrobat Pro DC",
-        "xmp:MetadataDate": "2022-01-01T12:00:00Z"
-    }
-    
-    result = verifier.verify_cos(extracted_metadata)
-    assert result["type"] == "Fake", f"Should identify fake document, got {result['type']}"
-    assert result["confidence"] < 0.6, f"Low confidence expected for fake document, got {result['confidence']:.2f}"
-    print(f"✓ Fake document test passed: {result['type']} with {result['confidence']:.2f} confidence")
-
-def test_multiple_trusted_patterns():
-    """Test verification against multiple trusted patterns"""
-    verifier = COSVerifier()
-    
-    # Load multiple trusted patterns
-    trusted_patterns = [
-        {
-            "id": 1,
-            "filename": "genuine_cos_1.pdf",
-            "metadata": {
-                "dc:date": "2023-10-01T12:00:00Z",
-                "dc:language": "en-US",
-                "pdf:Producer": "Apache FOP Version 2.3",
-                "xmp:CreateDate": "2023-10-01T12:00:00Z",
-                "xmp:CreatorTool": "Apache FOP Version 2.3",
-                "xmp:MetadataDate": "2023-10-01T12:00:00Z"
-            }
-        },
-        {
-            "id": 2,
-            "filename": "genuine_cos_2.pdf",
-            "metadata": {
-                "dc:date": "2023-09-15T10:30:00Z",
-                "dc:language": "en-GB",
-                "pdf:Producer": "Adobe Acrobat Pro DC",
-                "xmp:CreateDate": "2023-09-15T10:30:00Z",
-                "xmp:CreatorTool": "Adobe InDesign CS6",
-                "xmp:MetadataDate": "2023-09-15T10:30:00Z"
-            }
-        }
-    ]
-    
-    verifier.load_trusted_patterns(trusted_patterns)
-    
-    # Test against second pattern
-    extracted_metadata = {
-        "dc:date": "2023-09-15T10:30:00Z",
-        "dc:language": "en-GB",
-        "pdf:Producer": "Adobe Acrobat Pro DC",
-        "xmp:CreateDate": "2023-09-15T10:30:00Z",
-        "xmp:CreatorTool": "Adobe InDesign CS6",
-        "xmp:MetadataDate": "2023-09-15T10:30:00Z"
-    }
-    
-    result = verifier.verify_cos(extracted_metadata)
-    assert result["type"] == "Genuine", "Should match second pattern"
-    assert result["matched_pattern_id"] == 2, "Should match pattern ID 2"
-    assert result["confidence"] > 0.95, "High confidence expected"
-    print(f"✓ Multiple patterns test passed: matched pattern {result['matched_pattern_id']}")
-
-def test_no_trusted_patterns():
-    """Test behavior when no trusted patterns are loaded"""
-    verifier = COSVerifier()
-    
-    # Test without loading any patterns
-    extracted_metadata = {
-        "dc:date": "2023-10-01T12:00:00Z",
-        "dc:language": "en-US",
-        "pdf:Producer": "Apache FOP Version 2.3"
-    }
-    
+def assert_raises(exc_type, fn, *args, **kwargs):
+    """Minimal raises-helper so the file runs with or without pytest."""
     try:
-        result = verifier.verify_cos(extracted_metadata)
-        assert False, "Should raise ValueError when no patterns loaded"
-    except ValueError as e:
-        assert "No trusted patterns loaded" in str(e)
-        print("✓ No patterns test passed: correctly raised ValueError")
+        fn(*args, **kwargs)
+    except exc_type:
+        return
+    except Exception as e:  # noqa: BLE001 - re-assert with context
+        raise AssertionError(
+            f"expected {exc_type.__name__}, got {type(e).__name__}: {e}"
+        ) from e
+    raise AssertionError(f"expected {exc_type.__name__}, nothing was raised")
 
-def test_partial_metadata():
-    """Test verification with incomplete metadata"""
+
+def test_verifier_is_abstract_contract():
+    assert issubclass(COSVerifier, AbstractCOSVerifier)
     verifier = COSVerifier()
-    
-    # Load trusted patterns
-    trusted_patterns = [
-        {
-            "id": 1,
-            "filename": "genuine_cos_1.pdf",
-            "metadata": {
-                "dc:date": "2023-10-01T12:00:00Z",
-                "dc:language": "en-US",
-                "pdf:Producer": "Apache FOP Version 2.3",
-                "xmp:CreateDate": "2023-10-01T12:00:00Z",
-                "xmp:CreatorTool": "Apache FOP Version 2.3",
-                "xmp:MetadataDate": "2023-10-01T12:00:00Z"
-            }
-        }
-    ]
-    
-    verifier.load_trusted_patterns(trusted_patterns)
-    
-    # Test with incomplete metadata (missing some fields)
-    extracted_metadata = {
-        "dc:date": "2023-10-01T12:00:00Z",
-        "dc:language": "en-US",
-        "pdf:Producer": "Apache FOP Version 2.3"
-        # Missing xmp fields
-    }
-    
-    result = verifier.verify_cos(extracted_metadata)
-    assert result["type"] in ["Edited", "Fake"], "Should identify issues with missing fields"
-    assert len(result["mismatched_fields"]) > 0, "Should report missing fields as mismatched"
-    print(f"✓ Partial metadata test passed: {len(result['mismatched_fields'])} missing fields detected")
+    assert verifier is not None
 
-def run_all_tests():
-    """Run all test cases and report results"""
-    print("Running COS Verifier Test Suite")
-    print("=" * 40)
-    
-    try:
-        test_genuine_document()
-        test_edited_document()
-        test_minor_edit_detection()
-        test_fake_document()
-        test_multiple_trusted_patterns()
-        test_no_trusted_patterns()
-        test_partial_metadata()
-        
-        print("=" * 40)
-        print("✅ All tests passed successfully!")
-        return True
-        
-    except Exception as e:
-        print(f"❌ Test failed: {e}")
-        return False
+
+def test_stub_verify_raises_not_implemented():
+    verifier = COSVerifier()
+    assert_raises(NotImplementedError, asyncio.run, verifier.verify("/tmp/x.pdf"))
+
+
+def test_stub_extract_metadata_raises_not_implemented():
+    verifier = COSVerifier()
+    assert_raises(
+        NotImplementedError, asyncio.run, verifier.extract_metadata("/tmp/x.pdf")
+    )
+
+
+def test_legacy_methods_stay_removed():
+    # load_trusted_patterns / verify_cos were part of the pre-3f35d77
+    # implementation. App code must not silently depend on them again.
+    verifier = COSVerifier()
+    assert_raises(AttributeError, getattr, verifier, "load_trusted_patterns")
+    assert_raises(AttributeError, getattr, verifier, "verify_cos")
+
+
+def test_verification_result_accepts_valid_input():
+    result = VerificationResult(
+        status="verified",
+        confidence=0.97,
+        flags=["ok"],
+        metadata={"pdf:Producer": "Apache FOP"},
+    )
+    assert result.status == "verified"
+    assert result.confidence == 0.97
+    assert result.flags == ["ok"]
+    assert result.metadata == {"pdf:Producer": "Apache FOP"}
+
+
+def test_verification_result_rejects_invalid_status():
+    assert_raises(
+        ValueError,
+        lambda: VerificationResult(
+            status="totally-fine", confidence=0.5, flags=[], metadata={}
+        ),
+    )
+
+
+def test_verification_result_rejects_out_of_range_confidence():
+    for bad in (-0.01, 1.01):
+        assert_raises(
+            ValueError,
+            lambda b=bad: VerificationResult(
+                status="verified", confidence=b, flags=[], metadata={}
+            ),
+        )
+
+
+def test_verification_result_copies_metadata():
+    source = {"pdf:Producer": "Apache FOP"}
+    result = VerificationResult(
+        status="suspicious", confidence=0.5, flags=[], metadata=source
+    )
+    source["pdf:Producer"] = "mutated"
+    assert result.metadata["pdf:Producer"] == "Apache FOP"
+
 
 if __name__ == "__main__":
-    run_all_tests()
+    tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
+    for t in tests:
+        t()
+        print(f"✓ {t.__name__}")
+    print(f"\n{len(tests)} contract tests passed")

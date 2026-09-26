@@ -12,35 +12,44 @@ never had a corresponding migration (`sponsor_canonical`, `job_locks`,
 
 ## Fresh environment (new DB)
 
-`npm run db:migrate` now works normally — it applies `0000` then `0024_catchup`.
+`npm run db:migrate` applies journal entries `0000` + `0024`–`0030` in order.
+All journaled migrations are idempotent (`IF NOT EXISTS` / `IF EXISTS` /
+`DO … EXCEPTION WHEN duplicate_*`), so re-running is always safe.
 
-## Existing production DB
+## Existing production DB (drift cutover)
 
-Production already has this schema because `server/index.ts` runs boot-time
-DDL patches (`applyDataFixbacks()`, around lines 299–410) to paper over
-the drift. Running `db:migrate` there for the first time will try to
-`CREATE TABLE`/`ALTER TABLE` things that already exist and fail, because the
-`__drizzle_migrations` tracking table has never recorded anything.
+Production grew its schema via boot-time DDL (`applyDataFixbacks()` in
+`server/index.ts`) while `drizzle.__drizzle_migrations` stayed empty, so an
+unseeded `db:migrate` would re-apply everything. Two layers make the cutover
+safe (both run automatically in `start:with-migrate`, which Docker uses):
 
-Before running `db:migrate` against prod, seed the tracking table so Drizzle
-considers `0000` and `0024_catchup` already applied:
+1. **Seed** — `npm run db:seed-history` (`scripts/seed-migration-history.ts`
+   `--execute`) checks each journal entry's expected objects against the live
+   DB and inserts tracking rows `(hash = sha256 of file bytes,
+   created_at = journal when)` only for fully-present entries. Anything
+   missing stays pending. Dry-run first any time:
+   `npx tsx scripts/seed-migration-history.ts` (default mode writes nothing).
+2. **Idempotent SQL** — every journaled migration tolerates already-existing
+   objects, so partially-drifted entries self-heal when migrate applies them.
 
-```sql
-CREATE TABLE IF NOT EXISTS "drizzle"."__drizzle_migrations" (
-  id SERIAL PRIMARY KEY,
-  hash text NOT NULL,
-  created_at bigint
-);
--- hash values must match the sha256 of each migration file's contents,
--- as computed by drizzle-kit. Do not hand-roll these — instead run
--- `drizzle-kit migrate` with --dry-run once implemented, or apply via a
--- one-off script that reads migrations/meta/_journal.json and computes
--- the same hash drizzle-kit uses, then inserts rows for 0000 and 0024_catchup
--- before enabling this workflow for prod deploys.
+Manual cutover (one-off, with prod `DATABASE_URL`):
+
+```sh
+npx tsx scripts/seed-migration-history.ts              # inspect plan
+npx tsx scripts/seed-migration-history.ts --execute    # write tracking rows
+npm run db:migrate                                     # apply leftovers
 ```
 
-This has not been run against production — it needs a deploy-time decision
-and DB credentials this session did not have.
+Notes:
+
+- The seed hashes use drizzle-orm's exact algorithm; `tests/seed-migration-history.test.ts`
+  asserts byte-equality against drizzle-orm's own `readMigrationFiles`, plus
+  CHECKS coverage of every created object and a ban on `CONCURRENTLY` /
+  `ADD … IF NOT EXISTS` (invalid PG syntax) in journaled files.
+- `0030_drop_sponsor_list` drops the legacy `sponsor_list` table via migrate
+  on DBs that still have it (the seed leaves that entry pending there).
+- `0001`–`0023` and `0011_drop_sponsor_list.sql` remain historical record
+  only — never journaled, never executed.
 
 ## CREATE INDEX CONCURRENTLY is not usable here
 

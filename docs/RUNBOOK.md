@@ -1,6 +1,6 @@
 # Operations Runbook
 # checkbyai.net
-**Version:** 1.1 | **Last Updated:** 2026-03-20
+**Version:** 1.2 | **Last Updated:** 2026-09-26
 
 ---
 
@@ -8,7 +8,12 @@
 
 ### 1.1 Required Environment Variables
 
-Set all of these before starting the server in production. The server **exits immediately** if any required var is missing.
+**Canonical reference: [`.env.example`](../.env.example) / [docs/ENV_REFERENCE.md](ENV_REFERENCE.md)** —
+that file lists every variable with required/optional status. The block below
+shows the production-critical subset. The server **exits immediately** in
+production if any of the `REQUIRED_ENV_VARS` set is missing
+(`server/index.ts`: DATABASE_URL, SESSION_SECRET, PHONE_ENCRYPTION_KEY,
+IP_HASH_SALT, CHECKOUT_HMAC_SECRET, DIGEST_SIGNING_KEY, STRIPE_WEBHOOK_SECRET).
 
 ```bash
 # Database
@@ -21,12 +26,13 @@ IP_HASH_SALT="<random 32-char hex>"
 CHECKOUT_HMAC_SECRET="<random 64-char hex>"
 DIGEST_SIGNING_KEY="<random 64-char hex>"
 
-# Admin
+# Admin — optional (initial admin seeding only; NOT a fail-fast var)
 ADMIN_EMAIL="admin@yourdomain.com"
 
 # Stripe
 STRIPE_SECRET_KEY="sk_live_..."
-STRIPE_WEBHOOK_SECRET="whsec_..."
+STRIPE_WEBHOOK_SECRET="whsec_..."        # required (fail-fast)
+STRIPE_PUBLISHABLE_KEY="pk_live_..."     # required off-Replit
 
 # Email
 RESEND_API_KEY="re_..."
@@ -39,9 +45,10 @@ TWILIO_ACCOUNT_SID="AC..."
 TWILIO_AUTH_TOKEN="..."
 TWILIO_WHATSAPP_NUMBER="whatsapp:+14155238886"
 
-# AI
-OPENAI_API_KEY="sk-..."
-DEEPSEEK_API_KEY="..."   # fallback
+# AI (provider chain: OpenAI → Anthropic → OpenRouter/DeepSeek fallback)
+AI_INTEGRATIONS_OPENAI_API_KEY="sk-..."
+AI_INTEGRATIONS_ANTHROPIC_API_KEY="sk-ant-..."
+AI_INTEGRATIONS_OPENROUTER_API_KEY="..."   # fallback provider
 
 # Auth
 GOOGLE_CLIENT_ID="..."
