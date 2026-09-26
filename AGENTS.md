@@ -40,7 +40,7 @@ Run ALL THREE gates before declaring any code change done:
 ```sh
 npm run lint          # eslint + CSS validation
 npm run check         # tsc --noEmit
-npx vitest run        # unit/integration tests (57 files)
+npx vitest run        # unit/integration tests (58 files)
 ```
 
 Other common tasks:
@@ -50,6 +50,7 @@ npm run dev           # Vite + Express dev server
 npm run build         # client build + esbuild server bundle
 npm run test:run      # vitest (CI name for npx vitest run)
 npm run audit         # audit-ci (high/critical fail the gate)
+npm run db:seed-history && npm run db:migrate   # prod cutover: record drift, apply rest
 ```
 
 Python sidecar (uv-managed, Python pinned by `.python-version`):
@@ -74,8 +75,10 @@ python sidecar tests → build.
   `backend/test_cos_verifier.py` enforce this.
 - **Stripe webhook reads `req.rawBody` ONLY** (`server/routes/billing.ts`);
   body parsers in `server/index.ts` must keep providing it.
-- **Boot DDL (`applyDataFixbacks`) must stay** — prod cutover of migrations
-  0024–0030 has not run. It is single-flighted behind a Postgres advisory
+- **Boot DDL (`applyDataFixbacks`) must stay** — it is the drift safety net
+  under the migration cutover (`npm run db:seed-history` + idempotent
+  `0000`/`0024`–`0030`, wired into `start:with-migrate`; see
+  `migrations/README.md`). It is single-flighted behind a Postgres advisory
   lock; do not remove it, do not widen it.
 - **Required env vars** (`REQUIRED_ENV_VARS`, `server/index.ts`):
   `DATABASE_URL`, `SESSION_SECRET`, `PHONE_ENCRYPTION_KEY`, `IP_HASH_SALT`,

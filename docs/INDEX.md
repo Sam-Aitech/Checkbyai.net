@@ -73,6 +73,7 @@ Phase 5: generateHeadline() + monitor_job_runs audit [isTest/isGapDay flags; job
 | `server/utils/tierConfig.ts` | Subscription tier feature gates |
 | `server/db.ts` | Neon PostgreSQL pool + Drizzle ORM |
 | `shared/schema.ts` | Full database schema (source of truth) |
+| `scripts/seed-migration-history.ts` | Prod cutover: records drifted migrations in `drizzle.__drizzle_migrations` (`npm run db:seed-history`) |
 
 ### Binary Dependencies
 | Binary | Source | Used in |

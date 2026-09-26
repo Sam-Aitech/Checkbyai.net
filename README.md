@@ -94,7 +94,7 @@ cp .env.example .env
 # in production or the server exits on boot. See docs/ENV_REFERENCE.md.
 
 npm run setup:binaries   # installs qsv + csvdiff into ./bin (required — see below)
-npm run db:migrate       # fresh DB: applies 0000 + 0024_catchup (see migrations/README.md)
+npm run db:migrate       # fresh DB: applies 0000 + 0024–0030 (see migrations/README.md)
 npm run dev
 ```
 

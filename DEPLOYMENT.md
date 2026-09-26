@@ -159,13 +159,15 @@ Verify every required variable is set in your hosting environment before proceed
 ### Step 2: Run Database Migrations
 
 ```bash
-npm run db:migrate    # Applies journal migrations (0000 + 0024_catchup)
+npm run db:migrate    # Applies journal migrations (0000 + 0024–0030)
 ```
 
-> First run against a pre-existing production DB needs the `__drizzle_migrations`
-> seeding described in `migrations/README.md` (production was historically patched
-> by boot-time DDL instead). `npm run db:push` is dev/staging-only — it bypasses
-> migration history and must not be used against production.
+> First run against a pre-existing production DB: prefer
+> `npm run start:with-migrate`, which runs `db:seed-history` first — it
+> records already-present migrations in `__drizzle_migrations` so migrate
+> only applies the remainder (all journaled migrations are idempotent).
+> See `migrations/README.md`. `npm run db:push` is dev/staging-only — it
+> bypasses migration history and must not be used against production.
 
 ### Step 3: Install Binary Dependencies
 
@@ -238,7 +240,7 @@ npm run build && npm run start
 
 ```bash
 npm run start:with-migrate
-# Runs db:migrate before starting — safe for zero-downtime migrations
+# Runs db:seed-history + db:migrate before starting — safe for zero-downtime migrations
 ```
 
 ### Environment Variables Checklist Before Deploy
@@ -269,9 +271,12 @@ npm run start:with-migrate
 
 ```bash
 # Generate a new migration from schema changes
-npm run db:migrate
+npx drizzle-kit generate
 
 # Apply pending migrations
+npm run db:migrate
+
+# Seed tracking history for pre-existing DBs, then migrate, then start
 npm run start:with-migrate
 
 # Direct push (dev/staging only — bypasses migration history)
@@ -388,8 +393,8 @@ docker run -p 5000:5000 --env-file .env checkbyai
 ```
 
 Image details: runs as non-root user `checkbyai`, exposes port 5000, has a `HEALTHCHECK`
-against `/api/health`, and starts via `npm run start:with-migrate` (applies pending
-migrations before boot).
+against `/api/health`, and starts via `npm run start:with-migrate` (seeds migration
+history, then applies pending migrations before boot).
 
 > **Note:** The `bin/` directory (qsv, csvdiff) is created empty in the image — these
 > binaries are not baked in. Run `npm run setup:binaries` inside the container, or mount

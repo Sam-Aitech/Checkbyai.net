@@ -54,7 +54,7 @@ cp .env.example .env
 # Edit .env — see Environment Variables section
 
 # 4. Set up the database
-npm run db:migrate    # Fresh DB: applies 0000 + 0024_catchup (see migrations/README.md)
+npm run db:migrate    # Fresh DB: applies 0000 + 0024–0030 (see migrations/README.md)
 # Alternative for schema-first iteration (bypasses migration history — dev only):
 # npm run db:push
 
@@ -204,6 +204,9 @@ The database schema lives in `shared/schema.ts` and is managed by [Drizzle Kit](
 npm run db:push
 
 # Generate a migration file from schema changes
+npx drizzle-kit generate
+
+# Apply pending migrations
 npm run db:migrate
 
 # View current DB via Drizzle Studio (opens in browser)
