@@ -15,6 +15,11 @@ import {
   emptyStructuralFeatures,
   toEvidenceVerdict,
 } from "../services/forensicTypes";
+import {
+  buildAdminOverrideEvidence,
+  buildPatternAndCosForensicChecks,
+  chargeVerificationUsage,
+} from "../services/verificationShared";
 import { withRetry } from "../utils/dbRetry";
 import { emitToUser } from "../services/socketGateway";
 import { logger } from "../utils/logger";
@@ -94,23 +99,12 @@ export async function processPdfVerifyJob(job: Job<PdfVerifyJobData>): Promise<{
       result = 'fake';
       analysis = buildAdminOverrideAnalysis('fake', priorFlag.adminFeedback || 'Flagged as fake by a human reviewer.');
       metadata = (priorFlag.metadata as any) || {};
-      (analysis as any).forensicEvidence = buildForensicEvidence({
+      (analysis as any).forensicEvidence = buildAdminOverrideEvidence({
+        analysis,
         documentHash,
-        extractedFeatures: {},
-        structuralFeatures: emptyStructuralFeatures(),
-        forensicChecks: (Array.isArray((analysis as any).checks) ? (analysis as any).checks : []).map((c: any) => ({
-          checkId: `override:${c.name ?? 'admin-review'}`,
-          passed: !!c.passed,
-          detail: c.message,
-        })),
-        provenance: {
-          uploadMethod: 'bullmq-worker',
-          filenameSanitized: path.basename(originalname),
-          magicVerified: true,
-          processingTimestamp: new Date().toISOString(),
-        },
-        finalVerdict: 'FAKE',
-        finalConfidence: 99,
+        uploadMethod: 'bullmq-worker',
+        filename: path.basename(originalname),
+        verdict: 'FAKE',
       });
     } else if (priorApproval) {
       isAdminOverride = true;
@@ -119,23 +113,12 @@ export async function processPdfVerifyJob(job: Job<PdfVerifyJobData>): Promise<{
       result = 'genuine';
       analysis = buildAdminOverrideAnalysis('approved', priorApproval.adminFeedback || 'Confirmed genuine by a human reviewer.');
       metadata = (priorApproval.metadata as any) || {};
-      (analysis as any).forensicEvidence = buildForensicEvidence({
+      (analysis as any).forensicEvidence = buildAdminOverrideEvidence({
+        analysis,
         documentHash,
-        extractedFeatures: {},
-        structuralFeatures: emptyStructuralFeatures(),
-        forensicChecks: (Array.isArray((analysis as any).checks) ? (analysis as any).checks : []).map((c: any) => ({
-          checkId: `override:${c.name ?? 'admin-review'}`,
-          passed: !!c.passed,
-          detail: c.message,
-        })),
-        provenance: {
-          uploadMethod: 'bullmq-worker',
-          filenameSanitized: path.basename(originalname),
-          magicVerified: true,
-          processingTimestamp: new Date().toISOString(),
-        },
-        finalVerdict: 'GENUINE',
-        finalConfidence: 99,
+        uploadMethod: 'bullmq-worker',
+        filename: path.basename(originalname),
+        verdict: 'GENUINE',
       });
     } else {
       await job.updateProgress(10);
@@ -216,18 +199,7 @@ export async function processPdfVerifyJob(job: Job<PdfVerifyJobData>): Promise<{
             hasRealXmp: !!(extractedMetadata as any).rawXmpData,
           },
           structuralFeatures,
-          forensicChecks: [
-            ...(Array.isArray(outcome.checks) ? outcome.checks : []).map((c: any) => ({
-              checkId: `pattern:${c.name ?? 'unknown'}`,
-              passed: !!c.passed,
-              detail: c.message,
-            })),
-            ...(Array.isArray(cosCheckResult.checks) ? cosCheckResult.checks : []).map((c: any) => ({
-              checkId: `cos:${c.name ?? 'unknown'}`,
-              passed: !!c.passed,
-              detail: c.detail,
-            })),
-          ],
+          forensicChecks: buildPatternAndCosForensicChecks(outcome.checks, cosCheckResult.checks),
           provenance: {
             uploadMethod: 'bullmq-worker',
             filenameSanitized: path.basename(originalname),
@@ -269,19 +241,7 @@ export async function processPdfVerifyJob(job: Job<PdfVerifyJobData>): Promise<{
 
     await job.updateProgress(85);
     const verificationId = await withRetry(() => db.transaction(async (tx) => {
-      if (useCredits && userId) {
-        await tx.update(users).set({ credits: sql`GREATEST(COALESCE(${users.credits}, 0) - 1, 0)`, updatedAt: new Date() }).where(eq(users.id, userId));
-      } else if (useDailyLimit && userId) {
-        const today = new Date().toISOString().split('T')[0];
-        const [currentUser] = await tx.select({ dailyVerificationsUsed: users.dailyVerificationsUsed, lastVerificationDate: users.lastVerificationDate }).from(users).where(eq(users.id, userId));
-        const usageToday = currentUser?.lastVerificationDate === today ? (currentUser.dailyVerificationsUsed || 0) + 1 : 1;
-        await tx.update(users).set({
-          dailyVerificationsUsed: usageToday,
-          totalVerificationsUsed: sql`COALESCE(${users.totalVerificationsUsed}, 0) + 1`,
-          lastVerificationDate: today,
-          updatedAt: new Date(),
-        }).where(eq(users.id, userId));
-      }
+      await chargeVerificationUsage(tx, { userId, useCredits, useDailyLimit });
       const insertValues: any = {
         userId,
         filename: path.basename(originalname),

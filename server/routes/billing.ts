@@ -387,10 +387,6 @@ export function registerBillingRoutes(app: Express): void {
 
     try {
       const rawBody = (req as any).rawBody;
-      if (!rawBody) {
-        logger.error('Webhook error: rawBody not available — ensure express.json verify callback is configured');
-        return res.status(400).send('Webhook raw body unavailable');
-      }
       if (!process.env.STRIPE_WEBHOOK_SECRET) {
         logger.error(
           'Webhook error: STRIPE_WEBHOOK_SECRET is not set. ' +
@@ -401,6 +397,9 @@ export function registerBillingRoutes(app: Express): void {
       }
       event = stripe.webhooks.constructEvent(rawBody, sig!, process.env.STRIPE_WEBHOOK_SECRET);
     } catch (err: unknown) {
+      if (!(req as any).rawBody) {
+        logger.error('Webhook error: rawBody not available — ensure express.json verify callback is configured');
+      }
       logger.error({ err: err instanceof Error ? err.message : err }, 'Webhook signature verification failed');
       return res.status(400).send('Webhook signature verification failed');
     }
