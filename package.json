@@ -82,7 +82,7 @@
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.4.27",
     "bcrypt": "^6.0.0",
-    "bullmq": "^5.71.0",
+    "bullmq": "^6.3.9",
     "cheerio": "^1.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
