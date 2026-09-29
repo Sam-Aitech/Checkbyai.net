@@ -3,8 +3,7 @@ import * as path from "node:path";
 import * as tmp from "tmp";
 import type { Job } from "bullmq";
 import { db } from "../db";
-import { sql, eq } from "drizzle-orm";
-import { users, verificationResults, type TrustedPattern } from "@shared/schema";
+import { verificationResults, type TrustedPattern } from "@shared/schema";
 import { storage } from "../storage";
 import { PDFAnalyzer } from "../services/pdfAnalyzer";
 import { COSAuthenticityChecker } from "../services/cosAuthenticityChecker";
@@ -12,7 +11,6 @@ import { combineWithCosVerdict } from "../utils/cosVerdictCombiner";
 import { resolveVerificationWithTrust } from "../utils/trustedReference";
 import {
   buildForensicEvidence,
-  emptyStructuralFeatures,
   toEvidenceVerdict,
 } from "../services/forensicTypes";
 import {

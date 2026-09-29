@@ -5,14 +5,13 @@ import * as path from "path";
 import multer from "multer";
 import { storage } from "../storage";
 import { db } from "../db";
-import { sql, eq } from "drizzle-orm";
 import {
   buildAdminOverrideEvidence,
   buildPatternAndCosForensicChecks,
   chargeVerificationUsage,
 } from "../services/verificationShared";
 import { withRetry } from "../utils/dbRetry";
-import { users, verificationResults, type TrustedPattern } from "@shared/schema";
+import { verificationResults, type TrustedPattern } from "@shared/schema";
 import { isAuthenticated } from "../auth";
 import { verifyLimiter } from "../middleware/rateLimiter";
 import { PDFAnalyzer } from "../services/pdfAnalyzer";
@@ -23,7 +22,6 @@ import { combineWithCosVerdict } from "../utils/cosVerdictCombiner";
 import { resolveVerificationWithTrust } from "../utils/trustedReference";
 import {
   buildForensicEvidence,
-  emptyStructuralFeatures,
   toEvidenceVerdict,
 } from "../services/forensicTypes";
 import { success } from "../lib/response";
