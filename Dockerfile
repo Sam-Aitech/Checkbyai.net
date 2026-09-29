@@ -4,7 +4,7 @@
 # Node 22 LTS (Node 20 EOL 2026-04) — keep in sync with .nvmrc,
 # package.json engines, and .github/workflows node-version.
 # ─────────────────────────────────────────────────────────────
-FROM node:22-alpine AS builder
+FROM node:26-alpine AS builder
 
 WORKDIR /app
 
@@ -23,7 +23,7 @@ RUN npm prune --omit=dev
 # Stage 2: Runtime
 # Minimal image — no dev dependencies, no source files
 # ─────────────────────────────────────────────────────────────
-FROM node:22-alpine AS runner
+FROM node:26-alpine AS runner
 
 # Install security updates + runtime tools
 RUN apk update && apk upgrade && apk add --no-cache \
