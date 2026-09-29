@@ -3,3 +3,4 @@
 - [Lazy route HMR recovery](lazy-route-hmr-recovery.md) — transient Vite module-fetch failures can crash a lazy route during rapid HMR updates; recover with one guarded reload.
 - [Stripe customer migration](stripe-customer-migration.md) — changing Stripe account or mode invalidates stored customer IDs; checkout must recover missing/deleted customers.
 - [Preview asset cache](preview-asset-cache.md) — a route can show stale hashed build assets after a workflow restart; verify fresh dev HTML before changing app routing.
+- [Deployment dependency gate](deployment-dependency-gate.md) — Replit publish scans the complete uv lock, including transitive Python packages.

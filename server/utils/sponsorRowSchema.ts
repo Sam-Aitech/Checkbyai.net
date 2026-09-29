@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { match } from "ts-pattern";
-import { insertSponsorListSchema } from "@shared/schema";
 import { logger } from "./logger";
 
 // Why ts-pattern: ETL enum normalization must fail loudly when GOV.UK enum values
@@ -15,12 +14,17 @@ const MAX_TYPE_RATING_LENGTH = 128;
 const MAX_ROUTE_LENGTH = 160;
 export const SCHEMA_CHANGE_REJECTION_THRESHOLD = 0.2;
 
-const SponsorBaseFromDbSchema = insertSponsorListSchema.pick({
-  organisationName: true,
-  townCity: true,
-  county: true,
-  typeRating: true,
-  route: true,
+// Base column shapes for the sponsor CSV row. Historically derived from
+// `createInsertSchema(sponsorList)` — the sponsor_list table was retired
+// (migration 0030_drop_sponsor_list) and this base is now local. The shapes
+// below are structurally identical to what drizzle-zod generated:
+// required string for organisationName, nullable+optional strings for the rest.
+const SponsorBaseFromDbSchema = z.object({
+  organisationName: z.string(),
+  townCity: z.string().nullable().optional(),
+  county: z.string().nullable().optional(),
+  typeRating: z.string().nullable().optional(),
+  route: z.string().nullable().optional(),
 });
 
 // Priority 5 canonical licence status values (timeline domain).

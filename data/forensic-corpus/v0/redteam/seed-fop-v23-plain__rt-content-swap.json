@@ -1,0 +1,15 @@
+{
+  "group": "redteam",
+  "seedId": "seed-fop-v23-plain",
+  "seedSha256": "2e045c80af13cbd0df8d6f4dee1e884d3b174604952bded658cb3720256392ca",
+  "operator": "rt-content-swap",
+  "tactic": "Semantic forgery — visible content changes, all checked strings intact.",
+  "expectedGate": "GENUINE",
+  "subSeed": 2888118215,
+  "operatorParams": {
+    "changed": "Title"
+  },
+  "sha256": "306a1c830ccd63151a481d5727b07d886d7dcc541c164db51cdd08277a8d92b2",
+  "generator": "corpus-gen-v1",
+  "masterSeed": 42
+}

@@ -1,0 +1,9 @@
+{
+  "kind": "fixture-derived-standin",
+  "seedId": "seed-linearized",
+  "description": "Apache FOP 2.9, linearized (fast web view) — 2x startxref baseline",
+  "warning": "NOT a captured Home Office PDF. Mirrors the FOP 2.9 structure for pipeline development only; replace with provenanced captures when available.",
+  "sha256": "a9abce7ab5b6ff0525beb6911fa918c753e311249d7cc2cb066c1b57ced11fa3",
+  "generator": "corpus-gen-v1",
+  "masterSeed": 42
+}

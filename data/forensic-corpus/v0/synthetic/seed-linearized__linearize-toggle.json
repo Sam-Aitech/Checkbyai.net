@@ -1,0 +1,15 @@
+{
+  "group": "synthetic",
+  "seedId": "seed-linearized",
+  "seedSha256": "a9abce7ab5b6ff0525beb6911fa918c753e311249d7cc2cb066c1b57ced11fa3",
+  "operator": "linearize-toggle",
+  "tactic": "Fast-web-view conversion — structural flag flips, content same.",
+  "expectedGate": "GENUINE",
+  "subSeed": 3856768284,
+  "operatorParams": {
+    "direction": "strip"
+  },
+  "sha256": "fc825e7476757b0213d730160aba1ba6a61d877cd7aa0111bee0efa9380ea0b8",
+  "generator": "corpus-gen-v1",
+  "masterSeed": 42
+}

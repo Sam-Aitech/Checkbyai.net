@@ -1,5 +1,5 @@
 # checkbyai.net — Documentation Index
-**Last Updated:** 2026-04-18
+**Last Updated:** 2026-09-26
 
 ---
 
@@ -14,11 +14,23 @@
 | [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md) | Engineering | Full architecture, component deep-dives, data flows, external service integrations |
 | [DATA_MODEL.md](DATA_MODEL.md) | Engineering / DB | All database tables, column definitions, relationships, encryption schema |
 | [API_REFERENCE.md](API_REFERENCE.md) | Engineering / Frontend / Integration | All API endpoints, request/response shapes, auth requirements |
+| [API_CONTRACT.md](API_CONTRACT.md) | Integration partners | Stable request/response contract for the public API surface |
+| [ENV_REFERENCE.md](ENV_REFERENCE.md) | Engineering / Ops | Every environment variable: required vs optional, what breaks without it |
+| [PYTHON_SIDECAR.md](PYTHON_SIDECAR.md) | Engineering / Ops | FastAPI sidecar: run/test commands, Node-facing endpoints, engine stub contract, dep rules, troubleshooting |
+| [session-notes/](session-notes/) | Engineering | Archived session records (historical context only — not current state) |
 | [SECURITY.md](SECURITY.md) | Engineering / Compliance | Threat model, authentication design, data protection, outstanding issues |
 | [ARCHITECTURE_DECISIONS.md](ARCHITECTURE_DECISIONS.md) | Engineering | Why architectural choices were made (ADRs) |
+| [RUNBOOK.md](RUNBOOK.md) | Ops / On-call | Day-2 operations: env setup, jobs, queues, incident response |
+| [runbooks/](runbooks/README.md) | Ops / On-call | Per-job runbooks (sponsorMonitorJob, enrichmentSeed/Batch, jobAlertJob, notificationDrain) |
+| [RELIABILITY_GATES.md](RELIABILITY_GATES.md) | Engineering / QA | Reliability gates and exit criteria |
+| [PERFORMANCE_COST_HARDENING.md](PERFORMANCE_COST_HARDENING.md) | Engineering | Job budgets, cost controls, hardening rollout |
+| [perf-baseline.md](perf-baseline.md) / [perf-progress.md](perf-progress.md) | Engineering | Measured performance baselines and optimization progress |
 | [ENTERPRISE_EXECUTION_PLAN.md](ENTERPRISE_EXECUTION_PLAN.md) | Leadership / Engineering / Ops | CTO-approved hardening roadmap for enterprise readiness, delivery order, and exit criteria |
 | [EXECUTION_PHASES_0_8.md](EXECUTION_PHASES_0_8.md) | Leadership / Engineering / PM | End-to-end program status from Phase 0 through Phase 8 (completed vs remaining, GitHub build plan) |
 | [COS_CHECK_MIS.md](COS_CHECK_MIS.md) | Engineering | COS Check Metadata Inspector architecture, 6-point authenticity checks, type definitions, client integration |
+| [FORENSIC_CORPUS.md](FORENSIC_CORPUS.md) | Engineering | PDF forensic hardening program: corpus taxonomy, Phase 1 baseline, Phase 2 robustness matrix, Phase 3 discrimination results, evidence-bundle contract |
+
+Repo-root docs: [README.md](../README.md) · [DEVELOPMENT.md](../DEVELOPMENT.md) · [DEPLOYMENT.md](../DEPLOYMENT.md) · [CONTRIBUTING.md](../CONTRIBUTING.md) · [SECURITY.md](../SECURITY.md) (vulnerability policy — distinct from `docs/SECURITY.md`) · [CHANGELOG.md](../CHANGELOG.md) · [`.env.example`](../.env.example) (env source of truth)
 
 ---
 
@@ -29,23 +41,24 @@
 |---|---|---|
 | **What** | Watches gov.uk sponsor register; alerts on changes | Forensically analyses a COS PDF for tampering |
 | **Who** | Visa holders, HR teams, immigration advisers | Anyone verifying a COS document |
-| **Pricing** | Starter £24.99/mo · Pro £49.99/mo · Unlimited £99.99/mo | Credit-based; Expert Review packages |
+| **Pricing** | Alert Pass £9.99/yr · Alert Pass Pro £19.99/yr (see `server/scripts/seedProducts.ts`) | CoS Check £4.99 single (credit-based; Expert Review packages) |
 | **Core table** | `sponsor_canonical` | `verification_results` |
-| **Key job** | `sponsorMonitorJob.ts` at 00:30 UTC Mon-Fri | Inline per-request in `pdfAnalyzer.ts` |
+| **Key job** | `sponsorMonitorJob.ts` at 00:30 UTC Mon-Fri | Inline per-request in `pdfAnalyzer.ts` (+ BullMQ `pdf-verify` worker when Redis is up) |
 
-### Sponsor Monitor Pipeline (v2 — as of 2026-03-20)
+### Sponsor Monitor Pipeline (v2 — as of 2026-09)
 ```
 Phase 1: discoverCsvUrl() → ensureTodaysArchive()   [qsv validate + 100k hard floor]
-Phase 2: runCsvDiff(yesterday_fp.csv, today_fp.csv)  [csvdiff Go binary]
-Phase 3: applyStateMachine(diff)                     [4-state: NEWLY_GRANTED/ACTIVE/GRACE_PERIOD/REMOVED_REVOKED]
-Phase 4: notifyAffectedUsers() per change            [7 alertable change types]
-Phase 5: generateHeadline() + monitor_job_runs audit
+Phase 2: runCsvDiff(yesterday_fp.csv, today_fp.csv)  [csvdiff Go binary; gap-day → buildGapDayDiff()]
+Phase 3: applyStateMachine(diff)                     [4-state + rename/grace: NEWLY_GRANTED/ACTIVE/GRACE_PERIOD/REMOVED_REVOKED]
+Phase 4: notifyAffectedUsers() per change            [7 alertable change types, consolidated digest windows]
+Phase 5: generateHeadline() + monitor_job_runs audit [isTest/isGapDay flags; job_locks advisory mutex]
 ```
 
 ### Key Files
 | File | Role |
 |---|---|
-| `server/routes.ts` | All API routes |
+| `server/index.ts` | Boot, fail-fast env validation, security middleware, static/SSR serving |
+| `server/routes.ts` | Route registry — actual route modules live in `server/routes/*.ts` |
 | `server/utils/sponsorMonitorJob.ts` | Daily cron — orchestrates 5-phase pipeline |
 | `server/utils/sponsorStateMachine.ts` | 4-state reconciliation engine (replaces reconcile()) |
 | `server/utils/csvArchiver.ts` | Phase 1 — CSV download, qsv validation, archive registry |
@@ -55,11 +68,12 @@ Phase 5: generateHeadline() + monitor_job_runs audit
 | `server/utils/sponsorSearch.ts` | In-memory Fuse.js search index |
 | `server/utils/sponsorListFetcher.ts` | gov.uk CSV URL discovery + DTO types (SponsorChange, ChangeType) |
 | `server/services/pdfAnalyzer.ts` | PDF forensic analysis engine |
-| `server/services/cosAuthenticityChecker.ts` | COS Check Metadata Inspector — 6-point authenticity verification |
+| `server/services/cosAuthenticityChecker.ts` | COS Check Metadata Inspector — strict SMS 17-gate (checks 1–17, exact FOP 2.3, instant timestamp equality) |
 | `server/services/aiService.ts` | AI provider abstraction + fallback chain |
 | `server/utils/tierConfig.ts` | Subscription tier feature gates |
 | `server/db.ts` | Neon PostgreSQL pool + Drizzle ORM |
 | `shared/schema.ts` | Full database schema (source of truth) |
+| `scripts/seed-migration-history.ts` | Prod cutover: records drifted migrations in `drizzle.__drizzle_migrations` (`npm run db:seed-history`) |
 
 ### Binary Dependencies
 | Binary | Source | Used in |
@@ -87,7 +101,7 @@ Playbooks for common incidents:
 ### Deprecated / Removed
 | Item | Status | Replacement |
 |---|---|---|
-| `sponsor_list` DB table | Deprecated 2026-03-20, DROP after 2026-04-20 | `csv_archive` + `sponsor_canonical` |
+| `sponsor_list` DB table | **Dropped** 2026-09-26 (migration `0030_drop_sponsor_list.sql`) | `csv_archive` + `sponsor_canonical` |
 | `reconcile()` function | Deleted | `applyStateMachine()` in sponsorStateMachine.ts |
 | `downloadAndStreamSponsorList()` | @deprecated | `ensureTodaysArchive()` in csvArchiver.ts |
 | Backup 4h cron | Removed | DB idempotency check in runJobCore() |

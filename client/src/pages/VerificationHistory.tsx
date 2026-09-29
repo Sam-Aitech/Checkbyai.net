@@ -18,6 +18,7 @@ import {
   LogIn,
   History,
   BarChart3,
+  Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PageLayout from "@/components/PageLayout";
@@ -32,6 +33,7 @@ interface VerificationCheck {
   passed: boolean;
   severity: string;
   message: string;
+  kind?: 'forensic' | 'advisory';
 }
 
 interface Verification {
@@ -212,6 +214,7 @@ const VerificationCard = memo(function VerificationCard({ v, index }: { v: Verif
                   className="mt-3 space-y-2 overflow-hidden"
                 >
                   {v.checks.map((check, idx) => {
+                    const isAdvisory = check.kind === 'advisory';
                     const sev = severityStyles[check.severity] || severityStyles.info;
                     return (
                       <div
@@ -219,19 +222,23 @@ const VerificationCard = memo(function VerificationCard({ v, index }: { v: Verif
                         className={`flex items-start gap-3 px-3 py-2 rounded-xl ${
                           check.passed
                             ? "bg-success/5"
-                            : "bg-destructive/5"
+                            : isAdvisory
+                              ? "bg-info/5"
+                              : "bg-destructive/5"
                         }`}
                       >
                         {check.passed ? (
                           <CheckCircle className="w-4 h-4 text-success flex-shrink-0 mt-0.5" />
+                        ) : isAdvisory ? (
+                          <Info className="w-4 h-4 text-info flex-shrink-0 mt-0.5" />
                         ) : (
                           <XCircle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
                         )}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium text-foreground">{check.name}</span>
-                            <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${sev.bg} ${sev.text}`}>
-                              {check.severity}
+                            <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${isAdvisory ? "bg-info/10 text-info" : `${sev.bg} ${sev.text}`}`}>
+                              {isAdvisory ? "note" : check.severity}
                             </span>
                           </div>
                           <p className="text-xs text-muted-foreground mt-0.5">{check.message}</p>

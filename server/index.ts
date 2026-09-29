@@ -12,9 +12,10 @@ import { logger } from "./utils/logger";
 import { errorHandler } from "./lib/errorHandler";
 
 // Import the job queue setup
-import { initJobQueue, setupWorkers } from "./services/jobQueue";
-import { initRedisCache, cacheFlushPattern } from "./utils/redisClient";
-import { rebuildSponsorIndex } from "./utils/sponsorSearch";
+import { initJobQueue, setupWorkers, shutdownWorkers } from "./services/jobQueue";
+import { initRedisCache, cacheFlushPattern, getRedis } from "./utils/redisClient";
+import { getIO } from "./services/socketGateway";
+import { ensureIndexReady } from "./utils/sponsorSearch";
 import { runSponsorMonitorJob } from "./utils/sponsorMonitorJob";
 
 // Startup validation — fail fast if truly critical env vars are missing
@@ -33,6 +34,22 @@ const missingVars = REQUIRED_ENV_VARS.filter((v) => !process.env[v]);
 if (missingVars.length > 0) {
   missingVars.forEach((v) => logger.fatal({ envVar: v }, `CRITICAL: Missing required environment variable: ${v}`));
   if (process.env.NODE_ENV === "production") {
+    process.exit(1);
+  }
+}
+
+// Entropy guard: existence is checked above, but a trivially guessable
+// SESSION_SECRET signs every session cookie. Reject weak values in production.
+// (SEC-011 follow-up: length/entropy was previously not validated at all.)
+const sessionSecret = process.env.SESSION_SECRET;
+if (sessionSecret && process.env.NODE_ENV === "production") {
+  const looksWeak =
+    sessionSecret.length < 32 ||
+    /^(changeme|secret|password|test|dev|insecure)/i.test(sessionSecret);
+  if (looksWeak) {
+    logger.fatal(
+      "CRITICAL: SESSION_SECRET is too short or trivial. Generate with: openssl rand -hex 64"
+    );
     process.exit(1);
   }
 }
@@ -211,9 +228,28 @@ app.use((req, res, next) => {
 });
 
 // Body parsing middleware (excluding multipart which multer handles)
-// The verify callback captures the raw body for Stripe webhook signature verification
+//
+// Stripe webhooks need the exact raw bytes for signature verification and can
+// exceed the global JSON cap — give them a dedicated raw parser mounted BEFORE
+// the global express.json (body-parser marks the body parsed, so express.json
+// skips these requests).
+app.use('/api/stripe-webhook', express.raw({ type: 'application/json', limit: '1mb' }));
+app.use((req, res, next) => {
+  if (req.originalUrl.startsWith('/api/stripe-webhook') && Buffer.isBuffer(req.body)) {
+    (req as any).rawBody = req.body;
+  }
+  next();
+});
+
+// Global JSON cap: 256kb. No mounted endpoint legitimately exceeds this —
+// file uploads go through multer (multipart), Stripe through the raw parser
+// above. The previous 10mb limit let any anonymous POST pin up to 10MB of
+// heap per request (memory-DoS amplifier) and JSON.parse up to 10MB on the
+// single event loop per request (~50-200ms stall).
+// The verify callback stays as a belt-and-braces rawBody source for the
+// webhook if the raw parser above ever skips it (e.g. missing content-type).
 app.use(express.json({
-  limit: '10mb',
+  limit: '256kb',
   verify: (req: any, _res, buf) => {
     if (req.originalUrl && req.originalUrl.startsWith('/api/stripe-webhook')) {
       req.rawBody = buf;
@@ -221,41 +257,55 @@ app.use(express.json({
   },
 }));
 // T005: Use extended:false to prevent prototype pollution via nested object parsing
-app.use(express.urlencoded({ extended: false, limit: '10mb' }));
+app.use(express.urlencoded({ extended: false, limit: '64kb' }));
 
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
-
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
 
   res.on("finish", () => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
-      log(logLine);
+      // Deliberately does NOT serialize the response body: the previous
+      // implementation JSON.stringify'd every /api response (including 50-row
+      // directory pages and the search-index payload) only to truncate it to
+      // 80 chars — pure CPU/GC cost on the hot path. Status + latency is the
+      // signal that matters; response content belongs in structured logs
+      // where explicitly emitted.
+      const size = res.getHeader('content-length');
+      log(`${req.method} ${path} ${res.statusCode} in ${duration}ms${size ? ` (${size}b)` : ""}`);
     }
   });
 
   next();
 });
 
+// Session-level Postgres advisory lock name — serialises boot DDL across
+// replicas so only one instance runs the fixbacks below (the rest block
+// until the leader finishes, then no-op on the idempotent statements).
+const BOOT_DDL_LOCK_KEY = 'checkbyai:boot_ddl';
+
 async function applyDataFixbacks() {
   const client = await pool.connect();
+  let lockAcquired = false;
   try {
+    // Single-leader boot: with N replicas every instance would otherwise
+    // run DDL + CONCURRENTLY index builds concurrently — pointless DB load
+    // and a source of 42P07/lock contention. Blocks until the leader's
+    // session ends (advisory locks auto-release on disconnect, so a
+    // crashed leader can't wedge later boots). statement_timeout bounds
+    // the wait; on timeout we proceed anyway — every statement below is
+    // idempotent (IF NOT EXISTS / backfill WHERE-clause self-terminates).
+    try {
+      await client.query("SET statement_timeout = '120s'");
+      await client.query(`SELECT pg_advisory_lock(hashtext('${BOOT_DDL_LOCK_KEY}'))`);
+      lockAcquired = true;
+      await client.query("SET statement_timeout = 0");
+      logger.info("[Boot] Acquired boot-DDL advisory lock (single-leader fixbacks)");
+    } catch (err) {
+      logger.warn({ err }, "[Boot] Timed out waiting for boot-DDL leader — proceeding with idempotent fixbacks anyway");
+    }
+
     // ── Table-backed locks initialization ──
     try {
       await client.query(`
@@ -301,13 +351,14 @@ async function applyDataFixbacks() {
     // companies whose licence had actually been revoked. This backfill is
     // idempotent — once all rows are migrated, the WHERE clause matches none.
     try {
-      const notListedFix = await client.query<{ count: string }>(
+      const notListedFix = await client.query(
         `UPDATE "sponsor_canonical"
          SET    "status"     = 'REMOVED_REVOKED',
                 "removed_at" = COALESCE("removed_at", ("last_seen" + INTERVAL '1 day')::timestamptz)
-         WHERE  "status" = 'NOT_LISTED'
-         RETURNING 1`,
+         WHERE  "status" = 'NOT_LISTED'`,
       );
+      // rowCount only — RETURNING 1 would materialise every updated row
+      // (up to the full ~140k register) just to count them.
       const fixedRows = notListedFix.rowCount ?? 0;
       if (fixedRows > 0) {
         log(`Migrated ${fixedRows} legacy NOT_LISTED rows → REMOVED_REVOKED`);
@@ -319,10 +370,14 @@ async function applyDataFixbacks() {
     // ── sponsor_changes.is_test guard ─────────────────────────────────────────
     // Migration 0018 adds this column but drizzle-kit migrate may not run before
     // the dev server starts.  The /api/sponsor-changes endpoint filters on it.
+    // NOTE: PostgreSQL has no `ADD COLUMN IF NOT EXISTS` (still a syntax
+    // error through PG17) — the DO block below is the idempotent form.
     try {
       await client.query(`
-        ALTER TABLE "sponsor_changes"
-        ADD COLUMN IF NOT EXISTS "is_test" boolean DEFAULT false
+        DO $$ BEGIN
+          ALTER TABLE "sponsor_changes" ADD COLUMN "is_test" boolean DEFAULT false;
+        EXCEPTION WHEN duplicate_column THEN NULL;
+        END $$;
       `);
       await client.query(`
         CREATE INDEX IF NOT EXISTS "idx_sponsor_changes_is_test"
@@ -335,34 +390,54 @@ async function applyDataFixbacks() {
     // ── monitor_job_runs.is_gap_day guard ─────────────────────────────────────
     // Migration 0020 adds this column but drizzle-kit migrate may not run before
     // the dev server starts.  The job telemetry upsert writes this column.
+    // Same `ADD COLUMN IF NOT EXISTS` caveat as above — DO block instead.
     try {
       await client.query(`
-        ALTER TABLE "monitor_job_runs"
-        ADD COLUMN IF NOT EXISTS "is_gap_day" boolean DEFAULT false
+        DO $$ BEGIN
+          ALTER TABLE "monitor_job_runs" ADD COLUMN "is_gap_day" boolean DEFAULT false;
+        EXCEPTION WHEN duplicate_column THEN NULL;
+        END $$;
       `);
     } catch (err) {
       logger.error({ err }, "Failed to ensure monitor_job_runs.is_gap_day column exists at startup");
     }
-  } finally {
-    client.release();
-  }
-
-  // Concurrent indexes run outside a transaction (CREATE INDEX CONCURRENTLY requirement).
-  // CREATE INDEX CONCURRENTLY cannot run inside a transaction/lock).
-  const concurrentIndexes = [
-    `CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_sc_status_name" ON "sponsor_canonical"("status", "current_name")`,
-    `CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_sc_status_town" ON "sponsor_canonical"("status", "town_city")`,
-    `CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_sc_status_type" ON "sponsor_canonical"("status", "type_rating")`,
-    `CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_changes_date_type" ON "sponsor_changes"("snapshot_date" DESC, "change_type")`,
-    `CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_changes_fp_detected" ON "sponsor_changes"("fingerprint", "detected_at" DESC) WHERE "fingerprint" IS NOT NULL`,
-  ];
-  for (const sql of concurrentIndexes) {
-    try {
-      await pool.query(sql);
-    } catch (err: any) {
-      if (err?.code === '42P07') continue;
-      logger.warn({ err }, "Non-blocking: concurrent index creation failed (will retry next boot)");
+    // Concurrent indexes run outside a transaction (CREATE INDEX CONCURRENTLY
+    // requirement) — they run on this same dedicated client in autocommit
+    // mode (no BEGIN issued), still while the boot-DDL lock is held so only
+    // one replica builds them.
+    const concurrentIndexes = [
+      `CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_sc_status_name" ON "sponsor_canonical"("status", "current_name")`,
+      `CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_sc_status_town" ON "sponsor_canonical"("status", "town_city")`,
+      `CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_sc_status_type" ON "sponsor_canonical"("status", "type_rating")`,
+      // Backs the export.csv keyset pagination (current_name, id) row comparison.
+      `CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_sc_current_name_id" ON "sponsor_canonical"("current_name", "id")`,
+      `CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_changes_date_type" ON "sponsor_changes"("snapshot_date" DESC, "change_type")`,
+      `CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_changes_fp_detected" ON "sponsor_changes"("fingerprint", "detected_at" DESC) WHERE "fingerprint" IS NOT NULL`,
+    ];
+    for (const sql of concurrentIndexes) {
+      try {
+        await client.query(sql);
+      } catch (err: any) {
+        if (err?.code === '42P07') continue;
+        logger.warn({ err }, "Non-blocking: concurrent index creation failed (will retry next boot)");
+      }
     }
+  } finally {
+    if (lockAcquired) {
+      try {
+        await client.query(`SELECT pg_advisory_unlock(hashtext('${BOOT_DDL_LOCK_KEY}'))`);
+      } catch (err) {
+        logger.warn({ err }, "[Boot] Failed to release boot-DDL advisory lock (session close will)");
+      }
+    }
+    // Always reset — pooled clients are reused, and a leaked
+    // statement_timeout would cap every future borrower's queries.
+    try {
+      await client.query("SET statement_timeout = 0");
+    } catch {
+      /* client may already be broken — release below still runs */
+    }
+    client.release();
   }
 }
 
@@ -479,23 +554,73 @@ async function applyDataFixbacks() {
      serveStatic(app);
    }
 
-   // Eagerly warm the Fuse.js sponsor index so the first request after a restart
-   // hits a warm index rather than triggering an on-demand full-table scan.
-   // Fire-and-forget: a failed warm-up degrades to the normal lazy-build path.
-   rebuildSponsorIndex().catch((err: unknown) =>
-     logger.warn({ err: err instanceof Error ? err.message : String(err) }, "[Startup] Sponsor index warm-up failed (non-fatal)")
-   );
+    // Eagerly warm the Fuse.js sponsor index so the first request after a restart
+    // hits a warm index rather than triggering an on-demand full-table scan.
+    // ensureIndexReady() is single-flighted, so this coexists with the same
+    // call in registerRoutes() — exactly 1 full-table scan per boot.
+    // Fire-and-forget: a failed warm-up degrades to the normal lazy-build path.
+    ensureIndexReady().catch((err: unknown) =>
+      logger.warn({ err: err instanceof Error ? err.message : String(err) }, "[Startup] Sponsor index warm-up failed (non-fatal)")
+    );
 
-   // ALWAYS serve the app on port 5000
-   // this serves both the API and the client.
-   // It is the only port that is not firewalled.
-   const port = 5000;
-   server.listen({
-     port,
-     host: "0.0.0.0",
-     reusePort: true,
-   }, async () => {
-     log(`serving on port ${port}`);
-     await seedAdminUser();
+    // ALWAYS serve the app on port 5000
+    // this serves both the API and the client.
+    // It is the only port that is not firewalled.
+    const port = 5000;
+    server.listen({
+      port,
+      host: "0.0.0.0",
+      reusePort: true,
+    }, async () => {
+      log(`serving on port ${port}`);
+      await seedAdminUser();
     });
+
+    // ── Graceful shutdown (SIGTERM/SIGINT) ───────────────────────────────────
+    // HPA scale-down and deploys send SIGTERM; without a handler Node exits
+    // immediately, cutting in-flight requests and BullMQ job acknowledgements.
+    // Drain order: stop consuming jobs → close websockets → stop accepting
+    // HTTP → release Redis/PG handles. A 15s unref'd force-exit guarantees
+    // the old pod always terminates even if a long-lived SSE/keep-alive
+    // connection refuses to close.
+    let shuttingDown = false;
+    const gracefulShutdown = (signal: NodeJS.Signals) => {
+      if (shuttingDown) return;
+      shuttingDown = true;
+      logger.info({ signal }, "[Shutdown] Graceful shutdown initiated");
+      const forceExit = setTimeout(() => {
+        logger.error("[Shutdown] Timed out after 15s — forcing exit");
+        process.exit(1);
+      }, 15_000);
+      forceExit.unref();
+      void (async () => {
+        try {
+          await shutdownWorkers();
+        } catch (err) {
+          logger.error({ err }, "[Shutdown] Worker shutdown failed (continuing)");
+        }
+        try {
+          getIO()?.close();
+        } catch (err) {
+          logger.error({ err }, "[Shutdown] Socket.IO close failed (continuing)");
+        }
+        try {
+          await new Promise<void>((resolve, reject) => {
+            server.close((err) => (err ? reject(err) : resolve()));
+          });
+        } catch (err) {
+          logger.error({ err }, "[Shutdown] HTTP server close failed (continuing)");
+        }
+        try {
+          getRedis()?.disconnect();
+          await pool.end();
+        } catch (err) {
+          logger.error({ err }, "[Shutdown] Redis/PG teardown failed (continuing)");
+        }
+        logger.info("[Shutdown] Clean exit");
+        process.exit(0);
+      })();
+    };
+    process.on("SIGTERM", gracefulShutdown);
+    process.on("SIGINT", gracefulShutdown);
 })();

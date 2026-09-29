@@ -21,16 +21,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
 
       - name: Install dependencies
-        run: npm install --prefer-offline
+        run: npm ci
 
       - name: ESLint
         run: npm run lint
@@ -44,16 +44,16 @@ jobs:
     needs: lint-and-typecheck
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
 
       - name: Install dependencies
-        run: npm install --prefer-offline
+        run: npm ci
 
       - name: Run audit-ci
         id: audit
@@ -106,16 +106,16 @@ jobs:
     needs: [lint-and-typecheck, dependency-audit]
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
 
       - name: Install dependencies
-        run: npm install --prefer-offline
+        run: npm ci
 
       - name: Run tests
         run: npm run test:run
@@ -135,28 +135,52 @@ jobs:
           fi
           npm run test:e2e
 
+  python-sidecar:
+    name: Python Sidecar Tests
+    runs-on: ubuntu-latest
+    needs: lint-and-typecheck
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: .python-version
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run sidecar tests
+        run: uv run --with pytest pytest
+
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [lint-and-typecheck, dependency-audit, test]
+    needs: [lint-and-typecheck, dependency-audit, test, python-sidecar]
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
 
       - name: Install dependencies
-        run: npm install --prefer-offline
+        run: npm ci
 
       - name: Build application
         run: npm run build
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist/

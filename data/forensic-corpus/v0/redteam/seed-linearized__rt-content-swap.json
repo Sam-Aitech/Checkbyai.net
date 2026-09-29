@@ -1,0 +1,15 @@
+{
+  "group": "redteam",
+  "seedId": "seed-linearized",
+  "seedSha256": "a9abce7ab5b6ff0525beb6911fa918c753e311249d7cc2cb066c1b57ced11fa3",
+  "operator": "rt-content-swap",
+  "tactic": "Semantic forgery — visible content changes, all checked strings intact.",
+  "expectedGate": "GENUINE",
+  "subSeed": 1660268192,
+  "operatorParams": {
+    "changed": "Title"
+  },
+  "sha256": "91be81470dcbee54e32c3529d81e814960edc3fec0e513b51d1a514715817d1c",
+  "generator": "corpus-gen-v1",
+  "masterSeed": 42
+}

@@ -1,8 +1,16 @@
 {
   "$schema": "https://raw.githubusercontent.com/IBM/audit-ci/main/docs/schema.json",
   "high": true,
-  "allowlist": [
-    "axios", // CVE-2026-42043 (NO_PROXY bypass via transitive axios in optional dependency); accepted temporarily until upstream release is adopted; review by 2026-08-15.
-    "fast-xml-builder" // CVE-2026-44665 (XML attribute injection in transitive dependency); accepted temporarily while upstream fixes are rolled in; review by 2026-08-15.
-  ]
+  // Policy: allowlist ONLY holds actively-tracked, time-boxed exceptions.
+  // Each entry MUST carry a `review by YYYY-MM-DD` comment; expired entries
+  // fail review and must be removed (fix the advisory or drop the package).
+  // Last renewal: 2026-09-26 — previous entries (axios CVE-2026-42043,
+  // fast-xml-builder CVE-2026-44665, review-by 2026-08-15) removed: neither
+  // advisory is present in the current dependency tree.
+  // Known moderates (non-gating, `high: true` only), reviewed 2026-09-26:
+  //   csv-parse GHSA-8cw4-87c7-c6xx — `columns` option only; our 3 call sites
+  //   (csvArchiver/csvFingerprintBuilder/sponsorListFetcher) never pass
+  //   `columns`, so the vulnerable path is unreachable. Bump to 7.x only
+  //   after confirming v7 breaking changes against those call sites.
+  "allowlist": []
 }

@@ -39,6 +39,7 @@ import {
 } from "../utils/sponsorMonitorDiagnostics";
 import { rebuildSponsorIndex } from "../utils/sponsorSearch";
 import { isQueueAvailable, getSponsorRefreshQueue } from "../services/jobQueue";
+import { producerFamily } from "../services/forensicTypes";
 import { cacheFlushPattern } from "../utils/redisClient";
 import { getWatchLimit } from "../utils/tierConfig";
 import {
@@ -46,7 +47,9 @@ import {
   loadAdminForensicContext,
 } from "../services/adminForensicAnalysis";
 
-const TRUSTED_COS_FORENSIC_VERSION = 1;
+// Bumped 1 → 2 when the 6-check gate was replaced by the strict SMS 17-gate:
+// references validated under v1 were judged by different checks.
+const TRUSTED_COS_FORENSIC_VERSION = 2;
 
 function sanitizeForPrompt(text: string): string {
   return text.replace(/[<>`{}]/g, '');
@@ -285,7 +288,7 @@ export function registerAdminRoutes(app: Express): void {
   app.get('/api/admin/verification-logs', requireRole("admin"), async (req, res) => {
     try {
       const page = parseInt(req.query.page as string) || 1;
-      const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+      const limit = Math.min(Number.parseInt(req.query.limit as string, 10) || 50, 100);
       const status = req.query.status as string | undefined;
       const startDate = req.query.startDate as string | undefined;
       const endDate = req.query.endDate as string | undefined;
@@ -385,7 +388,7 @@ export function registerAdminRoutes(app: Express): void {
       if (trustedRef?.matched) {
         trustedContext += '\n<trusted_reference>\n';
         trustedContext += `Exact trusted match: true\nPattern: ${trustedRef.filename || 'unknown'} (id ${trustedRef.patternId ?? 'unknown'})\nSHA-256: ${trustedRef.documentHash || (verification as any).documentHash || 'unknown'}\n`;
-        trustedContext += 'This document is byte-identical to an admin-approved reference that passed all six mandatory forensic checks. Explain this fact; do not change the verdict.\n</trusted_reference>\n';
+          trustedContext += 'This document is byte-identical to an admin-approved reference that passed all seventeen mandatory forensic checks (checks 1-17). Explain this fact; do not change the verdict.\n</trusted_reference>\n';
       } else {
         trustedContext += '\n<trusted_reference>\nExact trusted match: false\nNo VALIDATED admin reference shares this document SHA-256. Assess on forensic evidence alone.\n</trusted_reference>\n';
       }
@@ -1068,7 +1071,7 @@ Format your response in clear, professional markdown.`;
   app.get('/api/admin/users', requireRole("admin"), async (req, res) => {
     try {
       const page = parseInt(req.query.page as string) || 1;
-      const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+      const limit = Math.min(Number.parseInt(req.query.limit as string, 10) || 50, 100);
       const search = req.query.search as string | undefined;
       const paidOnly = req.query.paidOnly === 'true';
 
@@ -2066,22 +2069,55 @@ Format your response in clear, professional markdown.`;
 
       if (adminStatus === 'fake' && adminFeedback?.trim()) {
         try {
-          const overrideDate = new Date().toISOString().split('T')[0];
-          const originalResult = verification.result;
-          const originalConfidence = verification.confidence;
           const producer = (verification.metadata as any)?.producer || 'Unknown';
-          const ruleText =
-            `CRITICAL ADMIN OVERRIDE [${overrideDate}]: Document initially verified as '${originalResult}' (${originalConfidence}% confidence) was confirmed FAKE by a human expert.\n` +
-            `Producer: ${producer}\n` +
-            `Admin reasoning: ${sanitizeForPrompt(adminFeedback.trim())}\n` +
-            `Action required: Apply heightened scrutiny to documents with similar metadata patterns. Do not classify as Genuine without explicit justification.`;
-
-          await storage.createGlobalAiRule({
-            category: 'hitl-override',
-            ruleText,
-            priority: 100,
-            isActive: true,
+          // Record the machine signal: WHICH checks failed on this confirmed
+          // fake (the auditor's own check-ID vocabulary), so future matching
+          // tests the same anomaly — never the producer string alone. Rows
+          // without a stored cosCheck (e.g. admin overrides) get no signal
+          // block and stay permanently display-only.
+          const storedChecks = (verification.analysisDetails as any)?.cosCheck?.checks;
+          const failedIds = Array.isArray(storedChecks)
+            ? storedChecks
+              .filter((c: any) => c && !c.passed && typeof (c.checkId ?? c.name) === 'string')
+              .map((c: any) => c.checkId ?? c.name)
+            : [];
+          const family = producerFamily(producer);
+          const signalBlock = failedIds.length > 0
+            ? `\nSignal(check-ids): ${failedIds.join(', ')}\nSignal(producer-family): ${family}`
+            : '';
+          // One note per (producer, failure signature): repeated markings of
+          // the same anomaly must not stack duplicate rules. A different
+          // failure signature on the same producer IS a new note.
+          const signature = `Producer: ${producer}|${failedIds.slice().sort((a, b) => a.localeCompare(b)).join(',')}`;
+          const activeRules = await storage.getActiveGlobalAiRules().catch(() => []);
+          const alreadyNoted = activeRules.some((r: any) => {
+            if (r.category !== 'hitl-override' || typeof r.ruleText !== 'string') return false;
+            if (!r.ruleText.includes(`Producer: ${producer}`)) return false;
+            const m = r.ruleText.match(/Signal\(check-ids\):\s*([a-z0-9\-, ]+)/i);
+            const existing = m
+              ? m[1].split(',').map((s: string) => s.trim().toLowerCase()).filter((s: string) => /^check-\d{2}$/.test(s)).sort((a: string, b: string) => a.localeCompare(b)).join(',')
+              : '';
+            return existing === failedIds.slice().sort((a, b) => a.localeCompare(b)).join(',');
           });
+          if (!alreadyNoted) {
+            const overrideDate = new Date().toISOString().split('T')[0];
+            const originalResult = verification.result;
+            const originalConfidence = verification.confidence;
+            const ruleText =
+              `ADMIN NOTE [${overrideDate}]: Document initially verified as '${originalResult}' (${originalConfidence}% confidence) was confirmed FAKE by a human expert.\n` +
+              `Producer: ${producer}\n` +
+              `Admin reasoning: ${sanitizeForPrompt(adminFeedback.trim())}\n` +
+              `Applies to documents failing the same checks; otherwise displayed as context only.${signalBlock}`;
+            await storage.createGlobalAiRule({
+              category: 'hitl-override',
+              ruleText,
+              priority: 100,
+              isActive: true,
+            });
+            logger.info(`[Admin] hitl-override note created (${signature || 'no-signal'}).`);
+          } else {
+            logger.info(`[Admin] hitl-override note already exists (${signature}) — skipping duplicate rule creation.`);
+          }
         } catch (ruleError) {
           logger.error({ err: ruleError }, 'Failed to create AI rule from admin override (non-fatal):');
         }
@@ -2138,7 +2174,7 @@ Format your response in clear, professional markdown.`;
 
   app.get('/api/knowledge-base', requireRole("admin"), async (req: any, res) => {
     try {
-      const limit = parseInt(req.query.limit as string) || 15;
+      const limit = Math.min(Number.parseInt(req.query.limit as string, 10) || 15, 100);
       const knowledge = await storage.getAdminFakeKnowledge(limit);
 
       let knowledgeContext = '';
@@ -2364,7 +2400,7 @@ Format your response in clear, professional markdown.`;
   app.get('/api/admin/users/:id/subscription-audit', requireRole("admin"), async (req, res) => {
     try {
       const userId = req.params.id;
-      const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
+      const limit = Math.min(Number.parseInt(req.query.limit as string, 10) || 20, 50);
       const log = await storage.getSubscriptionAuditLog(userId, limit);
       res.json(log);
     } catch (error) {
@@ -2376,7 +2412,7 @@ Format your response in clear, professional markdown.`;
   app.get('/api/admin/verification-logs-hitl', requireRole("admin"), async (req: any, res) => {
     try {
       const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 20;
+      const limit = Math.min(Number.parseInt(req.query.limit as string, 10) || 20, 100);
       const adminStatus = req.query.adminStatus as string;
 
       const logs = await storage.getVerificationLogsWithHITL(page, limit, adminStatus);
@@ -2429,7 +2465,7 @@ Format your response in clear, professional markdown.`;
   app.get('/api/admin/notifications/users', requireRole("admin"), async (req, res) => {
     try {
       const page = Math.max(1, parseInt(req.query.page as string) || 1);
-      const limit = Math.min(50, parseInt(req.query.limit as string) || 20);
+      const limit = Math.min(50, Number.parseInt(req.query.limit as string, 10) || 20);
       const search = (req.query.search as string)?.trim() ?? '';
       const offset = (page - 1) * limit;
 
@@ -2522,7 +2558,7 @@ Format your response in clear, professional markdown.`;
   app.get('/api/admin/notifications/log', requireRole("admin"), async (req, res) => {
     try {
       const page = Math.max(1, parseInt(req.query.page as string) || 1);
-      const limit = Math.min(100, parseInt(req.query.limit as string) || 25);
+      const limit = Math.min(100, Number.parseInt(req.query.limit as string, 10) || 25);
       const userId = req.query.userId as string | undefined;
       const offset = (page - 1) * limit;
 

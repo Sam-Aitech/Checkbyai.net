@@ -5,9 +5,13 @@ import * as path from "path";
 import multer from "multer";
 import { storage } from "../storage";
 import { db } from "../db";
-import { sql, eq } from "drizzle-orm";
+import {
+  buildAdminOverrideEvidence,
+  buildPatternAndCosForensicChecks,
+  chargeVerificationUsage,
+} from "../services/verificationShared";
 import { withRetry } from "../utils/dbRetry";
-import { users, verificationResults, type TrustedPattern } from "@shared/schema";
+import { verificationResults, type TrustedPattern } from "@shared/schema";
 import { isAuthenticated } from "../auth";
 import { verifyLimiter } from "../middleware/rateLimiter";
 import { PDFAnalyzer } from "../services/pdfAnalyzer";
@@ -16,6 +20,10 @@ import { getClientIp, hashIpAddress } from "../ipRateLimit";
 import { sanitizeUploadPath, assertSafeUploadFilename, assertPdfMagicBytes, toConfinedFsPath } from "../utils/uploadGuard";
 import { combineWithCosVerdict } from "../utils/cosVerdictCombiner";
 import { resolveVerificationWithTrust } from "../utils/trustedReference";
+import {
+  buildForensicEvidence,
+  toEvidenceVerdict,
+} from "../services/forensicTypes";
 import { success } from "../lib/response";
 import { asyncHandler } from "../lib/errorHandler";
 import { ApiError } from "../lib/apiError";
@@ -276,6 +284,15 @@ export function registerVerificationRoutes(app: Express): void {
         const reason = priorAdminFlag.adminFeedback || 'Flagged as fake by a human reviewer.';
         analysis = buildAdminOverrideAnalysis('fake', reason);
         metadata = (priorAdminFlag.metadata as any) || {};
+        // Parser did not run on this path — record an explicit override bundle
+        // so every persisted verification still carries pinned versions + hash.
+        (analysis as any).forensicEvidence = buildAdminOverrideEvidence({
+          analysis,
+          documentHash,
+          uploadMethod: 'api-verify-upload',
+          filename: path.basename(req.file!.originalname),
+          verdict: 'FAKE',
+        });
       } else if (priorAdminApproval) {
         isAdminOverride = true;
         adminOverrideStatus = 'approved';
@@ -284,6 +301,13 @@ export function registerVerificationRoutes(app: Express): void {
         const reason = priorAdminApproval.adminFeedback || 'Confirmed genuine by a human reviewer.';
         analysis = buildAdminOverrideAnalysis('approved', reason);
         metadata = (priorAdminApproval.metadata as any) || {};
+        (analysis as any).forensicEvidence = buildAdminOverrideEvidence({
+          analysis,
+          documentHash,
+          uploadMethod: 'api-verify-upload',
+          filename: path.basename(req.file!.originalname),
+          verdict: 'GENUINE',
+        });
       } else {
         const pdfQueue = getPdfVerifyQueue();
         const shouldQueue = isQueueAvailable() && !!pdfQueue && !isAdminOverride;
@@ -342,10 +366,15 @@ export function registerVerificationRoutes(app: Express): void {
           globalRules: activeRules.map((r: any) => ({ category: r.category, ruleText: r.ruleText, priority: r.priority })),
           hitlKnowledge: hitlFakes.map((v: any) => ({ filename: v.filename, result: v.result, confidence: v.confidence, adminFeedback: v.adminFeedback, metadata: v.metadata })),
         };
-        const [analysisResult, cosCheckResult] = await Promise.all([
-          pdfAnalyzer.analyzeAgainstTrustedPatterns(extractedMetadata, trustedPatterns, adminContext),
-          Promise.resolve(new COSAuthenticityChecker().check(pdfBinary, extractedMetadata)),
-        ]);
+        // The 17-gate runs FIRST (synchronous): its failed check IDs feed
+        // check-ID signal matching inside pattern analysis below.
+        const cosCheckResult = new COSAuthenticityChecker().check(pdfBinary, extractedMetadata);
+        const analysisResult = await pdfAnalyzer.analyzeAgainstTrustedPatterns(extractedMetadata, trustedPatterns, {
+          ...adminContext,
+          currentFailedCheckIds: cosCheckResult.checks
+            .filter((c) => !c.passed)
+            .map((c) => c.checkId ?? c.name),
+        });
         analysis = analysisResult;
         analysis.cosCheck = cosCheckResult;
         const outcome = resolveVerificationWithTrust(
@@ -368,6 +397,52 @@ export function registerVerificationRoutes(app: Express): void {
         analysis.confidence = outcome.confidence;
         analysis.checks = outcome.checks;
         analysis.trustedReference = outcome.trustedReference;
+        // ── Immutable internal evidence bundle (user-guidance-only) ─────────
+        // Verdict logic above is untouched. Structural features are measured
+        // here for offline robustness analysis; the served verdict still comes
+        // solely from the existing pattern + six-check pipeline.
+        try {
+          const structuralFeatures = pdfAnalyzer.extractStructuralFeatures(pdfBinary);
+          const parsedXmp = (extractedMetadata as any).parsedXmp ?? {};
+          const requiredXmp = ['dc:date', 'dc:format', 'dc:language', 'pdf:PDFVersion', 'pdf:Producer', 'xmp:CreateDate', 'xmp:CreatorTool', 'xmp:MetadataDate'];
+          const xmpPresence: Record<string, boolean> = {};
+          for (const f of requiredXmp) xmpPresence[f] = !!parsedXmp[f];
+          const forensicChecks = buildPatternAndCosForensicChecks(outcome.checks, cosCheckResult.checks);
+          (analysis as any).forensicEvidence = buildForensicEvidence({
+            documentHash,
+            extractedFeatures: {
+              producer: extractedMetadata.producer ?? null,
+              creator: extractedMetadata.creator ?? null,
+              pdfVersion: extractedMetadata.pdfVersion ?? null,
+              creationDate: extractedMetadata.creationDate ?? null,
+              modificationDate: extractedMetadata.modificationDate ?? null,
+              pages: extractedMetadata.pages ?? null,
+              fontCount: extractedMetadata.fontCount ?? 0,
+              wordCount: extractedMetadata.wordCount ?? null,
+              characterCount: extractedMetadata.characterCount ?? null,
+              isEncrypted: extractedMetadata.isEncrypted ?? false,
+              hasDigitalSignature: extractedMetadata.hasDigitalSignature ?? false,
+              xmpPresence,
+              hasRealXmp: !!(extractedMetadata as any).rawXmpData,
+            },
+            structuralFeatures,
+            forensicChecks,
+            provenance: {
+              uploadMethod: 'api-verify-upload',
+              filenameSanitized: path.basename(req.file!.originalname),
+              magicVerified: true,
+              processingTimestamp: new Date().toISOString(),
+            },
+            finalVerdict: toEvidenceVerdict(outcome.result),
+            finalConfidence: outcome.confidence,
+            abstentionReason:
+              outcome.result === 'suspicious'
+                ? (cosCheckResult.reason ?? 'Conflicting or unverifiable signals — human review recommended.')
+                : null,
+          });
+        } catch (e) {
+          logger.warn({ err: e }, '[Verify] forensic evidence bundle build failed (non-fatal)');
+        }
         metadata = {
           format: 'Pdf', mimeType: 'application/pdf', pdfVersion: extractedMetadata.pdfVersion || null, title: extractedMetadata.title || null,
           author: extractedMetadata.author || null, subject: extractedMetadata.subject || null, creator: extractedMetadata.creator || null,
@@ -380,19 +455,7 @@ export function registerVerificationRoutes(app: Express): void {
 
       if (isAdminOverride || enqueueFailed || !isQueueAvailable() || !getPdfVerifyQueue()) {
         const verificationId = await withRetry(() => db.transaction(async (tx) => {
-          if (useCredits && userId) {
-            await tx.update(users).set({ credits: sql`GREATEST(COALESCE(${users.credits}, 0) - 1, 0)`, updatedAt: new Date() }).where(eq(users.id, userId));
-          } else if (useDailyLimit && userId) {
-            const today = new Date().toISOString().split('T')[0];
-            const [currentUser] = await tx.select({ dailyVerificationsUsed: users.dailyVerificationsUsed, lastVerificationDate: users.lastVerificationDate }).from(users).where(eq(users.id, userId));
-            const usageToday = currentUser?.lastVerificationDate === today ? (currentUser.dailyVerificationsUsed || 0) + 1 : 1;
-            await tx.update(users).set({
-              dailyVerificationsUsed: usageToday,
-              totalVerificationsUsed: sql`COALESCE(${users.totalVerificationsUsed}, 0) + 1`,
-              lastVerificationDate: today,
-              updatedAt: new Date(),
-            }).where(eq(users.id, userId));
-          }
+          await chargeVerificationUsage(tx, { userId, useCredits, useDailyLimit });
           const insertValues: any = {
             userId, filename: path.basename(req.file!.originalname), result, confidence: Math.floor(analysis.confidence),
             metadata: isAdminOverride ? (adminOverrideSource!.metadata ?? {}) : metadata, analysisDetails: analysis, ipAddress: req.ip, receiptId, documentHash,

@@ -1,0 +1,15 @@
+{
+  "group": "synthetic",
+  "seedId": "seed-fop-v23-plain",
+  "seedSha256": "2e045c80af13cbd0df8d6f4dee1e884d3b174604952bded658cb3720256392ca",
+  "operator": "history-inject",
+  "tactic": "Edit-trail injection — history records an image editor.",
+  "expectedGate": "NON-GENUINE",
+  "subSeed": 2579287373,
+  "operatorParams": {
+    "softwareAgent": "Adobe Photoshop 25.0"
+  },
+  "sha256": "d0f4c3b857e63374b8a56fbe6828b7355de1a34072fe77a93a879049e486e498",
+  "generator": "corpus-gen-v1",
+  "masterSeed": 42
+}

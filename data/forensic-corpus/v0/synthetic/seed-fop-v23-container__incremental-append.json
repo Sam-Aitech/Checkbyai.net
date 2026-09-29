@@ -1,0 +1,15 @@
+{
+  "group": "synthetic",
+  "seedId": "seed-fop-v23-container",
+  "seedSha256": "137fde12338000d3aba57d4f1a0349e8dfa17f6e53a5684c5b5dde587a5c86bc",
+  "operator": "incremental-append",
+  "tactic": "Re-save — new revision appended with Prev chain. The strict SMS 17-gate does not judge revisions (all 17 profile strings intact → GENUINE); the Prev chain + object graft remain recorded in the structural evidence layer.",
+  "expectedGate": "GENUINE",
+  "subSeed": 1473003735,
+  "operatorParams": {
+    "prev": 84100
+  },
+  "sha256": "0a9a89bd546968e64465d2cba0238715070732e7bdb27a0e6f42b5f182a83fe5",
+  "generator": "corpus-gen-v1",
+  "masterSeed": 42
+}

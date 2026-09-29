@@ -1,0 +1,9 @@
+{
+  "kind": "fixture-derived-standin",
+  "seedId": "seed-fop-v23-plain",
+  "description": "Apache FOP 2.9, DC values as bare text nodes (alternate config)",
+  "warning": "NOT a captured Home Office PDF. Mirrors the FOP 2.9 structure for pipeline development only; replace with provenanced captures when available.",
+  "sha256": "2e045c80af13cbd0df8d6f4dee1e884d3b174604952bded658cb3720256392ca",
+  "generator": "corpus-gen-v1",
+  "masterSeed": 42
+}

@@ -54,8 +54,9 @@ cp .env.example .env
 # Edit .env — see Environment Variables section
 
 # 4. Set up the database
-npm run db:push       # Create/sync schema from shared/schema.ts
-npm run db:migrate    # Apply any pending migrations
+npm run db:migrate    # Fresh DB: applies 0000 + 0024–0030 (see migrations/README.md)
+# Alternative for schema-first iteration (bypasses migration history — dev only):
+# npm run db:push
 
 # 5. Start development server
 npm run dev
@@ -67,31 +68,41 @@ The app starts on **http://localhost:5000** (both frontend and backend on the sa
 
 ## Environment Variables
 
-Copy `.env.example` to `.env` and fill in:
+Copy `.env.example` to `.env` and fill in. **`.env.example` is the canonical,
+complete reference** — `docs/ENV_REFERENCE.md` mirrors it with per-variable
+context (required vs optional, which feature breaks without it).
 
 ### Minimum Required (to boot the server)
 
 ```env
 DATABASE_URL=postgresql://user:password@host/dbname?sslmode=require
-SESSION_SECRET=<random 64-char hex: openssl rand -hex 64>
-PHONE_ENCRYPTION_KEY=<random 32-char hex: openssl rand -hex 32>
-IP_HASH_SALT=<random 16-char hex: openssl rand -hex 16>
-CHECKOUT_HMAC_SECRET=<random 32-char hex: openssl rand -hex 32>
-DIGEST_SIGNING_KEY=<random 32-char hex: openssl rand -hex 32>
+SESSION_SECRET=<openssl rand -hex 64>              # 128 hex chars
+PHONE_ENCRYPTION_KEY=<openssl rand -hex 32>        # 64 hex chars (32 bytes — enforced at boot)
+IP_HASH_SALT=<openssl rand -hex 16>                # 32 hex chars
+CHECKOUT_HMAC_SECRET=<openssl rand -hex 32>        # 64 hex chars
+DIGEST_SIGNING_KEY=<openssl rand -hex 32>          # 64 hex chars
 ```
+
+In production the server additionally fail-fasts on `STRIPE_WEBHOOK_SECRET`
+(see `server/index.ts` `REQUIRED_ENV_VARS`).
 
 ### For Full Feature Testing
 
 ```env
-# Payments (use Stripe test keys)
+# Payments (use Stripe test keys; STRIPE_PUBLISHABLE_KEY needed off-Replit)
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PUBLISHABLE_KEY=pk_test_...
 
 # Email (use test/sandbox credentials)
 RESEND_API_KEY=re_...
 
 # AI (for COS Check)
 AI_INTEGRATIONS_OPENAI_API_KEY=sk-...
+
+# Job queue / shared rate limits (optional locally — see .env.example)
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
 ```
 
 ### Generating Secrets Locally
@@ -118,16 +129,18 @@ CheckByAI is a **monolithic** Node.js/Express application serving both the API a
 ```
 checkbyai.net (port 5000)
 ├── React Frontend (Vite, served as static files in production)
-├── Express API Server (routes.ts)
+├── Express API Server (routes/)
 │   ├── Auth (Passport.js — Email OTP + Google OAuth)
 │   ├── Sponsor Monitor routes
 │   ├── COS Check routes
 │   └── Admin routes
-├── Background Jobs (in-process)
+├── Background Jobs (in-process crons + BullMQ workers)
 │   ├── sponsorMonitorJob.ts — nightly cron at 00:30 UTC Mon–Fri
 │   ├── Startup catchup — 5-min timer fires on every boot to retrigger
 │   │   missed runs (bypasses per-hour throttle, uses advisory lock)
-│   └── jobAlertJob.ts — weekly digest
+│   ├── jobAlertJob.ts — weekly digest
+│   └── BullMQ workers — pdf-verify, sponsor-refresh, notification-dispatch,
+│       scraping-job (Redis-backed; inline fallback if Redis is down)
 ├── GitHub Actions External Cron
 │   └── sponsor-monitor-cron.yml — 00:35 UTC Mon–Fri → POST /api/ops/cron-ping
 │       (reliability fallback if in-process cron misfires on restart)
@@ -191,6 +204,9 @@ The database schema lives in `shared/schema.ts` and is managed by [Drizzle Kit](
 npm run db:push
 
 # Generate a migration file from schema changes
+npx drizzle-kit generate
+
+# Apply pending migrations
 npm run db:migrate
 
 # View current DB via Drizzle Studio (opens in browser)
@@ -369,16 +385,22 @@ npm run check:binaries
 The Python FastAPI backend handles:
 - Companies House data enrichment (Pro+ tier)
 - Job listing scraping for job alerts (Pro+ tier)
+- Metadata-comparison fallback for CoS verification
+
+Full runbook: [`docs/PYTHON_SIDECAR.md`](docs/PYTHON_SIDECAR.md)
 
 ### Setup
 
 ```bash
-# Python 3.11+ required
-pip install -r requirements.txt  # or: uv pip install -r pyproject.toml
+# Python 3.11 pinned by .python-version (scipy has no 3.14 wheels)
+uv sync                      # install deps from uv.lock
 
 # Start the Python backend
-python run_backend.py
+uv run python run_backend.py
 # Runs on http://localhost:8000
+
+# Tests
+uv run --with pytest pytest
 ```
 
 If `PYTHON_BACKEND_URL` is unset, the Node.js server uses Cheerio as the primary scraper and skips Companies House enrichment.

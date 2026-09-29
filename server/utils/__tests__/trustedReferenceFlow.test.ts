@@ -13,7 +13,8 @@ import {
 // Mirrors TRUSTED_COS_FORENSIC_VERSION in server/routes/admin.ts. Compared by
 // value (not imported) to keep this test free of the route module's side
 // effects (express, db, storage). Bump alongside the source constant.
-const EXPECTED_FORENSIC_VERSION = 1;
+// v2 = strict SMS 17-gate (v1 was the retired 6-check gate).
+const EXPECTED_FORENSIC_VERSION = 2;
 
 const uploadsDir = fs.mkdtempSync(path.join(os.tmpdir(), "trusted-ref-flow-"));
 process.env.UPLOADS_DIR = uploadsDir;
@@ -22,18 +23,29 @@ process.env.UPLOADS_DIR = uploadsDir;
 let PDFAnalyzer: typeof import("../../services/pdfAnalyzer").PDFAnalyzer;
 let COSAuthenticityChecker: typeof import("../../services/cosAuthenticityChecker").COSAuthenticityChecker;
 
-const SIX_MANDATORY = [
-  "Apache FOP Producer",
-  "XMP Fields Present",
-  "XMP Field Order",
-  "Info/XMP Consistency",
-  "Incremental Updates",
-  "Editing Tools",
+const SEVENTEEN_MANDATORY = [
+  "Check 1 (Format)",
+  "Check 2 (MimeType)",
+  "Check 3 (PdfVersion)",
+  "Check 4 (Creator)",
+  "Check 5 (Producer)",
+  "Check 6 (CreationDate)",
+  "Check 7 (Page Count)",
+  "Check 8 (Word Count)",
+  "Check 9 (Character Count)",
+  "Check 10 (dc:date)",
+  "Check 11 (dc:format)",
+  "Check 12 (dc:language)",
+  "Check 13 (pdf:PDFVersion)",
+  "Check 14 (pdf:Producer)",
+  "Check 15 (xmp:CreateDate)",
+  "Check 16 (xmp:CreatorTool)",
+  "Check 17 (xmp:MetadataDate)",
 ];
 
 let adminBytes: Buffer;
 let adminMetadata: any;
-let SIX_PASS: Array<{ name: string; passed: boolean; detail: string }>;
+let SEVENTEEN_PASS: Array<{ name: string; passed: boolean; detail: string }>;
 let REAL_FAIL: Array<{ name: string; passed: boolean; detail: string }>;
 let editedReason: string | null;
 
@@ -69,30 +81,34 @@ beforeAll(async () => {
   fs.writeFileSync(adminPath, adminBytes);
   adminMetadata = await new PDFAnalyzer().extractMetadata(adminPath);
   const adminCos = new COSAuthenticityChecker().check(adminBytes.toString("binary"), adminMetadata);
-  if (adminCos.verdict !== "GENUINE") throw new Error(`Fixture no longer passes all six: ${adminCos.reason}`);
-  SIX_PASS = adminCos.checks;
+  if (adminCos.verdict !== "GENUINE") throw new Error(`Fixture no longer passes all seventeen: ${adminCos.reason}`);
+  SEVENTEEN_PASS = adminCos.checks;
 
-  const editedBinary = incrementallyUpdatedPdfBinary();
+  // A consumer-tool re-export breaks exact-2.3 identity (checks 4/5/14/16).
+  // NOTE: a pure incremental revision preserving the profile now PASSES the
+  // strict gate by design (revision topology lives in the evidence layer).
+  const editedBinary = genuinePdfBinary().split("Apache FOP Version 2.3").join("iLovePDF");
   const editedPath = path.join(uploadsDir, "edited.pdf");
   fs.writeFileSync(editedPath, Buffer.from(editedBinary, "binary"));
   const editedMetadata = await new PDFAnalyzer().extractMetadata(editedPath);
   const editedCos = new COSAuthenticityChecker().check(editedBinary, editedMetadata);
+  if (editedCos.verdict !== "EDITED") throw new Error(`Edited fixture unexpectedly passes the gate`);
   REAL_FAIL = editedCos.checks;
   editedReason = editedCos.reason;
 });
 
 afterAll(() => fs.rmSync(uploadsDir, { recursive: true, force: true }));
 
-describe("real forensic chain — six mandatory checks", () => {
-  test("genuine fixture yields all six checks passing with GENUINE verdict", () => {
-    expect(SIX_PASS).toHaveLength(6);
-    expect(SIX_PASS.map((c) => c.name).sort()).toEqual([...SIX_MANDATORY].sort());
-    expect(SIX_PASS.every((c) => c.passed)).toBe(true);
+describe("real forensic chain — seventeen mandatory checks", () => {
+  test("genuine fixture yields all seventeen checks passing with GENUINE verdict", () => {
+    expect(SEVENTEEN_PASS).toHaveLength(17);
+    expect(SEVENTEEN_PASS.map((c) => c.name).sort()).toEqual([...SEVENTEEN_MANDATORY].sort());
+    expect(SEVENTEEN_PASS.every((c) => c.passed)).toBe(true);
   });
 });
 
 describe("Admin → trusted reference → customer flow", () => {
-  test("same bytes + current six PASS → genuine with validated status", () => {
+  test("same bytes + current seventeen PASS → genuine with validated status", () => {
     const hash = sha256(adminBytes);
     const outcome = resolveVerificationWithTrust(
       {
@@ -101,7 +117,7 @@ describe("Admin → trusted reference → customer flow", () => {
         patternChecks: [],
         cosVerdict: "GENUINE",
         cosReason: null,
-        cosChecks: SIX_PASS,
+        cosChecks: SEVENTEEN_PASS,
         trustedPatterns: [validatedRow(1, "cos-ref.pdf", hash, adminMetadata)],
         documentHash: hash,
       },
@@ -116,7 +132,7 @@ describe("Admin → trusted reference → customer flow", () => {
     expect(outcome.checks.some((c) => c.name === "Admin Trusted Reference Match")).toBe(true);
   });
 
-  test("same bytes + current six FAIL → conflict, never auto-genuine", () => {
+  test("same bytes + current seventeen FAIL → conflict, never auto-genuine", () => {
     const hash = sha256(adminBytes);
     const outcome = resolveVerificationWithTrust(
       {
@@ -137,7 +153,7 @@ describe("Admin → trusted reference → customer flow", () => {
     if (outcome.trustedReference.matched) {
       expect(outcome.trustedReference.status).toBe("conflict");
       expect(outcome.trustedReference.conflictReason).toBe(editedReason);
-      expect(outcome.trustedReference.conflictChecks).toContain("Incremental Updates");
+      expect(outcome.trustedReference.conflictChecks).toContain("Check 5 (Producer)");
     }
     expect(outcome.checks.some((c) => c.name === "Admin Trusted Reference Match")).toBe(true);
   });
@@ -173,7 +189,7 @@ describe("Admin → trusted reference → customer flow", () => {
         patternChecks: [],
         cosVerdict: "GENUINE",
         cosReason: null,
-        cosChecks: SIX_PASS,
+        cosChecks: SEVENTEEN_PASS,
         trustedPatterns: [validatedRow(7, "same-name.pdf", hash, adminMetadata)],
         documentHash: sha256(otherBytes),
       },
@@ -210,7 +226,7 @@ describe("Admin → trusted reference → customer flow", () => {
         patternChecks: [],
         cosVerdict: "GENUINE",
         cosReason: null,
-        cosChecks: SIX_PASS,
+        cosChecks: SEVENTEEN_PASS,
         trustedPatterns: [validatedRow(3, "legacy.pdf", hash, adminMetadata, { trustStatus: "UNVERIFIED" })],
         documentHash: hash,
       },
@@ -227,8 +243,8 @@ describe("Admin → trusted reference → customer flow", () => {
         patternConfidence: 90,
         patternChecks: [{ name: "Pattern", passed: true }],
         cosVerdict: "EDITED",
-        cosReason: "EDITED — re-saved after initial creation",
-        cosChecks: [{ name: "Incremental Updates", passed: false, detail: "1 re-save(s) detected" }],
+        cosReason: "EDITED — Check 5",
+        cosChecks: [{ name: "Check 5 (Producer)", passed: false, detail: "recreated with consumer tool" }],
         trustedPatterns: [],
         documentHash: sha256(adminBytes),
       },
@@ -288,7 +304,7 @@ describe("byte-level pipeline — Admin upload → customer upload", () => {
       filename: "admin-cos.pdf",
       documentHash,
     });
-    for (const name of SIX_MANDATORY) {
+    for (const name of SEVENTEEN_MANDATORY) {
       expect(customerCos.checks.some((c) => c.name === name && c.passed)).toBe(true);
     }
   });

@@ -1,0 +1,15 @@
+{
+  "group": "redteam",
+  "seedId": "seed-fop-v23-container",
+  "seedSha256": "137fde12338000d3aba57d4f1a0349e8dfa17f6e53a5684c5b5dde587a5c86bc",
+  "operator": "rt-date-clone",
+  "tactic": "Consistent backdating — every date agrees, all in the past.",
+  "expectedGate": "GENUINE",
+  "subSeed": 4076397519,
+  "operatorParams": {
+    "backdatedTo": "2025-01-15"
+  },
+  "sha256": "7220015fd0874b48c478227ce530861661d82fe9d40950b0e61ce00b0d595928",
+  "generator": "corpus-gen-v1",
+  "masterSeed": 42
+}

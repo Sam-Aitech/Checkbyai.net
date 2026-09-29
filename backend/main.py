@@ -7,6 +7,7 @@ import fitz  # PyMuPDF
 import json
 import os
 import asyncio
+import tempfile
 import time
 from typing import List, Dict, Any, Optional
 import hashlib
@@ -56,7 +57,13 @@ app.include_router(job_scraper_router)
 app.include_router(enrichment_router)
 
 
-# Initialize AI comparison engine with caching
+# The proprietary engine contract (COSVerifier/AIEngine) raises
+# NotImplementedError in this distribution — see cos_verifier.py /
+# ai_engine.py and docs/API_CONTRACT.md. The local metadata-comparison
+# engine below (extract_pdf_metadata + compare_with_trusted) is the
+# built-in fallback used by every endpoint in this file.
+
+# Initialize engine singletons (contract stubs; see note above)
 @lru_cache(maxsize=1)
 def get_cos_verifier():
     return COSVerifier()
@@ -150,6 +157,9 @@ class TrustedPattern:
                 
         return hashlib.sha256(hash_string.encode()).hexdigest()
 
+# Node probes both spellings: server/index.ts + sponsorMonitorDiagnostics
+# call /health, enrichmentWorker calls /api/health — serve both.
+@app.get("/health")
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint"""
@@ -197,41 +207,50 @@ async def upload_trusted(file: UploadFile = File(...)):
         
         # Save uploaded file temporarily
         safe_filename = os.path.basename(file.filename or "upload.pdf")
-        temp_path = os.path.join(os.getenv("TEMP_DIR", "/tmp"), f"temp_{safe_filename}")
+        temp_path = os.path.join(os.getenv("TEMP_DIR") or tempfile.gettempdir(), f"temp_{safe_filename}")
         with open(temp_path, "wb") as f:
             f.write(pdf_data)
             
-        # Extract metadata using AI engine
-        metadata = await ai_engine.extract_metadata(temp_path)
-        
-        # Remove temporary file
-        os.remove(temp_path)
+        # Extract metadata using the local PyMuPDF engine. The proprietary
+        # AIEngine.extract_metadata contract raises NotImplementedError in
+        # this distribution (see ai_engine.py).
+        try:
+            metadata = extract_pdf_metadata(temp_path)
+        finally:
+            # Remove temporary file (extract_pdf_metadata may raise)
+            os.remove(temp_path)
         
         # Create trusted pattern
         pattern_id = len(db.get_trusted_patterns()) + 1
         pattern = TrustedPattern(pattern_id, file.filename or "unknown", metadata)
         db.add_trusted_pattern(pattern)
-        
-        # Reload patterns in AI verifier
-        pattern_list = [{"id": p.id, "filename": p.filename, "metadata": p.metadata} for p in db.get_trusted_patterns()]
-        cos_verifier.load_trusted_patterns(pattern_list)
+        # No verifier reload: COSVerifier.load_trusted_patterns was removed
+        # with the proprietary engine (commit 3f35d77). compare_with_trusted
+        # reads db.get_trusted_patterns() on every verify call.
         
         return {"message": "Trusted pattern added successfully", "pattern_id": pattern_id}
         
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=f"Unreadable PDF: {e}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
 
 def extract_pdf_metadata(pdf_path: str) -> Optional[dict]:
     """Extract XMP metadata from PDF using PyMuPDF"""
     try:
-        doc = fitz.open(pdf_path)
-        metadata = doc.metadata
-        
-        # Close document
-        doc.close()
-        
-        return metadata
-        
+        # Read bytes first, then open from memory: fitz.open(path) leaks the
+        # OS file handle when parsing fails (FileDataError after the C layer
+        # has already opened the file), which locks the temp file on Windows
+        # (WinError 32) and turns an intended 422 into a 500.
+        with open(pdf_path, "rb") as f:
+            data = f.read()
+        doc = fitz.open(stream=data, filetype="pdf")
+        try:
+            return doc.metadata
+        finally:
+            doc.close()
     except Exception as e:
         raise ValueError(f"Error extracting metadata: {str(e)}")
 
@@ -256,29 +275,26 @@ async def verify_cos(file: UploadFile = File(...)):
         
         # Save uploaded file temporarily
         safe_filename = os.path.basename(file.filename or "upload.pdf")
-        temp_path = os.path.join(os.getenv("TEMP_DIR", "/tmp"), f"temp_{safe_filename}")
+        temp_path = os.path.join(os.getenv("TEMP_DIR") or tempfile.gettempdir(), f"temp_{safe_filename}")
         with open(temp_path, "wb") as f:
             f.write(pdf_data)
         
+        # Extract XMP/document metadata BEFORE deleting the temp file.
+        # (Previous version removed the file first and then referenced an
+        # never-assigned `metadata` variable — every non-demo request 500'd
+        # with NameError.)
+        try:
+            metadata = extract_pdf_metadata(temp_path)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=f"Unreadable PDF: {e}")
+        finally:
+            os.remove(temp_path)
         
-        # Remove temporary file
-        os.remove(temp_path)
-        
-        # Compare with trusted patterns using AI engine
-        if db.get_trusted_patterns():
-            try:
-                print(f"Using COSVerifier with {len(db.get_trusted_patterns())} trusted patterns")
-                # Ensure trusted patterns are loaded in the verifier
-                cos_verifier.load_trusted_patterns(db.get_trusted_patterns())
-                result = cos_verifier.verify_cos(metadata)
-                print(f"COSVerifier result: {result}")
-            except Exception as e:
-                print(f"COSVerifier failed with error: {e}")
-                print(f"Falling back to basic comparison")
-                # Fallback to basic comparison if AI engine fails
-                result = compare_with_trusted(metadata)
-        else:
-            result = compare_with_trusted(metadata)
+        # Compare with trusted patterns using the local metadata engine.
+        # COSVerifier.load_trusted_patterns / .verify_cos were removed with
+        # the proprietary logic (commit 3f35d77) — the in-file
+        # compare_with_trusted is the built-in comparison for this build.
+        result = compare_with_trusted(metadata)
         
         # Store submission
         submission_id = len(db.submitted_documents) + 1
@@ -309,6 +325,8 @@ async def verify_cos(file: UploadFile = File(...)):
             "mismatchedFields": result.get("mismatched_fields", [])
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Verification error: {str(e)}")
 

@@ -45,7 +45,7 @@
 - **Password authentication disabled for admin** — OTP only
 - Admin email must match `ADMIN_EMAIL` environment variable exactly
 - Admin OTP sent via Resend to the admin email
-- `role = 'admin'` enforced at DB level, checked on every admin route via `isAdmin` middleware
+- `role = 'admin'` enforced at DB level, checked on every admin route via `requireRole("admin")` / `requireAdmin` middleware (`server/middleware/roleGuard.ts`, 6-tier AppRole hierarchy)
 
 ### 2.4 Session Management
 ```
@@ -67,10 +67,11 @@ Store: PostgreSQL (connect-pg-simple)
 ### 3.1 Route Guards
 ```typescript
 isAuthenticated  ← req.isAuthenticated() via Passport
-isAdmin          ← isAuthenticated + users.role === 'admin' (DB check)
+requireRole(min) ← users.role satisfies AppRole hierarchy (server/middleware/roleGuard.ts)
+requireAdmin     ← requireRole("admin") alias, used across admin routes
 ```
 
-All sensitive data routes use `isAuthenticated`. All admin routes use `isAdmin`.
+All sensitive data routes use `isAuthenticated`. All admin routes use `requireRole("admin")`.
 
 ### 3.2 Resource Ownership
 - Watch deletion: verified that `companyWatches.userId === req.user.id` before delete
@@ -260,7 +261,7 @@ BREVO_API_KEY          — SMS notifications (disabled if absent)
 TWILIO_ACCOUNT_SID     — WhatsApp notifications (disabled if absent)
 GOOGLE_CLIENT_ID       — Google OAuth (disabled if absent)
 TURNSTILE_SECRET_KEY   — CAPTCHA (skipped in dev without this)
-OPENAI_API_KEY         — AI analysis (falls back to Claude/DeepSeek)
+AI_INTEGRATIONS_*_API_KEY — AI analysis (OpenAI → Anthropic → OpenRouter chain; server/services/aiService.ts)
 ```
 
 ---

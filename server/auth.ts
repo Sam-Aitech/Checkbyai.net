@@ -13,6 +13,7 @@ import { getAppUrl } from "./utils/appUrl";
 import { validateBody } from "./lib/validate";
 import { sendOtpSchema, verifyOtpSchema } from "./validation/auth";
 import { logger } from "./utils/logger";
+import { getCachedUser } from "./utils/userCache";
 
 
 if (process.env.NODE_ENV === "production" && !process.env.REPLIT_DOMAINS) {
@@ -344,7 +345,9 @@ export async function setupAuth(app: Express) {
       // Handle both old sessions (full user object) and new sessions (just ID string)
       const userId = typeof data === "string" ? data : data?.id;
       if (!userId) return cb(null, false);
-      const user = await storage.getUser(userId);
+      // 15s single-flight cache — this runs on every authenticated request
+      // and was previously one DB round-trip each time. See utils/userCache.ts.
+      const user = await getCachedUser(userId, (id) => storage.getUser(id));
       cb(null, user || false);
     } catch (err) {
       cb(err, null);

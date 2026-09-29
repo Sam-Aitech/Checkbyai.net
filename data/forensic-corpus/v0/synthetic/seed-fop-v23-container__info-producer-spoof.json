@@ -1,0 +1,16 @@
+{
+  "group": "synthetic",
+  "seedId": "seed-fop-v23-container",
+  "seedSha256": "137fde12338000d3aba57d4f1a0349e8dfa17f6e53a5684c5b5dde587a5c86bc",
+  "operator": "info-producer-spoof",
+  "tactic": "Version drift — all strings agree with each other, but the SMS profile pins 2.3 exactly.",
+  "expectedGate": "EDITED",
+  "subSeed": 701024785,
+  "operatorParams": {
+    "from": "Apache FOP Version 2.3",
+    "to": "Apache FOP Version 2.9"
+  },
+  "sha256": "b05f23b901c88dc44822591c31c44638d727dfa85f8cdefc3b42f73386809ecd",
+  "generator": "corpus-gen-v1",
+  "masterSeed": 42
+}

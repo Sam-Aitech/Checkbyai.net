@@ -13,6 +13,7 @@ interface TabbedResult {
     passed: boolean;
     severity: 'critical' | 'warning' | 'info';
     message: string;
+    kind?: 'forensic' | 'advisory';
   }>;
   receiptId?: string;
   documentHash?: string;

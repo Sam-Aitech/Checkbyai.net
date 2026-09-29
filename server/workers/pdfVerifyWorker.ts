@@ -3,13 +3,21 @@ import * as path from "node:path";
 import * as tmp from "tmp";
 import type { Job } from "bullmq";
 import { db } from "../db";
-import { sql, eq } from "drizzle-orm";
-import { users, verificationResults, type TrustedPattern } from "@shared/schema";
+import { verificationResults, type TrustedPattern } from "@shared/schema";
 import { storage } from "../storage";
 import { PDFAnalyzer } from "../services/pdfAnalyzer";
 import { COSAuthenticityChecker } from "../services/cosAuthenticityChecker";
 import { combineWithCosVerdict } from "../utils/cosVerdictCombiner";
 import { resolveVerificationWithTrust } from "../utils/trustedReference";
+import {
+  buildForensicEvidence,
+  toEvidenceVerdict,
+} from "../services/forensicTypes";
+import {
+  buildAdminOverrideEvidence,
+  buildPatternAndCosForensicChecks,
+  chargeVerificationUsage,
+} from "../services/verificationShared";
 import { withRetry } from "../utils/dbRetry";
 import { emitToUser } from "../services/socketGateway";
 import { logger } from "../utils/logger";
@@ -89,6 +97,13 @@ export async function processPdfVerifyJob(job: Job<PdfVerifyJobData>): Promise<{
       result = 'fake';
       analysis = buildAdminOverrideAnalysis('fake', priorFlag.adminFeedback || 'Flagged as fake by a human reviewer.');
       metadata = (priorFlag.metadata as any) || {};
+      (analysis as any).forensicEvidence = buildAdminOverrideEvidence({
+        analysis,
+        documentHash,
+        uploadMethod: 'bullmq-worker',
+        filename: path.basename(originalname),
+        verdict: 'FAKE',
+      });
     } else if (priorApproval) {
       isAdminOverride = true;
       adminOverrideStatus = 'approved';
@@ -96,6 +111,13 @@ export async function processPdfVerifyJob(job: Job<PdfVerifyJobData>): Promise<{
       result = 'genuine';
       analysis = buildAdminOverrideAnalysis('approved', priorApproval.adminFeedback || 'Confirmed genuine by a human reviewer.');
       metadata = (priorApproval.metadata as any) || {};
+      (analysis as any).forensicEvidence = buildAdminOverrideEvidence({
+        analysis,
+        documentHash,
+        uploadMethod: 'bullmq-worker',
+        filename: path.basename(originalname),
+        verdict: 'GENUINE',
+      });
     } else {
       await job.updateProgress(10);
       const pdfAnalyzer = new PDFAnalyzer();
@@ -115,10 +137,15 @@ export async function processPdfVerifyJob(job: Job<PdfVerifyJobData>): Promise<{
         globalRules: (activeRules as any[]).map((r: any) => ({ category: r.category, ruleText: r.ruleText, priority: r.priority })),
         hitlKnowledge: (hitlFakes as any[]).map((v: any) => ({ filename: v.filename, result: v.result, confidence: v.confidence, adminFeedback: v.adminFeedback, metadata: v.metadata })),
       };
-      const [analysisResult, cosCheckResult] = await Promise.all([
-        pdfAnalyzer.analyzeAgainstTrustedPatterns(extractedMetadata, trustedPatterns, adminContext),
-        Promise.resolve(new COSAuthenticityChecker().check(pdfBinary, extractedMetadata)),
-      ]);
+      // The 17-gate runs FIRST (synchronous): its failed check IDs feed
+      // check-ID signal matching inside pattern analysis below.
+      const cosCheckResult = new COSAuthenticityChecker().check(pdfBinary, extractedMetadata);
+      const analysisResult = await pdfAnalyzer.analyzeAgainstTrustedPatterns(extractedMetadata, trustedPatterns, {
+        ...adminContext,
+        currentFailedCheckIds: cosCheckResult.checks
+          .filter((c) => !c.passed)
+          .map((c) => c.checkId ?? c.name),
+      });
       analysis = analysisResult;
       (analysis as any).cosCheck = cosCheckResult;
       const outcome = resolveVerificationWithTrust(
@@ -145,6 +172,48 @@ export async function processPdfVerifyJob(job: Job<PdfVerifyJobData>): Promise<{
       analysis.confidence = outcome.confidence;
       analysis.checks = outcome.checks;
       (analysis as any).trustedReference = outcome.trustedReference;
+      // Immutable internal evidence bundle — verdict logic above untouched.
+      try {
+        const structuralFeatures = pdfAnalyzer.extractStructuralFeatures(pdfBinary);
+        const parsedXmp = (extractedMetadata as any).parsedXmp ?? {};
+        const requiredXmp = ['dc:date', 'dc:format', 'dc:language', 'pdf:PDFVersion', 'pdf:Producer', 'xmp:CreateDate', 'xmp:CreatorTool', 'xmp:MetadataDate'];
+        const xmpPresence: Record<string, boolean> = {};
+        for (const f of requiredXmp) xmpPresence[f] = !!parsedXmp[f];
+        (analysis as any).forensicEvidence = buildForensicEvidence({
+          documentHash,
+          extractedFeatures: {
+            producer: (extractedMetadata as any).producer ?? null,
+            creator: (extractedMetadata as any).creator ?? null,
+            pdfVersion: (extractedMetadata as any).pdfVersion ?? null,
+            creationDate: (extractedMetadata as any).creationDate ?? null,
+            modificationDate: (extractedMetadata as any).modificationDate ?? null,
+            pages: (extractedMetadata as any).pages ?? null,
+            fontCount: (extractedMetadata as any).fontCount ?? 0,
+            wordCount: (extractedMetadata as any).wordCount ?? null,
+            characterCount: (extractedMetadata as any).characterCount ?? null,
+            isEncrypted: (extractedMetadata as any).isEncrypted ?? false,
+            hasDigitalSignature: (extractedMetadata as any).hasDigitalSignature ?? false,
+            xmpPresence,
+            hasRealXmp: !!(extractedMetadata as any).rawXmpData,
+          },
+          structuralFeatures,
+          forensicChecks: buildPatternAndCosForensicChecks(outcome.checks, cosCheckResult.checks),
+          provenance: {
+            uploadMethod: 'bullmq-worker',
+            filenameSanitized: path.basename(originalname),
+            magicVerified: true,
+            processingTimestamp: new Date().toISOString(),
+          },
+          finalVerdict: toEvidenceVerdict(outcome.result),
+          finalConfidence: outcome.confidence,
+          abstentionReason:
+            outcome.result === 'suspicious'
+              ? (cosCheckResult.reason ?? 'Conflicting or unverifiable signals — human review recommended.')
+              : null,
+        });
+      } catch (e) {
+        logger.warn({ err: e }, '[PDFWorker] forensic evidence bundle build failed (non-fatal)');
+      }
       metadata = {
         format: 'Pdf',
         mimeType: 'application/pdf',
@@ -170,19 +239,7 @@ export async function processPdfVerifyJob(job: Job<PdfVerifyJobData>): Promise<{
 
     await job.updateProgress(85);
     const verificationId = await withRetry(() => db.transaction(async (tx) => {
-      if (useCredits && userId) {
-        await tx.update(users).set({ credits: sql`GREATEST(COALESCE(${users.credits}, 0) - 1, 0)`, updatedAt: new Date() }).where(eq(users.id, userId));
-      } else if (useDailyLimit && userId) {
-        const today = new Date().toISOString().split('T')[0];
-        const [currentUser] = await tx.select({ dailyVerificationsUsed: users.dailyVerificationsUsed, lastVerificationDate: users.lastVerificationDate }).from(users).where(eq(users.id, userId));
-        const usageToday = currentUser?.lastVerificationDate === today ? (currentUser.dailyVerificationsUsed || 0) + 1 : 1;
-        await tx.update(users).set({
-          dailyVerificationsUsed: usageToday,
-          totalVerificationsUsed: sql`COALESCE(${users.totalVerificationsUsed}, 0) + 1`,
-          lastVerificationDate: today,
-          updatedAt: new Date(),
-        }).where(eq(users.id, userId));
-      }
+      await chargeVerificationUsage(tx, { userId, useCredits, useDailyLimit });
       const insertValues: any = {
         userId,
         filename: path.basename(originalname),

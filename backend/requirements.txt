@@ -2,37 +2,37 @@
 # Source of truth is pyproject.toml at the project root (managed by uv).
 # This file is a human-readable reference only.
 
-# ── Web framework ──────────────────────────────────────────────────────────────
+# --- Web framework ---
 fastapi>=0.141.1
 uvicorn>=0.52.1
 starlette>=1.6.0
 python-multipart>=0.0.32     # multipart/form-data (file uploads)
 
-# ── HTTP / scraping ────────────────────────────────────────────────────────────
-requests>=2.34.2              # streaming CSV download in sponsor_etl_cron.py
-lxml>=6.1.1                   # XML/HTML parsing (fixes GHSA-vfmq-68hx-4jfw)
-scrapling>=0.4.14                # Gov.uk sponsor-register URL discovery
-curl_cffi>=0.16.0             # scrapling static-fetcher transport
+# --- HTTP / scraping ---
+requests>=2.34.2             # streaming CSV download in sponsor_etl_cron.py
+lxml>=6.1.1                  # XML/HTML parsing (fixes GHSA-vfmq-68hx-4jfw)
+scrapling>=0.4.14            # Gov.uk sponsor-register URL discovery
+curl_cffi>=0.16.0            # scrapling static-fetcher transport
+crawl4ai>=0.9.2              # async page enrichment (enrichment_router.py)
 # playwright                  # scrapling browser fetchers (install separately:
 #                             #   playwright install chromium)
 
-# ── PDF processing ────────────────────────────────────────────────────────────
-pymupdf>=1.28.2               # PDF parsing (cos_verifier.py, ai_engine.py)
+# --- PDF processing ---
+pymupdf>=1.28.2              # PDF parsing (main.py extract_pdf_metadata)
 
-# ── Machine learning / NLP ────────────────────────────────────────────────────
-scikit-learn>=1.9.0           # TF-IDF cosine similarity (ai_engine.py, cos_verifier.py)
-numpy>=2.4.6
-sentence-transformers>=6.1.0    # optional: semantic embeddings (cos_verifier.py)
-                              # falls back to TF-IDF when not installed
+# --- Machine learning ---
+# (none — scikit-learn, numpy, onnxruntime, duckdb and camoufox were removed
+#  2026-09-26 along with the proprietary engine; see commit 3f35d77. The
+#  built-in comparison engine is pure-Python hash/field matching.)
+# sentence-transformers     # optional: only used by the private core-engine
 
-# ── Database ──────────────────────────────────────────────────────────────────
-duckdb>=1.5.5                 # in-process analytics DB (sponsor register)
-psycopg2-binary>=2.9.13        # direct PostgreSQL writes in sponsor_etl_cron.py
-# sqlite3                     # stdlib — was used by sponsor_etl.py (now retired)
+# --- Database ---
+psycopg2-binary>=2.9.13      # direct PostgreSQL writes in sponsor_etl_cron.py
+# sqlite3                    # stdlib — was used by sponsor_etl.py (now retired)
 
-# ── Validation ────────────────────────────────────────────────────────────────
-pydantic>=2.13.5              # request/response models
+# --- Validation ---
+pydantic>=2.13.5             # request/response models
 
-# ── Enrichment ────────────────────────────────────────────────────────────────
-rapidfuzz>=3.0.0              # fuzzy string matching (enrichment_router.py)
-httpx>=0.24.0                 # async HTTP client (enrichment_router.py)
+# --- Enrichment ---
+rapidfuzz>=3.0.0             # fuzzy string matching (enrichment_router.py)
+httpx>=0.24.0                # async HTTP client (enrichment_router.py)

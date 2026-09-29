@@ -28,7 +28,7 @@ vi.mock("../../services/pdfAnalyzer", () => ({
 }));
 vi.mock("../../services/cosAuthenticityChecker", () => ({
   COSAuthenticityChecker: class {
-    check() { return { verdict: "genuine" }; }
+    check() { return { verdict: "genuine", reason: null, checks: [] }; }
   },
 }));
 vi.mock("../../utils/cosVerdictCombiner", () => ({

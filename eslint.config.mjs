@@ -28,6 +28,8 @@ export default [
       "**/coverage/**",
       "**/.vite/**",
       "**/*.d.ts",
+      "**/.venv/**",
+      "backend/**",
     ],
   },
   {

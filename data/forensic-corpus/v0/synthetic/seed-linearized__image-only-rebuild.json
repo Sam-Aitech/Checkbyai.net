@@ -1,0 +1,15 @@
+{
+  "group": "synthetic",
+  "seedId": "seed-linearized",
+  "seedSha256": "a9abce7ab5b6ff0525beb6911fa918c753e311249d7cc2cb066c1b57ced11fa3",
+  "operator": "image-only-rebuild",
+  "tactic": "Flattening — text layer destroyed, pages become images.",
+  "expectedGate": "EDITED",
+  "subSeed": 2286961232,
+  "operatorParams": {
+    "textBlocksExpected": 0
+  },
+  "sha256": "c8a23933121e628517eec72a245c2431cceec070a446e370944302a6f660c11d",
+  "generator": "corpus-gen-v1",
+  "masterSeed": 42
+}

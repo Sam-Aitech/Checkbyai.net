@@ -2,6 +2,59 @@ import * as fs from 'fs';
 import { logger } from '../utils/logger';
 import { XMLParser } from 'fast-xml-parser';
 import { sanitizeUploadPath, toConfinedFsPath } from '../utils/uploadGuard';
+import {
+  FORENSIC_FEATURE_SCHEMA_VERSION,
+  FORENSIC_PARSER_NAME,
+  FORENSIC_PARSER_VERSION,
+  producerFamily,
+  type IForensicParser,
+  type StructuralFeatures,
+} from './forensicTypes';
+
+/**
+ * Machine-readable signal block appended to auto-created hitl-override rules
+ * at flag time (see admin.ts). It records WHICH checks failed on the
+ * confirmed fake, in the auditor's own check-ID vocabulary:
+ *
+ *   Signal(check-ids): check-15, check-17
+ *   Signal(producer-family): apache-fop
+ *
+ * Legacy free-text rows have no block and are permanently display-only:
+ * without a recorded signal there is nothing specific to match, so matching
+ * would degenerate to the producer-string echo chamber.
+ */
+export interface AdminSignal {
+  checkIds: string[];
+  producerFamily: string | null;
+}
+
+export function parseAdminSignal(ruleText: unknown): AdminSignal | null {
+  if (typeof ruleText !== 'string') return null;
+  // Value class excludes newlines so a following Signal(...) line can never bleed in.
+  const idMatch = ruleText.match(/Signal\(check-ids\):\s*([a-z0-9\-, ]+)/i);
+  if (!idMatch) return null;
+  const checkIds = idMatch[1]
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => /^check-\d{2}$/.test(s));
+  if (checkIds.length === 0) return null;
+  const famMatch = ruleText.match(/Signal\(producer-family\):\s*(\S+)/i);
+  return { checkIds, producerFamily: famMatch ? famMatch[1].toLowerCase() : null };
+}
+
+/** Failed check IDs stored on a past verification row (its own cosCheck at flag time). */
+export function storedFailedCheckIds(row: unknown): string[] {
+  const checks = (row as { analysisDetails?: { cosCheck?: { checks?: unknown } } })?.analysisDetails?.cosCheck?.checks;
+  if (!Array.isArray(checks)) return [];
+  return checks
+    .filter((c) => c && typeof c === 'object' && !(c as { passed?: unknown }).passed)
+    .map((c) => {
+      const check = c as { checkId?: unknown; name?: unknown };
+      const id = typeof check.checkId === 'string' ? check.checkId : check.name;
+      return typeof id === 'string' ? id : '';
+    })
+    .filter((s) => s.length > 0);
+}
 
 /**
  * Yields control back to the Node.js event loop, preventing CPU-intensive
@@ -60,6 +113,12 @@ export interface PDFMetadata {
   pdfVersion?: string;
   language?: string;
   format?: string;
+  /**
+   * `%PDF-` header version snapshot, captured before XMP merge can overwrite
+   * `pdfVersion`. The SMS profile gate (Check 3) judges the header version —
+   * XMP's `pdf:PDFVersion` is Check 13's domain. Never derive one from the other.
+   */
+  pdfVersionHeader?: string;
   creatorTool?: string;
   metadataDate?: string;
   isEncrypted?: boolean;
@@ -99,6 +158,18 @@ export interface VerificationCheck {
   severity: 'critical' | 'warning' | 'info';
   message: string;
   details?: any;
+  /**
+   * Provenance of the check. `forensic` (default when absent) = measured from
+   * the document bytes and allowed to move the verdict. `advisory` = an
+   * administrator note surfaced for context — display-only UNLESS
+   * `signalMatched` (same failed check IDs as a confirmed fake): matched
+   * advisories carry limited, capped influence and can never fake alone.
+   * UI must render advisory rows in a neutral "Administrator notes" section,
+   * excluded from pass/fail tallies.
+   */
+  kind?: 'forensic' | 'advisory';
+  /** True when this advisory shares a recorded failure signature with the current doc. */
+  signalMatched?: boolean;
 }
 
 export interface VerificationAnalysis {
@@ -160,7 +231,117 @@ function mentions(text: string, value: string): boolean {
   return trimmed.length >= MIN_PRODUCER_MATCH_LENGTH && text.includes(trimmed);
 }
 
-export class PDFAnalyzer {
+export class PDFAnalyzer implements IForensicParser {
+  readonly parserName = FORENSIC_PARSER_NAME;
+  readonly parserVersion = FORENSIC_PARSER_VERSION;
+
+  /**
+   * Deterministic structural feature extraction over the raw PDF binary string.
+   *
+   * Pure function of `pdfBinary` (no I/O, no randomness, no Date): same bytes
+   * always yield the same features. Kept deliberately cheap (bounded scans,
+   * sampled entropy) so it can run in the hot path alongside the existing
+   * Info/XMP regex pipeline. It does NOT change any verdict — callers attach
+   * the result to the internal evidence bundle for offline robustness analysis.
+   */
+  extractStructuralFeatures(pdfBinary: string): StructuralFeatures {
+    const binary = pdfBinary ?? '';
+    const startxrefCount = (binary.match(/startxref/g) ?? []).length;
+    const isLinearized = /\/Linearized[\s/]/.test(binary.slice(0, 4096));
+    const incrementalUpdatesAboveBaseline = Math.max(0, startxrefCount - (isLinearized ? 2 : 1));
+    // Standalone `xref` section markers only: the leading `(?<![A-Za-z])`
+    // excludes the `xref` substring inside every `startxref` token, which the
+    // previous pattern double-counted (an appended revision with a new
+    // startxref then looked like a new xref table for the wrong reason).
+    const xrefSectionCount = (binary.match(/(?<![A-Za-z])xref(?![A-Za-z])/g) ?? []).length;
+    const hasPrevChain = /\/Prev\s+\d+/.test(binary);
+    const objectCountEstimate = (binary.match(/(?<!\d)\d+\s+\d+\s+obj\b/g) ?? []).length;
+    const streamCount = (binary.match(/\bstream\r?\n/g) ?? []).length;
+    const fontCountEstimate = this.extractFonts(binary).length;
+    const fontDescriptorCount = (binary.match(/\/FontDescriptor/g) ?? []).length;
+    const embeddedFontCount = (binary.match(/\/FontFile\d?/g) ?? []).length;
+    const textBlockCount = (binary.match(/BT\b[\s\S]*?\bET\b/g) ?? []).length;
+    const textOperatorCount = (binary.match(/\b(Tj|TJ|Tm|Tf)\b/g) ?? []).length;
+    return {
+      schemaVersion: FORENSIC_FEATURE_SCHEMA_VERSION,
+      startxrefCount,
+      isLinearized,
+      incrementalUpdatesAboveBaseline,
+      xrefSectionCount,
+      hasPrevChain,
+      objectCountEstimate,
+      streamCount,
+      streamLengthMismatchCount: this.countStreamLengthMismatches(binary),
+      fontCountEstimate,
+      hasUnembeddedFont: fontDescriptorCount > embeddedFontCount,
+      textBlockCount,
+      textOperatorCount,
+      wholeFileEntropyBitsPerByte: this.sampledShannonEntropy(binary),
+      fileSizeBytes: binary.length,
+    };
+  }
+
+  /**
+   * Sampled `/Length` integrity check: for up to 50 streams, compares the
+   * declared `/Length N` preceding `stream` against the measured bytes until
+   * `endstream`. A mismatch means the body was edited without updating the
+   * dictionary — invisible to metadata-only checks. Bounded and deterministic.
+   */
+  private countStreamLengthMismatches(pdfBinary: string): number {
+    let mismatches = 0;
+    let checked = 0;
+    let searchFrom = 0;
+    try {
+      while (checked < 50) {
+        const streamIdx = pdfBinary.indexOf('stream', searchFrom);
+        if (streamIdx === -1) break;
+        // Only count real stream keywords (followed by CRLF/LF), not prose.
+        const after = pdfBinary.slice(streamIdx + 6, streamIdx + 8);
+        if (after[0] !== '\r' && after[0] !== '\n') {
+          searchFrom = streamIdx + 6;
+          continue;
+        }
+        const dictWindow = pdfBinary.slice(Math.max(0, streamIdx - 512), streamIdx);
+        const lengthMatch = dictWindow.match(/\/Length\s+(\d+)(?![\d])/);
+        const bodyStart = pdfBinary.indexOf('\n', streamIdx) + 1;
+        const endIdx = pdfBinary.indexOf('endstream', bodyStart);
+        if (lengthMatch && bodyStart > 0 && endIdx > bodyStart) {
+          const declared = Number.parseInt(lengthMatch[1], 10);
+          // Body includes the trailing EOL before endstream per spec convention.
+          const measured = endIdx - bodyStart;
+          if (Number.isFinite(declared) && Math.abs(measured - declared) > 2) mismatches++;
+          checked++;
+        }
+        // Clamp forward: a lone-\r file with no later `\n` yields
+        // bodyStart 0 and an endIdx behind the cursor — without the max()
+        // the cursor would regress and this loop would never terminate on
+        // hostile input. Progress past streamIdx is guaranteed either way.
+        searchFrom = Math.max(endIdx === -1 ? streamIdx + 6 : endIdx + 9, streamIdx + 6);
+      }
+    } catch {
+      // Feature extraction must never throw — return best effort.
+    }
+    return mismatches;
+  }
+
+  /**
+   * Shannon entropy over a bounded prefix (first 1MiB) so 10MB uploads stay
+   * cheap. Deterministic; rounded to 2dp. Documented sampling — not a secret.
+   */
+  private sampledShannonEntropy(pdfBinary: string): number {
+    const N = Math.min(pdfBinary.length, 1024 * 1024);
+    if (N === 0) return 0;
+    const freq = new Array<number>(256).fill(0);
+    for (let i = 0; i < N; i++) freq[(pdfBinary.codePointAt(i) ?? 0) & 0xff]++;
+    let entropy = 0;
+    for (const count of freq) {
+      if (count === 0) continue;
+      const p = count / N;
+      entropy -= p * Math.log2(p);
+    }
+    return Math.round(entropy * 100) / 100;
+  }
+
   async extractMetadata(filePath: string): Promise<PDFMetadata> {
     try {
             // Path-traversal guard: assert filePath is inside the uploads directory
@@ -209,6 +390,11 @@ export class PDFAnalyzer {
         if (match) {
           metadata[key] = this.cleanPdfString(match[1]);
         }
+      }
+      // Snapshot the header version BEFORE XMP enhancement below can
+      // overwrite `pdfVersion` with the XMP-declared value (Check 3 vs 13).
+      if (metadata.pdfVersion) {
+        metadata.pdfVersionHeader = metadata.pdfVersion;
       }
 
       // ── Phase 3: Yield before expensive font extraction ────────────────────
@@ -822,6 +1008,12 @@ export class PDFAnalyzer {
     adminContext?: {
       globalRules: Array<{ category: string; ruleText: string; priority: number }>;
       hitlKnowledge: Array<{ filename: string; result: string; confidence: number; adminFeedback: string | null; metadata: any }>;
+      /**
+       * Failed 17-gate check IDs for the CURRENT document (computed by the
+       * caller via COSAuthenticityChecker BEFORE this call). Enables
+       * check-ID signal matching; absent = matchers stay silent.
+       */
+      currentFailedCheckIds?: string[];
     }
   ): Promise<VerificationAnalysis> {
     let bestMatch: any = null;
@@ -841,14 +1033,21 @@ export class PDFAnalyzer {
       bestMatch?.metadata || null
     );
 
-    // ── Admin Knowledge Injection ─────────────────────────────────────────
-    // Apply global AI rules and HITL overrides as additional scored checks.
-    // This runs AFTER the rule-based analysis so admin reasons always take effect.
+    // ── Admin Knowledge Injection ───────────────────────────────────────────
+    // Default: display-only advisory rows (see P0). The ONLY sanctioned path
+    // back to verdict relevance is check-ID signal matching: the note fires
+    // with influence iff the current document fails the SAME checks that
+    // failed on the confirmed fake — same anomaly, not same producer string.
+    // Matched influence stays capped (-20 once) and can never fake alone:
+    // no advisory row is ever critical.
     if (adminContext && (adminContext.globalRules.length > 0 || adminContext.hitlKnowledge.length > 0)) {
       const docProducer = (metadata.producer || '').toLowerCase();
       const docCreator  = (metadata.creator  || '').toLowerCase();
+      const docFamily = producerFamily(metadata.producer);
+      const currentFailed = adminContext.currentFailedCheckIds ?? [];
+      const seenAdvisories = new Set<string>();
 
-      // 1. Global AI rules — convert each matching rule into an advisory check
+      // 1. Global AI rules.
       for (const rule of adminContext.globalRules) {
         // Heuristic keyword match: does the rule text mention patterns visible in this doc?
         const ruleText  = rule.ruleText.toLowerCase();
@@ -856,47 +1055,82 @@ export class PDFAnalyzer {
                           mentions(ruleText, docCreator)  ||
                           ruleText.includes('all documents');
 
-        if (relevant) {
+        if (!relevant) continue;
+        const signal = parseAdminSignal(rule.ruleText);
+        if (!signal) {
+          // Legacy free-text row: display-only, deduplicated by identity.
+          const dedupKey = `rule:${rule.category}:${rule.ruleText.substring(0, 200)}`;
+          if (seenAdvisories.has(dedupKey)) continue;
+          seenAdvisories.add(dedupKey);
           ruleResult.checks.push({
-            name: `Admin Rule [${rule.category}]`,
+            name: `Admin Note [${rule.category}]`,
             passed: false,
             severity: 'warning',
-            message: `Admin directive: ${rule.ruleText.substring(0, 300)}`,
+            message: `Admin note (does not affect this verdict): ${rule.ruleText.substring(0, 300)}`,
+            kind: 'advisory',
           } as any);
-          // Each matching high-priority rule lowers the score significantly
-          (ruleResult as any).confidence = Math.max(0, ((ruleResult as any).confidence ?? 100) - Math.min(40, rule.priority / 3));
+          continue;
         }
+        // Signal rule: fires with influence only on same-anomaly + same-family.
+        // Otherwise silent — a rule about date-skew must not echo on clean docs.
+        const overlap = signal.checkIds.filter((id) => currentFailed.includes(id));
+        const familyOk = !signal.producerFamily || signal.producerFamily === docFamily;
+        if (overlap.length === 0 || !familyOk) continue;
+        const dedupKey = `rule-signal:${rule.category}:${overlap.slice().sort((a, b) => a.localeCompare(b)).join(',')}`;
+        if (seenAdvisories.has(dedupKey)) continue;
+        seenAdvisories.add(dedupKey);
+        ruleResult.checks.push({
+          name: `Admin Note [${rule.category}]`,
+          passed: false,
+          severity: 'warning',
+          message: `Admin note — this document fails the same checks (${overlap.join(', ')}) as a human-confirmed fake: ${rule.ruleText.substring(0, 200)}`,
+          kind: 'advisory',
+          signalMatched: true,
+        } as any);
       }
 
-      // 2. HITL — if human experts previously flagged a document with this exact
-      // producer as fake, surface it. Comparison is on the full producer string,
-      // not the normalised family: normalizeProducer() collapses every Apache FOP
-      // release to one identifier, and Apache FOP is the generator behind *all*
-      // genuine Home Office CoS documents, so a family-level match would flag the
-      // entire legitimate population.
+      // 2. HITL — exact-producer match surfaces context (display-only,
+      // deduplicated by producer+reason). Influence requires the stored
+      // failure signature: overlap between the old row's failed check IDs
+      // (captured at flag time) and the current document's.
       for (const cas of adminContext.hitlKnowledge) {
         const caseProducer = ((cas.metadata?.producer) || '').toLowerCase().trim();
         const isSignificantMatch = caseProducer.length >= MIN_PRODUCER_MATCH_LENGTH &&
           caseProducer === docProducer.trim() &&
           this.normalizeProducer(caseProducer) !== 'unknown';
-        if (isSignificantMatch) {
-          const reason = cas.adminFeedback || 'No reason provided';
-          ruleResult.checks.push({
-            name: 'Human Expert Correction (HITL)',
-            passed: false,
-            severity: 'warning',
-            message: `A human expert previously flagged a document with the same producer ("${cas.metadata?.producer}") as FAKE. Expert reason: ${reason}`,
-          } as any);
-          (ruleResult as any).confidence = Math.max(0, ((ruleResult as any).confidence ?? 100) - 30);
-        }
+        if (!isSignificantMatch) continue;
+        const reason = cas.adminFeedback || 'No reason provided';
+        const dedupKey = `hitl:${caseProducer}:${reason.substring(0, 200)}`;
+        if (seenAdvisories.has(dedupKey)) continue;
+        seenAdvisories.add(dedupKey);
+        const rowFailed = storedFailedCheckIds(cas);
+        const matched = rowFailed.length > 0 && rowFailed.some((id) => currentFailed.includes(id));
+        ruleResult.checks.push({
+          name: 'Human Expert Note (HITL)',
+          passed: false,
+          severity: 'warning',
+          message: matched
+            ? `A human expert confirmed a document with the same producer ("${cas.metadata?.producer}") as FAKE on the same checks (${rowFailed.filter((id) => currentFailed.includes(id)).join(', ')}). Expert reason: ${reason}`
+            : `A human expert previously flagged a document with the same producer ("${cas.metadata?.producer}") as FAKE. Expert reason: ${reason}. Context only — this document was judged on its own bytes.`,
+          kind: 'advisory',
+          ...(matched ? { signalMatched: true } : {}),
+        } as any);
       }
 
-      // Re-evaluate status. Admin knowledge is advisory: it can raise suspicion
-      // but never on its own condemn a document, because a single admin decision
-      // about one file would otherwise propagate to every later verification.
-      // Only the forensic checks above can produce a critical failure.
+      // Limited influence: at most one capped deduction no matter how many
+      // rows matched, and matched warnings join the suspicious tally (never
+      // fake — advisories are never critical). Display-only rows are excluded.
+      const matchedRows = ruleResult.checks.filter((c: any) => (c as any).signalMatched);
+      if (matchedRows.length > 0) {
+        (ruleResult as any).confidence = Math.max(0, ((ruleResult as any).confidence ?? 100) - 20);
+      }
       const criticalFails = ruleResult.checks.filter((c: any) => !c.passed && c.severity === 'critical');
-      const warningFails  = ruleResult.checks.filter((c: any) => !c.passed && c.severity === 'warning');
+      const warningFails = ruleResult.checks.filter(
+        (c: any) =>
+          !c.passed &&
+          c.severity === 'warning' &&
+          ((c as any).kind !== 'advisory' || (c as any).signalMatched === true),
+      );
       if (criticalFails.length > 0) {
         (ruleResult as any).status = 'fake';
       } else if (warningFails.length >= 2 || ((ruleResult as any).confidence ?? 100) < 70) {

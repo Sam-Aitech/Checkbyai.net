@@ -1,0 +1,17 @@
+{
+  "group": "synthetic",
+  "seedId": "seed-fop-v23-container",
+  "seedSha256": "137fde12338000d3aba57d4f1a0349e8dfa17f6e53a5684c5b5dde587a5c86bc",
+  "operator": "date-skew",
+  "tactic": "Backdate/forward-date — only the modification stamp moves.",
+  "expectedGate": "NON-GENUINE",
+  "subSeed": 4239759429,
+  "operatorParams": {
+    "from": "D:20250708215956Z",
+    "to": "D:20250813215956Z",
+    "skewDays": 36
+  },
+  "sha256": "e351264c018a26bffc20e75ba8122093600146fe42315194a97b58f20a56b41c",
+  "generator": "corpus-gen-v1",
+  "masterSeed": 42
+}

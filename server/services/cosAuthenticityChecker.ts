@@ -1,7 +1,38 @@
 import type { PDFMetadata } from './pdfAnalyzer';
 import type { COSCheckResult, COSCheck, COSForensic } from '../../shared/mis-types';
 
-const REQUIRED_XMP_FIELDS = [
+/**
+ * UK Home Office SMS (Sponsorship Management System) technical screening —
+ * 17 ordered checks in 4 sections:
+ *
+ *   Section 1  File Format          Check  1–3
+ *   Section 2  PDF Properties       Check  4–6
+ *   Section 3  Document Statistics  Check  7–9   (soft triage: only zero-text fails)
+ *   Section 4  XMP Tags             Check 10–17  (evaluated in XMP order)
+ *
+ * Decision logic: PASS (GENUINE) iff all 17 pass — warnings/notes permitted.
+ * FAIL (EDITED) on any failed row; reason lists failed check numbers.
+ *
+ * Deliberate strictness notes:
+ *  - Producer/creator/tool must equal `Apache FOP Version 2.3` EXACTLY
+ *    (trimmed, case-sensitive). Any other version or tool fails — this
+ *    subsumes tool-fingerprint detection, so no tool list is kept.
+ *  - Timestamp equality is instant comparison (epoch millis, whole-second
+ *    resolution), never string comparison: Info `20:59:56+01:00` and XMP
+ *    `21:59:56Z` are the same instant and PASS.
+ *  - `dc:language` must be `x-unknown`. The old `en-GB` display fallback must
+ *    never leak into this gate — only real `parsedXmp` values are read.
+ *  - No revision/startxref check here by design (strict profile replacement):
+ *    re-saves surface via version/timestamp divergence; revision topology
+ *    remains measured in the structural evidence layer, not this gate.
+ */
+
+const SMS_PRODUCER = 'Apache FOP Version 2.3';
+const SMS_PDF_VERSION = '1.4';
+const SMS_LANGUAGE = 'x-unknown';
+
+/** The 8 XMP fields in mandated audit order (Checks 10–17). */
+const XMP_FIELD_ORDER = [
   'dc:date',
   'dc:format',
   'dc:language',
@@ -12,103 +43,188 @@ const REQUIRED_XMP_FIELDS = [
   'xmp:MetadataDate',
 ] as const;
 
-/**
- * Bytes from the start of the file searched for the linearization dictionary.
- * The spec requires it to be the first object, so a small window is sufficient.
- */
-const LINEARIZATION_HEADER_BYTES = 4096;
+/** `YYYY-MM-DDTHH:mm:ss[.sss]Z` — UTC ISO-8601 as the SMS emits it. */
+const UTC_ISO_SHAPE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
 
-const EDITING_TOOLS: Array<{ pattern: RegExp; name: string }> = [
-  { pattern: /ilovepdf/i,         name: 'iLovePDF' },
-  { pattern: /smallpdf/i,         name: 'Smallpdf' },
-  { pattern: /pdf24/i,            name: 'PDF24' },
-  { pattern: /pdfcreator/i,       name: 'PDFCreator' },
-  { pattern: /nitro/i,            name: 'Nitro PDF' },
-  { pattern: /foxit/i,            name: 'Foxit PDF' },
-  { pattern: /pdfescape/i,        name: 'PDFescape' },
-  { pattern: /sejda/i,            name: 'Sejda PDF' },
-  // codeql[js/regex/missing-regexp-anchor] - Intentionally unanchored: checks if the string *contains* the tool signature, not whether the full string matches.
-  { pattern: /pdf\.io/i,          name: 'PDF.io' },
-  { pattern: /pdfcandy/i,         name: 'PDF Candy' },
-  { pattern: /lightpdf/i,         name: 'LightPDF' },
-  { pattern: /pdfsam/i,           name: 'PDFsam' },
-  { pattern: /photoshop/i,        name: 'Photoshop' },
-  { pattern: /illustrator/i,      name: 'Illustrator' },
-  { pattern: /gimp/i,             name: 'GIMP' },
-  { pattern: /inkscape/i,         name: 'Inkscape' },
-  { pattern: /canva/i,            name: 'Canva' },
-  { pattern: /microsoft.*word/i,  name: 'Microsoft Word' },
-  { pattern: /libreoffice/i,      name: 'LibreOffice' },
-  { pattern: /openoffice/i,       name: 'OpenOffice' },
-  { pattern: /google docs/i,      name: 'Google Docs' },
-  { pattern: /preview/i,          name: 'Apple Preview' },
-  { pattern: /pdfium/i,           name: 'PDFium' },
-];
+const WORD_BAND = { min: 300, max: 700 };
+const CHAR_BAND = { min: 3500, max: 6000 };
+
+function exact(value: unknown, expected: string): boolean {
+  return typeof value === 'string' && value.trim() === expected;
+}
+
+/**
+ * Parse a PDF date (`D:YYYYMMDDHHmmss` + optional `Z`/`+HH'mm'`/`-HH'mm'`)
+ * or ISO-8601 string to epoch millis. Missing tz suffix = UTC (documented
+ * assumption — the gate compares instants, and SMS output always carries
+ * either `Z`-equivalent XMP or an explicit PDF offset). Null when unparseable.
+ */
+export function parseDocInstant(dateStr: unknown): number | null {
+  if (typeof dateStr !== 'string') return null;
+  const s = dateStr.trim();
+  const pdf = s.match(
+    /^D:(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(Z|[+-]\d{2}'?\d{2}'?)?$/,
+  );
+  if (pdf) {
+    const [, Y, Mo, D, h, mi, sec, tz] = pdf;
+    let suffix = 'Z';
+    if (tz && tz !== 'Z') {
+      const m = tz.match(/^([+-])(\d{2})'?(\d{2})'?$/);
+      if (!m) return null;
+      suffix = `${m[1]}${m[2]}:${m[3]}`;
+    }
+    const ms = Date.parse(`${Y}-${Mo}-${D}T${h}:${mi}:${sec}${suffix}`);
+    return Number.isNaN(ms) ? null : ms;
+  }
+  const ms = Date.parse(s);
+  return Number.isNaN(ms) ? null : ms;
+}
+
+/** Whole-second instant equality. */
+function sameInstant(a: number | null, b: number | null): boolean {
+  return a !== null && b !== null && Math.floor(a / 1000) === Math.floor(b / 1000);
+}
 
 export class COSAuthenticityChecker {
   // Accepts the raw PDF binary string (passed from the route — avoids a second file read).
   check(pdfBinary: string, metadata: PDFMetadata): COSCheckResult {
-    const checks: COSCheck[] = [];
-    let firstFailReason: string | null = null;
-
-    const setEdited = (reason: string) => {
-      if (firstFailReason === null) firstFailReason = reason;
+    const rows: COSCheck[] = [];
+    const fail = (id: string, name: string, detail: string): void => {
+      rows.push({ checkId: id, name, passed: false, detail });
+    };
+    const pass = (
+      id: string,
+      name: string,
+      detail: string,
+      soft: 'pass' | 'note' | 'review' = 'pass',
+    ): void => {
+      // Soft rows (statistics triage) stay `passed: true` — they inform, never condemn.
+      rows.push({ checkId: id, name, passed: true, detail: soft === 'pass' ? detail : `[${soft}] ${detail}` });
     };
 
-    // parsedXmp holds only real values extracted from the XMP block.
-    // xmp_tags is synthesised with fallbacks and must NOT be used for presence checks.
     const parsedXmp: Record<string, string> = metadata.parsedXmp ?? {};
     const hasRealXmp = !!metadata.rawXmpData;
 
-    // ── Check 1: Producer must be Apache FOP ─────────────────────────────────
-    const producerCheck = this.checkApacheFop(metadata, parsedXmp);
-    checks.push(producerCheck);
-    if (!producerCheck.passed) setEdited(`not generated by the expected system (Apache FOP)`);
+    // ── Section 1: File Format (Checks 1–3) ─────────────────────────────────
+    const magicOk = pdfBinary.replace(/^\uFEFF/, '').trimStart().startsWith('%PDF-');
+    if (magicOk) pass('check-01', 'Check 1 (Format)', 'Format: Pdf');
+    else fail('check-01', 'Check 1 (Format)', 'Missing %PDF- magic — not a PDF');
+    if (magicOk) pass('check-02', 'Check 2 (MimeType)', 'MimeType: application/pdf (magic-verified at upload)');
+    else fail('check-02', 'Check 2 (MimeType)', 'Not a PDF — no MIME to attest');
 
-    // ── Check 2: All 8 XMP fields must be present (real values, no fallbacks) ─
-    const xmpPresenceCheck = this.checkXmpFieldsPresent(parsedXmp, hasRealXmp);
-    checks.push(xmpPresenceCheck);
-    if (!xmpPresenceCheck.passed) {
-      const missingList = xmpPresenceCheck.detail.replace('Missing: ', '');
-      setEdited(`missing ${missingList}`);
+    const headerVersion = metadata.pdfVersionHeader ?? metadata.pdfVersion;
+    if (headerVersion === SMS_PDF_VERSION) pass('check-03', 'Check 3 (PdfVersion)', `PdfVersion: ${headerVersion}`);
+    else fail('check-03', 'Check 3 (PdfVersion)', `Expected 1.4, found: ${headerVersion ?? 'absent'} — re-save suspected`);
+
+    // ── Section 2: PDF Properties (Checks 4–6) ──────────────────────────────
+    if (exact(metadata.creator, SMS_PRODUCER)) pass('check-04', 'Check 4 (Creator)', `Creator: ${metadata.creator!.trim()}`);
+    else fail('check-04', 'Check 4 (Creator)', `Expected "${SMS_PRODUCER}", found: ${metadata.creator ?? 'absent'}`);
+    if (exact(metadata.producer, SMS_PRODUCER)) pass('check-05', 'Check 5 (Producer)', `Producer: ${metadata.producer!.trim()}`);
+    else fail('check-05', 'Check 5 (Producer)', `Expected "${SMS_PRODUCER}", found: ${metadata.producer ?? 'absent'}`);
+    const creationInstant = parseDocInstant(metadata.creationDate);
+    if (creationInstant !== null) pass('check-06', 'Check 6 (CreationDate)', `CreationDate: ${metadata.creationDate}`);
+    else fail('check-06', 'Check 6 (CreationDate)', `Invalid or absent CreationDate: ${metadata.creationDate ?? 'absent'}`);
+
+    // ── Section 3: Document Statistics (Checks 7–9, soft triage) ────────────
+    const pages = metadata.pages ?? 0;
+    if (pages === 2) pass('check-07', 'Check 7 (Page Count)', 'Pages: 2 (standard CoS form)');
+    else pass('check-07', 'Check 7 (Page Count)', `Pages: ${pages} — manual page-boundary review`, 'note');
+
+    const words = metadata.wordCount ?? 0;
+    const chars = metadata.characterCount ?? 0;
+    if (words === 0 && chars === 0) {
+      pass('check-08', 'Check 8 (Word Count)', 'Words: 0 — see Check 9');
+      fail('check-09', 'Check 9 (Character Count)', 'No extractable text — flattened raster/scan');
+    } else {
+      if (words >= WORD_BAND.min && words <= WORD_BAND.max) pass('check-08', 'Check 8 (Word Count)', `Words: ${words} (band 300–700)`);
+      else pass('check-08', 'Check 8 (Word Count)', `Words: ${words} outside typical band 300–700 — review`, 'review');
+      if (chars >= CHAR_BAND.min && chars <= CHAR_BAND.max) pass('check-09', 'Check 9 (Character Count)', `Characters: ${chars} (band 3500–6000)`);
+      else pass('check-09', 'Check 9 (Character Count)', `Characters: ${chars} outside typical band 3500–6000 — review`, 'review');
     }
 
-    // ── Check 3: XMP fields must be in the correct order ─────────────────────
-    if (hasRealXmp) {
-      const orderCheck = this.checkXmpFieldOrder(metadata.rawXmpData!);
-      checks.push(orderCheck);
-      if (!orderCheck.passed) setEdited('XMP fields in unexpected order');
+    // ── Section 4: XMP Tags (Checks 10–17) ──────────────────────────────────
+    if (!hasRealXmp) {
+      for (let i = 0; i < XMP_FIELD_ORDER.length; i++) {
+        fail(`check-${10 + i}`, `Check ${10 + i} (${XMP_FIELD_ORDER[i]})`, 'No XMP block');
+      }
+    } else {
+      const fieldPass = new Array<boolean>(8).fill(true);
+
+      const dcDate = parsedXmp['dc:date'];
+      if (dcDate && UTC_ISO_SHAPE.test(dcDate.trim())) pass('check-10', 'Check 10 (dc:date)', `dc:date: ${dcDate.trim()}`);
+      else { fail('check-10', 'Check 10 (dc:date)', `Expected UTC ISO-8601, found: ${dcDate ?? 'absent'}`); fieldPass[0] = false; }
+
+      if (exact(parsedXmp['dc:format'], 'application/pdf')) pass('check-11', 'Check 11 (dc:format)', 'dc:format: application/pdf');
+      else { fail('check-11', 'Check 11 (dc:format)', `Expected "application/pdf", found: ${parsedXmp['dc:format'] ?? 'absent'}`); fieldPass[1] = false; }
+
+      if (exact(parsedXmp['dc:language'], SMS_LANGUAGE)) pass('check-12', 'Check 12 (dc:language)', 'dc:language: x-unknown');
+      else { fail('check-12', 'Check 12 (dc:language)', `Expected "x-unknown", found: ${parsedXmp['dc:language'] ?? 'absent'}`); fieldPass[2] = false; }
+
+      if (exact(parsedXmp['pdf:PDFVersion'], SMS_PDF_VERSION)) pass('check-13', 'Check 13 (pdf:PDFVersion)', 'pdf:PDFVersion: 1.4');
+      else { fail('check-13', 'Check 13 (pdf:PDFVersion)', `Expected "1.4", found: ${parsedXmp['pdf:PDFVersion'] ?? 'absent'}`); fieldPass[3] = false; }
+
+      if (exact(parsedXmp['pdf:Producer'], SMS_PRODUCER)) pass('check-14', 'Check 14 (pdf:Producer)', `pdf:Producer: ${parsedXmp['pdf:Producer']!.trim()}`);
+      else { fail('check-14', 'Check 14 (pdf:Producer)', `Expected "${SMS_PRODUCER}", found: ${parsedXmp['pdf:Producer'] ?? 'absent'}`); fieldPass[4] = false; }
+
+      const xmpCreate = parseDocInstant(parsedXmp['xmp:CreateDate']);
+      if (sameInstant(creationInstant, xmpCreate)) pass('check-15', 'Check 15 (xmp:CreateDate)', 'xmp:CreateDate matches CreationDate to the second');
+      else { fail('check-15', 'Check 15 (xmp:CreateDate)', `Mismatch: Info=${metadata.creationDate ?? 'absent'} XMP=${parsedXmp['xmp:CreateDate'] ?? 'absent'}`); fieldPass[5] = false; }
+
+      if (exact(parsedXmp['xmp:CreatorTool'], SMS_PRODUCER)) pass('check-16', 'Check 16 (xmp:CreatorTool)', `xmp:CreatorTool: ${parsedXmp['xmp:CreatorTool']!.trim()}`);
+      else { fail('check-16', 'Check 16 (xmp:CreatorTool)', `Expected "${SMS_PRODUCER}", found: ${parsedXmp['xmp:CreatorTool'] ?? 'absent'}`); fieldPass[6] = false; }
+
+      const xmpMeta = parseDocInstant(parsedXmp['xmp:MetadataDate']);
+      if (sameInstant(xmpCreate, xmpMeta)) pass('check-17', 'Check 17 (xmp:MetadataDate)', 'xmp:MetadataDate identical to xmp:CreateDate');
+      else {
+        fieldPass[7] = false;
+        if (xmpCreate !== null && xmpMeta !== null && xmpMeta > xmpCreate) {
+          fail('check-17', 'Check 17 (xmp:MetadataDate)', 'MetadataDate later than CreateDate — post-issuance alteration');
+        } else if (xmpCreate !== null && xmpMeta !== null) {
+          fail('check-17', 'Check 17 (xmp:MetadataDate)', 'MetadataDate earlier than CreateDate — impossible ordering');
+        } else {
+          fail('check-17', 'Check 17 (xmp:MetadataDate)', `Unparseable or absent: CreateDate=${parsedXmp['xmp:CreateDate'] ?? 'absent'} MetadataDate=${parsedXmp['xmp:MetadataDate'] ?? 'absent'}`);
+        }
+      }
+
+      // Order folding (no 18th row): every present field that breaks the
+      // mandated 10→17 positional monotonicity fails with sequence detail.
+      const rawXmp = metadata.rawXmpData!;
+      let lastIdx = -1;
+      XMP_FIELD_ORDER.forEach((field, i) => {
+        const idx = rawXmp.indexOf(field);
+        if (idx === -1 || !fieldPass[i]) {
+          if (idx !== -1) lastIdx = Math.max(lastIdx, idx);
+          return;
+        }
+        if (idx <= lastIdx) {
+          const row = rows.find((r) => r.checkId === `check-${10 + i}`);
+          if (row) {
+            row.passed = false;
+            row.detail = `Out of sequence: expected after ${previousPresentField(XMP_FIELD_ORDER, rawXmp, i)}`;
+          }
+        } else {
+          lastIdx = idx;
+        }
+      });
     }
 
-    // ── Check 4: Info dict must match XMP values (only when real XMP exists) ──
-    const consistencyCheck = this.checkInfoXmpConsistency(metadata, parsedXmp, hasRealXmp);
-    checks.push(consistencyCheck);
-    if (!consistencyCheck.passed) setEdited('document properties inconsistent');
+    const failed = rows.filter((r) => !r.passed);
+    const verdict = failed.length === 0 ? 'GENUINE' : 'EDITED';
 
-    // ── Check 5: No incremental updates ───────────────────────────────────────
-    const { check: incrementalCheck, count: incrementalCount } =
-      this.checkIncrementalUpdates(pdfBinary);
-    checks.push(incrementalCheck);
-    if (!incrementalCheck.passed) setEdited('re-saved after initial creation');
-
-    // ── Check 6: No editing tool fingerprints ─────────────────────────────────
-    const toolCheck = this.checkEditingTools(metadata);
-    checks.push(toolCheck);
-    if (!toolCheck.passed) setEdited(`modified using ${toolCheck.detail}`);
-
-    // ── Forensic summary ──────────────────────────────────────────────────────
     const infoXmpConsistency: COSForensic['infoXmpConsistency'] =
       !hasRealXmp ? 'XMP_ABSENT' :
-      consistencyCheck.passed ? 'MATCH' : 'MISMATCH';
+      rows.some((r) => (r.checkId === 'check-15' || r.checkId === 'check-17') && !r.passed)
+        ? 'MISMATCH' : 'MATCH';
 
     const forensic: COSForensic = {
-      incrementalUpdates: incrementalCount,
+      // Informational only (admin panel display) — NOT a check row. Revision
+      // topology is judged structurally in the evidence layer, never here.
+      incrementalUpdates: countRevisionsAboveBaseline(pdfBinary),
       infoXmpConsistency,
       toolFingerprint: metadata.producer ?? 'Unknown',
       suspiciousIndicators: metadata.forensic?.suspiciousIndicators ?? [],
     };
 
-    // Use real parsed XMP values only — null when field is genuinely absent.
     const xmpTags = {
       'dc:date':          parsedXmp['dc:date']          ?? null,
       'dc:format':        parsedXmp['dc:format']        ?? null,
@@ -121,9 +237,9 @@ export class COSAuthenticityChecker {
     } as const;
 
     return {
-      verdict: firstFailReason !== null ? 'EDITED' : 'GENUINE',
-      reason:  firstFailReason !== null ? `EDITED — ${firstFailReason}` : null,
-      checks,
+      verdict,
+      reason: verdict === 'GENUINE' ? null : `EDITED — ${failed.map((r) => r.checkId!.replace('check-', 'Check ')).join(', ')}`,
+      checks: rows,
       xmpTags,
       pdfProperties: {
         author:       metadata.author           ?? null,
@@ -144,135 +260,18 @@ export class COSAuthenticityChecker {
       forensic,
     };
   }
+}
 
-  /**
-   * Counts cross-reference sections beyond the baseline the file's structure implies.
-   *
-   * A linearized ("fast web view") PDF carries two startxref tokens by design: the
-   * first-page cross-reference table plus the main one. That is how the file is
-   * written at generation time, not evidence of a later re-save, so the expected
-   * baseline is two rather than one. Anything above the baseline is a genuine
-   * incremental update — each later modification appends one.
-   *
-   * Returns the count alongside the check because the forensic summary reports it.
-   */
-  private checkIncrementalUpdates(pdfBinary: string): { check: COSCheck; count: number } {
-    const startxrefMatches = pdfBinary.match(/startxref/g);
-    const startxrefCount = startxrefMatches ? startxrefMatches.length : 0;
-    const isLinearized = /\/Linearized[\s/]/.test(pdfBinary.slice(0, LINEARIZATION_HEADER_BYTES));
-    const expectedStartxrefs = isLinearized ? 2 : 1;
-    const count = Math.max(0, startxrefCount - expectedStartxrefs);
-    return {
-      count,
-      check: {
-        name: 'Incremental Updates',
-        passed: count <= 0,
-        detail: count <= 0 ? 'No re-saves detected' : `${count} re-save(s) detected`,
-      },
-    };
+/** Baseline-adjusted revision count for display only (see forensic summary). */
+function countRevisionsAboveBaseline(pdfBinary: string): number {
+  const count = (pdfBinary.match(/startxref/g) ?? []).length;
+  const linearized = /\/Linearized[\s/]/.test(pdfBinary.slice(0, 4096));
+  return Math.max(0, count - (linearized ? 2 : 1));
+}
+
+function previousPresentField(order: readonly string[], rawXmp: string, i: number): string {
+  for (let j = i - 1; j >= 0; j--) {
+    if (rawXmp.indexOf(order[j]) !== -1) return order[j];
   }
-
-  private checkApacheFop(metadata: PDFMetadata, parsedXmp: Record<string, string>): COSCheck {
-    const producer = metadata.producer ?? '';
-    const xmpProducer = parsedXmp['pdf:Producer'] ?? '';
-    const isApacheFop = /apache.?fop/i.test(producer) || /apache.?fop/i.test(xmpProducer);
-    return {
-      name: 'Apache FOP Producer',
-      passed: isApacheFop,
-      detail: isApacheFop
-        ? `Producer: ${producer || xmpProducer}`
-        : `Expected Apache FOP, found: ${producer || 'Unknown'}`,
-    };
-  }
-
-  private checkXmpFieldsPresent(parsedXmp: Record<string, string>, hasRealXmp: boolean): COSCheck {
-    if (!hasRealXmp) {
-      return {
-        name: 'XMP Fields Present',
-        passed: false,
-        detail: `Missing: ${REQUIRED_XMP_FIELDS.join(', ')} (no XMP block found)`,
-      };
-    }
-    const missing = REQUIRED_XMP_FIELDS.filter(f => !parsedXmp[f]);
-    return {
-      name: 'XMP Fields Present',
-      passed: missing.length === 0,
-      detail: missing.length === 0
-        ? 'All 8 required XMP fields present'
-        : `Missing: ${missing.join(', ')}`,
-    };
-  }
-
-  private checkXmpFieldOrder(rawXmp: string): COSCheck {
-    const positions = REQUIRED_XMP_FIELDS.map(field => rawXmp.indexOf(field));
-    const found = positions.filter(p => p !== -1);
-    const isOrdered = found.every((p, i) => i === 0 || p > found[i - 1]);
-    return {
-      name: 'XMP Field Order',
-      passed: isOrdered || found.length < 2,
-      detail: isOrdered ? 'XMP fields in expected order' : 'XMP fields out of expected order',
-    };
-  }
-
-  private checkInfoXmpConsistency(
-    metadata: PDFMetadata,
-    parsedXmp: Record<string, string>,
-    hasRealXmp: boolean,
-  ): COSCheck {
-    if (!hasRealXmp) {
-      return {
-        name: 'Info/XMP Consistency',
-        passed: false,
-        detail: 'No XMP block to compare against Info dictionary',
-      };
-    }
-
-    const mismatches: string[] = [];
-
-    if (metadata.producer && parsedXmp['pdf:Producer']) {
-      if (metadata.producer.trim().toLowerCase() !== parsedXmp['pdf:Producer'].trim().toLowerCase()) {
-        mismatches.push('Producer');
-      }
-    }
-
-    if (metadata.creator && parsedXmp['xmp:CreatorTool']) {
-      if (metadata.creator.trim().toLowerCase() !== parsedXmp['xmp:CreatorTool'].trim().toLowerCase()) {
-        mismatches.push('CreatorTool');
-      }
-    }
-
-    if (metadata.creationDate && parsedXmp['xmp:CreateDate']) {
-      const infoDate = this.normalizeDate(metadata.creationDate);
-      const xmpDate  = this.normalizeDate(parsedXmp['xmp:CreateDate']);
-      if (infoDate && xmpDate && infoDate !== xmpDate) {
-        mismatches.push('CreateDate');
-      }
-    }
-
-    return {
-      name: 'Info/XMP Consistency',
-      passed: mismatches.length === 0,
-      detail: mismatches.length === 0
-        ? 'Info dictionary matches XMP block'
-        : `Mismatch in: ${mismatches.join(', ')}`,
-    };
-  }
-
-  private checkEditingTools(metadata: PDFMetadata): COSCheck {
-    const combined = `${metadata.producer ?? ''} ${metadata.creator ?? ''}`;
-    for (const { pattern, name } of EDITING_TOOLS) {
-      if (pattern.test(combined)) {
-        return { name: 'Editing Tools', passed: false, detail: name };
-      }
-    }
-    return { name: 'Editing Tools', passed: true, detail: 'No editing tools detected' };
-  }
-
-  private normalizeDate(dateStr: string): string | null {
-    const pdfMatch = dateStr.match(/D:(\d{4})(\d{2})(\d{2})/);
-    if (pdfMatch) return `${pdfMatch[1]}-${pdfMatch[2]}-${pdfMatch[3]}`;
-    const isoMatch = dateStr.match(/(\d{4})-(\d{2})-(\d{2})/);
-    if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
-    return null;
-  }
+  return 'document start';
 }

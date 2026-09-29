@@ -1,0 +1,15 @@
+{
+  "group": "synthetic",
+  "seedId": "seed-linearized",
+  "seedSha256": "a9abce7ab5b6ff0525beb6911fa918c753e311249d7cc2cb066c1b57ced11fa3",
+  "operator": "xmp-rebuild",
+  "tactic": "Metadata reconstruction — values preserved, serialization changed.",
+  "expectedGate": "EDITED",
+  "subSeed": 2472131411,
+  "operatorParams": {
+    "order": "xmp,pdf,dc (non-canonical)"
+  },
+  "sha256": "26d0edb23e1f7e4d6739c54663f68ab918442258714af3d392eec312e5c13698",
+  "generator": "corpus-gen-v1",
+  "masterSeed": 42
+}
