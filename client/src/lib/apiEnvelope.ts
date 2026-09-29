@@ -9,7 +9,7 @@
  */
 
 // Keep in sync with server/lib/response.ts's ApiErrorCode.
-export type ApiErrorCode = "beta_login_required" | "cos_access_denied";
+export type ApiErrorCode = "beta_login_required" | "cos_access_denied" | "account_restricted";
 
 interface ApiSuccess<T> {
   success: true;

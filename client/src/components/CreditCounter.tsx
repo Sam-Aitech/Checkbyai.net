@@ -7,7 +7,10 @@ import { motion } from 'framer-motion';
 interface CreditsData {
   credits: number;
   subscriptionStatus: string;
+  hasAccess: boolean;
+  canVerify: boolean;
   isUnlimited: boolean;
+  remaining: number | null;
 }
 
 interface CreditCounterProps {
@@ -34,7 +37,7 @@ export default function CreditCounter({ variant = 'default', className = '' }: C
   }
 
   const isUnlimited = creditsData?.isUnlimited || creditsData?.subscriptionStatus === 'unlimited' || creditsData?.subscriptionStatus === 'enterprise';
-  const credits = creditsData?.credits || 0;
+  const remaining = creditsData?.remaining ?? creditsData?.credits ?? 0;
 
   if (variant === 'compact') {
     return (
@@ -43,7 +46,7 @@ export default function CreditCounter({ variant = 'default', className = '' }: C
         {isUnlimited ? (
           <Infinity className="w-4 h-4 text-green-600 dark:text-green-400" />
         ) : (
-          <span className="font-medium">{credits}</span>
+          <span className="font-medium">{remaining}</span>
         )}
       </div>
     );
@@ -64,8 +67,8 @@ export default function CreditCounter({ variant = 'default', className = '' }: C
         </span>
       ) : (
         <span>
-          <span className="font-bold">{credits}</span>
-          <span className="opacity-70 ml-1 text-xs">credits</span>
+          <span className="font-bold">{remaining}</span>
+          <span className="opacity-70 ml-1 text-xs">checks remaining</span>
         </span>
       )}
     </motion.div>

@@ -32,7 +32,10 @@ export interface SponsorChange {
 interface CreditsResponse {
   credits: number;
   subscriptionStatus: string;
+  hasAccess: boolean;
+  canVerify: boolean;
   isUnlimited: boolean;
+  remaining: number | null;
 }
 
 export type ProtectionStatus = "empty" | "clear" | "attention" | "critical";
@@ -92,15 +95,21 @@ export function useAccountSummary() {
   // server/routes/verification.ts — must never be used for Alert-Pass
   // tier/feature gating, only to mirror the server's COS-access truth here.
   const hasCosAccess =
-    user?.role === "admin" ||
-    user?.cosCheckSubscription === true ||
-    user?.cosCheckApproved === true ||
-    (user?.credits ?? 0) > 0;
+    creditsQuery.data?.hasAccess ??
+    (
+      user?.role === "admin" ||
+      user?.cosCheckSubscription === true ||
+      user?.cosCheckApproved === true ||
+      user?.verificationLimit != null ||
+      user?.subscriptionStatus === "unlimited" ||
+      user?.subscriptionStatus === "enterprise" ||
+      (user?.credits ?? 0) > 0
+    );
 
   const jobAlertsEligible = hasJobAlerts(user?.subscriptionStatus);
 
-  const isLoading = authLoading || (isAuthenticated && (watchesQuery.isLoading || changesQuery.isLoading));
-  const isError = !authLoading && isAuthenticated && (watchesQuery.isError || changesQuery.isError);
+  const isLoading = authLoading || (isAuthenticated && (watchesQuery.isLoading || changesQuery.isLoading || creditsQuery.isLoading));
+  const isError = !authLoading && isAuthenticated && (watchesQuery.isError || changesQuery.isError || creditsQuery.isError);
 
   return {
     user,
@@ -117,6 +126,17 @@ export function useAccountSummary() {
     watchLimit,
     atCapacity,
     hasCosAccess,
+    canVerifyCos: creditsQuery.data?.canVerify ?? hasCosAccess,
+    isCosUnlimited:
+      creditsQuery.data?.isUnlimited ??
+      (
+        user?.role === "admin" ||
+        user?.cosCheckSubscription === true ||
+        user?.verificationLimit === -1 ||
+        user?.subscriptionStatus === "unlimited" ||
+        user?.subscriptionStatus === "enterprise"
+      ),
+    cosChecksRemaining: creditsQuery.data?.remaining ?? user?.credits ?? 0,
     jobAlertsEligible,
     credits: creditsQuery.data?.credits ?? user?.credits ?? 0,
     refetchWatches: watchesQuery.refetch,

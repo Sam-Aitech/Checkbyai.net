@@ -61,7 +61,7 @@ export default function Home() {
   };
 
   return (
-    <PageLayout hideNav hideFooter>
+    <PageLayout hideFooter darkNav>
       <SEOHead {...homePageSEO} />
       <Suspense fallback={<LoadingSpinner />}>
         <HeroSection />

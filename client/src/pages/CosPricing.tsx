@@ -269,12 +269,6 @@ export default function CosPricing() {
   const isLoggedIn = !!user?.id;
   const { getPriceId } = usePackagePrices();
 
-  const paymentLinks: Record<string, string> = {
-    starter: 'https://buy.stripe.com/3cIeVec9k1pz2uQdIveZ203',
-    pro: 'https://buy.stripe.com/fZufZi4GSfgp1qMfQDeZ201',
-    unlimited: 'https://buy.stripe.com/dRm3cw7T41pz8Te5bZeZ202',
-  };
-
   const handleSelectPlan = async (plan: PricingPlan) => {
     if (plan.contactSales) {
       window.location.href = 'mailto:support@checkbyai.net?subject=Enterprise%20Plan%20Enquiry';
@@ -292,33 +286,11 @@ export default function CosPricing() {
 
     setLoading(plan.packageType);
 
-    // cos_check_single is a pay-per-use plan with no hand-created Payment
-    // Link — it goes through the dynamic /api/checkout/credits session
-    // instead, same as the annual alert plans on /pricing.
-    if (plan.packageType === 'cos_check_single') {
-      const priceId = getPriceId('cos_check_single');
-      if (!priceId) {
-        toast({ title: 'Not available yet', description: 'This plan is not open for checkout yet. Please check back shortly.', variant: 'destructive' });
-        setLoading(null);
-        return;
-      }
-      try {
-        const res = await apiRequest('POST', '/api/checkout/credits', { priceId, packageType: 'cos_check_single' });
-        const envelope = await res.json();
-        const { url } = unwrapApiEnvelope<{ url: string }>(envelope);
-        window.location.href = url;
-      } catch (error: any) {
-        toast({ title: 'Error', description: error.message || 'Failed to start checkout. Please try again.', variant: 'destructive' });
-        setLoading(null);
-      }
-      return;
-    }
-
-    const link = paymentLinks[plan.packageType];
-    if (!link) {
+    const priceId = getPriceId(plan.packageType);
+    if (!priceId) {
       toast({
-        title: 'Error',
-        description: 'Package not available. Please try again later.',
+        title: 'Not available yet',
+        description: 'This plan is not open for checkout yet. Please check back shortly.',
         variant: 'destructive',
       });
       setLoading(null);
@@ -326,10 +298,12 @@ export default function CosPricing() {
     }
 
     try {
-      const res = await apiRequest('POST', '/api/checkout/sign', { packageType: plan.packageType });
+      const res = await apiRequest('POST', '/api/checkout/credits', {
+        priceId,
+        packageType: plan.packageType,
+      });
       const envelope = await res.json();
-      const { clientReferenceId } = unwrapApiEnvelope<{ clientReferenceId: string }>(envelope);
-      const url = `${link}?client_reference_id=${encodeURIComponent(clientReferenceId)}&prefilled_email=${encodeURIComponent(user.email || '')}`;
+      const { url } = unwrapApiEnvelope<{ url: string }>(envelope);
       window.location.href = url;
     } catch (error: any) {
       toast({
@@ -441,7 +415,7 @@ export default function CosPricing() {
                 isLoggedIn={isLoggedIn}
                 loading={loading}
                 onSelect={handleSelectPlan}
-                available={plan.contactSales || plan.packageType !== 'cos_check_single' || !!getPriceId('cos_check_single')}
+                available={plan.contactSales || !!getPriceId(plan.packageType)}
               />
             ))}
           </div>

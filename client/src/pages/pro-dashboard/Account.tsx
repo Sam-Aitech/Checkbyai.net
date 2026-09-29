@@ -5,6 +5,7 @@
  * /dashboard page rather than re-embedding upload UI — locked decision).
  */
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -14,7 +15,7 @@ import { Shell, T, cardStyle } from "./index";
 import { useAccountSummary } from "./hooks/useAccountSummary";
 import {
   User, CreditCard, ShieldCheck, HelpCircle, Crown, AlertTriangle,
-  ExternalLink, Loader2, ChevronRight,
+  ExternalLink, Loader2, ChevronRight, LogOut,
 } from "lucide-react";
 
 function SectionCard({ title, Icon, children }: { title: string; Icon: any; children: React.ReactNode }) {
@@ -53,10 +54,25 @@ function UsageBar({ used, limit }: { used: number; limit: number }) {
 
 function AccountContent() {
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
   const summary = useAccountSummary();
   const [openingPortal, setOpeningPortal] = useState(false);
   const tierLabel = TIER_LABELS[summary.tier] || summary.tier;
+
+  const handleLogout = async () => {
+    try {
+      await apiRequest("POST", "/api/auth/logout");
+      setLocation("/");
+      window.location.reload();
+    } catch (error: any) {
+      toast({
+        title: "Logout failed",
+        description: error?.message || "Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleOpenBillingPortal = async () => {
     try {
@@ -83,6 +99,15 @@ function AccountContent() {
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <div><p style={{ fontSize: 11, color: T.muted, textTransform: "uppercase", marginBottom: 3 }}>Name</p><p style={{ fontSize: 14, color: T.text }}>{user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : "—"}</p></div>
           <div><p style={{ fontSize: 11, color: T.muted, textTransform: "uppercase", marginBottom: 3 }}>Email</p><p style={{ fontSize: 14, color: T.text }}>{user?.email || "—"}</p></div>
+          <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 14, marginTop: 4 }}>
+            <button
+              onClick={handleLogout}
+              style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "transparent", color: T.sub, border: `1px solid ${T.border}`, borderRadius: 9, padding: "8px 12px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+            >
+              <LogOut style={{ width: 14, height: 14 }} />
+              Sign out
+            </button>
+          </div>
         </div>
       </SectionCard>
 
@@ -104,7 +129,12 @@ function AccountContent() {
 
         {summary.hasCosAccess && (
           <div style={{ marginTop: 18, paddingTop: 16, borderTop: `1px solid ${T.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div><p style={{ fontSize: 11, color: T.muted, textTransform: "uppercase", marginBottom: 3 }}>CoS Checks</p><p style={{ fontSize: 14, color: T.text }}>{summary.credits} remaining</p></div>
+            <div>
+              <p style={{ fontSize: 11, color: T.muted, textTransform: "uppercase", marginBottom: 3 }}>CoS Checks</p>
+              <p style={{ fontSize: 14, color: T.text }}>
+                {summary.isCosUnlimited ? "Unlimited" : `${summary.cosChecksRemaining} remaining`}
+              </p>
+            </div>
           </div>
         )}
 

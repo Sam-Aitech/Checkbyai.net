@@ -24,17 +24,25 @@ interface VerificationResultsTabbedProps {
   result: TabbedResult;
   verificationId?: number;
   isAdmin?: boolean;
+  canViewHumanReviewDetails?: boolean;
 }
 
 export default function VerificationResultsTabbed({
   result,
   verificationId,
   isAdmin,
+  canViewHumanReviewDetails = false,
 }: VerificationResultsTabbedProps) {
   const hasCosCheck = !!result.cosCheck;
 
   if (!hasCosCheck) {
-    return <VerificationResults result={result} verificationId={verificationId} />;
+    return (
+      <VerificationResults
+        result={result}
+        verificationId={verificationId}
+        canViewHumanReviewDetails={canViewHumanReviewDetails}
+      />
+    );
   }
 
   return (
@@ -45,7 +53,11 @@ export default function VerificationResultsTabbed({
       </TabsList>
 
       <TabsContent value="verification">
-        <VerificationResults result={result} verificationId={verificationId} />
+        <VerificationResults
+          result={result}
+          verificationId={verificationId}
+          canViewHumanReviewDetails={canViewHumanReviewDetails}
+        />
       </TabsContent>
 
       <TabsContent value="inspector">

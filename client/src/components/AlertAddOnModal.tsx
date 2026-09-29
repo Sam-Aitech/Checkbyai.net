@@ -21,8 +21,8 @@ const ANNUAL_PLANS = [
 ] as const;
 
 const LEGACY_PLANS = [
-  { packageType: 'notification_starter', name: 'Starter (monthly)', price: '£24.99', period: '/mo' },
-  { packageType: 'notification_pro', name: 'Pro (monthly)', price: '£49.99', period: '/mo' },
+  { packageType: 'notification_starter', name: 'Alert Pass (Monthly)', price: '£24.99', period: '/mo' },
+  { packageType: 'notification_pro', name: 'Alert Pass Pro (Monthly)', price: '£49.99', period: '/mo' },
 ] as const;
 
 export default function AlertAddOnModal({ open, onOpenChange, companyName, userEmail }: Readonly<AlertAddOnModalProps>) {

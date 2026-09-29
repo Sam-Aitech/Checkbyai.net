@@ -364,15 +364,33 @@ function CompanyHistoryDialog({ fingerprint, companyName, open, onOpenChange, is
             <div className="border-t pt-4">
               <h4 className="text-sm font-semibold text-foreground mb-3">Event History</h4>
               {isFreeUser ? (
-                <div className="flex flex-col items-center justify-center bg-muted/50 border border-dashed border-border rounded-lg px-4 py-8 text-center">
-                  <Lock className="w-8 h-8 text-amber-500 mb-2" />
-                  <p className="text-sm font-semibold text-foreground mb-1">History Locked</p>
-                  <p className="text-xs text-muted-foreground text-center max-w-[280px] mb-4">
-                    Starter includes 30-day history, Pro 90-day. Paid members see every downgrade, revocation, and route change — e.g. “Downgraded from A-Rating to B-Rating · 12 Jan”.
-                  </p>
-                  <Button size="sm" onClick={() => { onOpenChange(false); setLocation("/pricing"); }} className="bg-slate-900 hover:bg-slate-800 text-white">
-                    <Lock className="w-3.5 h-3.5 mr-1" /> Unlock History
-                  </Button>
+                <div className="relative">
+                  {data.history.length > 0 && (
+                    <div className="relative pl-6 opacity-30 blur-[2px] select-none pointer-events-none">
+                      <div className="absolute left-[9px] top-2 bottom-2 w-px bg-border" />
+                      <div className="space-y-4">
+                        {data.history.slice(0, 3).map((evt) => (
+                          <div key={evt.id} className="relative">
+                            <div className="absolute -left-6 top-1 w-[18px] h-[18px] rounded-full bg-background border-2 border-border flex items-center justify-center z-10">{getChangeIcon(evt.event)}</div>
+                            <div className={`ml-2 p-2.5 rounded-lg border-l-2 ${getEventColor(evt.event)}`}>
+                              <p className="text-sm font-medium text-foreground">{getEventLabel(evt.event, evt.previousValue, evt.newValue)}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">{formatDate(evt.date || evt.snapshotDate)}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 rounded-lg">
+                    <Lock className="w-8 h-8 text-amber-500 mb-2" />
+                    <p className="text-sm font-semibold text-foreground mb-1">History Locked</p>
+                    <p className="text-xs text-muted-foreground text-center max-w-[280px] mb-3">
+                      Starter includes 30-day history, Pro 90-day. Paid members see every downgrade, revocation, and route change so they can detect warning signs early.
+                    </p>
+                    <Button size="sm" onClick={() => { onOpenChange(false); setLocation("/pricing"); }} className="bg-slate-900 hover:bg-slate-800 text-white">
+                      <Lock className="w-3.5 h-3.5 mr-1" /> Unlock History
+                    </Button>
+                  </div>
                 </div>
               ) : data.history.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-10 px-4 text-center">

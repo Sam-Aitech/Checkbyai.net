@@ -241,7 +241,9 @@ function OverviewContent() {
             <div style={{ ...cardStyle, marginTop: 16, padding: 16, display: "flex", alignItems: "center", gap: 10 }}>
               <CreditCard style={{ width: 16, height: 16, color: T.violet, flexShrink: 0 }} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{summary.credits} CoS checks left</p>
+                <p style={{ fontSize: 13, fontWeight: 600, color: T.text }}>
+                  {summary.isCosUnlimited ? "Unlimited CoS checks" : `${summary.cosChecksRemaining} CoS checks left`}
+                </p>
                 <a href="/pro-dashboard/account" style={{ fontSize: 11, color: T.violet, textDecoration: "none" }}>Manage in Account →</a>
               </div>
             </div>

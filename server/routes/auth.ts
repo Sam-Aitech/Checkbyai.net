@@ -63,18 +63,14 @@ export function registerAuthRoutes(app: Express): void {
     }
 
     const userId = req.user.id;
-    const canVerify = await storage.checkDailyLimit(userId);
-    const user = await storage.getUser(userId);
-
-    if (user?.subscriptionStatus === 'unlimited' || user?.subscriptionStatus === 'enterprise') {
-      success(res, { canVerify: true, isAnonymous: false, verificationsLeft: 'unlimited' });
-      return;
-    }
-
-    const today = new Date().toISOString().split('T')[0];
-    const usedToday = user?.lastVerificationDate === today ? (user.dailyVerificationsUsed || 0) : 0;
-    const verificationsLeft = Math.max(0, 1 - usedToday);
-
-    success(res, { canVerify, isAnonymous: false, verificationsLeft });
+    const entitlement = await storage.getCosEntitlement(userId);
+    success(res, {
+      canVerify: entitlement?.canVerify ?? false,
+      hasAccess: entitlement?.hasAccess ?? false,
+      isAnonymous: false,
+      isUnlimited: entitlement?.isUnlimited ?? false,
+      verificationsLeft: entitlement?.isUnlimited ? "unlimited" : (entitlement?.remaining ?? 0),
+      accessSource: entitlement?.accessSource ?? "none",
+    });
   }));
 }

@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, type ComponentType } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -7,37 +7,64 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { SocketNotificationListener } from "./hooks/useSocket";
 
+// Vite can briefly reject a lazy module request while a development HMR update
+// is invalidating the module graph. Retry once after a full reload so a
+// transient stale module URL does not leave the route inside ErrorBoundary.
+function lazyWithRetry<T extends ComponentType<any>>(
+  loader: () => Promise<{ default: T }>,
+  routeKey: string,
+) {
+  const retryKey = `lazy-route-retry:${routeKey}`;
+
+  return lazy(async () => {
+    try {
+      const module = await loader();
+      sessionStorage.removeItem(retryKey);
+      return module;
+    } catch (error) {
+      if (!sessionStorage.getItem(retryKey)) {
+        sessionStorage.setItem(retryKey, "1");
+        window.location.reload();
+        await new Promise<never>(() => {});
+      }
+
+      sessionStorage.removeItem(retryKey);
+      throw error;
+    }
+  });
+}
+
 // Lazy load all routes for better performance
-const Home = lazy(() => import("@/pages/home"));
-const LoginPage = lazy(() => import("@/pages/login"));
-const SimpleAdmin = lazy(() => import("@/pages/SimpleAdmin"));
-const DashboardPage = lazy(() => import("@/pages/dashboard"));
-const Pricing = lazy(() => import("@/pages/Pricing"));
-const CosPricing = lazy(() => import("@/pages/CosPricing"));
-const CheckoutSuccess = lazy(() => import("@/pages/CheckoutSuccess"));
-const Submit = lazy(() => import("@/pages/Submit"));
-const AIGuide = lazy(() => import("@/pages/AIGuide"));
-const COSGuide = lazy(() => import("@/pages/COSGuide"));
-const Technology = lazy(() => import("@/pages/Technology"));
-const ApiDocs = lazy(() => import("@/pages/ApiDocs"));
-const VerificationHistory = lazy(() => import("@/pages/VerificationHistory"));
-const SponsorMonitor = lazy(() => import("@/pages/SponsorMonitor"));
-const SponsorDashboard = lazy(() => import("@/pages/SponsorDashboard"));
-const SponsorChanges = lazy(() => import("@/pages/SponsorChanges"));
-const SponsorDirectory = lazy(() => import("@/pages/SponsorDirectory"));
-const CheckFakeCoS = lazy(() => import("@/pages/CheckFakeCoS"));
-const WhatToDoFakeCoS = lazy(() => import("@/pages/WhatToDoFakeCoS"));
-const About = lazy(() => import("@/pages/About"));
-const ProDashboardOverview = lazy(() => import("@/pages/pro-dashboard/Overview"));
-const ProDashboardMonitor = lazy(() => import("@/pages/pro-dashboard/Monitor"));
-const ProDashboardJobs = lazy(() => import("@/pages/pro-dashboard/Jobs"));
-const ProDashboardAlerts = lazy(() => import("@/pages/pro-dashboard/Alerts"));
-const ProDashboardHistory = lazy(() => import("@/pages/pro-dashboard/History"));
-const ProDashboardSupport = lazy(() => import("@/pages/pro-dashboard/Support"));
-const ProDashboardAccount = lazy(() => import("@/pages/pro-dashboard/Account"));
-const SponsorDetail = lazy(() => import("@/pages/SponsorDetail"));
-const ReceiptPage = lazy(() => import("@/pages/ReceiptPage"));
-const NotFound = lazy(() => import("@/pages/not-found"));
+const Home = lazyWithRetry(() => import("@/pages/home"), "home");
+const LoginPage = lazyWithRetry(() => import("@/pages/login"), "login");
+const SimpleAdmin = lazyWithRetry(() => import("@/pages/SimpleAdmin"), "admin");
+const DashboardPage = lazyWithRetry(() => import("@/pages/dashboard"), "dashboard");
+const Pricing = lazyWithRetry(() => import("@/pages/Pricing"), "pricing");
+const CosPricing = lazyWithRetry(() => import("@/pages/CosPricing"), "cos-pricing");
+const CheckoutSuccess = lazyWithRetry(() => import("@/pages/CheckoutSuccess"), "checkout-success");
+const Submit = lazyWithRetry(() => import("@/pages/Submit"), "submit");
+const AIGuide = lazyWithRetry(() => import("@/pages/AIGuide"), "ai-guide");
+const COSGuide = lazyWithRetry(() => import("@/pages/COSGuide"), "cos-guide");
+const Technology = lazyWithRetry(() => import("@/pages/Technology"), "technology");
+const ApiDocs = lazyWithRetry(() => import("@/pages/ApiDocs"), "api-docs");
+const VerificationHistory = lazyWithRetry(() => import("@/pages/VerificationHistory"), "verification-history");
+const SponsorMonitor = lazyWithRetry(() => import("@/pages/SponsorMonitor"), "sponsor-monitor");
+const SponsorDashboard = lazyWithRetry(() => import("@/pages/SponsorDashboard"), "sponsor-dashboard");
+const SponsorChanges = lazyWithRetry(() => import("@/pages/SponsorChanges"), "sponsor-changes");
+const SponsorDirectory = lazyWithRetry(() => import("@/pages/SponsorDirectory"), "sponsor-directory");
+const CheckFakeCoS = lazyWithRetry(() => import("@/pages/CheckFakeCoS"), "check-fake-cos");
+const WhatToDoFakeCoS = lazyWithRetry(() => import("@/pages/WhatToDoFakeCoS"), "what-to-do-fake-cos");
+const About = lazyWithRetry(() => import("@/pages/About"), "about");
+const ProDashboardOverview = lazyWithRetry(() => import("@/pages/pro-dashboard/Overview"), "pro-dashboard-overview");
+const ProDashboardMonitor = lazyWithRetry(() => import("@/pages/pro-dashboard/Monitor"), "pro-dashboard-monitor");
+const ProDashboardJobs = lazyWithRetry(() => import("@/pages/pro-dashboard/Jobs"), "pro-dashboard-jobs");
+const ProDashboardAlerts = lazyWithRetry(() => import("@/pages/pro-dashboard/Alerts"), "pro-dashboard-alerts");
+const ProDashboardHistory = lazyWithRetry(() => import("@/pages/pro-dashboard/History"), "pro-dashboard-history");
+const ProDashboardSupport = lazyWithRetry(() => import("@/pages/pro-dashboard/Support"), "pro-dashboard-support");
+const ProDashboardAccount = lazyWithRetry(() => import("@/pages/pro-dashboard/Account"), "pro-dashboard-account");
+const SponsorDetail = lazyWithRetry(() => import("@/pages/SponsorDetail"), "sponsor-detail");
+const ReceiptPage = lazyWithRetry(() => import("@/pages/ReceiptPage"), "receipt");
+const NotFound = lazyWithRetry(() => import("@/pages/not-found"), "not-found");
 
 // Minimal loading component for route transitions
 function RouteLoader() {

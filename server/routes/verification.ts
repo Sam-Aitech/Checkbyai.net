@@ -27,6 +27,33 @@ import { ApiError } from "../lib/apiError";
 import { logger } from "../utils/logger";
 import { isQueueAvailable, getPdfVerifyQueue } from "../services/jobQueue";
 import { storePdfUpload } from "../utils/pdfUploadStore";
+import { hasPaidCosAccess } from "@shared/cosEntitlement";
+
+const HUMAN_REVIEW_CHECK_NAME = "Admin Human Review Override";
+const LOCKED_HUMAN_REVIEW_MESSAGE = "Paid CoS access is required to view the human review finding and supporting reason.";
+
+function canViewHumanReviewDetails(user: any): boolean {
+  return user?.role === "admin" || hasPaidCosAccess(user ?? {});
+}
+
+function redactHumanReviewChecks(checks: any, canView: boolean): any {
+  if (canView || !Array.isArray(checks)) return checks;
+
+  return checks.map((check) =>
+    check?.name === HUMAN_REVIEW_CHECK_NAME
+      ? { ...check, message: LOCKED_HUMAN_REVIEW_MESSAGE }
+      : check,
+  );
+}
+
+function redactVerificationPayload(payload: any, canView: boolean): any {
+  if (canView || !payload || typeof payload !== "object") return payload;
+
+  return {
+    ...payload,
+    checks: redactHumanReviewChecks(payload.checks, canView),
+  };
+}
 
 function buildAdminOverrideAnalysis(status: 'fake' | 'approved', reason: string) {
   const isFake = status === 'fake';
@@ -87,6 +114,8 @@ export function registerVerificationRoutes(app: Express): void {
   app.get('/api/verify/status/:jobId', isAuthenticated, asyncHandler(async (req: any, res) => {
     const { jobId } = req.params;
     if (!jobId) throw new ApiError(400, "jobId required");
+    const requestingUser = await storage.getUser(req.user.id);
+    const canViewHumanReview = canViewHumanReviewDetails(requestingUser);
     // jobId is `verify-${documentHash.slice(0,16)}-${userId}-${nonce}`, not a
     // receiptId (`CBA-XXXXXXXX-XXXXXXXX`) — the fallback lookups below (used
     // once BullMQ evicts the job record via removeOnComplete/removeOnFail)
@@ -105,20 +134,45 @@ export function registerVerificationRoutes(app: Express): void {
     const queue = getPdfVerifyQueue();
     if (!queue) {
       const v = await lookupFallback();
-      if (v) success(res, { status: "completed", progress: 100, verificationId: v.id, receiptId: v.receiptId, result: v.result });
+      if (v) {
+        success(res, {
+          status: "completed",
+          progress: 100,
+          verificationId: v.id,
+          receiptId: v.receiptId,
+          result: v.result,
+          checks: redactHumanReviewChecks((v.analysisDetails as any)?.checks || [], canViewHumanReview),
+        });
+      }
       else success(res, { status: "not_found" });
       return;
     }
     const job = await queue.getJob(jobId);
     if (!job) {
       const byHash = await lookupFallback();
-      if (byHash) success(res, { status: "completed", progress: 100, verificationId: byHash.id, receiptId: byHash.receiptId, result: byHash.result });
+      if (byHash) {
+        success(res, {
+          status: "completed",
+          progress: 100,
+          verificationId: byHash.id,
+          receiptId: byHash.receiptId,
+          result: byHash.result,
+          checks: redactHumanReviewChecks((byHash.analysisDetails as any)?.checks || [], canViewHumanReview),
+        });
+      }
       else success(res, { status: "not_found" });
       return;
     }
     const state = await job.getState();
     const progress = (job.progress as number) || 0;
-    if (state === "completed") success(res, { status: "completed", progress: 100, jobId, returnvalue: job.returnvalue });
+    if (state === "completed") {
+      success(res, {
+        status: "completed",
+        progress: 100,
+        jobId,
+        returnvalue: redactVerificationPayload(job.returnvalue, canViewHumanReview),
+      });
+    }
     else if (state === "failed") success(res, { status: "failed", progress, failedReason: job.failedReason });
     else if (state === "active") success(res, { status: "active", progress });
     else success(res, { status: state, progress });
@@ -136,29 +190,11 @@ export function registerVerificationRoutes(app: Express): void {
     }
 
     const isAdminUser = betaUser.role === 'admin';
-    const hasCosSubscription = betaUser.cosCheckSubscription === true;
-    const hasAdminApproval = betaUser.cosCheckApproved === true;
-    // `credits` is currently minted ONLY by COS-domain grants (cos_check_single,
-    // COS starter/pro packages, and the notification_pro monthly +5 bundle) —
-    // alert_annual/alert_annual_pro/notification_starter never touch it. That
-    // makes credits>0 a safe COS-only signal HERE, in the COS verification gate
-    // only. It is a fact about current grant behavior in billing.ts, not a
-    // schema-enforced guarantee — if a future Alert-Pass package ever grants
-    // `credits`, this check must be revisited.
-    //
-    // INVARIANT: this signal must never be read anywhere that decides Alert-Pass
-    // tier/watch-limits/channels/jobAlerts (those derive solely from
-    // subscriptionStatus via shared/planTiers.ts). A notification_pro subscriber
-    // keeps full Alert-Pass-Pro features regardless of whether these COS credits
-    // are unspent, partially spent, or exhausted — exhausting them must never
-    // downgrade or gate any Alert-Pass feature.
-    const hasCosCredits = (betaUser.credits || 0) > 0;
-    // 'enterprise' is never auto-assigned by any checkout/webhook path (it's a
-    // manual/admin-provisioned value for negotiated deals covering both
-    // products), so treating it as an unconditional COS pass is zero-risk.
-    const hasEnterpriseGrant = betaUser.subscriptionStatus === 'enterprise';
-
-    if (!isAdminUser && !hasCosSubscription && !hasAdminApproval && !hasCosCredits && !hasEnterpriseGrant) {
+    const entitlement = await storage.getCosEntitlement(betaUserId);
+    if (!entitlement?.hasAccess) {
+      if (entitlement?.accessSource === "restricted") {
+        throw new ApiError(403, 'Your account is restricted. Please contact support.', 'account_restricted');
+      }
       throw new ApiError(403, 'Your account is pending COS Check access. Please contact support or upgrade your subscription.', 'cos_access_denied');
     }
 
@@ -193,7 +229,7 @@ export function registerVerificationRoutes(app: Express): void {
       // accepting an unchecked possibly-undefined value.
       const userId: string = betaUserId;
 
-      if (!betaUser.ipExempt && !isAdminUser) {
+      if (entitlement.consumptionSource === "daily" && !betaUser.ipExempt && !isAdminUser) {
         const clientIp = getClientIp(req);
         const hashedIp = hashIpAddress(clientIp);
         const ipRecord = await storage.getIpVerification(hashedIp);
@@ -212,20 +248,14 @@ export function registerVerificationRoutes(app: Express): void {
       let useDailyLimit = false;
 
       if (userId) {
-        const user = betaUser;
-        const hasUnlimited = isAdminUser || hasCosSubscription || user.subscriptionStatus === 'enterprise' || user.verificationLimit === -1;
-
-        if (!hasUnlimited) {
-          const credits = user.credits || 0;
-          if (credits > 0) {
-            useCredits = true;
-          } else {
-            const canVerify = await storage.checkDailyLimit(userId);
-            if (!canVerify) {
-              throw new ApiError(429, 'Daily verification limit reached. Purchase credits or upgrade for unlimited verifications.');
-            }
-            useDailyLimit = true;
-          }
+        if (!entitlement.canVerify) {
+          throw new ApiError(429, 'CoS verification limit reached. Purchase credits or ask an administrator to increase your limit.');
+        }
+        if (!entitlement.isUnlimited) {
+          useCredits = entitlement.consumptionSource === "credits";
+          useDailyLimit =
+            entitlement.consumptionSource === "custom_limit" ||
+            entitlement.consumptionSource === "daily";
         }
       }
 
@@ -461,7 +491,12 @@ export function registerVerificationRoutes(app: Express): void {
             const today = new Date().toISOString().split('T')[0];
             const [currentUser] = await tx.select({ dailyVerificationsUsed: users.dailyVerificationsUsed, lastVerificationDate: users.lastVerificationDate }).from(users).where(eq(users.id, userId));
             const usageToday = currentUser?.lastVerificationDate === today ? (currentUser.dailyVerificationsUsed || 0) + 1 : 1;
-            await tx.update(users).set({ dailyVerificationsUsed: usageToday, lastVerificationDate: today, updatedAt: new Date() }).where(eq(users.id, userId));
+            await tx.update(users).set({
+              dailyVerificationsUsed: usageToday,
+              totalVerificationsUsed: sql`COALESCE(${users.totalVerificationsUsed}, 0) + 1`,
+              lastVerificationDate: today,
+              updatedAt: new Date(),
+            }).where(eq(users.id, userId));
           }
           const insertValues: any = {
             userId, filename: path.basename(req.file!.originalname), result, confidence: Math.floor(analysis.confidence),
@@ -515,6 +550,8 @@ export function registerVerificationRoutes(app: Express): void {
 
   app.get('/api/my-verifications', isAuthenticated, asyncHandler(async (req: any, res) => {
     const userId = req.user.id;
+    const requestingUser = await storage.getUser(userId);
+    const canViewHumanReview = canViewHumanReviewDetails(requestingUser);
     const verifications = await storage.getVerificationsByUserId(userId);
 
     const history = verifications.map(v => ({
@@ -526,7 +563,7 @@ export function registerVerificationRoutes(app: Express): void {
       confidence: v.confidence,
       verifiedAt: v.verifiedAt,
       adminStatus: v.adminStatus,
-      checks: (v.analysisDetails as any)?.checks || [],
+      checks: redactHumanReviewChecks((v.analysisDetails as any)?.checks || [], canViewHumanReview),
     }));
 
     success(res, history);

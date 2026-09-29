@@ -186,7 +186,6 @@ export default function CheckoutSuccess() {
       setIsRetryingWatch(false);
     }
   };
-
   const getNextStepCta = (): { label: string; href: string; secondary?: { label: string; href: string } } => {
     const t = verifyResult?.packageType;
     if (t === 'unlimited') return { label: 'Start Verifying Documents', href: '/dashboard?fresh=1', secondary: { label: 'Go to Sponsor Dashboard', href: sponsorDashboardUrl } };
