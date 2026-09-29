@@ -6,7 +6,7 @@ export function validateBody<T extends z.ZodTypeAny>(schema: T) {
   return (req: Request, _res: Response, next: NextFunction) => {
     const result = schema.safeParse(req.body);
     if (!result.success) {
-      const first = result.error.errors[0];
+      const first = result.error.issues[0];
       throw new ApiError(400, `${first.path.join(".")}: ${first.message}`);
     }
     req.body = result.data;
@@ -18,10 +18,10 @@ export function validateQuery<T extends z.ZodTypeAny>(schema: T) {
   return (req: Request, _res: Response, next: NextFunction) => {
     const result = schema.safeParse(req.query);
     if (!result.success) {
-      const first = result.error.errors[0];
+      const first = result.error.issues[0];
       throw new ApiError(400, `${first.path.join(".")}: ${first.message}`);
     }
-    req.query = result.data;
+    req.query = result.data as Request["query"];
     next();
   };
 }

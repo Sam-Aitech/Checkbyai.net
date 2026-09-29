@@ -657,7 +657,7 @@ export function registerSponsorRoutes(app: Express): void {
     });
     const parsed = watchSchema.safeParse(req.body);
     if (!parsed.success) {
-      throw new ApiError(400, parsed.error.errors.map(e => e.message).join(', '));
+      throw new ApiError(400, parsed.error.issues.map(e => e.message).join(', '));
     }
     const { organisation_name, town_city, fingerprint: fpParam } = parsed.data;
 
