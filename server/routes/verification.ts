@@ -11,6 +11,7 @@ import {
   chargeVerificationUsage,
 } from "../services/verificationShared";
 import { withRetry } from "../utils/dbRetry";
+import { invalidateUserCache } from "../utils/userCache";
 import { verificationResults, type TrustedPattern } from "@shared/schema";
 import { isAuthenticated } from "../auth";
 import { verifyLimiter } from "../middleware/rateLimiter";
@@ -469,6 +470,8 @@ export function registerVerificationRoutes(app: Express): void {
           const [verification] = await tx.insert(verificationResults).values(insertValues).returning();
           return verification.id;
         }), 'verify-result');
+        // Credits / daily usage changed: drop the cached session user row.
+        if (userId) invalidateUserCache(userId);
         success(res, {
           id: verificationId, receiptId, documentHash, result, confidence: analysis.confidence, details: analysis.details,
           checks: analysis.checks || [], forensicAnalysis: analysis.details?.forensicAnalysis || null, adminOverride: isAdminOverride,

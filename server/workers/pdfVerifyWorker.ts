@@ -19,6 +19,7 @@ import {
   chargeVerificationUsage,
 } from "../services/verificationShared";
 import { withRetry } from "../utils/dbRetry";
+import { invalidateUserCache } from "../utils/userCache";
 import { emitToUser } from "../services/socketGateway";
 import { logger } from "../utils/logger";
 import { fetchPdfUpload, deletePdfUpload } from "../utils/pdfUploadStore";
@@ -260,6 +261,8 @@ export async function processPdfVerifyJob(job: Job<PdfVerifyJobData>): Promise<{
       const [verification] = await tx.insert(verificationResults).values(insertValues).returning();
       return verification.id;
     }), 'pdf-verify-worker');
+    // Credits / daily usage changed: drop the cached session user row.
+    if (userId) invalidateUserCache(userId);
 
     await job.updateProgress(100);
     const payload = { verificationId, receiptId, documentHash, result, confidence: analysis.confidence, isAdminOverride };

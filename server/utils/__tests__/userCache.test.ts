@@ -94,4 +94,65 @@ describe("getCachedUser", () => {
     invalidateUserCache();
     expect(getUserCacheSize()).toBe(0);
   });
+  it("expires negative entries after the short negative TTL", async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(makeUser("late"));
+
+    expect(await getCachedUser("late", fetcher)).toBe(false);
+    vi.advanceTimersByTime(2_500);
+    expect(await getCachedUser("late", fetcher)).toMatchObject({ id: "late" });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not cache a fetch that was invalidated while in flight", async () => {
+    let resolveStale!: (user: User) => void;
+    const stale = new Promise<User>((resolve) => {
+      resolveStale = resolve;
+    });
+    const fetcher = vi
+      .fn()
+      .mockReturnValueOnce(stale)
+      .mockResolvedValueOnce({ ...makeUser("u1"), role: "restricted" } as unknown as User);
+
+    const inFlight = getCachedUser("u1", fetcher);
+    invalidateUserCache("u1"); // write lands while the old read is pending
+    resolveStale(makeUser("u1"));
+    await inFlight;
+
+    // The stale result must not have been stored: next read hits the source.
+    const fresh = await getCachedUser("u1", fetcher);
+    expect(fresh).toMatchObject({ role: "restricted" });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it("starts a fresh fetch after invalidation instead of joining a stale flight", async () => {
+    let resolveStale!: (user: User) => void;
+    const fetcher = vi
+      .fn()
+      .mockReturnValueOnce(new Promise<User>((r) => (resolveStale = r)))
+      .mockResolvedValueOnce(makeUser("u1"));
+
+    const first = getCachedUser("u1", fetcher);
+    invalidateUserCache("u1");
+    const second = await getCachedUser("u1", fetcher);
+    resolveStale(makeUser("u1"));
+    await first;
+
+    expect(second).toMatchObject({ id: "u1" });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it("survives fetchers that throw synchronously without wedging the key", async () => {
+    const fetcher = vi
+      .fn()
+      .mockImplementationOnce(() => {
+        throw new Error("sync boom");
+      })
+      .mockResolvedValueOnce(makeUser("u1"));
+
+    await expect(getCachedUser("u1", fetcher)).rejects.toThrow("sync boom");
+    expect(await getCachedUser("u1", fetcher)).toMatchObject({ id: "u1" });
+  });
 });

@@ -1,6 +1,7 @@
 import { users, type User, type UpsertUser, type SubscriptionAuditLogEntry, type NotifPrefs, type NotifEventType, DEFAULT_NOTIF_PREFS, subscriptionAuditLog } from "@shared/schema";
 import { db } from "../db";
 import { eq, desc, count, sql, and, isNull } from "drizzle-orm";
+import { invalidateUserCache } from "../utils/userCache";
 import { resolveCosEntitlement, type CosEntitlement } from "@shared/cosEntitlement";
 
 export class UserRepository {
@@ -389,4 +390,49 @@ export class UserRepository {
   }
 }
 
-export const userRepository = new UserRepository();
+// Methods that write the users table. Session deserialization caches user rows
+// (utils/userCache.ts), so every write must drop the cached entry or restriction,
+// deletion, role and subscription changes would keep being served stale.
+// Arguments are a userId for most methods and an email/phone identifier for
+// verifyUser; the returned row's id is invalidated too. Invalidating a key
+// that is not cached is a no-op, so covering both is safe.
+const USER_WRITE_METHODS = [
+  "upsertUser",
+  "updateUserPassword",
+  "verifyUser",
+  "updateUserStripeInfo",
+  "updateUserSubscription",
+  "updateUserStripeCustomer",
+  "addCredits",
+  "deductCredits",
+  "updateDailyVerificationUsage",
+  "updateUserVerificationLimit",
+  "updateCosCheckApproval",
+  "updateIpExempt",
+  "updateCosCheckSubscription",
+  "updateCosBeta",
+  "deleteUser",
+  "updateUserRestriction",
+  "updateUserNotifPrefs",
+] as const satisfies readonly (keyof UserRepository)[];
+
+function withCacheInvalidation(repo: UserRepository): UserRepository {
+  for (const name of USER_WRITE_METHODS) {
+    const original = (repo[name] as (...args: any[]) => Promise<unknown>).bind(repo);
+    (repo as any)[name] = async (...args: unknown[]) => {
+      let result: unknown;
+      try {
+        result = await original(...args);
+        return result;
+      } finally {
+        // Also on failure: a partially applied write must not leave stale rows.
+        for (const arg of args) if (typeof arg === "string") invalidateUserCache(arg);
+        const id = (result as { id?: unknown } | undefined)?.id;
+        if (typeof id === "string") invalidateUserCache(id);
+      }
+    };
+  }
+  return repo;
+}
+
+export const userRepository = withCacheInvalidation(new UserRepository());

@@ -24,6 +24,7 @@ import { z } from "zod";
 import { requireRole } from "../middleware/roleGuard";
 import { isAuthenticated } from "../auth";
 import { storage } from "../storage";
+import { invalidateUserCache } from "../utils/userCache";
 import { PDFAnalyzer } from "../services/pdfAnalyzer";
 import { COSAuthenticityChecker } from "../services/cosAuthenticityChecker";
 import { upload } from "./verification";
@@ -2368,6 +2369,7 @@ Format your response in clear, professional markdown.`;
           .returning();
         updatedUser = u;
       }
+      invalidateUserCache(userId);
 
       const newCredits = updatedUser?.credits ?? 0;
       const delta = newCredits - prevCredits;
@@ -2545,6 +2547,7 @@ Format your response in clear, professional markdown.`;
         .update(users)
         .set({ notifPrefs: merged })
         .where(eq(users.id, id));
+      invalidateUserCache(id);
 
       logger.info({ userId: id, adminId: req.user?.id }, '[Admin] notif_prefs updated for user');
       res.json({ notifPrefs: merged });

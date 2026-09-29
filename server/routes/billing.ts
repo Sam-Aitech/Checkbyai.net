@@ -10,6 +10,7 @@ import { sendEmailReliably } from "../utils/resilientEmail";
 import { getAppUrl } from "../utils/appUrl";
 import { isAuthenticated } from "../auth";
 import { storage } from "../storage";
+import { invalidateUserCache } from "../utils/userCache";
 import { logger } from "../utils/logger";
 import { getWatchLimit } from "../utils/tierConfig";
 import { normalizeName, generateFingerprint } from "../utils/sponsorListFetcher";
@@ -581,6 +582,7 @@ export function registerBillingRoutes(app: Express): void {
             claim: (tx) => tryClaimSession(session.id, tx),
             grant: (tx) => applyPackageGrant(tx, userId, packageType, session.subscription ?? null, session.customer ?? null),
           }), 'webhook-checkout-session');
+          invalidateUserCache(userId);
 
           // Side effects are deliberately outside the transaction — best-effort,
           // already fire-and-forget with their own `.catch()` — and only run
@@ -854,6 +856,7 @@ export function registerBillingRoutes(app: Express): void {
             claim: (tx) => tryClaimSession(sessionId, tx),
             grant: (tx) => applyPackageGrant(tx, sessionUserId, packageType, (session.subscription as string) ?? null, (session.customer as string) ?? null),
           }), 'checkout-verify-session');
+          invalidateUserCache(sessionUserId);
 
           const AUTO_WATCH_TYPES = ['notification_starter', 'notification_pro', 'alert_annual', 'alert_annual_pro'];
           if (granted && !!packageType && AUTO_WATCH_TYPES.includes(packageType) && companyName) {
