@@ -109,7 +109,7 @@
     "memoizee": "^0.4.17",
     "multer": "^2.3.0",
     "node-cron": "^4.2.1",
-    "openai": "^6.16.0",
+    "openai": "^7.23.0",
     "openid-client": "^6.8.1",
     "p-limit": "^7.2.0",
     "p-retry": "^7.1.1",
