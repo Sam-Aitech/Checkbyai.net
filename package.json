@@ -93,7 +93,7 @@
     "date-fns": "^3.6.0",
     "drizzle-kit": "^0.31.11",
     "drizzle-orm": "^0.45.3",
-    "drizzle-zod": "0.8.3",
+    "drizzle-zod": "0.7.1",
     "embla-carousel-react": "^8.6.0",
     "esbuild": "^0.28.2",
     "express": "^4.21.2",
