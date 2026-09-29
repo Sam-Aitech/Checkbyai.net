@@ -176,7 +176,7 @@
     "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.70.1",
     "@typescript-eslint/parser": "^8.70.1",
-    "@vitest/coverage-v8": "^4.1.6",
+    "@vitest/coverage-v8": "^5.0.2",
     "audit-ci": "^7.1.0",
     "dotenv": "^17.4.2",
     "eslint": "^10.11.0",
