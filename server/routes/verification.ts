@@ -6,8 +6,8 @@ import multer from "multer";
 import { storage } from "../storage";
 import { db } from "../db";
 import {
+  attachPdfVerdictEvidence,
   buildAdminOverrideEvidence,
-  buildPatternAndCosForensicChecks,
   chargeVerificationUsage,
 } from "../services/verificationShared";
 import { withRetry } from "../utils/dbRetry";
@@ -402,48 +402,18 @@ export function registerVerificationRoutes(app: Express): void {
         // Verdict logic above is untouched. Structural features are measured
         // here for offline robustness analysis; the served verdict still comes
         // solely from the existing pattern + six-check pipeline.
-        try {
-          const structuralFeatures = pdfAnalyzer.extractStructuralFeatures(pdfBinary);
-          const parsedXmp = (extractedMetadata as any).parsedXmp ?? {};
-          const requiredXmp = ['dc:date', 'dc:format', 'dc:language', 'pdf:PDFVersion', 'pdf:Producer', 'xmp:CreateDate', 'xmp:CreatorTool', 'xmp:MetadataDate'];
-          const xmpPresence: Record<string, boolean> = {};
-          for (const f of requiredXmp) xmpPresence[f] = !!parsedXmp[f];
-          const forensicChecks = buildPatternAndCosForensicChecks(outcome.checks, cosCheckResult.checks);
-          (analysis as any).forensicEvidence = buildForensicEvidence({
-            documentHash,
-            extractedFeatures: {
-              producer: extractedMetadata.producer ?? null,
-              creator: extractedMetadata.creator ?? null,
-              pdfVersion: extractedMetadata.pdfVersion ?? null,
-              creationDate: extractedMetadata.creationDate ?? null,
-              modificationDate: extractedMetadata.modificationDate ?? null,
-              pages: extractedMetadata.pages ?? null,
-              fontCount: extractedMetadata.fontCount ?? 0,
-              wordCount: extractedMetadata.wordCount ?? null,
-              characterCount: extractedMetadata.characterCount ?? null,
-              isEncrypted: extractedMetadata.isEncrypted ?? false,
-              hasDigitalSignature: extractedMetadata.hasDigitalSignature ?? false,
-              xmpPresence,
-              hasRealXmp: !!(extractedMetadata as any).rawXmpData,
-            },
-            structuralFeatures,
-            forensicChecks,
-            provenance: {
-              uploadMethod: 'api-verify-upload',
-              filenameSanitized: path.basename(req.file!.originalname),
-              magicVerified: true,
-              processingTimestamp: new Date().toISOString(),
-            },
-            finalVerdict: toEvidenceVerdict(outcome.result),
-            finalConfidence: outcome.confidence,
-            abstentionReason:
-              outcome.result === 'suspicious'
-                ? (cosCheckResult.reason ?? 'Conflicting or unverifiable signals — human review recommended.')
-                : null,
-          });
-        } catch (e) {
-          logger.warn({ err: e }, '[Verify] forensic evidence bundle build failed (non-fatal)');
-        }
+        attachPdfVerdictEvidence(analysis, {
+          pdfBinary,
+          extractedMetadata,
+          extractStructuralFeatures: (bin) => pdfAnalyzer.extractStructuralFeatures(bin),
+          outcome,
+          cosCheckResult,
+          documentHash,
+          receiptId,
+          uploadMethod: 'api-verify-upload',
+          filename: path.basename(req.file!.originalname),
+          logTag: '[Verify]',
+        });
         metadata = {
           format: 'Pdf', mimeType: 'application/pdf', pdfVersion: extractedMetadata.pdfVersion || null, title: extractedMetadata.title || null,
           author: extractedMetadata.author || null, subject: extractedMetadata.subject || null, creator: extractedMetadata.creator || null,

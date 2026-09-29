@@ -14,8 +14,8 @@ import {
   toEvidenceVerdict,
 } from "../services/forensicTypes";
 import {
+  attachPdfVerdictEvidence,
   buildAdminOverrideEvidence,
-  buildPatternAndCosForensicChecks,
   chargeVerificationUsage,
 } from "../services/verificationShared";
 import { withRetry } from "../utils/dbRetry";
@@ -174,47 +174,18 @@ export async function processPdfVerifyJob(job: Job<PdfVerifyJobData>): Promise<{
       analysis.checks = outcome.checks;
       (analysis as any).trustedReference = outcome.trustedReference;
       // Immutable internal evidence bundle — verdict logic above untouched.
-      try {
-        const structuralFeatures = pdfAnalyzer.extractStructuralFeatures(pdfBinary);
-        const parsedXmp = (extractedMetadata as any).parsedXmp ?? {};
-        const requiredXmp = ['dc:date', 'dc:format', 'dc:language', 'pdf:PDFVersion', 'pdf:Producer', 'xmp:CreateDate', 'xmp:CreatorTool', 'xmp:MetadataDate'];
-        const xmpPresence: Record<string, boolean> = {};
-        for (const f of requiredXmp) xmpPresence[f] = !!parsedXmp[f];
-        (analysis as any).forensicEvidence = buildForensicEvidence({
-          documentHash,
-          extractedFeatures: {
-            producer: (extractedMetadata as any).producer ?? null,
-            creator: (extractedMetadata as any).creator ?? null,
-            pdfVersion: (extractedMetadata as any).pdfVersion ?? null,
-            creationDate: (extractedMetadata as any).creationDate ?? null,
-            modificationDate: (extractedMetadata as any).modificationDate ?? null,
-            pages: (extractedMetadata as any).pages ?? null,
-            fontCount: (extractedMetadata as any).fontCount ?? 0,
-            wordCount: (extractedMetadata as any).wordCount ?? null,
-            characterCount: (extractedMetadata as any).characterCount ?? null,
-            isEncrypted: (extractedMetadata as any).isEncrypted ?? false,
-            hasDigitalSignature: (extractedMetadata as any).hasDigitalSignature ?? false,
-            xmpPresence,
-            hasRealXmp: !!(extractedMetadata as any).rawXmpData,
-          },
-          structuralFeatures,
-          forensicChecks: buildPatternAndCosForensicChecks(outcome.checks, cosCheckResult.checks),
-          provenance: {
-            uploadMethod: 'bullmq-worker',
-            filenameSanitized: path.basename(originalname),
-            magicVerified: true,
-            processingTimestamp: new Date().toISOString(),
-          },
-          finalVerdict: toEvidenceVerdict(outcome.result),
-          finalConfidence: outcome.confidence,
-          abstentionReason:
-            outcome.result === 'suspicious'
-              ? (cosCheckResult.reason ?? 'Conflicting or unverifiable signals — human review recommended.')
-              : null,
-        });
-      } catch (e) {
-        logger.warn({ err: e }, '[PDFWorker] forensic evidence bundle build failed (non-fatal)');
-      }
+      attachPdfVerdictEvidence(analysis, {
+        pdfBinary,
+        extractedMetadata,
+        extractStructuralFeatures: (bin) => pdfAnalyzer.extractStructuralFeatures(bin),
+        outcome,
+        cosCheckResult,
+        documentHash,
+        receiptId,
+        uploadMethod: 'bullmq-worker',
+        filename: path.basename(originalname),
+        logTag: '[PDFWorker]',
+      });
       metadata = {
         format: 'Pdf',
         mimeType: 'application/pdf',

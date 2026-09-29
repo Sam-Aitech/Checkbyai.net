@@ -6,6 +6,7 @@ import {
   FORENSIC_FEATURE_SCHEMA_VERSION,
   FORENSIC_PARSER_NAME,
   FORENSIC_PARSER_VERSION,
+  STREAM_MISMATCH_EXTRACTION_FAILED,
   producerFamily,
   type IForensicParser,
   type StructuralFeatures,
@@ -318,8 +319,12 @@ export class PDFAnalyzer implements IForensicParser {
         // hostile input. Progress past streamIdx is guaranteed either way.
         searchFrom = Math.max(endIdx === -1 ? streamIdx + 6 : endIdx + 9, streamIdx + 6);
       }
-    } catch {
-      // Feature extraction must never throw — return best effort.
+    } catch (err) {
+      // Feature extraction must never throw, but a partial count would read as
+      // "few/no mismatches" on exactly the malformed input that matters. Report
+      // the STREAM_MISMATCH_EXTRACTION_FAILED sentinel instead and say so.
+      logger.warn({ err }, '[PDFAnalyzer] stream length scan failed — reporting extraction-failed sentinel');
+      return STREAM_MISMATCH_EXTRACTION_FAILED;
     }
     return mismatches;
   }

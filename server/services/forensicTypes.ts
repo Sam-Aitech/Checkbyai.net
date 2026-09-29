@@ -26,6 +26,9 @@ export const FORENSIC_PARSER_NAME = 'node-regex-parser' as const;
 export const FORENSIC_PARSER_VERSION = 'node-regex-v2' as const;
 export const FORENSIC_RULE_SET_VERSION = 'cos-rules-v1' as const;
 export const FORENSIC_FEATURE_SCHEMA_VERSION = 'feature-schema-v1' as const;
+
+/** `streamLengthMismatchCount` value meaning the stream scan threw — NOT "zero mismatches". */
+export const STREAM_MISMATCH_EXTRACTION_FAILED = -1;
 export const FORENSIC_MODEL_VERSION = 'deterministic-v1' as const;
 
 // ── Parser interface ─────────────────────────────────────────────────────────
@@ -60,7 +63,10 @@ export interface StructuralFeatures {
   objectCountEstimate: number;
   /** Count of `stream`…`endstream` bodies. Structural. */
   streamCount: number;
-  /** Streams whose declared `/Length` disagrees with measured bytes. Strong signal. */
+  /**
+   * Streams whose declared `/Length` disagrees with measured bytes. Strong signal.
+   * `STREAM_MISMATCH_EXTRACTION_FAILED` (-1) means the scan failed, not that none were found.
+   */
   streamLengthMismatchCount: number;
   /** Distinct `/BaseFont|/FontName` entries. Survives metadata cloning. */
   fontCountEstimate: number;
