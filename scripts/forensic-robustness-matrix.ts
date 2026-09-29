@@ -19,7 +19,6 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { PDFAnalyzer } from '../server/services/pdfAnalyzer.ts';
 import {
-  MATRIX_FEATURES,
   classifyCell,
   diffFeatures,
   scoreMatrix,

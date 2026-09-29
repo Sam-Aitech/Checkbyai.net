@@ -288,7 +288,7 @@ export function registerAdminRoutes(app: Express): void {
   app.get('/api/admin/verification-logs', requireRole("admin"), async (req, res) => {
     try {
       const page = parseInt(req.query.page as string) || 1;
-      const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+      const limit = Math.min(Number.parseInt(req.query.limit as string, 10) || 50, 100);
       const status = req.query.status as string | undefined;
       const startDate = req.query.startDate as string | undefined;
       const endDate = req.query.endDate as string | undefined;
@@ -1071,7 +1071,7 @@ Format your response in clear, professional markdown.`;
   app.get('/api/admin/users', requireRole("admin"), async (req, res) => {
     try {
       const page = parseInt(req.query.page as string) || 1;
-      const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+      const limit = Math.min(Number.parseInt(req.query.limit as string, 10) || 50, 100);
       const search = req.query.search as string | undefined;
       const paidOnly = req.query.paidOnly === 'true';
 
@@ -2088,16 +2088,16 @@ Format your response in clear, professional markdown.`;
           // One note per (producer, failure signature): repeated markings of
           // the same anomaly must not stack duplicate rules. A different
           // failure signature on the same producer IS a new note.
-          const signature = `Producer: ${producer}|${failedIds.slice().sort().join(',')}`;
+          const signature = `Producer: ${producer}|${failedIds.slice().sort((a, b) => a.localeCompare(b)).join(',')}`;
           const activeRules = await storage.getActiveGlobalAiRules().catch(() => []);
           const alreadyNoted = activeRules.some((r: any) => {
             if (r.category !== 'hitl-override' || typeof r.ruleText !== 'string') return false;
             if (!r.ruleText.includes(`Producer: ${producer}`)) return false;
             const m = r.ruleText.match(/Signal\(check-ids\):\s*([a-z0-9\-, ]+)/i);
             const existing = m
-              ? m[1].split(',').map((s: string) => s.trim().toLowerCase()).filter((s: string) => /^check-\d{2}$/.test(s)).sort().join(',')
+              ? m[1].split(',').map((s: string) => s.trim().toLowerCase()).filter((s: string) => /^check-\d{2}$/.test(s)).sort((a: string, b: string) => a.localeCompare(b)).join(',')
               : '';
-            return existing === failedIds.slice().sort().join(',');
+            return existing === failedIds.slice().sort((a, b) => a.localeCompare(b)).join(',');
           });
           if (!alreadyNoted) {
             const overrideDate = new Date().toISOString().split('T')[0];
@@ -2174,7 +2174,7 @@ Format your response in clear, professional markdown.`;
 
   app.get('/api/knowledge-base', requireRole("admin"), async (req: any, res) => {
     try {
-      const limit = Math.min(parseInt(req.query.limit as string) || 15, 100);
+      const limit = Math.min(Number.parseInt(req.query.limit as string, 10) || 15, 100);
       const knowledge = await storage.getAdminFakeKnowledge(limit);
 
       let knowledgeContext = '';
@@ -2400,7 +2400,7 @@ Format your response in clear, professional markdown.`;
   app.get('/api/admin/users/:id/subscription-audit', requireRole("admin"), async (req, res) => {
     try {
       const userId = req.params.id;
-      const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
+      const limit = Math.min(Number.parseInt(req.query.limit as string, 10) || 20, 50);
       const log = await storage.getSubscriptionAuditLog(userId, limit);
       res.json(log);
     } catch (error) {
@@ -2412,7 +2412,7 @@ Format your response in clear, professional markdown.`;
   app.get('/api/admin/verification-logs-hitl', requireRole("admin"), async (req: any, res) => {
     try {
       const page = parseInt(req.query.page as string) || 1;
-      const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+      const limit = Math.min(Number.parseInt(req.query.limit as string, 10) || 20, 100);
       const adminStatus = req.query.adminStatus as string;
 
       const logs = await storage.getVerificationLogsWithHITL(page, limit, adminStatus);
@@ -2465,7 +2465,7 @@ Format your response in clear, professional markdown.`;
   app.get('/api/admin/notifications/users', requireRole("admin"), async (req, res) => {
     try {
       const page = Math.max(1, parseInt(req.query.page as string) || 1);
-      const limit = Math.min(50, parseInt(req.query.limit as string) || 20);
+      const limit = Math.min(50, Number.parseInt(req.query.limit as string, 10) || 20);
       const search = (req.query.search as string)?.trim() ?? '';
       const offset = (page - 1) * limit;
 
@@ -2558,7 +2558,7 @@ Format your response in clear, professional markdown.`;
   app.get('/api/admin/notifications/log', requireRole("admin"), async (req, res) => {
     try {
       const page = Math.max(1, parseInt(req.query.page as string) || 1);
-      const limit = Math.min(100, parseInt(req.query.limit as string) || 25);
+      const limit = Math.min(100, Number.parseInt(req.query.limit as string, 10) || 25);
       const userId = req.query.userId as string | undefined;
       const offset = (page - 1) * limit;
 

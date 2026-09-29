@@ -255,7 +255,7 @@ export class PDFAnalyzer implements IForensicParser {
     // startxref then looked like a new xref table for the wrong reason).
     const xrefSectionCount = (binary.match(/(?<![A-Za-z])xref(?![A-Za-z])/g) ?? []).length;
     const hasPrevChain = /\/Prev\s+\d+/.test(binary);
-    const objectCountEstimate = (binary.match(/\d+\s+\d+\s+obj\b/g) ?? []).length;
+    const objectCountEstimate = (binary.match(/(?<!\d)\d+\s+\d+\s+obj\b/g) ?? []).length;
     const streamCount = (binary.match(/\bstream\r?\n/g) ?? []).length;
     const fontCountEstimate = this.extractFonts(binary).length;
     const fontDescriptorCount = (binary.match(/\/FontDescriptor/g) ?? []).length;
@@ -306,7 +306,7 @@ export class PDFAnalyzer implements IForensicParser {
         const bodyStart = pdfBinary.indexOf('\n', streamIdx) + 1;
         const endIdx = pdfBinary.indexOf('endstream', bodyStart);
         if (lengthMatch && bodyStart > 0 && endIdx > bodyStart) {
-          const declared = parseInt(lengthMatch[1], 10);
+          const declared = Number.parseInt(lengthMatch[1], 10);
           // Body includes the trailing EOL before endstream per spec convention.
           const measured = endIdx - bodyStart;
           if (Number.isFinite(declared) && Math.abs(measured - declared) > 2) mismatches++;
@@ -332,7 +332,7 @@ export class PDFAnalyzer implements IForensicParser {
     const N = Math.min(pdfBinary.length, 1024 * 1024);
     if (N === 0) return 0;
     const freq = new Array<number>(256).fill(0);
-    for (let i = 0; i < N; i++) freq[pdfBinary.charCodeAt(i) & 0xff]++;
+    for (let i = 0; i < N; i++) freq[(pdfBinary.codePointAt(i) ?? 0) & 0xff]++;
     let entropy = 0;
     for (const count of freq) {
       if (count === 0) continue;
@@ -1076,7 +1076,7 @@ export class PDFAnalyzer implements IForensicParser {
         const overlap = signal.checkIds.filter((id) => currentFailed.includes(id));
         const familyOk = !signal.producerFamily || signal.producerFamily === docFamily;
         if (overlap.length === 0 || !familyOk) continue;
-        const dedupKey = `rule-signal:${rule.category}:${overlap.slice().sort().join(',')}`;
+        const dedupKey = `rule-signal:${rule.category}:${overlap.slice().sort((a, b) => a.localeCompare(b)).join(',')}`;
         if (seenAdvisories.has(dedupKey)) continue;
         seenAdvisories.add(dedupKey);
         ruleResult.checks.push({

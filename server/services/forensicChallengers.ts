@@ -38,9 +38,9 @@ export interface AnachronismResult {
 export function parseDocYear(dateStr: unknown): number | null {
   if (typeof dateStr !== 'string') return null;
   const pdf = dateStr.match(/D:(\d{4})/);
-  if (pdf) return parseInt(pdf[1], 10);
+  if (pdf) return Number.parseInt(pdf[1], 10);
   const iso = dateStr.match(/^(\d{4})-\d{2}/);
-  if (iso) return parseInt(iso[1], 10);
+  if (iso) return Number.parseInt(iso[1], 10);
   return null;
 }
 

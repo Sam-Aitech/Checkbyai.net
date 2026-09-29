@@ -64,6 +64,16 @@ const ok = (binary: string, params: Record<string, unknown> = {}): OperatorResul
   skipped: false,
 });
 
+/** Remove the first line containing `/Linearized` (linear-time, no regex backtracking). */
+function removeLinearizedLine(binary: string): string {
+  const at = binary.indexOf('/Linearized');
+  if (at === -1) return binary;
+  const lineEnd = binary.indexOf('\n', at);
+  if (lineEnd === -1) return binary;
+  const lineStart = binary.lastIndexOf('\n', at) + 1;
+  return binary.slice(0, lineStart) + binary.slice(lineEnd + 1);
+}
+
 const skip = (binary: string, reason: string): OperatorResult => ({
   binary,
   params: { skippedReason: reason },
@@ -318,7 +328,7 @@ const linearizeToggle: ForensicOperator = {
   expectedGate: 'GENUINE',
   apply(binary) {
     if (binary.includes('/Linearized')) {
-      const toggled = binary.replace(/[^\n]*\/Linearized[^\n]*\n/, '');
+      const toggled = removeLinearizedLine(binary);
       if (toggled === binary) return skip(binary, 'linearization line not removable');
       return ok(toggled, { direction: 'strip' });
     }

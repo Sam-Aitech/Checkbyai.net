@@ -52,9 +52,6 @@ async function main(): Promise<void> {
   const analyzer = new PDFAnalyzer();
   const checker = new COSAuthenticityChecker();
 
-  const readBinary = (rel: string): string =>
-    fs.readFileSync(path.join(corpusRoot, rel)).toString('binary');
-
   async function analyse(rel: string): Promise<{ metadata: any; binary: string }> {
     const bytes = fs.readFileSync(path.join(corpusRoot, rel));
     const tmp = path.join(scratch, rel.replace(/[/\\]/g, '_'));

@@ -60,7 +60,6 @@ const hasColumn = (checks: ExistenceCheck[], table: string, column: string) =>
   checks.some((c) => c.kind === "column" && c.table === table && c.column === column);
 const hasIndex = (checks: ExistenceCheck[], name: string) =>
   checks.some((c) => c.kind === "index" && c.name === name);
-const hasFk = (checks: ExistenceCheck[], name: string) => checks.some((c) => c.kind === "fk" && c.name === name);
 const hasConstraint = (checks: ExistenceCheck[], name: string) =>
   checks.some((c) => (c.kind === "fk" || c.kind === "constraint") && c.name === name);
 const hasExtension = (checks: ExistenceCheck[], name: string) =>

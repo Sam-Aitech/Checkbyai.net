@@ -93,7 +93,7 @@ describe('feature-schema-v1 structural signals', () => {
     // Core red-team property: cloning `Apache FOP` strings must not change
     // body-topology signals. If it does, the feature is string-coupled.
     const genuine = genuinePdfBinary();
-    const spoofed = genuine.replace(/Apache FOP Version 2\.9/g, 'Apache FOP Version 2.9');
+    const spoofed = genuine.replace(/Apache FOP Version 2\.9/g, 'Acrobat Distiller 9.0.');
     expect(testFeatures(spoofed)).toEqual(testFeatures(genuine));
   });
 });
