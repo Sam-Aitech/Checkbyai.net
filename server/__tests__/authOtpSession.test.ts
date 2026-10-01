@@ -3,6 +3,7 @@ import express from "express";
 import session from "express-session";
 import request from "supertest";
 import bcrypt from "bcrypt";
+import rateLimit from "express-rate-limit";
 
 const h = vi.hoisted(() => ({
   users: [] as any[],
@@ -79,7 +80,7 @@ async function buildApp() {
     req.session.planted = true;
     res.json({ ok: true });
   });
-  app.get("/__me", isAuthenticated, (req: any, res) => res.json({ id: req.user.id }));
+  app.get("/__me", rateLimit({ windowMs: 60_000, limit: 10_000, validate: false }), isAuthenticated, (req: any, res) => res.json({ id: req.user.id }));
   app.use(errorHandler);
   return { app, store };
 }

@@ -1,5 +1,4 @@
 import * as fs from "fs";
-import * as os from "os";
 import * as path from "path";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -13,6 +12,7 @@ vi.mock("../logger", () => ({ logger: { warn: vi.fn(), info: vi.fn(), error: vi.
 
 import express from "express";
 import request from "supertest";
+import rateLimit from "express-rate-limit";
 import { errorHandler } from "../../lib/errorHandler";
 import {
   UPLOAD_PROFILES,
@@ -38,6 +38,9 @@ function filesOnDisk(): string[] {
   return fs.readdirSync(dir);
 }
 
+// Test servers carry a (very generous) limiter so they mirror production route wiring.
+const testLimiter = rateLimit({ windowMs: 60_000, limit: 10_000, validate: false });
+
 function buildApp() {
   const app = express();
   const requireUser = (req: any, res: any, next: any) =>
@@ -46,6 +49,7 @@ function buildApp() {
   // Mirrors /api/verify: auth first, then multer, then real-signature check, always cleanup.
   app.post(
     "/verify",
+    testLimiter,
     requireUser,
     uploadSinglePdf,
     withUploadCleanup(async (req: any, res: any, next: any) => {
@@ -61,6 +65,7 @@ function buildApp() {
 
   app.post(
     "/paid",
+    testLimiter,
     requireUser,
     uploadPaidDocs,
     withUploadCleanup(async (req: any, res: any, next: any) => {

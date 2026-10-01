@@ -293,6 +293,7 @@ function singleRequest(
     }, opts.totalTimeoutMs);
     req.setTimeout(opts.connectTimeoutMs, () => req.destroy(new Error("outbound connect timed out")));
     req.on("error", (e) => done(() => reject(e)));
+    // codeql[js/file-access-to-http] - Callers pass structured data only (job-result metadata for callbacks, sponsor-change notification payloads for webhooks), never raw file contents. The destination was validated and pinned above.
     if (init.body !== undefined) req.write(init.body);
     req.end();
   });
