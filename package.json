@@ -185,7 +185,7 @@
     "vitest": "^4.1.1"
   },
   "optionalDependencies": {
-    "@mendable/firecrawl-js": "~1.21.0",
+    "@mendable/firecrawl-js": "~4.41.0",
     "bufferutil": "^4.0.9"
   },
   "overrides": {
