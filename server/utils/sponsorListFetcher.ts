@@ -31,10 +31,12 @@ async function discoverViaFirecrawl(homeOfficeUrl: string): Promise<string | nul
     // Dynamically import to avoid making it a hard dependency
     const FirecrawlApp = (await import('@mendable/firecrawl-js')).default;
     const app = new FirecrawlApp({ apiKey: process.env.FIRECRAWL_API_KEY! });
-    const result = await app.scrapeUrl(homeOfficeUrl, { formats: ['markdown'] });
+    // v2+ SDK: scrape() returns the Document directly and throws on failure
+    // (handled by the catch below) — there is no `success` flag any more.
+    const result = await app.scrape(homeOfficeUrl, { formats: ['markdown'] });
     
     // Extract CSV URL from markdown content
-    if (result.success && result.markdown) {
+    if (result.markdown) {
       const match = result.markdown.match(/https?:\/\/[^\s)"]+\.csv/i);
       return match?.[0] ?? null;
     }

@@ -19,7 +19,7 @@ export function registerFeedbackRoutes(app: Express): void {
       res.json(newFeedback);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid feedback data", errors: error.errors });
+        return res.status(400).json({ message: "Invalid feedback data", errors: error.issues });
       }
       logger.error({ err: error }, "Error creating feedback:");
       res.status(500).json({ message: "Failed to submit feedback" });

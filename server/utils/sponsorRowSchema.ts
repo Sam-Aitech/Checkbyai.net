@@ -29,15 +29,15 @@ const SponsorBaseFromDbSchema = z.object({
 
 // Priority 5 canonical licence status values (timeline domain).
 export const SponsorLicenceStatusSchema = z.enum(["Active", "Suspended", "Revoked", "Surrendered"], {
-  required_error: "licenceStatus is required",
+  error: (issue) => (issue.input === undefined ? "licenceStatus is required" : undefined),
 });
 // Gov.uk sponsor feed rating values.
 export const SponsorRatingSchema = z.enum(["A-RATING", "B-RATING"], {
-  required_error: "rating is required",
+  error: (issue) => (issue.input === undefined ? "rating is required" : undefined),
 });
 // Gov.uk sponsor feed licence-type values for this ETL domain.
 export const SponsorLicenceTypeSchema = z.enum(["WORKER", "TEMPORARY_WORKER"], {
-  required_error: "licenceType is required",
+  error: (issue) => (issue.input === undefined ? "licenceType is required" : undefined),
 });
 
 const LastUpdatedSchema = z
@@ -189,7 +189,7 @@ export function deriveSponsorRowEnums(input: {
   };
 }
 
-export function issueFieldName(issuePath: (string | number)[]): string {
+export function issueFieldName(issuePath: readonly PropertyKey[]): string {
   if (issuePath.length === 0) return "_row";
   const first = issuePath[0];
   return typeof first === "string" ? first : "_row";
