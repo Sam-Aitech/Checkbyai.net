@@ -100,7 +100,7 @@ export function registerNotificationRoutes(app: Express): void {
     const userId = req.user.id;
     const parsed = notifPrefSchema.safeParse(req.body);
     if (!parsed.success) {
-      throw new ApiError(400, parsed.error.errors.map(e => e.message).join(', '));
+      throw new ApiError(400, parsed.error.issues.map(e => e.message).join(', '));
     }
     const { email_enabled, whatsapp_enabled, whatsapp_number, sms_enabled, sms_number, webhook_enabled, webhook_url } = parsed.data;
 
@@ -191,7 +191,7 @@ export function registerNotificationRoutes(app: Express): void {
   app.patch('/api/notifications/preferences', isAuthenticated, asyncHandler(async (req: any, res) => {
     const parsed = notifEventSchema.safeParse(req.body);
     if (!parsed.success) {
-      throw new ApiError(400, parsed.error.errors.map((e: any) => e.message).join(', '));
+      throw new ApiError(400, parsed.error.issues.map((e: any) => e.message).join(', '));
     }
     await storage.updateUserNotifPrefs(req.user.id, parsed.data);
     success(res, { message: 'Notification event preferences updated.' });

@@ -1041,7 +1041,7 @@ Format your response in clear, professional markdown.`;
       });
       const tpParsed = trustProducerSchema.safeParse(req.body);
       if (!tpParsed.success) {
-        return res.status(400).json({ message: tpParsed.error.errors.map(e => e.message).join(', ') });
+        return res.status(400).json({ message: tpParsed.error.issues.map(e => e.message).join(', ') });
       }
       const { producer, verificationId } = tpParsed.data;
 
@@ -1502,7 +1502,7 @@ Format your response in clear, professional markdown.`;
     try {
       const parsed = globalRuleSchema.safeParse(req.body);
       if (!parsed.success) {
-        return res.status(400).json({ message: parsed.error.errors.map(e => e.message).join(', ') });
+        return res.status(400).json({ message: parsed.error.issues.map(e => e.message).join(', ') });
       }
 
       const { category, ruleText, priority } = parsed.data;
@@ -1575,7 +1575,7 @@ Format your response in clear, professional markdown.`;
     try {
       const parsed = teachAiSchema.safeParse(req.body);
       if (!parsed.success) {
-        return res.status(400).json({ message: parsed.error.errors.map(e => e.message).join(', ') });
+        return res.status(400).json({ message: parsed.error.issues.map(e => e.message).join(', ') });
       }
 
       const { verificationId, category, ruleText, priority } = parsed.data;
