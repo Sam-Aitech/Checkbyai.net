@@ -195,22 +195,31 @@ describe("webhookChannel", () => {
     recipient: "https://hooks.example.com/sponsor",
   };
 
-  beforeEach(() => { vi.resetModules(); vi.restoreAllMocks(); vi.unstubAllEnvs(); });
+  beforeEach(() => { vi.resetModules(); vi.restoreAllMocks(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.useRealTimers(); vi.doUnmock("../../../security/outboundPolicy"); });
 
-  it("sends webhook with HMAC signature", async () => {
+  async function mockPolicy(impl: (url: string, init: any, opts: any) => Promise<any>) {
+    const actual = await vi.importActual<typeof import("../../../security/outboundPolicy")>("../../../security/outboundPolicy");
+    const safeOutboundRequest = vi.fn(impl);
+    vi.doMock("../../../security/outboundPolicy", () => ({ ...actual, safeOutboundRequest }));
+    return { safeOutboundRequest, OutboundBlockedError: actual.OutboundBlockedError };
+  }
+
+  it("sends webhook with HMAC signature through the central outbound policy", async () => {
     vi.stubEnv("WEBHOOK_SECRET", "test-secret");
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true, headers: { get: (h: string) => (h === "X-Request-Id" ? "req-1" : null) },
-    });
-    vi.stubGlobal("fetch", fetchMock);
+    const { safeOutboundRequest } = await mockPolicy(async () => ({
+      status: 200, headers: { "x-request-id": "req-1" }, body: "", truncated: false,
+    }));
 
     const { webhookChannel } = await import("../webhook");
     const result = await webhookChannel.send(payload);
     expect(result.success).toBe(true);
     expect(result.providerMessageId).toBe("req-1");
-    const args = fetchMock.mock.calls[0][1];
-    expect(args.headers["X-CheckByAI-Signature"]).toBeDefined();
-    expect(args.headers["X-CheckByAI-Timestamp"]).toBeDefined();
+    const [url, init, opts] = safeOutboundRequest.mock.calls[0];
+    expect(url).toBe(payload.recipient);
+    expect(init.headers["X-CheckByAI-Signature"]).toBeDefined();
+    expect(init.headers["X-CheckByAI-Timestamp"]).toBeDefined();
+    expect(init.headers["X-CheckByAI-Signature-V2"]).toBeDefined();
+    expect(opts.maxRedirects).toBe(0); // redirects are never followed for webhooks
   });
 
   it("rejects non-HTTPS URLs", async () => {
@@ -223,35 +232,53 @@ describe("webhookChannel", () => {
   it("retries on HTTP errors up to max attempts", async () => {
     vi.stubEnv("WEBHOOK_SECRET", "test-secret");
     useInstantTimers();
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: false, status: 502, headers: { get: () => null },
-      text: async () => "Bad Gateway",
-    });
-    vi.stubGlobal("fetch", fetchMock);
+    const { safeOutboundRequest } = await mockPolicy(async () => ({
+      status: 502, headers: {}, body: "Bad Gateway", truncated: false,
+    }));
 
     const { webhookChannel } = await import("../webhook");
     const result = await webhookChannel.send(payload);
     expect(result.success).toBe(false);
-    // 1 initial attempt + 2 quick retries (RETRY_DELAYS_MS has 2 entries)
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(safeOutboundRequest).toHaveBeenCalledTimes(3);
+    // Response bodies from customer endpoints are not echoed into results/logs.
+    expect(result.error).not.toContain("Bad Gateway");
   });
 
-  it("blocks delivery to private/internal hosts (SSRF guard)", async () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
+  it("does not retry and reports a policy rejection (SSRF guard)", async () => {
+    const mocked = await mockPolicy(async () => {
+      throw new (await vi.importActual<typeof import("../../../security/outboundPolicy")>("../../../security/outboundPolicy")).OutboundBlockedError("ip_blocked", "attacker.example.com", "private");
+    });
 
+    const { webhookChannel } = await import("../webhook");
+    const result = await webhookChannel.send({ ...payload, recipient: "https://attacker.example.com/hook" });
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("internal/private");
+    expect(mocked.safeOutboundRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it("blocks a metadata-address webhook end to end with the real policy (no transport touched)", async () => {
     const { webhookChannel } = await import("../webhook");
     const result = await webhookChannel.send({ ...payload, recipient: "https://169.254.169.254/latest/meta-data" });
     expect(result.success).toBe(false);
     expect(result.error).toContain("internal/private");
-    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("clamps an attacker-controlled Retry-After", async () => {
+    const sleeps: number[] = [];
+    vi.useFakeTimers();
+    vi.stubGlobal("setTimeout", (fn: Function, ms: number) => { sleeps.push(ms); fn(); return 0; });
+    await mockPolicy(async () => ({
+      status: 429, headers: { "retry-after": "86400" }, body: "", truncated: false,
+    }));
+    const { webhookChannel } = await import("../webhook");
+    await webhookChannel.send(payload);
+    expect(Math.max(...sleeps)).toBeLessThanOrEqual(30_000);
   });
 
   it("handles network errors gracefully", async () => {
     vi.stubEnv("WEBHOOK_SECRET", "test-secret");
     useInstantTimers();
-    const fetchMock = vi.fn().mockRejectedValue(new Error("fetch failed"));
-    vi.stubGlobal("fetch", fetchMock);
+    await mockPolicy(async () => { throw new Error("fetch failed"); });
 
     const { webhookChannel } = await import("../webhook");
     const result = await webhookChannel.send(payload);
@@ -260,14 +287,13 @@ describe("webhookChannel", () => {
   });
 
   it("sends without signature when no WEBHOOK_SECRET", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, headers: { get: () => null } });
-    vi.stubGlobal("fetch", fetchMock);
+    const { safeOutboundRequest } = await mockPolicy(async () => ({ status: 200, headers: {}, body: "", truncated: false }));
 
     const { webhookChannel } = await import("../webhook");
     const result = await webhookChannel.send(payload);
     expect(result.success).toBe(true);
-    const args = fetchMock.mock.calls[0][1];
-    expect(args.headers["X-CheckByAI-Signature"]).toBeUndefined();
+    const init = safeOutboundRequest.mock.calls[0][1];
+    expect(init.headers["X-CheckByAI-Signature"]).toBeUndefined();
   });
 });
 

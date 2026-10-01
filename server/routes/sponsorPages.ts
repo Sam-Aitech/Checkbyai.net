@@ -5,28 +5,11 @@ import { sponsorCanonical, sponsorChanges, sponsorEnrichment, dailyDigest, monit
 import { cacheGet, cacheSet } from "../utils/redisClient";
 import { getAppUrl } from "../utils/appUrl";
 import { ensureIndexReady, getIndexData, getIndexVersion, type SearchIndexEntry } from "../utils/sponsorSearch";
-import rateLimit from "express-rate-limit";
 import { success } from "../lib/response";
 import { asyncHandler } from "../lib/errorHandler";
 import { ApiError } from "../lib/apiError";
-
-/** Wrap a CSV field value in quotes if it contains commas, quotes, or newlines. */
-function csvEscape(val: string): string {
-  if (!val) return "";
-  if (val.includes(",") || val.includes('"') || val.includes("\n") || val.includes("\r")) {
-    return `"${val.replace(/"/g, '""')}"`;
-  }
-  return val;
-}
-
-// 5 CSV downloads per hour per IP — it's a heavy full-table scan.
-const csvRateLimit = rateLimit({
-  windowMs: 60 * 60 * 1_000,
-  max: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: "Too many CSV downloads. Please wait before downloading again.",
-});
+import { csvRow } from "../utils/csvSafe";
+import { csvExportLimiter } from "../middleware/rateLimiter";
 
 /** URL-safe slug from a display string — used to build readable /sponsor/{id}/{slug} URLs. */
 export function toSlug(str: string): string {
@@ -405,7 +388,7 @@ export function registerSponsorPageRoutes(app: Express): void {
   // joined string on the event loop. Backpressure-aware: each chunk awaits
   // 'drain' when the socket is full, and stops immediately if the client
   // disconnects mid-download.
-  app.get("/api/sponsors/export.csv", csvRateLimit, asyncHandler(async (_req: any, res) => {
+  app.get("/api/sponsors/export.csv", csvExportLimiter, asyncHandler(async (_req: any, res) => {
     const today = new Date().toISOString().split("T")[0];
     const CHUNK_SIZE = 5_000;
 
@@ -444,14 +427,15 @@ export function registerSponsorPageRoutes(app: Express): void {
 
       let buf = "";
       for (const r of rows) {
-        buf += [
-          csvEscape(r.name      || ""),
-          csvEscape(r.town      || ""),
-          csvEscape(r.type_rating || ""),
-          csvEscape(r.route     || ""),
-          csvEscape(r.status    || ""),
+        // Every cell goes through csvCell: formula-prefixed values (= + - @, tab, CR) are neutralised.
+        buf += csvRow([
+          r.name,
+          r.town,
+          r.type_rating,
+          r.route,
+          r.status,
           r.granted_at ? String(r.granted_at).slice(0, 10) : "",
-        ].join(",") + "\r\n";
+        ]);
       }
       if (!res.write(buf)) await waitForDrain(res);
 

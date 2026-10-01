@@ -8,12 +8,30 @@ import { db } from "./db";
 import { notificationPreferences } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import crypto from "crypto";
-import { otpLimiter, otpEmailLimiter } from "./middleware/rateLimiter";
+import { adminOtpEmailLimiter, adminOtpLimiter, otpEmailLimiter, otpLimiter, otpVerifyEmailLimiter } from "./middleware/rateLimiter";
 import { getAppUrl } from "./utils/appUrl";
 import { validateBody } from "./lib/validate";
 import { sendOtpSchema, verifyOtpSchema } from "./validation/auth";
 import { logger } from "./utils/logger";
+import { getTrustProxyHops } from "./utils/trustProxy";
 import { getCachedUser } from "./utils/userCache";
+import {
+  SESSION_COOKIE_NAME,
+  SESSION_TTL_MS,
+  endSession,
+  establishAuthenticatedSession,
+  revokeOtherSessions,
+  sessionCookieOptions,
+} from "./utils/sessionSecurity";
+import {
+  GENERIC_OTP_FAILURE,
+  OTP_TTL_MS,
+  checkOtp,
+  generateOtpCode,
+  hashOtpCode,
+  normalizeEmail,
+  resetOtpAttempts,
+} from "./services/emailOtp";
 
 
 if (process.env.NODE_ENV === "production" && !process.env.REPLIT_DOMAINS) {
@@ -22,10 +40,11 @@ if (process.env.NODE_ENV === "production" && !process.env.REPLIT_DOMAINS) {
   logger.warn("REPLIT_DOMAINS not provided; Google OAuth callback redirects may fail.");
 }
 
-export function getSession() {
-  const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
+export function getSession(store?: session.Store) {
+  const sessionTtl = SESSION_TTL_MS; // 1 week
   const pgStore = connectPg(session);
-  const sessionStore = new pgStore({
+  // A store can be injected (tests use an in-memory one); production uses Postgres.
+  const sessionStore = store ?? new pgStore({
     conString: process.env.DATABASE_URL,
     createTableIfMissing: false,
     ttl: sessionTtl,
@@ -40,18 +59,14 @@ export function getSession() {
     resave: false,
     saveUninitialized: false,
     proxy: true,
-    cookie: {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: sessionTtl,
-    },
+    name: SESSION_COOKIE_NAME,
+    cookie: sessionCookieOptions(),
   });
 }
 
 // Generate 6-digit OTP code
 export function generateOTP(): string {
-  return crypto.randomInt(100000, 999999).toString();
+  return generateOtpCode();
 }
 
 // Send OTP via Resend email (for regular users)
@@ -265,9 +280,9 @@ export async function sendMasterPackageNotification(userEmail: string, userId: s
   }
 }
 
-export async function setupAuth(app: Express) {
-  app.set("trust proxy", 1);
-  app.use(getSession());
+export async function setupAuth(app: Express, options: { sessionStore?: session.Store } = {}) {
+  app.set("trust proxy", getTrustProxyHops());
+  app.use(getSession(options.sessionStore));
   app.use(passport.initialize());
   app.use(passport.session());
 
@@ -407,8 +422,9 @@ export async function setupAuth(app: Express) {
           return res.redirect("/login?error=google_auth_failed");
         }
 
-        req.logIn(user, (loginError) => {
-          if (loginError) {
+        establishAuthenticatedSession(req, user).then(
+          () => res.redirect("/sponsor-monitor"),
+          (loginError: unknown) => {
             logger.error(
               {
                 err: loginError instanceof Error ? loginError.message : String(loginError),
@@ -416,9 +432,8 @@ export async function setupAuth(app: Express) {
               "[Auth] Failed to create Google OAuth session",
             );
             return res.redirect("/login?error=google_auth_failed");
-          }
-          return res.redirect("/sponsor-monitor");
-        });
+          },
+        );
       })(req, res, next);
     });
   }
@@ -456,8 +471,8 @@ export async function setupAuth(app: Express) {
       }
 
       // Generate OTP and set expiry (10 minutes)
-      const code = generateOTP();
-      const expiry = new Date(Date.now() + 10 * 60 * 1000);
+      const code = generateOtpCode();
+      const expiry = new Date(Date.now() + OTP_TTL_MS);
 
       // Check if user exists
       const existingUser = await storage.getUserByEmail(email);
@@ -473,8 +488,10 @@ export async function setupAuth(app: Express) {
         });
       }
 
-      // Store OTP code
-      await storage.updateUserVerificationCode(email, code, expiry);
+      // Store only a keyed hash of the code, bound to this address and the "user" flow,
+      // and give the new code a fresh attempt budget.
+      await storage.updateUserVerificationCode(email, hashOtpCode(email, code, "user"), expiry);
+      await resetOtpAttempts(email, "user");
 
       // Send email
       const sent = await sendEmailOTP(email, code);
@@ -491,24 +508,17 @@ export async function setupAuth(app: Express) {
   });
 
   // Email OTP: Verify code
-  app.post("/api/auth/email/verify-otp", otpLimiter, validateBody(verifyOtpSchema), async (req, res) => {
+  app.post("/api/auth/email/verify-otp", otpLimiter, validateBody(verifyOtpSchema), otpVerifyEmailLimiter, async (req, res) => {
     try {
       const { email, code } = req.body;
 
       const user = await storage.getUserByEmail(email);
-      
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
 
-      // Check code and expiry
-      if (!user.verificationCode || user.verificationCode.length !== code.length ||
-          !crypto.timingSafeEqual(Buffer.from(user.verificationCode), Buffer.from(code))) {
-        return res.status(400).json({ message: "Invalid verification code" });
-      }
-
-      if (!user.codeExpiry || new Date() > user.codeExpiry) {
-        return res.status(400).json({ message: "Verification code expired" });
+      // One outcome for unknown account, wrong code, expired code and exhausted attempts, with
+      // identical hashing and attempt accounting in every case (no account enumeration).
+      const otpOk = await checkOtp(email, code, "user", user);
+      if (!otpOk || !user) {
+        return res.status(400).json({ message: GENERIC_OTP_FAILURE });
       }
 
       // Mark user as verified
@@ -557,12 +567,12 @@ export async function setupAuth(app: Express) {
         authProvider: verifiedUser.authProvider,
       };
 
-      req.login(sessionUser, (err) => {
-        if (err) {
-          return res.status(500).json({ message: "Failed to create session" });
-        }
-        res.json({ message: "Login successful", user: sessionUser });
-      });
+      try {
+        await establishAuthenticatedSession(req, sessionUser);
+      } catch {
+        return res.status(500).json({ message: "Failed to create session" });
+      }
+      res.json({ message: "Login successful", user: sessionUser });
     } catch (error) {
       logger.error({ err: error }, "Error verifying OTP");
       res.status(500).json({ message: "Failed to verify code" });
@@ -570,7 +580,7 @@ export async function setupAuth(app: Express) {
   });
 
   // Admin OTP: Send verification code via Resend
-  app.post("/api/auth/admin/send-otp", otpLimiter, validateBody(sendOtpSchema), otpEmailLimiter, async (req, res) => {
+  app.post("/api/auth/admin/send-otp", adminOtpLimiter, validateBody(sendOtpSchema), adminOtpEmailLimiter, async (req, res) => {
     try {
       const { email, turnstileToken } = req.body;
 
@@ -593,38 +603,35 @@ export async function setupAuth(app: Express) {
         }
       }
 
-      // Check if email matches ADMIN_EMAIL
+      // Same lookup and the same response for every address: the reply never reveals whether the
+      // address is the admin address, and the email is dispatched in the background so response
+      // time does not depend on it either.
       const envAdminEmail = process.env.ADMIN_EMAIL;
-
-      if (!envAdminEmail || email.toLowerCase() !== envAdminEmail.toLowerCase()) {
-        return res.status(403).json({ message: "This email is not authorized for admin access" });
-      }
-
-      // Generate OTP and set expiry (10 minutes)
-      const code = generateOTP();
-      const expiry = new Date(Date.now() + 10 * 60 * 1000);
-
-      // Get or create admin user
+      const isAdminEmail = !!envAdminEmail && normalizeEmail(email) === normalizeEmail(envAdminEmail);
       const existingAdminUser = await storage.getUserByEmail(email);
 
-      if (!existingAdminUser) {
-        await storage.upsertUser({
-          id: "admin_" + crypto.randomUUID(),
-          email: email,
-          authProvider: "admin",
-          role: "admin",
-          isVerified: true,
-        });
-      }
+      if (isAdminEmail) {
+        const code = generateOtpCode();
+        const expiry = new Date(Date.now() + OTP_TTL_MS);
 
-      // Store OTP code
-      await storage.updateUserVerificationCode(email, code, expiry);
+        if (!existingAdminUser) {
+          await storage.upsertUser({
+            id: "admin_" + crypto.randomUUID(),
+            email: email,
+            authProvider: "admin",
+            role: "admin",
+            isVerified: true,
+          });
+        }
 
-      // Send email via Resend
-      const sent = await sendAdminOTPViaResend(email, code);
-      
-      if (!sent) {
-        return res.status(500).json({ message: "Failed to send verification email. Please check Resend API configuration." });
+        await storage.updateUserVerificationCode(email, hashOtpCode(email, code, "admin"), expiry);
+        await resetOtpAttempts(email, "admin");
+
+        void sendAdminOTPViaResend(email, code)
+          .then((sent) => {
+            if (!sent) logger.error("Admin OTP email could not be sent");
+          })
+          .catch((err) => logger.error({ err }, "Admin OTP email dispatch failed"));
       }
 
       res.json({ message: "Verification code sent to your email" });
@@ -635,31 +642,19 @@ export async function setupAuth(app: Express) {
   });
 
   // Admin OTP: Verify code and login
-  app.post("/api/auth/admin/verify-otp", otpLimiter, validateBody(verifyOtpSchema), async (req, res) => {
+  app.post("/api/auth/admin/verify-otp", adminOtpLimiter, validateBody(verifyOtpSchema), otpVerifyEmailLimiter, async (req, res) => {
     try {
       const { email, code } = req.body;
 
-      // Check if email matches ADMIN_EMAIL
       const envAdminEmail = process.env.ADMIN_EMAIL;
+      const isAdminEmail = !!envAdminEmail && normalizeEmail(email) === normalizeEmail(envAdminEmail);
 
-      if (!envAdminEmail || email.toLowerCase() !== envAdminEmail.toLowerCase()) {
-        return res.status(403).json({ message: "This email is not authorized for admin access" });
-      }
-
-      const user = await storage.getUserByEmail(email);
-
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      // Check code and expiry
-      if (!user.verificationCode || user.verificationCode.length !== code.length ||
-          !crypto.timingSafeEqual(Buffer.from(user.verificationCode), Buffer.from(code))) {
-        return res.status(400).json({ message: "Invalid verification code" });
-      }
-
-      if (!user.codeExpiry || new Date() > user.codeExpiry) {
-        return res.status(400).json({ message: "Verification code expired" });
+      // Non-admin addresses, unknown accounts, wrong and expired codes are indistinguishable.
+      const found = await storage.getUserByEmail(email);
+      const user = isAdminEmail ? found : undefined;
+      const otpOk = await checkOtp(email, code, "admin", user);
+      if (!otpOk || !user) {
+        return res.status(400).json({ message: GENERIC_OTP_FAILURE });
       }
 
       // Clear verification code and ensure admin role
@@ -681,12 +676,14 @@ export async function setupAuth(app: Express) {
         authProvider: 'admin',
       };
 
-      req.login(sessionUser, (err) => {
-        if (err) {
-          return res.status(500).json({ message: "Failed to create session" });
-        }
-        res.json({ message: "Login successful", user: sessionUser });
-      });
+      try {
+        await establishAuthenticatedSession(req, sessionUser);
+      } catch {
+        return res.status(500).json({ message: "Failed to create session" });
+      }
+      // Privilege elevation: sessions opened for this account before admin login are revoked.
+      await revokeOtherSessions(updatedUser.id, req.sessionID);
+      res.json({ message: "Login successful", user: sessionUser });
     } catch (error) {
       logger.error({ err: error }, "Error verifying admin OTP");
       res.status(500).json({ message: "Failed to verify code" });
@@ -694,10 +691,13 @@ export async function setupAuth(app: Express) {
   });
 
   // Logout
-  app.post("/api/auth/logout", (req, res) => {
-    req.logout(() => {
-      res.json({ message: "Logged out successfully" });
-    });
+  app.post("/api/auth/logout", async (req, res) => {
+    try {
+      await endSession(req, res);
+    } catch (err) {
+      logger.error({ err }, "[Auth] Logout failed");
+    }
+    res.json({ message: "Logged out successfully" });
   });
 }
 

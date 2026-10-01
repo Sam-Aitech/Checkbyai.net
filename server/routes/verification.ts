@@ -2,7 +2,6 @@ import type { Express } from "express";
 import * as crypto from "crypto";
 import * as fs from "fs";
 import * as path from "path";
-import multer from "multer";
 import { storage } from "../storage";
 import { db } from "../db";
 import {
@@ -13,11 +12,12 @@ import {
 import { withRetry } from "../utils/dbRetry";
 import { verificationResults, type TrustedPattern } from "@shared/schema";
 import { isAuthenticated } from "../auth";
-import { verifyLimiter } from "../middleware/rateLimiter";
+import { receiptVerifyLimiter, verifyLimiter } from "../middleware/rateLimiter";
 import { PDFAnalyzer } from "../services/pdfAnalyzer";
 import { COSAuthenticityChecker } from "../services/cosAuthenticityChecker";
 import { getClientIp, hashIpAddress } from "../ipRateLimit";
-import { sanitizeUploadPath, assertSafeUploadFilename, assertPdfMagicBytes, toConfinedFsPath } from "../utils/uploadGuard";
+import { sanitizeUploadPath, assertSafeUploadFilename, toConfinedFsPath } from "../utils/uploadGuard";
+import { UPLOAD_PROFILES, uploadSinglePdf, verifyUploadedFiles, withUploadCleanup } from "../utils/uploadPolicy";
 import { combineWithCosVerdict } from "../utils/cosVerdictCombiner";
 import { resolveVerificationWithTrust } from "../utils/trustedReference";
 import {
@@ -30,6 +30,7 @@ import { ApiError } from "../lib/apiError";
 import { logger } from "../utils/logger";
 import { isQueueAvailable, getPdfVerifyQueue } from "../services/jobQueue";
 import { storePdfUpload } from "../utils/pdfUploadStore";
+import { RECEIPT_SIGNATURE_VERSION, signReceipt, verifyReceiptSignature, type ReceiptFields } from "../utils/receiptSignature";
 import { hasPaidCosAccess } from "@shared/cosEntitlement";
 
 const HUMAN_REVIEW_CHECK_NAME = "Admin Human Review Override";
@@ -97,22 +98,6 @@ async function generateDocumentHash(filePath: string): Promise<string> {
   });
 }
 
-// Configure multer for file uploads with security limits
-export const upload = multer({
-  dest: 'uploads/',
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB max file size
-    files: 1,
-  },
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'application/pdf') {
-      cb(null, true);
-    } else {
-      cb(new Error('Only PDF files are accepted'));
-    }
-  },
-});
-
 export function registerVerificationRoutes(app: Express): void {
   app.get('/api/verify/status/:jobId', isAuthenticated, asyncHandler(async (req: any, res) => {
     const { jobId } = req.params;
@@ -129,10 +114,14 @@ export function registerVerificationRoutes(app: Express): void {
     // hyphens (e.g. a UUID) is captured whole — it backtracks only enough to
     // satisfy the required trailing `-<8 hex>` nonce.
     const jobIdMatch = /^verify-([0-9a-f]{16})-(.+)-[0-9a-f]{8}$/.exec(jobId);
+    // The acting principal is the authenticated session user. The userId embedded in a
+    // client-supplied jobId is never trusted: the fallback is scoped to the session user,
+    // so another user's jobId simply resolves to "not_found".
     const lookupFallback = async () => {
       if (!jobIdMatch) return null;
-      const [, hashPrefix, userId] = jobIdMatch;
-      return storage.getVerificationByDocHashPrefixAndUser(hashPrefix, userId).catch(() => null);
+      const [, hashPrefix, embeddedUserId] = jobIdMatch;
+      if (embeddedUserId !== req.user.id) return null;
+      return storage.getVerificationByDocHashPrefixAndUser(hashPrefix, req.user.id).catch(() => null);
     };
     const queue = getPdfVerifyQueue();
     if (!queue) {
@@ -151,6 +140,12 @@ export function registerVerificationRoutes(app: Express): void {
       return;
     }
     const job = await queue.getJob(jobId);
+    // Job data is written server-side at enqueue time: enforce ownership before revealing
+    // state, progress, failure reasons or the verification payload.
+    if (job && job.data?.userId !== req.user.id) {
+      success(res, { status: "not_found" });
+      return;
+    }
     if (!job) {
       const byHash = await lookupFallback();
       if (byHash) {
@@ -181,7 +176,15 @@ export function registerVerificationRoutes(app: Express): void {
     else success(res, { status: state, progress });
   }));
 
-  app.post('/api/verify', verifyLimiter, upload.single('file'), asyncHandler(async (req: any, res) => {
+  // Unauthenticated requests are rejected BEFORE multer runs, so they can never write to disk.
+  const requireBetaLogin = (req: any, _res: any, next: any) => {
+    if (!req.isAuthenticated()) {
+      return next(new ApiError(403, 'CoS Check is currently in closed beta. Please log in and request access.', 'beta_login_required'));
+    }
+    next();
+  };
+
+  app.post('/api/verify', verifyLimiter, requireBetaLogin, uploadSinglePdf, asyncHandler(withUploadCleanup(async (req: any, res) => {
     if (!req.isAuthenticated()) {
       throw new ApiError(403, 'CoS Check is currently in closed beta. Please log in and request access.', 'beta_login_required');
     }
@@ -220,7 +223,7 @@ export function registerVerificationRoutes(app: Express): void {
       // client can spoof. Read the file's actual magic bytes before doing anything
       // else with it.
       try {
-        await assertPdfMagicBytes(safeFilePath);
+        await verifyUploadedFiles(req, UPLOAD_PROFILES.singlePdf);
       } catch (err) {
         throw new ApiError(400, "Uploaded file is not a valid PDF.");
       }
@@ -481,8 +484,11 @@ export function registerVerificationRoutes(app: Express): void {
     } finally {
       await fs.promises.unlink(toConfinedFsPath(safeFilePath)).catch(() => {});
     }
-  }));
+  })));
 
+  // Receipts are public capability URLs by design (portable proof): the 64-bit random id is the
+  // capability, and soft-deleted rows are never served. The payload is built only from the stored
+  // record; nothing is taken from the request.
   app.get('/api/receipt/:receiptId', asyncHandler(async (req, res) => {
     const { receiptId } = req.params;
     const verification = await storage.getVerificationByReceiptId(receiptId);
@@ -491,6 +497,14 @@ export function registerVerificationRoutes(app: Express): void {
       throw new ApiError(404, 'Receipt not found');
     }
 
+    const fields = {
+      receiptId: verification.receiptId,
+      documentHash: verification.documentHash,
+      result: verification.result,
+      confidence: verification.confidence,
+      verifiedAt: verification.verifiedAt,
+    } as ReceiptFields;
+
     const receiptData = {
       receiptId: verification.receiptId,
       documentHash: verification.documentHash,
@@ -498,12 +512,32 @@ export function registerVerificationRoutes(app: Express): void {
       confidence: verification.confidence,
       verifiedAt: verification.verifiedAt,
       checksPerformed: (verification.analysisDetails as any)?.checks?.length || 0,
+      // Legacy unkeyed digest, kept for API compatibility. It is NOT tamper-proof: anyone can
+      // recompute it. Use `signature` (keyed) or the verify endpoint for integrity.
       integrityHash: crypto.createHash('sha256')
         .update(`${verification.receiptId}:${verification.documentHash}:${verification.result}:${verification.confidence}:${verification.verifiedAt}`)
-        .digest('hex')
+        .digest('hex'),
+      signature: signReceipt(fields) ?? undefined,
+      signatureVersion: RECEIPT_SIGNATURE_VERSION,
     };
 
     success(res, receiptData);
+  }));
+
+  // Lets a third party check a presented receipt: valid only if the signature matches the stored record.
+  app.get('/api/receipt/:receiptId/verify', receiptVerifyLimiter, asyncHandler(async (req, res) => {
+    const verification = await storage.getVerificationByReceiptId(req.params.receiptId);
+    if (!verification) {
+      throw new ApiError(404, 'Receipt not found');
+    }
+    const valid = verifyReceiptSignature({
+      receiptId: verification.receiptId,
+      documentHash: verification.documentHash,
+      result: verification.result,
+      confidence: verification.confidence,
+      verifiedAt: verification.verifiedAt,
+    } as ReceiptFields, req.query.signature);
+    success(res, { receiptId: verification.receiptId, valid });
   }));
 
   app.get('/api/my-verifications', isAuthenticated, asyncHandler(async (req: any, res) => {

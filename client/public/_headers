@@ -4,7 +4,9 @@
   X-XSS-Protection: 1; mode=block
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://replit.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https: wss:
+  # Content-Security-Policy is set by the Node server (server/securityHeaders.ts), which is the only
+  # origin that serves this app. A second, weaker policy here would be intersected with it on hosts
+  # that honour this file, so it is intentionally not declared.
 
 /*.html
   Cache-Control: public, max-age=3600

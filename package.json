@@ -156,7 +156,7 @@
     "wouter": "^3.11.0",
     "ws": "^8.21.3",
     "xml2js": "^0.6.2",
-    "zod": "^3.25.76",
+    "zod": "^4.6.5",
     "zod-validation-error": "^3.5.4"
   },
   "devDependencies": {
@@ -185,10 +185,11 @@
     "vitest": "^4.1.1"
   },
   "optionalDependencies": {
-    "@mendable/firecrawl-js": "~1.21.0",
+    "@mendable/firecrawl-js": "~4.41.0",
     "bufferutil": "^4.1.0"
   },
   "overrides": {
+    "axios": "^1.20.0",
     "follow-redirects": ">=1.15.12",
     "uuid": ">=12.0.0",
     "@esbuild-kit/core-utils": {

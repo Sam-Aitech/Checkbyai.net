@@ -39,6 +39,17 @@ when `NODE_ENV=production` and any is missing):
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Optional | Google login button hidden |
 | `ADMIN_EMAIL` | Optional | Initial-admin seeding skipped; admin OTP login has no target. **Not** fail-fast (intentionally excluded from `REQUIRED_ENV_VARS`) |
 
+### Outbound requests (webhooks, job callbacks), CSP, proxy and OTP
+
+| Variable | Status | Effect |
+|---|---|---|
+| `OUTBOUND_ALLOWED_HOSTS` | Optional, comma-separated exact hostnames | When set, webhook and callback URLs must match one of these hosts exactly (no suffix matching). Unset: any public HTTPS host that passes DNS and IP checks |
+| `OUTBOUND_ALLOWED_PORTS` | Optional (default `443`) | Comma-separated ports allowed for outbound URLs |
+| `OUTBOUND_ALLOW_LOCAL_DEV` | Dev only | `1` permits `http://` and loopback targets **only when `NODE_ENV=development`**. Boot fails if set in any other environment |
+| `CSP_CONNECT_SRC` | Optional, comma-separated https origins | Extra `connect-src` origins. The Sentry ingest host is derived automatically from `VITE_SENTRY_DSN` / `SENTRY_DSN` |
+| `TRUST_PROXY_HOPS` | Optional integer 0 to 10 (default `1`) | Trusted reverse-proxy hops for `req.ip`, which every IP-keyed rate limiter uses. Cloudflare then Nginx then Node is `2` |
+| `OTP_HASH_SECRET` | Optional (defaults to `SESSION_SECRET`) | Key for hashing email OTP codes. Rotating it invalidates codes in flight (10-minute lifetime) |
+
 ## Queue / cache / rate limiting
 
 | Variable | Status | If missing |

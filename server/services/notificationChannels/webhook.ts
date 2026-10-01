@@ -4,31 +4,14 @@ import { logger } from "../../utils/logger";
 import { jitterDelay, parseRetryAfter } from "../../utils/jitterRetry";
 import { waitForBucket } from "../../utils/tokenBucket";
 import { withIdempotency } from "../../utils/notifIdempotency";
+import { OutboundBlockedError, safeOutboundRequest } from "../../security/outboundPolicy";
 
 const log = logger.child({ module: "Channel:Webhook" });
 
 const MAX_ATTEMPTS = 3;
 
-// SSRF guard: block delivery to loopback / private / link-local / metadata hosts.
-// Webhook URLs are user-supplied (enterprise), so an attacker could otherwise point
-// them at internal services. HTTPS-only is already enforced by the caller.
-const BLOCKED_HOST_PATTERNS: RegExp[] = [
-  /^localhost$/i,
-  /^127\./,
-  /^0\./,
-  /^10\./,
-  /^192\.168\./,
-  /^169\.254\./,            // link-local (incl. cloud metadata 169.254.169.254)
-  /^172\.(1[6-9]|2\d|3[01])\./, // 172.16.0.0 – 172.31.255.255
-  /^::1$/,
-  /^fe80:/i,               // IPv6 link-local
-  /^f[cd][0-9a-f]{2}:/i,   // IPv6 unique-local (fc00::/7)
-];
-
-function isBlockedWebhookHost(hostname: string): boolean {
-  const host = hostname.replace(/^\[|\]$/g, "").toLowerCase(); // strip IPv6 brackets
-  return BLOCKED_HOST_PATTERNS.some((re) => re.test(host));
-}
+// Retry-After from a customer endpoint is untrusted: never stall a worker longer than this.
+const MAX_RETRY_AFTER_MS = 30_000;
 
 function signPayload(payload: string, secret: string): string {
   return crypto.createHmac("sha256", secret).update(payload).digest("hex");
@@ -56,35 +39,43 @@ function buildHeaders(bodyJson: string): Record<string, string> {
   };
   const secret = process.env.WEBHOOK_SECRET;
   if (secret) {
+    const ts = Math.floor(Date.now() / 1000).toString();
     headers["X-CheckByAI-Signature"] = signPayload(bodyJson, secret);
-    headers["X-CheckByAI-Timestamp"] = Math.floor(Date.now() / 1000).toString();
+    headers["X-CheckByAI-Timestamp"] = ts;
+    // Replay-resistant: the timestamp is covered by this signature (legacy header kept for receivers).
+    headers["X-CheckByAI-Signature-V2"] = signPayload(`${ts}.${bodyJson}`, secret);
   }
   return headers;
 }
 
-// One delivery attempt. Resolves with a SendResult; network/abort errors reject
-// and are handled by the retry loop in send().
+// One delivery attempt. Resolves with a SendResult; network errors reject and are handled
+// by the retry loop in sendWithRetry(). OutboundBlockedError is never retried.
 async function attemptDelivery(
   webhookUrl: string,
   bodyJson: string,
   headers: Record<string, string>,
 ): Promise<SendResult> {
-  const host = (()=>{ try{ return new URL(webhookUrl).hostname; } catch{ return "global"; }})();
+  const host = (() => { try { return new URL(webhookUrl).hostname; } catch { return "global"; } })();
   await waitForBucket("webhook", host);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10_000);
-  try {
-    const res = await fetch(webhookUrl, { method: "POST", headers, body: bodyJson, signal: controller.signal });
-    if (res.ok) {
-      const providerMessageId = res.headers.get("X-Request-Id") ?? res.headers.get("x-request-id") ?? undefined;
-      return { success: true, providerMessageId };
-    }
-    const retryAfter = parseRetryAfter(res.headers.get("retry-after"));
-    if (retryAfter) await new Promise(r=>setTimeout(r, retryAfter));
-    return { success: false, error: `HTTP ${res.status}: ${await res.text().catch(() => "no body")}` };
-  } finally {
-    clearTimeout(timeout);
+  // Policy re-validates scheme/port/DNS on every attempt and pins the connection to the validated IP.
+  const res = await safeOutboundRequest(
+    webhookUrl,
+    { method: "POST", headers, body: bodyJson },
+    { maxRedirects: 0, totalTimeoutMs: 10_000, maxResponseBytes: 4 * 1024 },
+  );
+  if (res.status >= 200 && res.status < 300) {
+    const rid = res.headers["x-request-id"];
+    return { success: true, providerMessageId: Array.isArray(rid) ? rid[0] : rid };
   }
+  const retryAfterHeader = res.headers["retry-after"];
+  const retryAfter = parseRetryAfter(Array.isArray(retryAfterHeader) ? retryAfterHeader[0] : (retryAfterHeader ?? null));
+  if (retryAfter) await new Promise((r) => setTimeout(r, Math.min(retryAfter, MAX_RETRY_AFTER_MS)));
+  // Response bodies from customer endpoints are deliberately not propagated into logs/notif_log.
+  return { success: false, error: `HTTP ${res.status}` };
+}
+
+function hostOf(url: string): string {
+  try { return new URL(url).hostname; } catch { return "invalid"; }
 }
 
 async function sendWithRetry(payload: ChannelPayload, webhookUrl: string): Promise<SendResult> {
@@ -96,10 +87,14 @@ async function sendWithRetry(payload: ChannelPayload, webhookUrl: string): Promi
       const result = await attemptDelivery(webhookUrl, bodyJson, headers);
       if (result.success) return result;
       lastError = result.error;
-      log.warn({ webhookUrl, attempt, error: lastError }, "Webhook delivery failed");
+      log.warn({ host: hostOf(webhookUrl), attempt, error: lastError }, "Webhook delivery failed");
     } catch (err: unknown) {
+      if (err instanceof OutboundBlockedError) {
+        // Policy rejection is deterministic for this destination: do not retry.
+        return { success: false, error: "Webhook URL targets a disallowed (internal/private) host" };
+      }
       lastError = err instanceof Error ? err.message : String(err);
-      log.error({ err: lastError, webhookUrl, attempt }, "Webhook delivery threw");
+      log.error({ err: lastError, host: hostOf(webhookUrl), attempt }, "Webhook delivery threw");
     }
     if (attempt < MAX_ATTEMPTS - 1) await new Promise(rr => setTimeout(rr, jitterDelay(attempt, 1000, 30000)));
   }
@@ -112,14 +107,9 @@ export const webhookChannel: NotificationChannel = {
   send(payload: ChannelPayload): Promise<SendResult> {
     const webhookUrl = payload.recipient;
     if (!webhookUrl?.startsWith("https://")) return Promise.resolve({ success: false, error: "Invalid webhook URL (must be HTTPS)" });
-    let parsedHost: string;
-    try { parsedHost = new URL(webhookUrl).hostname; } catch { return Promise.resolve({ success: false, error: "Invalid webhook URL" }); }
-    if (isBlockedWebhookHost(parsedHost)) {
-      log.warn({ webhookUrl }, "Webhook delivery blocked — internal/private host");
-      return Promise.resolve({ success: false, error: "Webhook URL targets a disallowed (internal/private) host" });
-    }
-    // Validation happens before the idempotency claim — no point claiming a
-    // key for a request that's going to be rejected regardless.
+    // Full SSRF validation (scheme, port, credentials, DNS A/AAAA, IP classes) happens inside
+    // safeOutboundRequest on every attempt. Validation precedes the idempotency claim's
+    // side effects only for the cheap scheme check above.
     return withIdempotency(payload, "webhook", () => sendWithRetry(payload, webhookUrl));
   },
 };

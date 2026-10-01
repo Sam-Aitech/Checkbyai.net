@@ -6,7 +6,8 @@ import { db } from "../db";
 import { jobTriggerAudit, shadowParityReports, shadowRunResults, incidentTickets, monitorJobRuns } from "@shared/schema";
 import { requireRole } from "../middleware/roleGuard";
 import { opsTriggerLimiter } from "../middleware/rateLimiter";
-import { isSafeCallbackUrl, signPayload } from "../utils/callbackSigner";
+import { isSafeCallbackUrl, signPayload, signPayloadWithTimestamp } from "../utils/callbackSigner";
+import { safeOutboundRequest } from "../security/outboundPolicy";
 import { isUuidV4 } from "../utils/idempotency";
 import { generateCorrelationId, startJobRun, finishJobRun } from "../utils/jobTelemetry";
 import { runSponsorMonitorJob } from "../utils/sponsorMonitorJob";
@@ -103,41 +104,34 @@ async function markAuditCompleted(params: {
 }
 
 async function sendSignedCallback(callbackUrl: string, payload: Record<string, unknown>): Promise<void> {
-    // ── SSRF guard: validate on every call including retries ─────────────
-    const safe = await isSafeCallbackUrl(callbackUrl);
-    if (!safe) {
-          throw new Error(`SSRF_BLOCKED: callbackUrl failed safety check — only external HTTPS URLs resolving to public IPs are permitted.`
-                              );
-    }
-    // ──────────────────────────────────────────────────────────────────────
   const secret = process.env.CALLBACK_SIGNING_SECRET;
   if (!secret) {
     throw new Error("CALLBACK_SIGNING_SECRET is not configured");
   }
 
   const body = JSON.stringify(payload);
-  const signature = signPayload(body, secret);
+  const timestamp = Math.floor(Date.now() / 1000);
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), CALLBACK_CONFIG.timeoutMs);
-
-  try {
-    // codeql[js/request-forgery, js/file-access-to-http] - The callbackUrl has been validated by isSafeCallbackUrl() above, which performs DNS resolution and rejects private/loopback IPs. The payload contains only structured job-result metadata, not raw file contents.
-    const response = await fetch(callbackUrl, {
+  // Centralised outbound policy: HTTPS only, public IPs only, connection pinned to the
+  // validated address (no second DNS lookup), redirects never followed, bounded time/size.
+  // It re-validates on every call, including retries.
+  const response = await safeOutboundRequest(
+    callbackUrl,
+    {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Checkbyai-Signature": signature,
+        "X-Checkbyai-Signature": signPayload(body, secret),
+        "X-Checkbyai-Timestamp": String(timestamp),
+        "X-Checkbyai-Signature-V2": signPayloadWithTimestamp(body, secret, timestamp),
       },
       body,
-      signal: controller.signal,
-    });
+    },
+    { totalTimeoutMs: CALLBACK_CONFIG.timeoutMs, maxRedirects: 0 },
+  );
 
-    if (!response.ok) {
-      throw new Error(`Callback endpoint returned ${response.status}`);
-    }
-  } finally {
-    clearTimeout(timer);
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error(`Callback endpoint returned ${response.status}`);
   }
 }
 

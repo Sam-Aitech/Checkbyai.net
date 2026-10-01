@@ -203,6 +203,9 @@ class DatabaseStorage implements IStorage {
   getPaidSubmission(id: number) { return paidSubmissionRepository.getPaidSubmission(id); }
   getPaidSubmissionBySessionId(sessionId: string) { return paidSubmissionRepository.getPaidSubmissionBySessionId(sessionId); }
   updatePaidSubmission(id: number, data: Partial<InsertPaidSubmission>) { return paidSubmissionRepository.updatePaidSubmission(id, data); }
+  getPaidSubmissionForUser(id: number, userId: string) { return paidSubmissionRepository.getPaidSubmissionForUser(id, userId); }
+  getPaidSubmissionBySessionIdForUser(sessionId: string, userId: string) { return paidSubmissionRepository.getPaidSubmissionBySessionIdForUser(sessionId, userId); }
+  updatePaidSubmissionForUser(id: number, userId: string, data: Partial<InsertPaidSubmission>) { return paidSubmissionRepository.updatePaidSubmissionForUser(id, userId, data); }
   getPendingPaidSubmissions() { return paidSubmissionRepository.getPendingPaidSubmissions(); }
   getAllPaidSubmissions() { return paidSubmissionRepository.getAllPaidSubmissions(); }
   getAssignedSubmissions(adminId: string) { return paidSubmissionRepository.getAssignedSubmissions(adminId); }
