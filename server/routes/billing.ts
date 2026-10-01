@@ -1,5 +1,4 @@
 import type { Express } from "express";
-import rateLimit from "express-rate-limit";
 import * as crypto from "crypto";
 import Stripe from "stripe";
 import { db } from "../db";
@@ -7,8 +6,9 @@ import { sql, eq, lt, and, inArray } from "drizzle-orm";
 import { withRetry } from "../utils/dbRetry";
 import { users, processedCheckouts, companyWatches, sponsorCanonical, DEFAULT_NOTIF_PREFS } from "@shared/schema";
 import { sendEmailReliably } from "../utils/resilientEmail";
-import { getAppUrl } from "../utils/appUrl";
+import { getAppUrl, getRedirectBaseUrl } from "../utils/appUrl";
 import { isAuthenticated } from "../auth";
+import { checkoutLimiter, stripeKeyLimiter } from "../middleware/rateLimiter";
 import { storage } from "../storage";
 import { logger } from "../utils/logger";
 import { getWatchLimit } from "../utils/tierConfig";
@@ -559,6 +559,9 @@ export function registerBillingRoutes(app: Express): void {
             // not a silent double-grant or a silently-skipped one.
             if (await tryClaimSession(session.id)) {
               await storage.createPaidSubmission({
+                // Bind the buyer: ownership checks fail closed on NULL, so an unowned row
+                // would lock the paying customer out of their own submission.
+                userId: prevUser?.id ?? null,
                 email: session.customer_details?.email || '',
                 packageType: 'full',
                 paymentStatus: 'paid',
@@ -675,12 +678,12 @@ export function registerBillingRoutes(app: Express): void {
 
   // Stripe Customer Portal — lets paid users self-serve: update card, view
   // invoices, cancel subscription. Returns a short-lived portal URL.
-  app.post('/api/billing/portal', isAuthenticated, asyncHandler(async (req: any, res) => {
+  app.post('/api/billing/portal', isAuthenticated, checkoutLimiter, asyncHandler(async (req: any, res) => {
     const user = await storage.getUser(req.user.id);
     if (!user?.stripeCustomerId) {
       throw new ApiError(400, 'No active subscription found. Subscribe to a plan first.');
     }
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const baseUrl = getRedirectBaseUrl(req);
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: user.stripeCustomerId,
       return_url: `${baseUrl}/pro-dashboard`,
@@ -688,7 +691,7 @@ export function registerBillingRoutes(app: Express): void {
     success(res, { url: portalSession.url });
   }));
 
-  app.post('/api/checkout/sign', isAuthenticated, asyncHandler(async (req: any, res) => {
+  app.post('/api/checkout/sign', isAuthenticated, checkoutLimiter, asyncHandler(async (req: any, res) => {
     const userId = req.user.id;
     const { packageType, companyName } = req.body;
     const validTypes = ['starter', 'pro', 'unlimited', 'master', 'notification_starter', 'notification_pro'];
@@ -699,7 +702,7 @@ export function registerBillingRoutes(app: Express): void {
     success(res, { clientReferenceId });
   }));
 
-  app.post('/api/checkout/credits', isAuthenticated, asyncHandler(async (req: any, res) => {
+  app.post('/api/checkout/credits', isAuthenticated, checkoutLimiter, asyncHandler(async (req: any, res) => {
     const userId = req.user.id;
     const { priceId, packageType, companyName } = req.body;
 
@@ -778,7 +781,7 @@ export function registerBillingRoutes(app: Express): void {
     // existing customer.subscription.deleted webhook auto-downgrade the user
     // back to free at expiry instead of needing a separate cron job.
     const isSubscription = priceForValidation.type === 'recurring';
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const baseUrl = getRedirectBaseUrl(req);
     const cancelUrl = buildCheckoutCancelUrl(baseUrl, packageType, companyName);
 
     const commonParams = {
@@ -812,7 +815,7 @@ export function registerBillingRoutes(app: Express): void {
     success(res, entitlement);
   }));
 
-  app.get('/api/checkout/verify/:sessionId', isAuthenticated, asyncHandler(async (req: any, res) => {
+  app.get('/api/checkout/verify/:sessionId', isAuthenticated, checkoutLimiter, asyncHandler(async (req: any, res) => {
     const { sessionId } = req.params;
     const session = await stripe.checkout.sessions.retrieve(sessionId);
 
@@ -836,6 +839,7 @@ export function registerBillingRoutes(app: Express): void {
         if (packageType === 'master') {
           if (await tryClaimSession(sessionId)) {
             await storage.createPaidSubmission({
+              userId: req.user.id,
               email: session.customer_details?.email || req.user.email || '',
               packageType: 'full',
               paymentStatus: 'paid',
@@ -888,14 +892,6 @@ export function registerBillingRoutes(app: Express): void {
       success(res, { success: false, status: session.payment_status });
     }
   }));
-
-  const stripeKeyLimiter = rateLimit({
-    windowMs: 60 * 1000,
-    max: 10,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { message: "Too many requests. Please try again later." },
-  });
 
   app.get('/api/stripe/publishable-key', stripeKeyLimiter, asyncHandler(async (req, res) => {
     if (process.env.STRIPE_PUBLISHABLE_KEY) {

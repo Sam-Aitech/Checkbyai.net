@@ -3,10 +3,19 @@ import bcrypt from "bcrypt";
 import { storage } from "../storage";
 import { logger } from "../utils/logger";
 import { ApiError } from "../lib/apiError";
+import { GENERIC_OTP_FAILURE, OTP_TTL_MS, checkOtp, generateOtpCode, hashOtpCode, resetOtpAttempts } from "./emailOtp";
+
+// Hash of a random value, created once on first use. Compared against when an account is missing so
+// login takes the same time either way. Never a literal in source, and it matches nothing a user can type.
+let dummyPasswordHash: Promise<string> | undefined;
+function getDummyPasswordHash(): Promise<string> {
+  dummyPasswordHash ??= bcrypt.hash(crypto.randomBytes(32).toString("hex"), 10);
+  return dummyPasswordHash;
+}
 
 export class AuthService {
   generateOTP(): string {
-    return crypto.randomInt(100000, 999999).toString();
+    return generateOtpCode();
   }
 
   async sendEmailOTP(email: string, code: string): Promise<boolean> {
@@ -80,36 +89,25 @@ export class AuthService {
   }
 
   async storeOTP(identifier: string, code: string): Promise<Date> {
-    const expiry = new Date(Date.now() + 10 * 60 * 1000);
-    await storage.updateUserVerificationCode(identifier, code, expiry);
+    const expiry = new Date(Date.now() + OTP_TTL_MS);
+    await storage.updateUserVerificationCode(identifier, hashOtpCode(identifier, code, "user"), expiry);
+    await resetOtpAttempts(identifier, "user");
     return expiry;
   }
 
   async verifyOTP(email: string, code: string): Promise<void> {
     const user = await storage.getUserByEmail(email);
-    if (!user) throw new ApiError(404, "User not found");
-
-    if (
-      !user.verificationCode ||
-      user.verificationCode.length !== code.length ||
-      !crypto.timingSafeEqual(Buffer.from(user.verificationCode), Buffer.from(code))
-    ) {
-      throw new ApiError(400, "Invalid verification code");
-    }
-
-    if (!user.codeExpiry || new Date() > user.codeExpiry) {
-      throw new ApiError(400, "Verification code expired");
+    // Single generic failure for unknown account, wrong code, expired code and exhausted attempts.
+    if (!(await checkOtp(email, code, "user", user)) || !user) {
+      throw new ApiError(400, GENERIC_OTP_FAILURE);
     }
   }
 
   async loginWithPassword(email: string, password: string): Promise<void> {
     const user = await storage.getUserByEmail(email);
-    if (!user || !user.hashedPassword) {
-      throw new ApiError(401, "Invalid email or password");
-    }
-
-    const passwordMatch = await bcrypt.compare(password, user.hashedPassword);
-    if (!passwordMatch) {
+    // Always run one bcrypt comparison so a missing account is not faster than a wrong password.
+    const passwordMatch = await bcrypt.compare(password, user?.hashedPassword || (await getDummyPasswordHash()));
+    if (!user?.hashedPassword || !passwordMatch) {
       throw new ApiError(401, "Invalid email or password");
     }
   }

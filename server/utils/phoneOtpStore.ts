@@ -31,7 +31,8 @@ function otpKey(userId: string, channel: string, phone: string): string {
 }
 
 function rateKey(userId: string, channel: string): string {
-  return `phone:rate:${userId}:${channel}`;
+  // Plain integer counter (atomic INCR). Not the legacy JSON key, so old entries are simply ignored.
+  return `phone:rate2:${userId}:${channel}`;
 }
 
 export async function getOtp(userId: string, channel: string, phone: string): Promise<OtpEntry | null> {
@@ -74,12 +75,15 @@ export async function incrementOtpAttempts(userId: string, channel: string, phon
   const redis = getRedis();
   const key = otpKey(userId, channel, phone);
   if (redis) {
-    const raw = await redis.get(key);
-    if (!raw) return 0;
-    const entry = JSON.parse(raw) as OtpEntry;
-    entry.attempts++;
-    await redis.set(key, JSON.stringify(entry), "KEEPTTL");
-    return entry.attempts;
+    // Single atomic script: concurrent guesses cannot read the same count and each "succeed" at attempt N.
+    const attempts = await redis.eval(
+      "local v = redis.call('GET', KEYS[1]); if not v then return 0 end; " +
+        "local e = cjson.decode(v); e.attempts = e.attempts + 1; " +
+        "redis.call('SET', KEYS[1], cjson.encode(e), 'KEEPTTL'); return e.attempts",
+      1,
+      key,
+    );
+    return Number(attempts) || 0;
   }
   const memKey = `${userId}:${channel}:${phone}`;
   const entry = memoryOtpStore.get(memKey);
@@ -96,8 +100,7 @@ export async function getRateCount(userId: string, channel: string): Promise<num
   const redis = getRedis();
   if (redis) {
     const raw = await redis.get(rateKey(userId, channel));
-    if (!raw) return 0;
-    return (JSON.parse(raw) as RateEntry).count;
+    return raw ? Number(raw) || 0 : 0;
   }
   const memKey = `${userId}:${channel}`;
   const entry = memoryRateStore.get(memKey);
@@ -113,14 +116,9 @@ export async function incrementRateCount(userId: string, channel: string): Promi
   const key = rateKey(userId, channel);
   const expiresAt = now() + RATE_TTL_SECONDS * 1000;
   if (redis) {
-    const raw = await redis.get(key);
-    if (raw) {
-      const entry = JSON.parse(raw) as RateEntry;
-      entry.count++;
-      await redis.set(key, JSON.stringify(entry), "KEEPTTL");
-    } else {
-      await redis.set(key, JSON.stringify({ count: 1, expiresAt }), "EX", RATE_TTL_SECONDS);
-    }
+    // Atomic: INCR, and start the window on the first hit only.
+    const count = await redis.incr(key);
+    if (count === 1) await redis.expire(key, RATE_TTL_SECONDS);
   } else {
     const memKey = `${userId}:${channel}`;
     const entry = memoryRateStore.get(memKey);

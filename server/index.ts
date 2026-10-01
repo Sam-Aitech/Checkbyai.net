@@ -5,11 +5,15 @@ import * as Sentry from "@sentry/node";
 import { makeRateLimitStore } from "./utils/redisRateLimitStore";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { createSecurityHeadersMiddleware } from "./securityHeaders";
+import nodePath from "node:path";
+import { collectInlineStyleHashes, createSecurityHeadersMiddleware, resolveConnectSrcExtra } from "./securityHeaders";
 import { storage } from "./storage";
 import { pool } from "./db";
 import { logger } from "./utils/logger";
+import { getTrustProxyHops } from "./utils/trustProxy";
 import { errorHandler } from "./lib/errorHandler";
+import { assertOutboundConfig } from "./security/outboundPolicy";
+import { createWwwRedirect } from "./middleware/wwwRedirect";
 
 // Import the job queue setup
 import { initJobQueue, setupWorkers, shutdownWorkers } from "./services/jobQueue";
@@ -52,6 +56,14 @@ if (sessionSecret && process.env.NODE_ENV === "production") {
     );
     process.exit(1);
   }
+}
+
+// The local-development outbound exception must never be active outside development.
+try {
+  assertOutboundConfig();
+} catch (err) {
+  logger.fatal({ err }, "CRITICAL: invalid outbound policy configuration");
+  process.exit(1);
 }
 
 // ── Python ETL Agent Health Check (Phase 1d) ──
@@ -127,7 +139,7 @@ const app = express();
 
 // Trust the first proxy so req.ip is the real client IP behind Nginx/load balancer.
 // Without this, req.ip is undefined or 127.0.0.1, which breaks all IP-based rate limiting.
-app.set('trust proxy', 1);
+app.set("trust proxy", getTrustProxyHops());
 app.disable('x-powered-by');
 
 if (isSentryEnabled) {
@@ -136,7 +148,11 @@ if (isSentryEnabled) {
 }
 
 // Helmet is applied first to enforce baseline browser hardening before any other middleware.
-app.use(createSecurityHeadersMiddleware(isProduction));
+// Production CSP allow-lists the inline <style> blocks of the built HTML by hash (no 'unsafe-inline').
+app.use(createSecurityHeadersMiddleware(isProduction, {
+  styleHashes: isProduction ? collectInlineStyleHashes(nodePath.resolve(import.meta.dirname, "..", "dist", "public")) : [],
+  connectSrcExtra: resolveConnectSrcExtra(),
+}));
 
 app.use(compression({
   level: 6,
@@ -164,14 +180,7 @@ const globalFallbackLimiter = rateLimit({
 // module requests (/src/, /@vite/, /@fs/, etc.) and break lazy-loaded routes.
 app.use('/api', globalFallbackLimiter);
 // WWW redirect middleware - redirect www to non-www
-app.use((req, res, next) => {
-  if (req.headers.host && req.headers.host.startsWith('www.')) {
-    const newHost = req.headers.host.replace('www.', '');
-    const redirectUrl = `${req.protocol}://${newHost}${req.originalUrl}`;
-    return res.redirect(301, redirectUrl);
-  }
-  next();
-});
+app.use(createWwwRedirect());
 
 // T001: Security and Performance Headers
 app.use((req, res, next) => {
@@ -623,4 +632,8 @@ async function applyDataFixbacks() {
     };
     process.on("SIGTERM", gracefulShutdown);
     process.on("SIGINT", gracefulShutdown);
-})();
+})().catch((err) => {
+  // Same outcome as the previous unhandled rejection (process exits), but logged explicitly.
+  logger.fatal({ err }, "[Startup] Fatal error during startup");
+  process.exit(1);
+});

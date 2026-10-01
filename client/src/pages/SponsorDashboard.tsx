@@ -483,7 +483,7 @@ export default function SponsorDashboard() {
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       const returnUrl = `/dashboard/sponsor${companyParam ? `?company=${encodeURIComponent(companyParam)}` : ""}`;
-      setLocation(`/login?return=${encodeURIComponent(returnUrl)}`);
+      setLocation(`/login?redirect=${encodeURIComponent(returnUrl)}`);
     }
   }, [authLoading, isAuthenticated, companyParam, setLocation]);
 

@@ -4,6 +4,7 @@ import { eq, desc } from "drizzle-orm";
 import { notificationPreferences, notificationLog, sponsorChanges, jobAlertPreferences } from "@shared/schema";
 import { z } from "zod";
 import { isAuthenticated } from "../auth";
+import { notificationPrefsLimiter, phoneOtpLimiter } from "../middleware/rateLimiter";
 import { encryptPhone, decryptPhone } from "../utils/phoneCrypto";
 import { sendSMS, sendWhatsApp } from "../services/messaging";
 import { isChannelAllowed, getTierConfig } from "../utils/tierConfig";
@@ -14,6 +15,7 @@ import { success } from "../lib/response";
 import { asyncHandler } from "../lib/errorHandler";
 import { ApiError } from "../lib/apiError";
 import { logger } from "../utils/logger";
+import { assertSafeOutboundUrl, OutboundBlockedError } from "../security/outboundPolicy";
 
 const MAX_OTP_ATTEMPTS = 5;
 const MAX_OTP_REQUESTS = 3;
@@ -96,7 +98,7 @@ export function registerNotificationRoutes(app: Express): void {
     });
   }));
 
-  app.put('/api/notification-preferences', isAuthenticated, asyncHandler(async (req: any, res) => {
+  app.put('/api/notification-preferences', isAuthenticated, notificationPrefsLimiter, asyncHandler(async (req: any, res) => {
     const userId = req.user.id;
     const parsed = notifPrefSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -120,6 +122,18 @@ export function registerNotificationRoutes(app: Express): void {
 
     if (webhook_url && !webhook_url.startsWith("https://")) {
       throw new ApiError(400, "Webhook URL must start with https://");
+    }
+    if (webhook_url) {
+      // Save-time check through the central outbound policy (credentials, port, DNS, IP classes).
+      // Delivery re-validates and pins the connection on every attempt, since DNS can change later.
+      try {
+        await assertSafeOutboundUrl(webhook_url);
+      } catch (err) {
+        if (err instanceof OutboundBlockedError) {
+          throw new ApiError(400, "Webhook URL must be a public HTTPS endpoint (port 443, no credentials).");
+        }
+        throw err;
+      }
     }
     if (webhook_enabled && !webhook_url) {
       throw new ApiError(400, "Please provide a webhook URL to enable webhook notifications.");
@@ -247,7 +261,7 @@ export function registerNotificationRoutes(app: Express): void {
     success(res, { fingerprint, enabled });
   }));
 
-  app.post('/api/notification-preferences/verify-phone', isAuthenticated, asyncHandler(async (req: any, res) => {
+  app.post('/api/notification-preferences/verify-phone', isAuthenticated, phoneOtpLimiter, asyncHandler(async (req: any, res) => {
     const { phone_number, channel } = req.body;
 
     if (!phone_number || !PHONE_REGEX.test(phone_number)) {
@@ -298,7 +312,7 @@ export function registerNotificationRoutes(app: Express): void {
     success(res, { message: `Verification code sent to ${phone_number} via ${channel}.` });
   }));
 
-  app.post('/api/notification-preferences/confirm-phone', isAuthenticated, asyncHandler(async (req: any, res) => {
+  app.post('/api/notification-preferences/confirm-phone', isAuthenticated, phoneOtpLimiter, asyncHandler(async (req: any, res) => {
     const { phone_number, channel, code } = req.body;
 
     if (!phone_number || !channel || !code) {

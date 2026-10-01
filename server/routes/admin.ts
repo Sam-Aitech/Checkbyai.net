@@ -23,12 +23,15 @@ import {
 import { z } from "zod";
 import { requireRole } from "../middleware/roleGuard";
 import { isAuthenticated } from "../auth";
+import { paidCheckoutLimiter, paidSubmitLimiter } from "../middleware/rateLimiter";
 import { storage } from "../storage";
+import { ApiError } from "../lib/apiError";
 import { PDFAnalyzer } from "../services/pdfAnalyzer";
 import { COSAuthenticityChecker } from "../services/cosAuthenticityChecker";
-import { upload } from "./verification";
+import { parseSubmissionId, toOwnerSubmissionView } from "../utils/paidSubmissionView";
+import { UPLOAD_PROFILES, removeStoredUploads, removeUploadedFiles, uploadPaidDocs, uploadSinglePdf, verifyUploadedFiles } from "../utils/uploadPolicy";
 import { sendEmailReliably } from "../utils/resilientEmail";
-import { getAppUrl } from "../utils/appUrl";
+import { getAppUrl, getRedirectBaseUrl } from "../utils/appUrl";
 import { checkBinaryHealth } from "../utils/binaryRunner";
 import { sanitizeUploadPath, assertSafeUploadFilename, assertPdfMagicBytes, toConfinedFsPath } from "../utils/uploadGuard";
 import { isJobRunning, getLastRunInfo, runSponsorMonitorJob } from "../utils/sponsorMonitorJob";
@@ -120,7 +123,7 @@ export function registerAdminRoutes(app: Express): void {
     }
   });
 
-  app.post('/api/admin/trusted-patterns', requireRole("admin"), upload.single('file'), async (req, res) => {
+  app.post('/api/admin/trusted-patterns', requireRole("admin"), uploadSinglePdf, async (req, res) => {
     let safeFilePath: string | undefined;
     try {
       if (!req.file) {
@@ -231,7 +234,7 @@ export function registerAdminRoutes(app: Express): void {
     }
   });
 
-  app.post('/api/admin/extract-metadata', requireRole("admin"), upload.single('file'), async (req: any, res) => {
+  app.post('/api/admin/extract-metadata', requireRole("admin"), uploadSinglePdf, async (req: any, res) => {
     let safeFilePath: string | undefined;
     try {
       if (!req.file) {
@@ -1123,7 +1126,7 @@ Format your response in clear, professional markdown.`;
             html,
           },
           "[Restrict]",
-        );
+        ).catch((err) => logger.error({ err }, "[Restrict] email dispatch failed"));
       }
 
       res.json({
@@ -1184,7 +1187,7 @@ Format your response in clear, professional markdown.`;
             html,
           },
           "[Limit]",
-        );
+        ).catch((err) => logger.error({ err }, "[Limit] email dispatch failed"));
       }
 
       res.json({
@@ -1249,7 +1252,7 @@ Format your response in clear, professional markdown.`;
               html,
             },
             "[CoS Approval]",
-          );
+          ).catch((err) => logger.error({ err }, "[Email] email dispatch failed"));
         }
       }
 
@@ -1352,7 +1355,7 @@ Format your response in clear, professional markdown.`;
             html,
           },
           "[COS Subscription]",
-        );
+        ).catch((err) => logger.error({ err }, "[Email] email dispatch failed"));
       }
 
       res.json({
@@ -1412,7 +1415,7 @@ Format your response in clear, professional markdown.`;
               html,
             },
             "[COS Beta]",
-          );
+          ).catch((err) => logger.error({ err }, "[Email] email dispatch failed"));
         }
       }
 
@@ -1442,7 +1445,8 @@ Format your response in clear, professional markdown.`;
       await storage.deleteUser(userId);
 
       await db.execute(
-        sql`DELETE FROM sessions WHERE sess->'passport'->'user'->>'id' = ${userId}`
+        // serializeUser stores the id as a plain string; legacy sessions stored an object with an id.
+        sql`DELETE FROM sessions WHERE sess->'passport'->>'user' = ${userId} OR sess->'passport'->'user'->>'id' = ${userId}`
       );
 
       res.json({ message: 'User deleted successfully', userId });
@@ -1628,7 +1632,7 @@ Format your response in clear, professional markdown.`;
     }
   });
 
-  app.post('/api/paid/create-checkout', isAuthenticated, async (req, res) => {
+  app.post('/api/paid/create-checkout', isAuthenticated, paidCheckoutLimiter, async (req, res) => {
     try {
       const { packageType } = req.body;
 
@@ -1664,8 +1668,8 @@ Format your response in clear, professional markdown.`;
           },
         ],
         mode: 'payment',
-        success_url: `${req.headers.origin}/submit?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${req.headers.origin}/pricing`,
+        success_url: `${getRedirectBaseUrl(req)}/submit?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${getRedirectBaseUrl(req)}/pricing`,
         metadata: {
           packageType,
         },
@@ -1693,10 +1697,16 @@ Format your response in clear, professional markdown.`;
     }
   });
 
-  app.get('/api/paid/submission/:sessionId', isAuthenticated, async (req, res) => {
+  app.get('/api/paid/submission/:sessionId', isAuthenticated, async (req: any, res) => {
     try {
       const { sessionId } = req.params;
-      const submission = await storage.getPaidSubmissionBySessionId(sessionId);
+      const currentUserId: string | undefined = req.user?.id;
+      if (!currentUserId) {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
+
+      // Owner predicate is part of the SQL: another user's session id behaves exactly like an unknown one.
+      const submission = await storage.getPaidSubmissionBySessionIdForUser(sessionId, currentUserId);
 
       if (!submission) {
         return res.status(404).json({ message: 'Submission not found' });
@@ -1709,94 +1719,120 @@ Format your response in clear, professional markdown.`;
       const session = await stripeInstance.checkout.sessions.retrieve(sessionId);
 
       if (session.payment_status === 'paid' && submission.paymentStatus !== 'paid') {
-        await storage.updatePaidSubmission(submission.id, {
+        await storage.updatePaidSubmissionForUser(submission.id, currentUserId, {
           paymentStatus: 'paid',
           email: session.customer_details?.email || '',
         });
       }
 
-      const updatedSubmission = await storage.getPaidSubmissionBySessionId(sessionId);
-      res.json(updatedSubmission);
+      const updatedSubmission = await storage.getPaidSubmissionBySessionIdForUser(sessionId, currentUserId);
+      if (!updatedSubmission) {
+        return res.status(404).json({ message: 'Submission not found' });
+      }
+      res.json(toOwnerSubmissionView(updatedSubmission));
     } catch (error: unknown) {
       logger.error({ err: error }, 'Get submission error:');
       res.status(500).json({ message: 'Failed to get submission' });
     }
   });
 
-  app.post('/api/paid/submit/:submissionId', upload.fields([
-    { name: 'cosDocument', maxCount: 1 },
-    { name: 'supportingDocuments', maxCount: 5 },
-  ]), isAuthenticated, async (req: any, res) => {
+  // Authentication runs BEFORE multer so anonymous requests can never write files to disk.
+  app.post('/api/paid/submit/:submissionId', isAuthenticated, paidSubmitLimiter, uploadPaidDocs, async (req: any, res) => {
+    // Files are kept only once the submission has been accepted; every other exit removes them.
+    let accepted = false;
     try {
-      const submissionId = parseInt(req.params.submissionId);
-      const submission = await storage.getPaidSubmission(submissionId);
-
-      if (!submission) {
-        return res.status(404).json({ message: 'Submission not found' });
-      }
-
-      const currentUserId = (req as any).user?.id;
+      const currentUserId: string | undefined = req.user?.id;
       if (!currentUserId) {
         return res.status(401).json({ message: 'Unauthorized' });
       }
 
-      if (submission.userId !== currentUserId) {
-        return res.status(403).json({ message: 'Forbidden' });
+      const submissionId = parseSubmissionId(req.params.submissionId);
+      if (submissionId === null) {
+        return res.status(404).json({ message: 'Submission not found' });
+      }
+
+      // Owner-scoped lookup: non-owner and nonexistent are indistinguishable (404).
+      const submission = await storage.getPaidSubmissionForUser(submissionId, currentUserId);
+
+      if (!submission) {
+        return res.status(404).json({ message: 'Submission not found' });
       }
 
       if (submission.paymentStatus !== 'paid') {
         return res.status(400).json({ message: 'Payment not completed' });
       }
 
-      const {
-        howApplied,
-        emailsReceived,
-        confirmationDetails,
-        employerName,
-        jobTitle,
-        cosReferenceNumber,
-        additionalNotes,
-      } = req.body;
+      // Real file signatures (not the client's MIME header) must match each file's extension.
+      try {
+        await verifyUploadedFiles(req, UPLOAD_PROFILES.paidDocs);
+      } catch (err) {
+        if (err instanceof ApiError) return res.status(err.statusCode).json({ message: err.message });
+        throw err;
+      }
 
-      const cosDocumentPath = req.files?.cosDocument?.[0]?.path || null;
-      const supportingDocumentsPath = req.files?.supportingDocuments?.map((f: any) => f.path) || [];
+      // Text answers must be plain strings within a sane length (no arrays/objects from qs/JSON).
+      const textFields = [
+        'howApplied', 'emailsReceived', 'confirmationDetails', 'employerName',
+        'jobTitle', 'cosReferenceNumber', 'additionalNotes',
+      ] as const;
+      const text: Partial<Record<(typeof textFields)[number], string>> = {};
+      for (const key of textFields) {
+        const value = req.body?.[key];
+        if (value === undefined) continue;
+        if (typeof value !== 'string' || value.length > 10_000) {
+          return res.status(400).json({ message: `Invalid value for ${key}` });
+        }
+        text[key] = value;
+      }
 
-      await storage.updatePaidSubmission(submissionId, {
-        howApplied,
-        emailsReceived,
-        confirmationDetails,
-        employerName,
-        jobTitle,
-        cosReferenceNumber,
-        additionalNotes,
-        cosDocumentPath,
-        supportingDocumentsPath,
+      const newCosPath: string | undefined = req.files?.cosDocument?.[0]?.path;
+      const newSupportingPaths: string[] | undefined = req.files?.supportingDocuments?.length
+        ? req.files.supportingDocuments.map((f: any) => f.path)
+        : undefined;
+
+      const updated = await storage.updatePaidSubmissionForUser(submissionId, currentUserId, {
+        ...text,
+        // Only replace stored documents when new ones were uploaded.
+        ...(newCosPath ? { cosDocumentPath: newCosPath } : {}),
+        ...(newSupportingPaths ? { supportingDocumentsPath: newSupportingPaths } : {}),
         reviewStatus: 'pending',
       });
+      if (!updated) {
+        return res.status(404).json({ message: 'Submission not found' });
+      }
+      accepted = true;
+
+      // Documents superseded by this resubmission are deleted so they do not accumulate on disk.
+      await removeStoredUploads([
+        ...(newCosPath ? [submission.cosDocumentPath] : []),
+        ...(newSupportingPaths && Array.isArray(submission.supportingDocumentsPath) ? (submission.supportingDocumentsPath as string[]) : []),
+      ]);
 
       res.json({ message: 'Submission received successfully', submissionId });
     } catch (error: unknown) {
       logger.error({ err: error }, 'Submit error:');
       res.status(500).json({ message: 'Failed to submit' });
+    } finally {
+      if (!accepted) await removeUploadedFiles(req);
     }
   });
 
-  app.get('/api/paid/status/:submissionId', isAuthenticated, async (req, res) => {
+  app.get('/api/paid/status/:submissionId', isAuthenticated, async (req: any, res) => {
     try {
-      const submissionId = parseInt(req.params.submissionId);
-      const submission = await storage.getPaidSubmission(submissionId);
-
-      if (!submission) {
-        return res.status(404).json({ message: 'Submission not found' });
-      }
-
-      const currentUserId = (req as any).user?.id;
+      const currentUserId: string | undefined = req.user?.id;
       if (!currentUserId) {
         return res.status(401).json({ message: 'Unauthorized' });
       }
 
-      if (submission.userId !== currentUserId) {
-        return res.status(403).json({ message: 'Forbidden' });
+      const submissionId = parseSubmissionId(req.params.submissionId);
+      if (submissionId === null) {
+        return res.status(404).json({ message: 'Submission not found' });
+      }
+
+      const submission = await storage.getPaidSubmissionForUser(submissionId, currentUserId);
+
+      if (!submission) {
+        return res.status(404).json({ message: 'Submission not found' });
       }
 
       res.json({
@@ -2317,7 +2353,7 @@ Format your response in clear, professional markdown.`;
             html,
           },
           '[SponsorMonitorPlan]',
-        );
+        ).catch((err) => logger.error({ err }, "[SponsorMonitorPlan] email dispatch failed"));
       }
 
       res.json({

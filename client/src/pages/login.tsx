@@ -12,6 +12,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import logoImg from "@assets/logo_material.png";
 import { queryClient, getQueryFn } from "@/lib/queryClient";
 import { isPaidTier } from "@shared/planTiers";
+import { safeRedirectPath } from "@shared/safeRedirect";
 import BrandLogo from "@/components/BrandLogo";
 import GoogleLoginButton from "@/components/GoogleLoginButton";
 import { Turnstile } from "@marsidev/react-turnstile";
@@ -225,7 +226,8 @@ export default function LoginPage() {
       const redirectTo = params.get("redirect");
 
       // Fetch fresh user data to determine plan-based redirect
-      let destination = redirectTo && redirectTo.startsWith("/") ? redirectTo : null;
+      // Only same-origin relative paths are honoured (rejects //host, /\host, encoded variants, schemes).
+      let destination = safeRedirectPath(redirectTo);
       if (!destination) {
         try {
           const userData = await queryClient.fetchQuery<any>({
