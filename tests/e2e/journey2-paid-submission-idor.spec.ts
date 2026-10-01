@@ -3,7 +3,8 @@ import { loginWithPassword } from "./support/auth";
 import { cleanupE2EData, E2E_USERS, seedE2EData } from "./support/db-seed";
 
 function isAccessDeniedStatus(status: number): boolean {
-  return status === 403 || [301, 302, 303, 307, 308].includes(status);
+  // 404 is the deliberate non-enumerating response: another user's id looks like an unknown id.
+  return status === 403 || status === 404 || [301, 302, 303, 307, 308].includes(status);
 }
 
 test.describe("Journey 2 — Paid submission IDOR protection", () => {

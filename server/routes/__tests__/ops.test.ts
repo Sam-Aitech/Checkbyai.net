@@ -90,6 +90,11 @@ vi.mock("../../middleware/rateLimiter", () => ({
 vi.mock("../../utils/callbackSigner", () => ({
   isSafeCallbackUrl: async (url: string) => !url.includes("localhost"),
   signPayload: (_payload: string, _secret: string) => "sha256=test",
+  signPayloadWithTimestamp: (_payload: string, _secret: string, _ts: number) => "sha256=test-v2",
+}));
+
+vi.mock("../../security/outboundPolicy", () => ({
+  safeOutboundRequest: vi.fn(async () => ({ status: 200, headers: {}, body: "", truncated: false })),
 }));
 
 vi.mock("../../utils/jobTelemetry", () => ({

@@ -232,7 +232,12 @@ The `processed_checkouts` table has a unique constraint on `stripeSessionId`. An
 |---|---|---|
 | `POST /api/auth/login` | 10 req/15min per IP | Brute force protection |
 | `POST /api/auth/*/send-otp` | 5 req/15min per IP | OTP flooding / SMS cost abuse |
-| `POST /api/auth/*/verify-otp` | 5 req/15min per IP | OTP brute force |
+| `POST /api/auth/email/verify-otp`, `/admin/verify-otp` | 5 req/15min per IP, 20 req/15min per canonical email, plus 5 wrong guesses per code | OTP brute force across IPs |
+| `POST /api/auth/admin/*` | Separate buckets from the user OTP flow | Admin and user flows cannot starve or mask each other |
+| `PUT /api/notification-preferences`, `/verify-phone`, `/confirm-phone` | 20 / 10 req per 15min per user | Webhook URL validation and SMS cost abuse |
+| `POST /api/paid/create-checkout`, `/api/paid/submit/:id` | 10 req/15min, 20 req/1hr per user | Stripe session spam, upload abuse |
+| `/api/checkout/*`, `/api/billing/portal` | 30 req/15min per user | Stripe API abuse |
+| `GET /api/sponsors/export.csv` | 5 req/1hr per IP | Full-table scan cost |
 | `POST /api/verify` | 10 req/1hr per IP | AI inference cost protection |
 | `GET /api/sponsors/free-search` (+ `historical-search`, one shared bucket) | 1 req/day per IP (IP-only key; validation 400s don't count) | Sponsor data scraping prevention |
 | Notification dispatch | 10 notifications/user/24h | Notification spam prevention |
@@ -322,3 +327,53 @@ AI_INTEGRATIONS_*_API_KEY — AI analysis (OpenAI → Anthropic → OpenRouter c
 | MEDIUM | Content-Security-Policy nonce for inline scripts | Not implemented |
 | LOW | Rotate `PHONE_ENCRYPTION_KEY` migration path | Not documented |
 | LOW | Audit log for admin actions | Partial — HITL feedback logged; other admin actions not |
+
+---
+
+## 12. Audit remediation (2026-10)
+
+Controls added after the external security audit. Every item is covered by automated tests.
+
+### Outbound requests (SSRF)
+- One policy for every user- or admin-influenced URL: `server/security/outboundPolicy.ts` (classifier in `ipClassifier.ts`). Do not call `fetch` on such URLs.
+- HTTPS and port 443 only, no embedded credentials, exact-host allowlist when `OUTBOUND_ALLOWED_HOSTS` is set.
+- A and AAAA are resolved and **every** address must be public. Blocked: loopback, unspecified, RFC 1918, link-local and cloud metadata (`169.254.0.0/16`, `fd00:ec2::254`), carrier-grade NAT, multicast, broadcast, unique-local, IPv4-mapped, NAT64 and 6to4 wrappers.
+- The connection is pinned to the validated address list through a custom `lookup`, so there is no second DNS resolution between check and connect (DNS rebinding). TLS verification and SNI stay on the original hostname.
+- Redirects are never followed. Timeouts and a response-size cap apply. Retries re-run the full validation. `Retry-After` is clamped to 30s.
+- Blocked requests are logged with reason and host only, never the path, query, headers or body.
+- Job callbacks gain `X-Checkbyai-Timestamp` and `X-Checkbyai-Signature-V2` (HMAC over `timestamp.body`); the original signature header is unchanged. Webhooks gain `X-CheckByAI-Signature-V2` likewise. Receivers should reject timestamps older than a few minutes.
+- **Infrastructure gap:** `docker-compose.yml` cannot express egress filtering and publishes the Postgres and Redis ports. In production, restrict outbound traffic at the network layer (deny RFC 1918, link-local and metadata ranges) and do not publish those ports. The application check does not replace this.
+
+### Object-level authorization
+- User-facing paid-submission reads and writes use `getPaidSubmissionForUser`, `getPaidSubmissionBySessionIdForUser` and `updatePaidSubmissionForUser`, which constrain by id **and** owner in SQL. Another user's id, a nonexistent id and an ownerless row are indistinguishable (404).
+- The unscoped repository methods are for admin and system code only.
+- `GET /api/verify/status/:jobId` takes the owner from server-side job data, never from the job id string.
+- The tenancy model is per-user; there is no organisation model.
+
+### Uploads
+- `server/utils/uploadPolicy.ts`: extension plus declared-MIME allowlist per use case, real signature check (`%PDF-`, JPEG, PNG), double-extension and traversal rejection, size/count/field limits, random on-disk names inside `UPLOADS_DIR`, temp files removed on every exit path, errors mapped to 400/413/415.
+- Authentication runs before multer. `/uploads/*` is never served.
+- **Not implemented:** malware scanning and quarantine (no scanner exists in this repo). Safest next step: a ClamAV sidecar scanning files before they are moved out of the scratch directory.
+
+### Email OTP
+- Codes are 6 CSPRNG digits, 10-minute, single-use, stored only as an HMAC bound to the address and flow (`user` or `admin`). A code issued for one flow or address verifies nowhere else.
+- Unknown account, wrong code, expired code, exhausted attempts and non-admin addresses all return the same `400 Invalid or expired verification code`. Admin send returns the same response for every address and dispatches the email in the background.
+- Five wrong guesses per account invalidate the code, whatever the source IP.
+- `register` still answers `409 User already exists`. That is a product decision outstanding (enumeration trade-off against sign-up UX).
+- API responses never include `hashedPassword`, `verificationCode` or `codeExpiry`.
+
+### Sessions
+- The session id is regenerated before the identity is attached on password login, registration, OTP verify, Google callback and admin elevation (`server/utils/sessionSecurity.ts`). Admin login revokes the account's other sessions. Logout destroys the stored session and expires the cookie.
+- Cookie `connect.sid`: HttpOnly, SameSite=Lax, Path=/, host-only, Secure in production. The name is shared with the Socket.IO gateway, so a `__Host-` prefix needs a coordinated change.
+
+### Content-Security-Policy
+- Production: no `unsafe-inline` or `unsafe-eval` in `script-src`; inline `<style>` blocks are allowed by SHA-256 hash computed at boot from the built HTML; `style-src-attr 'unsafe-inline'` remains for style attributes in server-rendered and static markup (attributes cannot run script). `img-src` allows only self, data and `*.googleusercontent.com`. Turnstile and the Sentry ingest host are the only third-party origins. `object-src 'none'`, `base-uri`, `form-action` and `frame-ancestors` are locked down.
+- Stripe is reached by navigation, so no Stripe origins are allowed.
+
+### Redirects
+- Return URLs go through `shared/safeRedirect.ts` (single leading slash only; rejects `//`, backslashes, control characters, encoded variants, schemes and credentials). Stripe success, cancel and return URLs use `APP_URL` (or the canonical origin) in production, never the `Host` or `Origin` header. The `www` redirect only targets the canonical origin.
+
+### Receipts, exports, rate limits
+- Receipts carry an HMAC `signature` over the canonical stored record (key derived from `DIGEST_SIGNING_KEY`); `GET /api/receipt/:id/verify?signature=` checks one. Receipt ids remain public capability URLs by design. The legacy `integrityHash` is unkeyed and not tamper-proof.
+- CSV exports neutralise cells starting (after whitespace) with `=`, `+`, `-`, `@`, tab or CR (`server/utils/csvSafe.ts`).
+- All limiters come from one factory (`createLimiter`) and now use Redis through a store resolved lazily. Previously they were constructed before Redis connected and silently used per-process memory. Keys are canonical (case, Unicode form, `+tag` and Gmail dots collapsed for email keys). Set `TRUST_PROXY_HOPS` to the real proxy topology.
