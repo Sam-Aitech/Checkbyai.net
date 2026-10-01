@@ -82,7 +82,7 @@ export function parseIpv6(input: string): number[] | null {
   if (halves.length === 2) {
     const missing = 8 - head.length - rest.length;
     if (missing < 1) return null;
-    groups = [...head, ...Array(missing).fill("0"), ...rest];
+    groups = [...head, ...new Array<string>(missing).fill("0"), ...rest];
   } else {
     groups = head;
   }
@@ -90,7 +90,7 @@ export function parseIpv6(input: string): number[] | null {
   const out: number[] = [];
   for (const g of groups) {
     if (!/^[0-9a-f]{1,4}$/.test(g)) return null;
-    out.push(parseInt(g, 16));
+    out.push(Number.parseInt(g, 16));
   }
   return out;
 }

@@ -19,7 +19,7 @@ export function neutraliseFormula(value: string): string {
 
 export function csvCell(raw: unknown): string {
   if (raw === null || raw === undefined) return "";
-  const value = neutraliseFormula(String(raw));
+  const value = neutraliseFormula(typeof raw === "string" ? raw : JSON.stringify(raw) ?? "");
   if (value === "") return "";
   if (/[",\r\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
   return value;

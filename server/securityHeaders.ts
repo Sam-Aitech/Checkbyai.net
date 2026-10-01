@@ -43,7 +43,7 @@ export function collectInlineStyleHashes(rootDir: string): string[] {
     }
   };
   walk(rootDir);
-  return [...hashes].sort();
+  return [...hashes].sort((a, b) => a.localeCompare(b));
 }
 
 /** https origins from CSP_CONNECT_SRC plus the Sentry DSN host, de-duplicated and validated. */
@@ -61,7 +61,7 @@ export function resolveConnectSrcExtra(env: NodeJS.ProcessEnv = process.env): st
       // ignore malformed values rather than widening the policy
     }
   }
-  return [...origins].sort();
+  return [...origins].sort((a, b) => a.localeCompare(b));
 }
 
 // Replit's development Preview renders the app in an iframe. Keep

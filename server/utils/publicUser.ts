@@ -9,10 +9,9 @@ export function toPublicUser<T extends Partial<User>>(user: T): Omit<T, (typeof 
 export function toPublicUser<T extends Partial<User>>(user: T | undefined | null): Omit<T, (typeof SECRET_USER_FIELDS)[number]> | undefined;
 export function toPublicUser<T extends Partial<User>>(user: T | undefined | null) {
   if (!user) return undefined;
-  // Explicit destructuring (not dynamic key deletion) so the secret fields are named and typed.
-  const { hashedPassword, verificationCode, codeExpiry, ...rest } = user;
-  void hashedPassword;
-  void verificationCode;
-  void codeExpiry;
-  return rest as Omit<T, (typeof SECRET_USER_FIELDS)[number]>;
+  const secret = new Set<string>(SECRET_USER_FIELDS);
+  return Object.fromEntries(Object.entries(user).filter(([key]) => !secret.has(key))) as Omit<
+    T,
+    (typeof SECRET_USER_FIELDS)[number]
+  >;
 }

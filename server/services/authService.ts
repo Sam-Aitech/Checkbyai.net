@@ -5,8 +5,13 @@ import { logger } from "../utils/logger";
 import { ApiError } from "../lib/apiError";
 import { GENERIC_OTP_FAILURE, OTP_TTL_MS, checkOtp, generateOtpCode, hashOtpCode, resetOtpAttempts } from "./emailOtp";
 
-// Fixed hash compared against when an account is missing, so login takes the same time either way.
-const DUMMY_PASSWORD_HASH = "$2b$10$CwTycUXWue0Thq9StjUM0uJ8y3o3o8mWmQ5nJ0m2i0b6G8mV8b0Ke";
+// Hash of a random value, created once on first use. Compared against when an account is missing so
+// login takes the same time either way. Never a literal in source, and it matches nothing a user can type.
+let dummyPasswordHash: Promise<string> | undefined;
+function getDummyPasswordHash(): Promise<string> {
+  dummyPasswordHash ??= bcrypt.hash(crypto.randomBytes(32).toString("hex"), 10);
+  return dummyPasswordHash;
+}
 
 export class AuthService {
   generateOTP(): string {
@@ -101,8 +106,8 @@ export class AuthService {
   async loginWithPassword(email: string, password: string): Promise<void> {
     const user = await storage.getUserByEmail(email);
     // Always run one bcrypt comparison so a missing account is not faster than a wrong password.
-    const passwordMatch = await bcrypt.compare(password, user?.hashedPassword || DUMMY_PASSWORD_HASH);
-    if (!user || !user.hashedPassword || !passwordMatch) {
+    const passwordMatch = await bcrypt.compare(password, user?.hashedPassword || (await getDummyPasswordHash()));
+    if (!user?.hashedPassword || !passwordMatch) {
       throw new ApiError(401, "Invalid email or password");
     }
   }

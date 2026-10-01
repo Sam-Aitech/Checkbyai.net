@@ -1,5 +1,5 @@
-import * as fs from "fs";
-import * as path from "path";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import multer from "multer";
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 import { ApiError } from "../lib/apiError";
@@ -228,14 +228,19 @@ export function mapUploadError(err: unknown): unknown {
   return err;
 }
 
+function describeUploadError(err: unknown): string {
+  if (err instanceof multer.MulterError) return err.code;
+  if (err instanceof Error) return err.message;
+  return "unknown";
+}
+
 /** Wraps a multer middleware so its errors are mapped and never become 500s. */
 export function guardedUpload(middleware: RequestHandler): RequestHandler {
   return (req: Request, res: Response, next: NextFunction) => {
     middleware(req, res, (err?: unknown) => {
       if (err) {
-        const reason = err instanceof multer.MulterError ? err.code : err instanceof Error ? err.message : "unknown";
-        logger.warn({ reason, route: req.path }, "Upload rejected");
-        void removeUploadedFiles(req);
+        logger.warn({ reason: describeUploadError(err), route: req.path }, "Upload rejected");
+        removeUploadedFiles(req).catch(() => undefined);
         return next(mapUploadError(err));
       }
       next();

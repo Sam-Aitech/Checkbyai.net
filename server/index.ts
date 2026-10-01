@@ -632,4 +632,8 @@ async function applyDataFixbacks() {
     };
     process.on("SIGTERM", gracefulShutdown);
     process.on("SIGINT", gracefulShutdown);
-})();
+})().catch((err) => {
+  // Same outcome as the previous unhandled rejection (process exits), but logged explicitly.
+  logger.fatal({ err }, "[Startup] Fatal error during startup");
+  process.exit(1);
+});

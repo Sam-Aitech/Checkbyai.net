@@ -35,10 +35,15 @@ function regenerate(req: Request): Promise<void> {
   });
 }
 
+/** Promise rejections must carry an Error, whatever the callback API hands back. */
+function asError(err: unknown): Error {
+  return err instanceof Error ? err : new Error(String(err));
+}
+
 function login(req: Request, user: Express.User): Promise<void> {
   return new Promise((resolve, reject) => {
     // keepSessionInfo is irrelevant here: the session was regenerated just above and is empty.
-    req.login(user, { session: true, keepSessionInfo: true }, (err: unknown) => (err ? reject(err) : resolve()));
+    req.login(user, { session: true, keepSessionInfo: true }, (err: unknown) => (err ? reject(asError(err)) : resolve()));
   });
 }
 
@@ -59,7 +64,7 @@ export async function establishAuthenticatedSession(req: Request, user: Express.
 /** Logout: drop the identity, destroy the stored session and expire the cookie. */
 export async function endSession(req: Request, res: Response): Promise<void> {
   await new Promise<void>((resolve, reject) => {
-    req.logout((err: unknown) => (err ? reject(err) : resolve()));
+    req.logout((err: unknown) => (err ? reject(asError(err)) : resolve()));
   });
   await new Promise<void>((resolve) => {
     if (!req.session) return resolve();

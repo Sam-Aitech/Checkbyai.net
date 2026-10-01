@@ -55,9 +55,15 @@ function ResultBadge({ result }: { result: ReceiptData['result'] }) {
 function CopyButton({ value, label }: Readonly<{ value: string; label: string }>) {
   const [copied, setCopied] = useState(false);
   const copy = () => {
-    navigator.clipboard.writeText(value);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    navigator.clipboard.writeText(value).then(
+      () => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      },
+      () => {
+        // Clipboard access denied (permissions or insecure context): leave the button state unchanged.
+      },
+    );
   };
   return (
     <button

@@ -1126,7 +1126,7 @@ Format your response in clear, professional markdown.`;
             html,
           },
           "[Restrict]",
-        );
+        ).catch((err) => logger.error({ err }, "[Restrict] email dispatch failed"));
       }
 
       res.json({
@@ -1187,7 +1187,7 @@ Format your response in clear, professional markdown.`;
             html,
           },
           "[Limit]",
-        );
+        ).catch((err) => logger.error({ err }, "[Limit] email dispatch failed"));
       }
 
       res.json({
@@ -1252,7 +1252,7 @@ Format your response in clear, professional markdown.`;
               html,
             },
             "[CoS Approval]",
-          );
+          ).catch((err) => logger.error({ err }, "[Email] email dispatch failed"));
         }
       }
 
@@ -1355,7 +1355,7 @@ Format your response in clear, professional markdown.`;
             html,
           },
           "[COS Subscription]",
-        );
+        ).catch((err) => logger.error({ err }, "[Email] email dispatch failed"));
       }
 
       res.json({
@@ -1415,7 +1415,7 @@ Format your response in clear, professional markdown.`;
               html,
             },
             "[COS Beta]",
-          );
+          ).catch((err) => logger.error({ err }, "[Email] email dispatch failed"));
         }
       }
 
@@ -2353,7 +2353,7 @@ Format your response in clear, professional markdown.`;
             html,
           },
           '[SponsorMonitorPlan]',
-        );
+        ).catch((err) => logger.error({ err }, "[SponsorMonitorPlan] email dispatch failed"));
       }
 
       res.json({
