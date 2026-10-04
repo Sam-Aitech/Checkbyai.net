@@ -96,7 +96,7 @@
     "drizzle-zod": "0.7.1",
     "embla-carousel-react": "^8.6.0",
     "esbuild": "^0.28.2",
-    "express": "^4.21.2",
+    "express": "^5.2.1",
     "express-rate-limit": "^8.7.0",
     "express-session": "^1.19.0",
     "fast-xml-parser": "^5.11.1",
@@ -162,7 +162,7 @@
   "devDependencies": {
     "@playwright/test": "^1.63.0",
     "@types/connect-pg-simple": "^7.0.3",
-    "@types/express": "^4.17.25",
+    "@types/express": "^5.0.6",
     "@types/express-session": "^1.19.0",
     "@types/node": "^26.6.3",
     "@types/passport": "^1.0.17",
